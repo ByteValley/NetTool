@@ -1,0 +1,117 @@
+# 最右IP替换
+HOST-SUFFIX,izuiyou.com,proxy
+host-suffix, ixiaochuan.cn, proxy
+
+# 抖音IP替换
+HOST-SUFFIX,amemv.com,proxy
+HOST-SUFFIX,snssdk.com,proxy
+
+# ======= 哔哩哔哩 ======= #
+HOST-SUFFIX,biliapi.net,proxy
+HOST-SUFFIX,biliapi.com,proxy 
+HOST,api.bilibili.com,proxy 
+HOST,api.bilibili.tv,proxy 
+HOST,app.bilibili.com,proxy 
+HOST,api.live.bilibili.com,proxy 
+HOST,api.vc.bilibili.com,proxy 
+HOST,passport.bilibili.com,proxy 
+HOST,live-trace.bilibili.com,proxy 
+HOST,message.bilibili.com,proxy 
+HOST,cm.bilibili.com,proxy 
+HOST-SUFFIX,bilibili.com,proxy 
+HOST-SUFFIX,im9.com,proxy 
+HOST-SUFFIX,acg.tv,proxy 
+HOST-SUFFIX,biligame.com,proxy
+
+# ======= 微博 ======= #
+HOST,api.weibo.cn,proxy
+HOST,api.weibo.com,proxy 
+HOST-SUFFIX,weibocdn.com,proxy 
+HOST-KEYWORD,weibo,proxy 
+
+# ======= 百度贴吧 ======= #
+HOST,tieba.baidu.com,proxy 
+HOST,tbmsg.baidu.com,proxy 
+HOST,tb5.bdstatic.com,proxy 
+HOST,fclog.baidu.com,proxy 
+HOST,gsp0.baidu.com,proxy
+HOST,hm.baidu.com,proxy 
+HOST,www.baidu.com,proxy
+ 
+# ======= 微信 ======= #
+# HOST,szshort.weixin.qq.com,direct
+# HOST,szextshort.weixin.qq.com,direct
+# HOST,szminorshort.weixin.qq.com,direct
+# HOST,mp.weixin.qq.com,direct 
+# HOST-SUFFIX,wxsnsdy.wxs.qq.com,direct
+
+# ======= 知乎 ======= #
+HOST-SUFFIX,zhihu.com,proxy
+HOST-SUFFIX,zhimg.com,proxy
+IP-CIDR,103.41.167.226/32,proxy
+IP-CIDR,103.41.167.234/31,proxy
+IP-CIDR,103.41.167.236/32,proxy
+IP-CIDR,118.89.204.198/32,proxy
+IP6-CIDR,2402:4e00:1200:ed00:0:9089:6dac:96b6/128,proxy
+
+IP-CIDR,103.41.167.0/24,proxy
+
+# ======= 国家反诈中心 ======= #
+HOST-SUFFIX,gjfzpt.cn,REJECT 
+
+# ======= 抖音 ======= #
+# 请求域名过多，建议全局代理
+HOST-KEYWORD,core-c-lq,proxy
+HOST-KEYWORD,core-lq,proxy
+HOST-KEYWORD,normal-c-lq,proxy
+HOST-KEYWORD,normal-lq,proxy
+HOST-KEYWORD,search-quic-lq,proxy
+HOST-KEYWORD,search-lq,proxy
+
+# ======= 头条 ======= #
+HOST-SUFFIX,toutiaoapi.com,proxy
+
+# ======= 快手 ======= #
+HOST-SUFFIX,gifshow.com,proxy
+HOST-SUFFIX,ksapisrv.com,proxy
+
+# ======= 小红书 ======= #
+HOST-SUFFIX,xiaohongshu.com,proxy
+
+# ======= 其乐论坛 ======= #
+HOST,keylol.com,proxy
+
+# ======= 西瓜视频 ======= #
+HOST-SUFFIX,ixigua.com,proxy
+
+# ======= 文叔叔 ======= #
+HOST,www.wenshushu.cn,proxy
+
+# ======= 酷安 ======= #
+HOST,api.coolapk.com,proxy
+
+# ======= 豆瓣 ======= #
+# iOS客户端，目前无法可靠地处理iOS端的请求，建议全局代理
+IP-CIDR,119.29.29.98/32,REJECT
+HOST,frodo.douban.com,proxy
+# 网页端
+HOST,www.douban.com,proxy
+
+# ======= TapTap ======= #
+HOST,api.taptapdada.com,proxy
+
+# ======= 网易大神 ======= #
+HOST,god.gameyw.netease.com,proxy
+
+# ======= 虎牙 ======= #
+HOST-SUFFIX,huya.com,proxy
+
+# ======= 懂球帝 ======= #
+HOST-SUFFIX,dongqiudi.com,proxy
+
+# ======= NGA ======= #
+# 个人主页ip，开代理以后发一个评论就会变代理ip
+HOST,ngabbs.com,proxy
+
+# ======= 小米社区 ======= #
+HOST-SUFFIX,vip.miui.com,proxy
