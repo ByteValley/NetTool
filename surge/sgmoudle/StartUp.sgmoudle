@@ -1,4 +1,5 @@
-
+#!name=去开屏广告
+#!desc=去启动页广告
 
 [Script]
 12306 = type=http-response,pattern=^https?:\/\/ad\.12306\.cn\/ad\/ser\/getAdList,requires-body=1,max-size=0,script-path=https://github.com/ddgksf2013/Scripts/raw/master/12306.js
