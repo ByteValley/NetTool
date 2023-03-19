@@ -1,0 +1,7 @@
+
+
+[Script]
+http-request ^http[s]?:\/\/.+\/api(\/video\/report_item?|\/live\/room\/detail?|\/video\/related?|\/video\/detail|\/social\/posts_info).*$ script-path=https://raw.githubusercontent.com/gjwj666/qx/main/Baoyu.js, requires-body=false, tag=Baoyu
+
+[MITM]
+hostname = *1*, 42.157.*.*
