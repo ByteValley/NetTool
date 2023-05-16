@@ -1,0 +1,138 @@
+################################################################
+# 针对部分网站显示IP归属地的QuantumultX分流规则
+# 原项目地址：https://github.com/lwd-temp/anti-ip-attribution
+# 欢迎提issues或私信bot,贡献应用新的api地址
+# https://t.me/ddgksf2021
+# 更新时间：2022-08-23
+###############################################################
+
+# ======= 哔哩哔哩 ======= #
+DOMAIN-SUFFIX,biliapi.net,proxy
+DOMAIN-SUFFIX,biliapi.com,proxy 
+DOMAIN,api.bilibili.com,proxy 
+DOMAIN,api.bilibili.tv,proxy
+DOMAIN,app.bilibili.com,proxy 
+DOMAIN,api.live.bilibili.com,proxy 
+DOMAIN,api.vc.bilibili.com,proxy 
+DOMAIN,passport.bilibili.com,proxy 
+DOMAIN,live-trace.bilibili.com,proxy
+DOMAIN,message.bilibili.com,proxy
+DOMAIN,cm.bilibili.com,proxy
+DOMAIN-SUFFIX,bilibili.com,proxy
+DOMAIN-SUFFIX,im9.com,proxy
+DOMAIN-SUFFIX,acg.tv,proxy
+DOMAIN-SUFFIX,biligame.com,proxy
+
+# ======= 微博 ======= #
+DOMAIN,api.weibo.cn,proxy
+DOMAIN,api.weibo.com,proxy
+DOMAIN-SUFFIX,weibocdn.com,proxy
+DOMAIN-KEYWORD,weibo,proxy
+
+# ======= 百度贴吧 ======= #
+DOMAIN,tieba.baidu.com,proxy
+DOMAIN,tbmsg.baidu.com,proxy
+DOMAIN,tb5.bdstatic.com,proxy
+DOMAIN,fclog.baidu.com,proxy
+DOMAIN,gsp0.baidu.com,proxy
+DOMAIN,hm.baidu.com,proxy
+DOMAIN,www.baidu.com,proxy
+ 
+# ======= 微信 ======= #
+# DOMAIN,szshort.weixin.qq.com,proxy
+# DOMAIN,szextshort.weixin.qq.com,proxy
+# DOMAIN,szminorshort.weixin.qq.com,proxy
+# DOMAIN,mp.weixin.qq.com,proxy
+
+# ======= 知乎 ======= #
+#DOMAIN,zhihu-web-analytics.zhihu.com,proxy
+#DOMAIN,www.zhihu.com,proxy
+#DOMAIN,api.zhihu.com,proxy
+DOMAIN-SUFFIX,zhihu.com,proxy
+IP-CIDR,103.41.167.0/24,proxy
+
+# ======= 国家反诈中心 ======= #
+DOMAIN-SUFFIX,gjfzpt.cn,REJECT 
+
+# ======= 抖音 ======= #
+# 请求域名过多，建议全局代理
+DOMAIN-KEYWORD,core-c-lq,proxy
+DOMAIN-KEYWORD,core-lq,proxy
+DOMAIN-KEYWORD,normal-c-lq,proxy
+DOMAIN-KEYWORD,normal-lq,proxy
+DOMAIN-KEYWORD,search-quic-lq,proxy
+DOMAIN-KEYWORD,search-lq,proxy
+
+# ======= 头条 ======= #
+DOMAIN-SUFFIX,toutiaoapi.com,proxy
+
+# ======= 快手 ======= #
+DOMAIN-SUFFIX,gifshow.com,proxy
+DOMAIN-SUFFIX,ksapisrv.com,proxy
+
+# ======= 小红书 ======= #
+DOMAIN-SUFFIX,xiaohongshu.com,proxy
+
+# ======= 其乐论坛 ======= #
+DOMAIN,keylol.com,proxy
+
+# ======= 西瓜视频 ======= #
+DOMAIN-SUFFIX,ixigua.com,proxy
+
+# ======= 文叔叔 ======= #
+DOMAIN,www.wenshushu.cn,proxy
+
+# ======= 酷安 ======= #
+DOMAIN,api.coolapk.com,proxy
+
+# ======= 豆瓣 ======= #
+# iOS客户端，目前无法可靠地处理iOS端的请求，建议全局代理
+IP-CIDR,119.29.29.98/32,REJECT
+DOMAIN,frodo.douban.com,proxy
+# 网页端
+DOMAIN,www.douban.com,proxy
+
+# ======= TapTap ======= #
+DOMAIN,api.taptapdada.com,proxy
+
+# ======= 网易大神 ======= #
+DOMAIN,god.gameyw.netease.com,proxy
+
+# ======= 虎牙 ======= #
+DOMAIN-SUFFIX,huya.com,proxy
+
+# ======= 懂球帝 ======= #
+DOMAIN-SUFFIX,dongqiudi.com,proxy
+
+# ======= NGA ======= #
+# 个人主页ip，开代理以后发一个评论就会变代理ip
+DOMAIN,ngabbs.com,proxy
+
+# ======= 小米社区 ======= #
+DOMAIN-SUFFIX,vip.miui.com,proxy
+
+# ======= 网易云音乐======= #
+DOMAIN-SUFFIX,music.163.com,proxy
+DOMAIN,nstool.netease.com,proxy
+DOMAIN,wanproxy.127.net,proxy
+DOMAIN,mam.netease.com,proxy
+DOMAIN,dt.netease.im,proxy
+DOMAIN,api.iplay.163.com,proxy
+DOMAIN,api.k.163.com,proxy
+DOMAIN,lbs.netease.im,proxy
+DOMAIN,wannos.127.net,proxy
+DOMAIN,ac.dun.163.com,proxy
+DOMAIN-SUFFIX,music.126.net,proxy
+DOMAIN-SUFFIX,laiqukankan.com,proxy
+DOMAIN-SUFFIX,music.ntes53.netease.com,proxy
+IP-CIDR,101.71.154.241/32,proxy
+IP-CIDR,103.126.92.132/32,proxy
+IP-CIDR,103.126.92.133/32,proxy
+IP-CIDR,112.13.119.18/32,proxy
+IP-CIDR,112.13.122.4/32,proxy
+IP-CIDR,115.236.118.34/32,proxy
+IP-CIDR,115.236.121.4/32,proxy
+IP-CIDR,45.254.48.1/32,proxy
+IP-CIDR,59.111.160.195/32,proxy
+IP-CIDR,59.111.19.33/32,proxy
+IP-CIDR,59.111.19.53/32,proxy
