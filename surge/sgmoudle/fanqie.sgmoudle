@@ -54,7 +54,7 @@ DOMAIN-SUFFIX,byteorge.com,REJECT
 
 DOMAIN-SUFFIX,bytegoofy.com,REJECT
 
-DOMAIN-SUFFIX,bytedance.com,REJECT
+#DOMAIN-SUFFIX,bytedance.com,REJECT
 
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
 
