@@ -14,7 +14,7 @@ DOMAIN-SUFFIX,byteimg.com,DIRECT
 
 DOMAIN,i.snssdk.com,REJECT
 
-DOMAIN,i-lq.snssdk.com,REJECT
+# DOMAIN,i-lq.snssdk.com,REJECT
 
 DOMAIN,dig.bdurl.net,REJECT
 
