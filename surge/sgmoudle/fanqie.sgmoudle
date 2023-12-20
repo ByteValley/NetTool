@@ -18,7 +18,7 @@ DOMAIN,i.snssdk.com,REJECT
 
 DOMAIN,dig.bdurl.net,REJECT
 
-# DOMAIN-KEYWORD,zijieapi,REJECT
+DOMAIN-KEYWORD,zijieapi,REJECT
 
 DOMAIN,activity-ag.awemeughun.com,REJECT
 
