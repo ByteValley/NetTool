@@ -14,11 +14,11 @@ DOMAIN,p9-ad-sign.byteimg.com,REJECT
 
 DOMAIN,i.snssdk.com,REJECT
 
-#DOMAIN,i-lq.snssdk.com,REJECT
+DOMAIN,i-lq.snssdk.com,REJECT
 
 DOMAIN,dig.bdurl.net,REJECT
 
-DOMAIN-KEYWORD,zijieapi,REJECT
+#DOMAIN-KEYWORD,zijieapi,REJECT
 
 DOMAIN,activity-ag.awemeughun.com,REJECT
 
@@ -26,7 +26,7 @@ DOMAIN,mcs.snssdk.com,REJECT
 
 DOMAIN,tnc3-alisc1.snssdk.com,REJECT
 
-#DOMAIN,security-lq.snssdk.com,REJECT
+DOMAIN,security-lq.snssdk.com,REJECT
 
 DOMAIN,tnc3-aliec2.snssdk.com,REJECT
 
