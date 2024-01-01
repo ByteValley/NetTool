@@ -12,7 +12,7 @@ DOMAIN,p9-ad-sign.byteimg.com,REJECT
 
 #DOMAIN-SUFFIX,byteimg.com,DIRECT
 
-#DOMAIN,i.snssdk.com,REJECT
+DOMAIN,i.snssdk.com,REJECT
 
 #DOMAIN,i-lq.snssdk.com,REJECT
 
