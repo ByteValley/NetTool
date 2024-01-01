@@ -10,7 +10,7 @@ DOMAIN,p6-ad-sign.byteimg.com,REJECT
 
 DOMAIN,p9-ad-sign.byteimg.com,REJECT
 
-DOMAIN-SUFFIX,byteimg.com,DIRECT
+#DOMAIN-SUFFIX,byteimg.com,DIRECT
 
 #DOMAIN,i.snssdk.com,REJECT
 
@@ -30,9 +30,7 @@ DOMAIN,tnc3-alisc1.snssdk.com,REJECT
 
 DOMAIN,tnc3-aliec2.snssdk.com,REJECT
 
-#DOMAIN,is.snssdk.com,REJECT
-
-#DOMAIN,i.snssdk.com,REJECT
+DOMAIN,is.snssdk.com,REJECT
 
 DOMAIN,v6-novelapp.ixigua.com,REJECT
 
