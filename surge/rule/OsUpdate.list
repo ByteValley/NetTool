@@ -1,6 +1,6 @@
 # Mac Software Update (sysin)
 DOMAIN-SUFFIX,swdist.apple.com
-#DOMAIN-SUFFIX,swscan.apple.com
+DOMAIN-SUFFIX,swscan.apple.com
 #optional, download url
 DOMAIN-SUFFIX,swcdn.apple.com
 DOMAIN-SUFFIX,gdmf.apple.com
