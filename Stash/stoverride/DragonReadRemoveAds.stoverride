@@ -60,39 +60,22 @@ http:
     - "*.fqnovelvod.com"
 
   url-rewrite:
-    - >-
-      *-default.ixigua.com - reject
+    - *-default.ixigua.com - reject
 # URL-REGEX,.+web\.business\.image,REJECT
-    - >-
-      ^http:\/\/.+\.byteimg\.com\/ad-app-package - reject
-    - >-
-      ^http:\/\/.+\.byteimg\.com\/web\.business\.image - reject
+    - ^http:\/\/.+\.byteimg\.com\/ad-app-package - reject
+    - ^http:\/\/.+\.byteimg\.com\/web\.business\.image - reject
 # 番茄小说去章末广告
-    - >-
-      ^https?:\/\/.+\.pangolin-sdk-toutiao\.com\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/ - reject
-    - >-
-      ^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4 - reject
-    - >-
-      ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad)\/.+ - reject
-    - >-
-      ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/web\.business\.image\/.+ - reject
-    - >-
-      ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/obj\/ad-pattern\/renderer - reject
-    - >-
-      ^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
-    - >-
-      ^https?:\/\/.+\.byteimg.com/tos-cn-i-1yzifmftcy\/(.+)-jpeg\.jpeg - reject
-    - >-
-      ^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from\=ad - reject
-    - >-
-      ^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+ - reject
-    - >-
-      ^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4 - reject
-    - >-
-      ^https?:\/\/.+\.snssdk.com\/api\/ad\/.+ - reject
+    - ^https?:\/\/.+\.pangolin-sdk-toutiao\.com\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/ - reject
+    - ^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4 - reject
+    - ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad)\/.+ - reject
+    - ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/web\.business\.image\/.+ - reject
+    - ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/obj\/ad-pattern\/renderer - reject
+    - ^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
+    - ^https?:\/\/.+\.byteimg.com/tos-cn-i-1yzifmftcy\/(.+)-jpeg\.jpeg - reject
+    - ^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from\=ad - reject
+    - ^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+ - reject
+    - ^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4 - reject
+    - ^https?:\/\/.+\.snssdk.com\/api\/ad\/.+ - reject
 # 下面两条来自他人,暂不知是哪个app
-    - >-
-      ^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/ - reject
-    - >-
-      ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(ad-app-package|ad)\/.+ - reject
-    - >-
+    - ^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/ - reject
+    - ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(ad-app-package|ad)\/.+ - reject
