@@ -1,0 +1,7 @@
+payload:
+  - '+.swdist.apple.com'
+  - '+.swscan.apple.com'
+  - '+.swcdn.apple.com'
+  - '+.gdmf.apple.com'
+  - '+.mesu.apple.com'
+  - '+.xp.apple.com'
