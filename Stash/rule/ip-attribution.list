@@ -7,6 +7,7 @@ DOMAIN-SUFFIX,ksapisrv.com,proxy
 
 # ======= 小红书 ======= #
 DOMAIN-SUFFIX,xiaohongshu.com,proxy
+DOMAIN-SUFFIX,xhscdn.com,proxy
 
 # ======= 微博 ======= #
 DOMAIN,api.weibo.cn,proxy
