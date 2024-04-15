@@ -1,0 +1,49 @@
+name: |-
+  微博去广告
+desc: |-
+  微博去广告
+icon: |-
+  https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/Weibo.png
+category: |-
+  shawn
+
+http:
+
+  mitm:
+    - "api.weibo.cn"
+    - "mapi.weibo.com"
+    - "*.uve.weibo.com"
+    - "new.vip.weibo.cn"
+
+  script:
+# 微博去广告以及去除各部分推广模块 - cherish
+    - match: ^https?://m?api\.weibo\.c(n|om)/2/(cardlist|searchall|page|messageflow|statuses/(unread_)?friends(/|_)timeline|groups/timeline|statuses/(unread_hot_timeline|extend|video_mixtimeline)|profile/(me|statuses)|video/(community_tab|remind_info|tiny_stream_video_list)|checkin/show|\!/live/media_homelist|comments/build_comments|container/get_item|search/(finder|container_timeline|container_discover))
+      name: "微博去广告_9"
+      type: response
+      require-body: true
+
+# 删除微博开屏广告 - cherish
+    - match: ^https?://(sdk|wb)app\.uve\.weibo\.com(/interface/sdk/sdkad.php|/wbapplua/wbpullad.lua)
+      name: "微博去广告1_11"
+      type: response
+      require-body: true
+
+# 自定义tab皮肤
+    - match: ^https://api.weibo.cn/2/!/client/light_skin
+      name: "微博去广告_9"
+      type: response
+      require-body: true
+
+# 非会员设置tab皮肤 - cherish
+    - match: ^https://new.vip.weibo.cn/littleskin/preview
+      name: "微博去广告_9"
+      type: response
+      require-body: true
+
+script-providers:
+  "微博去广告_9":
+    url: https://raw.githubusercontent.com/zmqcherish/proxy-script/main/weibo_main.js
+    interval: 86400
+  "微博去广告1_11":
+    url: https://raw.githubusercontent.com/zmqcherish/proxy-script/main/weibo_launch.js
+    interval: 86400
