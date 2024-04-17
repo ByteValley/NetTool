@@ -16,7 +16,7 @@
 刷新 DNS = title="刷新 DNS ",content="DNS 缓存刷新",icon=leaf.arrow.triangle.circlepath,icon-color="#00C8FF",script-name= 刷新 DNS,update-interval=-1
 
 # > ChatGPT检测
-ChatGPT检测 = title="ChatGPT检测",content="未支持",style=good,update-interval=-1, script-name=ChatGPT检测
+ChatGPT检测 = title="ChatGPT检测",content="未支持",,icon=tray.and.arrow.down.fill,icon-color="#9978FF",update-interval=-1, script-name=ChatGPT检测
 
 # > 流媒体检测
 流媒体检测 = title="流媒体检测",content="请刷新",style=good,update-interval=-1, script-name=流媒体检测
