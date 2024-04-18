@@ -1,35 +1,29 @@
-# ======= 头条 ======= #
-DOMAIN-SUFFIX,toutiaoapi.com
+payload:
+  - '+.toutiaoapi.com'
 
-# ======= 快手 ======= #
-DOMAIN-SUFFIX,gifshow.com
-DOMAIN-SUFFIX,ksapisrv.com
+  - '+.gifshow.com'
+  - '+.ksapisrv.com'
 
-# ======= 小红书 ======= #
-DOMAIN-SUFFIX,xiaohongshu.com
-DOMAIN-SUFFIX,xhscdn.com
+  - '+.xiaohongshu.com'
 
-# ======= 微博 ======= #
-DOMAIN,api.weibo.cn
-DOMAIN,api.weibo.com
-DOMAIN-SUFFIX,weibocdn.com 
-DOMAIN-KEYWORD,weibo 
+  - 'api.weibo.cn'
+  - 'api.weibo.com'
+  - 'weibocdn.com'
+  - '+.weibo'
 
-# ======= 百度贴吧 ======= #
-DOMAIN,tieba.baidu.com 
-DOMAIN,tbmsg.baidu.com 
-DOMAIN,tb5.bdstatic.com 
-DOMAIN,fclog.baidu.com 
-DOMAIN,gsp0.baidu.com
-DOMAIN,hm.baidu.com 
-DOMAIN,www.baidu.com
+  - 'tieba.baidu.com'
+  - 'tbmsg.baidu.com'
+  - 'tb5.bdstatic.com'
+  - 'fclog.baidu.com'
+  - 'gsp0.baidu.com'
+  - 'hm.baidu.com'
+  - 'www.baidu.com'
 
-# ======= 知乎 ======= #
-DOMAIN-SUFFIX,zhihu.com
-DOMAIN-SUFFIX,zhimg.com
-IP-CIDR,103.41.167.226/32
-IP-CIDR,103.41.167.234/31
-IP-CIDR,103.41.167.236/32
-IP-CIDR,118.89.204.198/32
-IP-CIDR,103.41.167.0/24
-IP-CIDR6,2402:4e00:1200:ed00:0:9089:6dac:96b6/128
+  - '+.zhihu.com'
+  - '+.zhimg.com'
+  - '103.41.167.226/32'
+  - '103.41.167.234/31'
+  - '103.41.167.236/32'
+  - '118.89.204.198/32'
+  - '+103.41.167.0/24'
+  - '2402:4e00:1200:ed00:0:9089:6dac:96b6/128'
