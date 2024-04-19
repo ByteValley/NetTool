@@ -21,11 +21,11 @@ ChatGPT检测 = script-name=ChatGPT检测
 # > 流媒体检测
 流媒体检测 = title="流媒体检测",content="请刷新",style=good,update-interval=-1, script-name=流媒体检测
 
-# > 节日信息
-节日信息 = title="节日信息",content="请刷新",icon=tray.and.arrow.down.fill,icon-color="#9978FF",update-interval=360,script-name=节日信息
-
 # > 节假日信息
 Timecard = title="节假日信息",content="请刷新", script-name=Timecard,update-interval=360
+
+# > 节日信息
+节日信息 = title="节日信息",content="请刷新",icon=tray.and.arrow.down.fill,icon-color="#9978FF",update-interval=360,script-name=节日信息
 
 # > 节点信息
 # IP信息=title="节点信息",content="请刷新",style=info,update-interval=360,script-name=IP信息
