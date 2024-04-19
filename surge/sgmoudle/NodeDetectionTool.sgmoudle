@@ -49,11 +49,11 @@ ChatGPT检测 = type=generic,script-path=https://raw.githubusercontent.com/deeze
 # > 节点信息
 # IP信息=type=generic,script-path=https://raw.githubusercontent.com/deezertidal/Surge_Module/master/files/ip-api.js
 
-# > 网络详情
-网络详情 = type=generic, script-path=https://hub.nange.cn/Script/Tools/NetInfo.js
-
 # > 网络概览
 网络概览 = type=generic,timeout=5,script-path=https://raw.githubusercontent.com/TributePaulWalker/Profiles/main/JavaScript/Surge/ipcheck.js
+
+# > 网络详情
+网络详情 = type=generic, script-path=https://hub.nange.cn/Script/Tools/NetInfo.js
 
 # > 刷新 DNS 缓存
 刷新 DNS = type=generic, script-path=https://hub.nange.cn/Script/Tools/FlushDNS.js
