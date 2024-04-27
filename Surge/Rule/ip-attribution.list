@@ -1,0 +1,35 @@
+# ======= 头条 ======= #
+DOMAIN-SUFFIX,toutiaoapi.com,proxy
+
+# ======= 快手 ======= #
+DOMAIN-SUFFIX,gifshow.com,proxy
+DOMAIN-SUFFIX,ksapisrv.com,proxy
+
+# ======= 小红书 ======= #
+DOMAIN-SUFFIX,xiaohongshu.com,proxy
+DOMAIN-SUFFIX,xhscdn.com,proxy
+
+# ======= 微博 ======= #
+DOMAIN,api.weibo.cn,proxy
+DOMAIN,api.weibo.com,proxy 
+DOMAIN-SUFFIX,weibocdn.com,proxy 
+DOMAIN-KEYWORD,weibo,proxy 
+
+# ======= 百度贴吧 ======= #
+DOMAIN,tieba.baidu.com,proxy 
+DOMAIN,tbmsg.baidu.com,proxy 
+DOMAIN,tb5.bdstatic.com,proxy 
+DOMAIN,fclog.baidu.com,proxy 
+DOMAIN,gsp0.baidu.com,proxy
+DOMAIN,hm.baidu.com,proxy 
+DOMAIN,www.baidu.com,proxy
+
+# ======= 知乎 ======= #
+DOMAIN-SUFFIX,zhihu.com,proxy
+DOMAIN-SUFFIX,zhimg.com,proxy
+IP-CIDR,103.41.167.226/32,proxy
+IP-CIDR,103.41.167.234/31,proxy
+IP-CIDR,103.41.167.236/32,proxy
+IP-CIDR,118.89.204.198/32,proxy
+IP-CIDR,103.41.167.0/24,proxy
+IP-CIDR6,2402:4e00:1200:ed00:0:9089:6dac:96b6/128,proxy
