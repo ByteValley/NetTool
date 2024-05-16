@@ -23,6 +23,7 @@ DOMAIN,fclog.baidu.com,proxy
 DOMAIN,gsp0.baidu.com,proxy
 DOMAIN,hm.baidu.com,proxy 
 DOMAIN,www.baidu.com,proxy
+DOMAIN,tiebapic.baidu.com,proxy
 
 # ======= 知乎 ======= #
 DOMAIN-SUFFIX,zhihu.com,proxy
