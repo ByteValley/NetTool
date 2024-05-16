@@ -11,6 +11,7 @@ payload:
   - 'weibocdn.com'
   - '+.weibo'
 
+  - 'tiebapic.baidu.com'
   - 'tieba.baidu.com'
   - 'tbmsg.baidu.com'
   - 'tb5.bdstatic.com'
