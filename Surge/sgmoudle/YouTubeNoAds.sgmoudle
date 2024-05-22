@@ -1,7 +1,7 @@
 #!name=YouTube去广告
 #!desc=YouTube去广告
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/YouTube.png
-#!category=崇陽
+#!category=Shawn
 
 [URL Rewrite]
 # ======= 视频广告请求 ======= #
