@@ -1,0 +1,71 @@
+#!name=节点信息
+#!desc=用于节点解锁查询。
+#!category=Enhance
+#!homepage=https://whatshub.top
+[Panel]
+# > 配置重载
+配置重载 = title="配置重载",content="配置重载",style=info,script-name=配置重载,update-interval=-1
+
+# > 服务状态
+服务状态 = title="服务状态",content="请刷新",style=info,update-interval=-1,script-name=服务状态
+
+# > 抓包状态
+抓包状态 = title="抓包状态",content="请刷新",icon=tray.and.arrow.down.fill,icon-color="#9978FF", script-name=抓包状态,update-interval=-1
+
+# > 刷新 DNS 缓存
+刷新 DNS = title="刷新 DNS ",content="DNS 缓存刷新",icon=leaf.arrow.triangle.circlepath,icon-color="#00C8FF",script-name= 刷新 DNS,update-interval=-1
+
+# > 节点解锁查询
+节点解锁查询 = title="节点解锁查询",content="请刷新",style=good,update-interval=-1, script-name=节点解锁查询
+
+# > 地理位置查询
+地理位置查询 = title="地理位置查询",content="请刷新",style=location,update-interval=-1, script-name=地理位置查询
+
+# > 节假日信息
+Timecard = title="节假日信息",content="请刷新", script-name=Timecard,update-interval=360
+
+# > 节日信息
+节日信息 = title="节日信息",content="请刷新",icon=tray.and.arrow.down.fill,icon-color="#9978FF",update-interval=360,script-name=节日信息
+
+# > 节点信息
+# IP信息=title="节点信息",content="请刷新",style=info,update-interval=360,script-name=IP信息
+
+# > 网络概览
+网络概览 = script-name=网络概览,title=网络概览,content=请刷新,style=info,update-interval=60
+
+# > 网络详情
+网络详情 = title="网络详情",content="请刷新",style=info,update-interval=360,script-name=网络详情
+
+[Script]
+# > 配置重载
+配置重载 = script-path=https://raw.githubusercontent.com/TributePaulWalker/Profiles/main/JavaScript/Surge/Profile-Reload.js,type=generic
+
+# > 流媒体检测
+流媒体检测= type=generic, script-path=https://gitlab.com/lodepuly/vpn_tool/-/raw/master/Resource/Script/Node_detection_tool/NodeUnlockDetection.js
+
+# > 地理位置查询
+地理位置查询 = type=generic,script-path= https://gitlab.com/lodepuly/vpn_tool/-/raw/master/Resource/Script/Node_detection_tool/LocationDetection.js
+
+# > 节点信息
+# IP信息=type=generic,script-path=https://raw.githubusercontent.com/deezertidal/Surge_Module/master/files/ip-api.js
+
+# > 网络概览
+网络概览 = type=generic,timeout=5,script-path=https://raw.githubusercontent.com/TributePaulWalker/Profiles/main/JavaScript/Surge/ipcheck.js
+
+# > 网络详情
+网络详情 = type=generic, script-path=https://hub.nange.cn/Script/Tools/NetInfo.js
+
+# > 刷新 DNS 缓存
+刷新 DNS = type=generic, script-path=https://hub.nange.cn/Script/Tools/FlushDNS.js
+
+# > 抓包状态
+抓包状态 = type=generic, script-path=https://hub.nange.cn/Script/Tools/CaptureMode.js
+
+# > 服务状态
+服务状态 = type=generic, script-path=https://hub.nange.cn/Script/Tools/APIStatus.js
+
+# > 节日信息
+节日信息 = type=generic, script-path=https://hub.nange.cn/Script/Tools/Days.js
+
+# > 节假日信息
+Timecard = type=generic,timeout=10,script-path=https://raw.githubusercontent.com/smartmimi/conf/master/surge/timecard.js
