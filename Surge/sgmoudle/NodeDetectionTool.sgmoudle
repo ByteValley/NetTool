@@ -11,6 +11,12 @@ hostname = %APPEND% net-lsp-x.com
 # > 快速清除Surge的DNS缓存
 FlushDNS = script-name=FlushDNS,update-interval=600
 
+# > 详细的显示你当前的网络信息
+NetInfoPanel=title="",content="",style=info,script-name=net-info-panel.js,update-interval=1
+
+# > 流媒体解锁检测
+stream-all = script-name=stream-all, title="流媒体解锁检测", content="请刷新面板", update-interval=3600
+
 # > Ping CN CF 二合一面板
 # > 根据网络延迟生成柱状图
 ProPing = script-name=ProPing,update-interval={{{update-interval}}}
@@ -18,14 +24,8 @@ ProPing = script-name=ProPing,update-interval={{{update-interval}}}
 # > 网络连通性测试
 Connectivity_Test = script-name=Connectivity_Test,update-interval=1
 
-# > 详细的显示你当前的网络信息
-NetInfoPanel=title="",content="",style=info,script-name=net-info-panel.js,update-interval=1
-
 # > 网络信息面板
 {{{PANEL_NAME}}} = script-name=网络信息面板,update-interval={{{UPDATE-INTERVAL}}}
-
-# > 流媒体解锁检测
-stream-all = script-name=stream-all, title="流媒体解锁检测", content="请刷新面板", update-interval=3600
 
 # > 节假日信息
 Timecard = title="节假日信息",content="请刷新", script-name=Timecard,update-interval=360
