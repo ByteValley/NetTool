@@ -19,10 +19,10 @@ stream-all = script-name=stream-all, title="流媒体解锁检测", content="请
 
 # > Ping CN CF 二合一面板
 # > 根据网络延迟生成柱状图
-ProPing = script-name=ProPing,update-interval={{{update-interval}}}
+#ProPing = script-name=ProPing,update-interval={{{update-interval}}}
 
 # > 网络连通性测试
-Connectivity_Test = script-name=Connectivity_Test,update-interval=1
+#Connectivity_Test = script-name=Connectivity_Test,update-interval=1
 
 # > 网络信息面板
 {{{PANEL_NAME}}} = script-name=网络信息面板,update-interval={{{UPDATE-INTERVAL}}}
@@ -45,10 +45,10 @@ stream-all = type=generic, timeout=15, script-path=https://raw.githubusercontent
 
 # > Ping CN CF 二合一面板
 # > 根据网络延迟生成柱状图
-ProPing = type=generic,timeout=6,script-path=https://raw.githubusercontent.com/Keywos/rule/main/script/ping/js/pingt.js, script-update-interval={{{script-update}}},argument=Size={{{Size}}}&cnUrl={{{cnUrl}}}&usUrl={{{usUrl}}}&icons={{{icons}}}&icolor={{{icolor}}}
+#ProPing = type=generic,timeout=6,script-path=https://raw.githubusercontent.com/Keywos/rule/main/script/ping/js/pingt.js, script-update-interval={{{script-update}}},argument=Size={{{Size}}}&cnUrl={{{cnUrl}}}&usUrl={{{usUrl}}}&icons={{{icons}}}&icolor={{{icolor}}}
 
 # > 网络连通性测试
-Connectivity_Test = type=generic,timeout=3,script-path= https://raw.githubusercontent.com/getsomecat/GetSomeCats/Surge/script/ConnectivityTest.js,argument=title=Connectivity Test&icon=icloud.and.arrow.down&color=#FF9F0A&server=false
+#Connectivity_Test = type=generic,timeout=3,script-path= https://raw.githubusercontent.com/getsomecat/GetSomeCats/Surge/script/ConnectivityTest.js,argument=title=Connectivity Test&icon=icloud.and.arrow.down&color=#FF9F0A&server=false
 
 # > 网络信息面板
 # Request
