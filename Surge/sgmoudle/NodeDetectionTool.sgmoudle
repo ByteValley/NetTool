@@ -41,7 +41,7 @@ Timecard = title="节假日信息",content="请刷新", script-name=Timecard,upd
 配置重载 = script-path=https://raw.githubusercontent.com/TributePaulWalker/Profiles/main/JavaScript/Surge/Profile-Reload.js,type=generic
 
 # > 流媒体解锁检测
-流媒体解锁检测= type=generic, script-path=https://gitlab.com/lodepuly/vpn_tool/-/raw/master/Resource/Script/Node_detection_tool/NodeUnlockDetection.js
+流媒体解锁检测= type=generic, script-path=https://raw.githubusercontent.com/SeannLiang/NetTool/main/Surge/Scripts/StreamingCheck.js
 
 # > 地理位置查询
 地理位置查询 = type=generic,script-path= https://gitlab.com/lodepuly/vpn_tool/-/raw/master/Resource/Script/Node_detection_tool/LocationDetection.js
