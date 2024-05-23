@@ -1,0 +1,201 @@
+name: |-
+  微博去广告
+desc: |-
+  微博去广告
+author: |-
+  RuCu6 zmqcherish
+icon: |-
+  https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/Weibo.png
+category: |-
+  RuCu6
+update: |-
+  2024-01-22 17:00
+
+http:
+
+  mitm:
+    - "*.weibo.cn"
+    - "*.weibo.com"
+    - "weibo.com"
+
+  url-rewrite:
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/(ug\/checkin\/list|push\/daily)\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/live\/media_homelist\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/comments\/bullet_screens\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/photo\/info\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/statuses\/(container_positive|push_info)\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/vote\/get_vote_detail\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/chaohua\/discovery\/home_bottom\/switch\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/huati\/(discovery_home_bottom_getdotinfo|mobile_discovery_searchchange)\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/wbox\/\w+\/(home_bottom_modal|interest_category)\? - reject-dict
+# 发现页 热门微博信息流,搜索列表,热搜提醒,猜你想搜,视频流红包
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/search\/container_discover\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/hot\/hours_spotlight\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/video\/redpacket\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/!\/sug\/list\/finderchange\? - reject-dict
+# 开屏广告 //*.uve.weibo.com
+    - >-
+      ^https:\/\/bootrealtime\.uve\.weibo\.com\/v[23]\/ad\/realtime - reject-dict
+    - >-
+      ^https:\/\/sdkapp\.uve\.weibo\.com\/interface\/sdk\/(get-lbs-cell-info\.php|sdkconfig\.php) - reject
+# 微博长文章推广
+    - >-
+      ^https:\/\/card\.weibo\.com\/article\/m\/aj\/(reward|uvead)\? - reject-dict
+    - >-
+      ^https:\/\/weibo\.com\/ttarticle\/x\/m\/aj\/(reward|uvead)\? - reject-dict
+
+  script:
+# 首页 签到,发布按钮,侧边栏,右上角红包,顶部tab,侧边栏提醒,超话tab悬浮,顶部直播
+    - match: ^https:\/\/api\.weibo\.cn\/2\/(checkin\/show|client\/publisher_list|push\/active)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/groups\/allgroups\/v2\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+# 详情页 超话,评论区,看图界面,个人主页,我的页面,信息流,商品橱窗,视频流,视频号,视频调查,话题卡片
+    - match: ^https:\/\/api\.weibo\.cn\/2\/(cardlist|page)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/comments\/build_comments\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/(container\/asyn|flowlist|flowpage)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/friendships\/(create|destroy)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/profile\/(container_timeline|dealatt|me|statuses\/tab|userinfo)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/statuses\/(container_timeline(_hot|_topic|_topicpage|_unread)?|unread_hot_timeline)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/statuses\/(extend|show)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/video\/tiny_stream_video_list\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/!\/huati\/discovery_home_bottom_channels\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+# 消息页
+    - match: ^https:\/\/api\.weibo\.cn\/2\/direct_messages\/user_list\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/messageflow\/notice\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/search\/(container_timeline|finder)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/api\.weibo\.cn\/2\/searchall\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/bootpreload\.uve\.weibo\.com\/v1\/ad\/preload
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/sdkapp\.uve\.weibo\.com\/interface\/sdk\/sdkad\.php
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+    - match: ^https:\/\/wbapp\.uve\.weibo\.com\/(preload\/get_ad|wbapplua\/wbpullad\.lua)\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+# 会员图标
+    - match: ^https:\/\/new\.vip\.weibo\.cn\/aj\/appicon\/list\?
+      name: "weibo_5"
+      type: response
+      require-body: true
+      max-size: -1
+      timeout: 60
+
+script-providers:
+  "weibo_5":
+    url: https://raw.githubusercontent.com/RuCu6/QuanX/main/Scripts/weibo.js
+    interval: 86400
