@@ -25,9 +25,9 @@ http:
 
 tiles:
 # > 快速清除Surge的DNS缓存
-  - name: "FlushDNS_27"
+  - name: "刷新DNS_27"
     interval: 3600
-    title: "FlushDNS_27"
+    title: "刷新DNS_27"
     icon: "cube"
     backgroundColor: ""
     timeout: 10
@@ -35,9 +35,9 @@ tiles:
       title=DNS FLush&icon=cube&color=#afe59a&server=false
 
 # > 详细的显示你当前的网络信息
-  - name: "net-info-panel.js_29"
+  - name: "网络信息_29"
     interval: 3600
-    title: "net-info-panel.js_29"
+    title: "网络信息_29"
     icon: ""
     backgroundColor: ""
     timeout: 30
@@ -60,18 +60,18 @@ tiles:
     backgroundColor: ""
 
 # > 节假日信息
-  - name: "Timecard_47"
+  - name: "节假日信息_47"
     interval: 3600
-    title: "Timecard_47"
+    title: "节假日信息_47"
     icon: ""
     backgroundColor: ""
     timeout: 10
 
 script-providers:
-  "FlushDNS_27":
+  "刷新DNS_27":
     url: https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Module/Panel/Flush-DNS/Moore/Flush-DNS.js
     interval: 86400
-  "net-info-panel.js_29":
+  "网络信息_29":
     url: https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Module/Panel/Network-Info/Moore/Network-Info.js
     interval: 86400
   "网络信息请求_39":
@@ -80,6 +80,6 @@ script-providers:
   "节日信息_45":
     url: https://hub.nange.cn/Script/Tools/Days.js
     interval: 86400
-  "Timecard_47":
+  "节假日信息_47":
     url: https://raw.githubusercontent.com/smartmimi/conf/master/surge/timecard.js
     interval: 86400
