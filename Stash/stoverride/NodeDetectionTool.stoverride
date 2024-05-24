@@ -30,7 +30,6 @@ tiles:
     title: "刷新DNS_27"
     icon: "cube"
     backgroundColor: ""
-    timeout: 10
     argument: |-
       title=DNS FLush&icon=cube&color=#afe59a&server=false
 
@@ -40,7 +39,6 @@ tiles:
     title: "网络信息_29"
     icon: ""
     backgroundColor: ""
-    timeout: 30
 
 # Panel
   - name: "网络信息请求_39"
@@ -65,7 +63,6 @@ tiles:
     title: "节假日信息_47"
     icon: ""
     backgroundColor: ""
-    timeout: 10
 
 script-providers:
   "刷新DNS_27":
