@@ -42,14 +42,6 @@ tiles:
     backgroundColor: ""
     timeout: 30
 
-# > 流媒体解锁检测
-  - name: "stream-all_31"
-    interval: 3600
-    title: "stream-all_31"
-    icon: ""
-    backgroundColor: ""
-    timeout: 15
-
 # Panel
   - name: "网络信息请求_39"
     interval: 3600
@@ -81,9 +73,6 @@ script-providers:
     interval: 86400
   "net-info-panel.js_29":
     url: https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Module/Panel/Network-Info/Moore/Network-Info.js
-    interval: 86400
-  "stream-all_31":
-    url: https://raw.githubusercontent.com/Rabbit-Spec/Surge/Master/Module/Panel/Stream-All/Moore/Stream-All.js
     interval: 86400
   "网络信息请求_39":
     url: https://raw.githubusercontent.com/xream/scripts/main/surge/modules/network-info/net-lsp-x.js
