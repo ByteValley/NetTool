@@ -41,7 +41,6 @@ http:
     - "tv.youtube.com"
     - "music.youtube.com"
     - "youtubei.googleapis.com"
-    - "-redirector*.googlevideo.com"
     - "*.googlevideo.com"
     - "*.youtube.com"
 
