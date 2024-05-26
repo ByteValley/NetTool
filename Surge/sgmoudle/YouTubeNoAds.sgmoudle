@@ -24,4 +24,4 @@ youtube.request.preview = type=http-request, pattern=^https?:\/\/youtubei\.googl
 youtube.response.preview = type=http-response, pattern=^https?:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(browse|next|player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch), script-path=https://raw.githubusercontent.com/Maasea/sgmodule/master/Script/Youtube/dist/youtube.response.preview.js, requires-body=true, binary-body-mode=true, max-size=-1, timeout=60
 
 [MITM]
-hostname = %APPEND% -redirector*.googlevideo.com, *.googlevideo.com, www.youtube.com, s.youtube.com, youtubei.googleapis.com
+hostname = %APPEND% -redirector*.googlevideo.com, *.googlevideo.com, www.youtube.com, s.youtube.com, youtubei.googleapis.com, m.youtube.com, tv.youtube.com, music.youtube.com, -redirector*.googlevideo.com, *.googlevideo.com, *.youtube.com
