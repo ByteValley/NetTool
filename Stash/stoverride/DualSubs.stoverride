@@ -3,7 +3,7 @@ name: |-
 desc: |-
   Disney+, Star+, HBO Max, HBO GO, Hulu, Netflix, Paramount+, Prime Video, YouTube, etc. subtitles add-ons
 icon: |-
-  https://github.com/DualSubs/Universal/raw/main/src/assets/icon_rounded.png
+  https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1056.png
 category: |-
   🍿️ DualSubs
 
@@ -14,6 +14,7 @@ http:
     - "*.media.starott.com"
     - "*.api.hbo.com"
     - "*.hbomaxcdn.com"
+    - "*.h264.io"
     - "*.hbogoasia.com"
     - "*.conviva.com"
     - "*.go.com"
@@ -57,6 +58,13 @@ http:
       type: request
       require-body: true
       max-size: 0
+
+    - match: https:\/\/.+h264.io\/.+\.vtt
+      name: "Dualsub_4"
+      type: response
+      require-body: true
+      max-size: 0
+      timeout: 30
 
 script-providers:
   "Dualsub_4":
