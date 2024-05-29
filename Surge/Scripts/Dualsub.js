@@ -24,6 +24,9 @@
         HBO-Max-Dualsub = type=http-response,pattern=https:\/\/(manifests.v2.api.hbo.com|.+hbomaxcdn.com)\/(hls.m3u8.+|video.+\.vtt),requires-body=1,max-size=0,timeout=30,script-path=Dualsub.js
         HBO-Max-Dualsub-Setting = type=http-request,pattern=https:\/\/setting.hbomaxcdn.com\/\?action=(g|s)et,requires-body=1,max-size=0,script-path=Dualsub.js
 
+
+        HBO-GO-Dualsub = type=http-response,pattern=https:\/\/(manifests.v2.api.hbo.com|.+hboasia.com)\/(hls.m3u8.+|video.+\.vtt),requires-body=1,max-size=0,timeout=30,script-path=Dualsub.js
+
         Hulu-Dualsub = type=http-response,pattern=^http.+huluim.com\/.+\.vtt$,requires-body=1,max-size=0,timeout=30,script-path=Dualsub.js
         Hulu-Dualsub-Setting = type=http-request,pattern=https:\/\/setting.huluim.com\/\?action=(g|s)et,requires-body=1,max-size=0,script-path=Dualsub.js
 
@@ -40,7 +43,7 @@
         YouTube-Dualsub-Setting = type=http-request,pattern=https:\/\/setting.youtube.com\/\?action=(g|s)et,requires-body=1,max-size=0,script-path=Dualsub.js
 
         [MITM]
-        hostname = *.media.dssott.com, *.media.starott.com, *.api.hbo.com, *.hbomaxcdn.com, *.huluim.com, *.nflxvideo.net, *.cbsaavideo.com, *.cbsivideo.com, *.cloudfront.net, *.akamaihd.net, *.avi-cdn.net, *.youtube.com
+        hostname = *.media.dssott.com, *.media.starott.com, *.api.hbo.com, *.hbomaxcdn.com, *.hboasia.com, *.huluim.com, *.nflxvideo.net, *.cbsaavideo.com, *.cbsivideo.com, *.cloudfront.net, *.akamaihd.net, *.avi-cdn.net, *.youtube.com
 
     Author:
         Telegram: Neurogram
@@ -53,9 +56,9 @@ let headers = $request.headers
 let default_settings = {
     Disney: {
         type: "Official", // Official, Google, DeepL, External, Disable
-        lang: "English [CC]",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "English [CC]",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -69,9 +72,25 @@ let default_settings = {
     },
     HBOMax: {
         type: "Official", // Official, Google, DeepL, External, Disable
-        lang: "English CC",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "en-US SDH",
+        tl: "Chinese (Traditional)",
+        line: "s", // f, s
+        dkey: "null", // DeepL API key
+        s_subtitles_url: "null",
+        t_subtitles_url: "null",
+        subtitles: "null",
+        subtitles_type: "null",
+        subtitles_sl: "null",
+        subtitles_tl: "null",
+        subtitles_line: "null",
+        external_subtitles: "null"
+    },
+    HBOGO: {
+        type: "Official", // Official, Google, DeepL, External, Disable
+        lang: "Chinese (Traditional)",
+        sl: "auto",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -85,9 +104,9 @@ let default_settings = {
     },
     Hulu: {
         type: "Google", // Google, DeepL, External, Disable
-        lang: "English",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "en",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -101,9 +120,9 @@ let default_settings = {
     },
     Netflix: {
         type: "Google", // Google, DeepL, External, Disable
-        lang: "English",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "en",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -117,9 +136,9 @@ let default_settings = {
     },
     Paramount: {
         type: "Google", // Google, DeepL, External, Disable
-        lang: "English",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "en",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -133,9 +152,9 @@ let default_settings = {
     },
     PrimeVideo: {
         type: "Official", // Official, Google, DeepL, External, Disable
-        lang: "English [CC]",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "English [CC]",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -150,9 +169,9 @@ let default_settings = {
     General: {
         service: "null",
         type: "Google", // Google, DeepL, External, Disable
-        lang: "English",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "en",
+        tl: "Chinese (Traditional)",
         line: "s", // f, s
         dkey: "null", // DeepL API key
         s_subtitles_url: "null",
@@ -166,10 +185,10 @@ let default_settings = {
     },
     YouTube: {
         type: "Enable", // Enable, Disable
-        lang: "English",
+        lang: "Chinese (Traditional)",
         sl: "auto",
-        tl: "en",
-        line: "sl"
+        tl: "Chinese (Traditional)",
+        line: "s"
     }
 }
 
@@ -182,6 +201,7 @@ if (typeof (settings) == "string") settings = JSON.parse(settings)
 let service = ""
 if (url.match(/(dss|star)ott.com/)) service = "Disney"
 if (url.match(/hbo(maxcdn)*.com/)) service = "HBOMax"
+if (url.match(/hbo(asia)*.com/)) service = "HBOGO"
 if (url.match(/huluim.com/)) service = "Hulu"
 if (url.match(/nflxvideo.net/)) service = "Netflix"
 if (url.match(/cbs(aa|i)video.com/)) service = "Paramount"
