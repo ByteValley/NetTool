@@ -1,0 +1,11 @@
+#!name=🍿️ DualSubs
+#!desc=Disney+, Star+, HBO Max, HBO GO, Hulu, Netflix, Paramount+, Prime Video, YouTube, etc. subtitles add-ons
+#!category=🍿️ DualSubs
+
+[Script]
+Dualsub = type=http-response,pattern=^http.+(media.(dss|star)ott|manifests.v2.api.hbo|hbomaxcdn|nflxvideo|cbs(aa|i)video|cloudfront|akamaihd|avi-cdn|huluim|youtube).(com|net)\/(.+\.vtt($|\?m=\d+)|.+-all-.+\.m3u8.*|hls\.m3u8.+|\?o=\d+&v=\d+&e=.+|\w+\/2\$.+\/[a-zA-Z0-9-]+\.m3u8|api\/timedtext.+),requires-body=1,max-size=0,timeout=30,script-path=https://raw.githubusercontent.com/SeannLiang/NetTool/main/Surge/Scripts/Dualsub.js
+Dualsub-setting = type=http-request,pattern=^http.+(setting|general).(media.dssott|hbomaxcdn|nflxvideo|youtube|cbsivideo|cloudfront|huluim).(com|net)\/\?action=(g|s)et,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/SeannLiang/NetTool/main/Surge/Scripts/Dualsub.js
+Max = type=http-response,pattern=https:\/\/.+h264.io\/.+\.vtt,requires-body=1,max-size=0,timeout=30,script-path=https://raw.githubusercontent.com/SeannLiang/NetTool/main/Surge/Scripts/Dualsub.js
+
+[MITM]
+hostname = %APPEND% *.media.dssott.com, *.media.starott.com, *.api.hbo.com, *.hbomaxcdn.com, *.h264.io, *.hbogoasia.com, *.conviva.com, *.go.com, *.hbo.com, *.hbogo.com, *.hbonow.com, *.hbogoasia.com, *.hbogoasia.tw, *.gamer.com.tw, *.bahamut.com.tw, *.hinet.net, *.fbcdn.net, *.gvt1.com, *.digicert.com, *.viblast.com, *.huluim.com, *.oca.nflxvideo.net, *.nflxvideo.net, *.cbsaavideo.com, *.cbsivideo.com, *.cloudfront.net, *.akamaihd.net, *.avi-cdn.net, www.youtube.com, m.youtube.com, tv.youtube.com, music.youtube.com, youtubei.googleapis.com, *.googlevideo.com, *.youtube.com
