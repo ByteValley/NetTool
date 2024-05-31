@@ -9,3 +9,4 @@ Dualsub-setting = type=http-request,pattern=^http.+(setting|general).(media.dsso
 
 [MITM]
 hostname = %APPEND% *.media.dssott.com, *.media.starott.com, *.api.hbo.com, *.hbomaxcdn.com, *.max.com, *.h264.io, *.huluim.com, *.hulu.com, *.nflxvideo.net, *.cbsaavideo.com, *.cbsivideo.com, *.cloudfront.net, *.akamaihd.net, *.avi-cdn.net, *.youtube.com
+tcp-connection = true
