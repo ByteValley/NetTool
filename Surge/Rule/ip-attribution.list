@@ -1,4 +1,5 @@
 # ======= 头条 ======= #
+DOMAIN-SUFFIX,toutiao.com
 DOMAIN-SUFFIX,toutiaoapi.com
 
 # ======= 快手 ======= #
