@@ -15,7 +15,7 @@ FlushDNS = script-name=FlushDNS,update-interval=600
 NetInfoPanel=title="",content="",style=info,script-name=net-info-panel.js,update-interval=1
 
 # > 流媒体解锁检测
-stream-all = script-name=stream-all, title="流媒体解锁检测", content="请刷新面板", update-interval=3600
+stream-all = script-name=stream-all, title="流媒体解锁检测", content="请刷新面板", update-interval=1
 
 # > Ping CN CF 二合一面板
 # > 根据网络延迟生成柱状图
