@@ -5,7 +5,7 @@ desc: |-
 icon: |-
   https://gitlab.com/lodepuly/iconlibrary/-/raw/main/Other_icon/120px/RemoteResourceConverter.png
 category: |-
-  Shawn
+  面板模块
 arguments: |-
   script-update:-1 ,update-interval: 10, Size:7, cnUrl:"", usUrl:"",icons:barometer,icolor:#80A0BF,DOMESTIC_IPv4:spcn,DOMESTIC_IPv4_KEY:若接口需要就填这里,DOMESTIC_IPv6:ddnspod,LANDING_IPv4:ipapi,LANDING_IPv6:ipsb,DNS:ali,FLAG:1,ASN:0,ORG:0,PRIVACY:0,LAN:0,SSID:0,IPv6:0,MASK:0,TIMEOUT:5,RETRIES:1,RETRY_DELAY:1,ENTRANCE_DELAY:0,EVENT_SCRIPT_NAME:网络信息变化,EVENT_DELAY:3,PANEL_NAME:网络信息面板,UPDATE-INTERVAL:10,ICON:globe.asia.australia,ICON-COLOR:#6699FF
 arguments-desc: |-
