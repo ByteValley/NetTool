@@ -1,6 +1,7 @@
 #!name=番茄小说
 #!desc=番茄小说广告屏蔽
-#!authorzqzess
+#!author=zqzess
+#!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告都得死
 
 [Rule]
