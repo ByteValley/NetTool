@@ -8,6 +8,14 @@
 # USER-AGENT: 1
 # TOTAL: 11
 DOMAIN,wmff.warnermediacdn.com
+DOMAIN,default.any-amer.prd.api.max.com
+DOMAIN,play.max.com
+DOMAIN,default.any-any.prd.api.max.com
+DOMAIN,telegraph.prd.api.max.com
+DOMAIN,default.beam-any.prd.api.max.com
+DOMAIN,default.beam-amer.prd.api.max.com
+DOMAIN,default.beam-amer.use.prd.api.max.com
+DOMAIN,events.prd.api.max.com
 DOMAIN-SUFFIX,max.com
 DOMAIN-SUFFIX,cinemax.com
 DOMAIN-SUFFIX,discomax.com
