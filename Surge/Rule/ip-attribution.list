@@ -2,6 +2,7 @@
 DOMAIN-SUFFIX,snssdk.com
 DOMAIN-SUFFIX,bytedanceapi.com
 DOMAIN-SUFFIX,toutiaoapi.com
+DOMAIN-KEYWORD,toutiao
 
 # ======= 快手 ======= #
 DOMAIN-SUFFIX,gifshow.com
