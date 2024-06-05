@@ -7,7 +7,7 @@ author: |-
 icon: |-
   https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/Weibo.png
 category: |-
-  Shawn
+  广告都得死
 http:
   mitm:
     - "api.weibo.cn"
