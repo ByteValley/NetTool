@@ -1,6 +1,7 @@
 #!name=番茄小说
 #!desc=番茄小说广告屏蔽
-#!category=zqzess
+#!authorzqzess
+#!category=广告都得死
 
 [Rule]
 # 番茄小说 version = 3.1
