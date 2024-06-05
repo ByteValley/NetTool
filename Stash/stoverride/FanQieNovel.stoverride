@@ -59,9 +59,6 @@ http:
 
   url-rewrite:
     - >-
-      *-default.ixigua.com - reject
-# URL-REGEX,.+web\.business\.image,REJECT
-    - >-
       ^http:\/\/.+\.byteimg\.com\/ad-app-package - reject
     - >-
       ^http:\/\/.+\.byteimg\.com\/web\.business\.image - reject
