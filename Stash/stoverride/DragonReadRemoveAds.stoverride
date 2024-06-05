@@ -3,20 +3,18 @@ name: |-
 desc: |-
   番茄小说广告屏蔽
 icon: |-
-  https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
+  https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1088.png
 category: |-
-  Shawn
+  广告都得死
 
 rules:
 # 番茄小说 version = 3.1
   - DOMAIN,p6-ad-sign.byteimg.com,REJECT
   - DOMAIN,p9-ad-sign.byteimg.com,REJECT
-# DOMAIN-SUFFIX,byteimg.com,DIRECT
   - DOMAIN,i.snssdk.com,REJECT
   - DOMAIN,i-lq.snssdk.com,REJECT
   - DOMAIN,dig.bdurl.net,REJECT
   - DOMAIN,imapi3-normal-lf.zijieapi.com,DIRECT
-  - DOMAIN-KEYWORD,zijieapi,REJECT
 # DOMAIN,polaris3-normal-lq.zijieapi.com,REJECT
   - DOMAIN,activity-ag.awemeughun.com,REJECT
   - DOMAIN,mcs.snssdk.com,REJECT
@@ -60,6 +58,9 @@ http:
     - "*.fqnovelvod.com"
 
   url-rewrite:
+    - >-
+      *-default.ixigua.com - reject
+# URL-REGEX,.+web\.business\.image,REJECT
     - >-
       ^http:\/\/.+\.byteimg\.com\/ad-app-package - reject
     - >-
