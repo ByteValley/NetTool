@@ -1,6 +1,6 @@
 # ======= 头条 ======= #
 DOMAIN-SUFFIX,toutiaoapi.com
-DOMAIN-KEYWORD,toutiao
+DOMAIN-SUFFIX,doubao.com
 
 # ======= 快手 ======= #
 DOMAIN-SUFFIX,gifshow.com
