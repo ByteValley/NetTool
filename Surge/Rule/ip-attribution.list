@@ -1,4 +1,6 @@
 # ======= 头条 ======= #
+DOMAIN-SUFFIX,snssdk.com
+DOMAIN-SUFFIX,bytedanceapi.com
 DOMAIN-SUFFIX,toutiaoapi.com
 
 # ======= 快手 ======= #
