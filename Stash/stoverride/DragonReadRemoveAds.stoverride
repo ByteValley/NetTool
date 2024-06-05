@@ -58,9 +58,7 @@ http:
     - "*.fqnovelvod.com"
 
   url-rewrite:
-    - >-
-      *-default.ixigua.com - reject
-# URL-REGEX,.+web\.business\.image,REJECT
+
     - >-
       ^http:\/\/.+\.byteimg\.com\/ad-app-package - reject
     - >-
