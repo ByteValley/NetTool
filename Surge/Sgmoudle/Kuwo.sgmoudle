@@ -1,5 +1,3 @@
-/****************************
-
 #!name = 酷我音乐 & 酷我畅听
 #!desc = 〔 酷我音乐&酷我畅听 〕全功能破解
 #!category = Enhancements
@@ -16,5 +14,3 @@ http-response ^(?!.*img).*?kuwo\.cn(/vip|/openapi)?(/enc|/audi.tion|/v[\d]/(user
 
 [Mitm]
 hostname = *.kuwo.cn
-
-****************************/
