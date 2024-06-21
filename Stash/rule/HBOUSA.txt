@@ -7,4 +7,5 @@ payload:
   - '+.hbomaxcdn.com'
   - '+.cinemax.com'
   - '+.discomax.com'
+  - '+.prd.api.max.com'
   - '+.hbomaxdash.s.llnwi.net'
