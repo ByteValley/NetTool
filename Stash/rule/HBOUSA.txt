@@ -1,0 +1,10 @@
+payload:
+  - 'wmff.warnermediacdn.com'
+  - '+.h264.io'
+  - '+.maxgo.com'
+  - '+.hbonow.com'
+  - '+.hbomax.com'
+  - '+.hbomaxcdn.com'
+  - '+.cinemax.com'
+  - '+.discomax.com'
+  - '+.hbomaxdash.s.llnwi.net'
