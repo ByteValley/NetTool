@@ -1,0 +1,280 @@
+proxy-providers:
+  Aladdin:
+    interval: 86400
+    url: http://sub.store/download/Aladdin
+    benchmark-timeout: 10
+    benchmark-url: http://www.gstatic.com/generate_204
+  Eternal:
+    interval: 86400
+    url: https://sub.store/download/Eternal
+    benchmark-timeout: 10
+    benchmark-url: http://www.gstatic.com/generate_204
+  Enet:
+    interval: 86400
+    url: https://sub.store/download/Enet
+    benchmark-timeout: 10
+    benchmark-url: http://www.gstatic.com/generate_204
+  KTM:
+    interval: 86400
+    url: https://sub.store/download/KTMCloud
+    benchmark-timeout: 10
+    benchmark-url: http://www.gstatic.com/generate_204
+  Eggtart:
+    interval: 86400
+    url: https://sub.store/download/Eggtart
+    benchmark-timeout: 10
+    benchmark-url: http://www.gstatic.com/generate_204
+  Fish:
+    interval: 0
+    url: http://sub.store/download/Fish
+  TianDan:
+    interval: 86400
+    url: http://sub.store/download/TIANDAN
+proxy-groups:
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/Fastfish.png
+    name: FishCloud
+    type: select
+    use:
+      - Fish
+    lazy: true
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/Enet.png
+    name: EnetCloud
+    type: select
+    use:
+      - Enet
+    lazy: true
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/NSFW.png
+    name: KTMCloud
+    type: select
+    use:
+      - KTM
+    lazy: true
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/MGNB.png
+    name: EggtartCloud
+    type: select
+    use:
+      - Eggtart
+    lazy: true
+  - icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/TIDAL.png
+    lazy: true
+    name: TanDanCloud
+    type: select
+    use:
+      - TianDan
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/Element.png
+    name: EternalNetwork
+    type: select
+    use:
+      - Eternal
+    lazy: true
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/SSlinks.png
+    name: AladdinNetwork
+    type: select
+    use:
+      - Aladdin
+    lazy: true
+  - name: TW
+    filter: 台|TW|Tai
+    lazy: true
+    proxies: null
+    type: select
+    use:
+      - Fish
+      - Enet
+      - KTM
+      - Eggtart
+      - TianDan
+      - Eternal
+      - Aladdin
+    icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/TW.png
+  - filter: ' 美|US|States'
+    icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/US.png
+    lazy: true
+    name: US
+    type: select
+    use:
+      - Fish
+      - Enet
+      - Eggtart
+      - TianDan
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Color/Netflix.png
+    lazy: true
+    name: Netflix
+    proxies:
+      - TW
+      - PROXY
+    type: select
+    use-url:
+      - http://sub.store/download/Netflix
+  - icon: https://raw.githubusercontent.com/Orz-3/mini/master/Alpha/Nucleus.png
+    name: PROXY
+    type: select
+    use: null
+    proxies:
+      - TW
+      - US
+      - FishCloud
+      - EnetCloud
+      - KTMCloud
+      - EggtartCloud
+      - TanDanCloud
+      - AladdinNetwork
+      - EternalNetwork
+  - name: 境内服务
+    proxies:
+      - DIRECT
+      - PROXY
+      - REJECT
+    type: select
+    icon: https://raw.githubusercontent.com/erdongchanyo/icon/main/Policy-Filter/Mainland.png
+  - name: 境外服务
+    proxies:
+      - PROXY
+      - DIRECT
+      - REJECT
+    type: select
+    icon: https://raw.githubusercontent.com/erdongchanyo/icon/main/Policy-Filter/Proxy.png
+  - name: 拒绝服务
+    proxies:
+      - REJECT
+      - DIRECT
+      - PROXY
+    type: select
+    icon: https://raw.githubusercontent.com/erdongchanyo/icon/main/Policy-Filter/Reject.png
+  - name: 系统服务
+    proxies:
+      - REJECT
+      - DIRECT
+      - PROXY
+    type: select
+    icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Apple_Update.png
+  - icon: https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Bypass.png
+    name: 属地替换
+    proxies:
+      - TW
+      - PROXY
+    type: select
+rule-providers:
+  reject:
+    type: http
+    behavior: domain
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/reject.txt
+    path: ./ruleset/reject.yaml
+    interval: 86400
+  google:
+    behavior: domain
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/google.txt
+  proxy:
+    behavior: domain
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt
+  apple:
+    type: http
+    behavior: domain
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt
+    path: ./ruleset/apple.yaml
+    interval: 86400
+  icloud:
+    behavior: domain
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/icloud.txt
+  direct:
+    type: http
+    behavior: domain
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt
+    path: ./ruleset/direct.yaml
+    interval: 86400
+  private:
+    type: http
+    behavior: domain
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/private.txt
+    path: ./ruleset/private.yaml
+    interval: 86400
+  cncidr:
+    type: http
+    behavior: ipcidr
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt
+    path: ./ruleset/cncidr.yaml
+    interval: 86400
+  lancidr:
+    type: http
+    behavior: ipcidr
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/lancidr.txt
+    path: ./ruleset/lancidr.yaml
+    interval: 86400
+  os-update:
+    behavior: domain
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/SeannLiang/NetTool/main/Stash/rule/OsUpdate.txt
+  ip-attribution:
+    behavior: domain
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/SeannLiang/NetTool/main/Stash/rule/ip-attribution.txt
+  Hulu:
+    behavior: classical
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Hulu/Hulu.yaml
+  HBOGO:
+    behavior: classical
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/HBOHK/HBOHK.yaml
+  HBOMax:
+    behavior: classical
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/HBOUSA/HBOUSA.yaml
+  Disney:
+    behavior: classical
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Disney/Disney.yaml
+  Netflix:
+    behavior: classical
+    format: yaml
+    interval: 86400
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
+rules:
+  - RULE-SET,Netflix,Netflix
+  - RULE-SET,Disney,TW
+  - RULE-SET,HBOGO,TW
+  - RULE-SET,HBOMax,US
+  - RULE-SET,Hulu,US
+  - RULE-SET,os-update,系统服务
+  - RULE-SET,reject,拒绝服务
+  - RULE-SET,ip-attribution,属地替换
+  - RULE-SET,google,境外服务
+  - RULE-SET,proxy,境外服务
+  - RULE-SET,private,境内服务
+  - RULE-SET,apple,境内服务
+  - RULE-SET,icloud,境内服务
+  - RULE-SET,direct,境内服务
+  - RULE-SET,lancidr,境内服务
+  - RULE-SET,cncidr,境内服务
+  - GEOIP,LAN,境内服务
+  - GEOIP,CN,境内服务
+  - MATCH,境外服务
+http:
+  ca: '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'
+  ca-passphrase: 'JUQE00F8'
+script:
+  shortcuts:
+    quic: network == 'udp' and dst_port == 443
+dns:
+  default-nameserver:
+    - 114.114.115.115
+    - 119.28.28.28
+    - 223.6.6.6
+    - system
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+log-level: warning
+mode: rule
