@@ -137,8 +137,8 @@ IP-CIDR, 122.229.8.47/32, REJECT, no-resolve
 IP-CIDR, 122.229.29.89/32, REJECT, no-resolve
 
 # 快递100
-URL-REGEX, ^http:\/\/p\.kuaidi100\.com\/mobile\/mobileapi\.do, REJECT-DICT
-URL-REGEX, ^http:\/\/p\.kuaidi100\.com\/advertisement\/, REJECT-DICT
+URL-REGEX, ^http:\/\/p\.kuaidi100\.com\/mobile\/mobileapi\.do, REJECT
+URL-REGEX, ^http:\/\/p\.kuaidi100\.com\/advertisement\/, REJECT
 
 # 京东 - 弃用地址
 DOMAIN, waapdg.jd.com, REJECT
