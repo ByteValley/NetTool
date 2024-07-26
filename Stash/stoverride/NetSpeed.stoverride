@@ -11,14 +11,14 @@ auther: |-
 
 tiles:
   - name: "NetSpeed_15"
-    interval: 3600
+    interval: 5
     title: "NetSpeed_15"
     icon: ""
     backgroundColor: ""
     argument: |-
-      title=NetSpeed&iconfast=bolt&iconmid=hare&iconslow=tortoise&colorlow=#06D6A0&colormid=#FFD166&colorhigh=#EF476F&mb=3
+      title=网速面板&iconfast=bolt&iconmid=hare&iconslow=tortoise&colorlow=#06D6A0&colormid=#FFD166&colorhigh=#EF476F&mb=3
 
 script-providers:
   "NetSpeed_15":
     url: https://raw.githubusercontent.com/getsomecat/GetSomeCats/Surge/modules/Panel/Net_Speed/Net_Speed.js
-    interval: 1
+    interval: 86400
