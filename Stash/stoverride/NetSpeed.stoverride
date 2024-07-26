@@ -11,7 +11,7 @@ auther: |-
 
 tiles:
   - name: "NetSpeed"
-    interval: 30
+    interval: 3600
     title: "NetSpeed"
     icon: ""
     backgroundColor: ""
