@@ -28,13 +28,13 @@ tiles:
 
 # > 节日信息
   - name: "节日信息"
-    interval: -1
+    interval: 3600
     title: "节日信息"
     icon: ""
     backgroundColor: ""
     
   - name: "NetSpeed"
-    interval: -1
+    interval: 3600
     title: "NetSpeed"
     icon: ""
     backgroundColor: ""
@@ -42,7 +42,7 @@ tiles:
       title=网速面板&iconfast=bolt&iconmid=hare&iconslow=tortoise&colorlow=#06D6A0&colormid=#FFD166&colorhigh=#EF476F&mb=3
 
   - name: "网络信息"
-    interval: -1
+    interval: 3600
     title: "网络信息"
     icon: "globe.asia.australia"
     backgroundColor: "#6699FF"
