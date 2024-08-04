@@ -1,0 +1,24 @@
+#!name=YouTube去广告
+#!desc=YouTube去广告
+#!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/YouTube.png
+#!keyword=广告都得死
+#!author=zqzess
+#!homepage=http://script.hub/file/_start_/https://github.com/ddgksf2013/Rewrite/raw/master/AdBlock/YoutubeAds.conf/_end_/YouTubeNoAds.plugin.txt?n=YouTube去广告&type=qx-rewrite&target=loon-plugin&del=true&icon=https%3A%2F%2Fgitlab.com%2Flodepuly%2Ficonlibrary%2F-%2Fraw%2Fmain%2FApp_icon%2F120px%2FYouTube.png&category=广告都得死
+
+[Rewrite]
+# ======= 视频广告请求 ======= #
+(^https?:\/\/[\w-]+\.googlevideo\.com\/(?!dclk_video_ads).+?)&ctier=L(&.+?),ctier,(.+) $1$2$3 302
+^https?:\/\/[\w-]+\.googlevideo\.com\/(?!(dclk_video_ads|videoplayback\?)).+&oad - reject-200
+# ======= 通用广告请求 ======= #
+^https?:\/\/(www|s)\.youtube\.com\/api\/stats\/ads - reject-200
+^https?:\/\/(www|s)\.youtube\.com\/(pagead|ptracking) - reject-200
+^https?:\/\/s\.youtube\.com\/api\/stats\/qoe\?adcontext - reject-200
+
+[Script]
+# ======= 视频PIP|后台播放|瀑布流|搜索页|播放页|短视频|贴片广告  ======= #
+http-request ^https?:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(browse|next|player|reel\/reel_watch_sequence|get_watch) script-path=https://raw.githubusercontent.com/Maasea/sgmodule/master/Script/Youtube/dist/youtube.request.preview.js, requires-body=true, binary-body-mode=true, timeout=60, tag=youtube.request.preview
+
+http-response ^https?:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(browse|next|player|search|reel\/reel_watch_sequence|guide|account\/get_setting|get_watch) script-path=https://raw.githubusercontent.com/Maasea/sgmodule/master/Script/Youtube/dist/youtube.response.preview.js, requires-body=true, binary-body-mode=true, timeout=60, tag=youtube.response.preview
+
+[MITM]
+hostname = -redirector*.googlevideo.com, *.googlevideo.com, www.youtube.com, s.youtube.com, youtubei.googleapis.com
