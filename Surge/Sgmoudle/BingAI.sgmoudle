@@ -1,0 +1,28 @@
+#!name=Bing AI
+#!desc=将Safari浏览器伪装为Edge浏览器，以便绕过BingAI的使用限制。
+#!author=LiuYaChen 可莉🅥
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Bing.png
+#!category=Enhancements
+#!openUrl=https://apps.apple.com/app/id345323231
+#!tag=功能增强, LiuYaChen 可莉🅥
+#!system=iOS
+#!loon_version=3.2.1(372)
+#!homepage=https://github.com/luestr/ProxyResource/blob/main/README.md
+#!date=2023-09-08 13:48:55
+
+[Rule]
+DOMAIN-SUFFIX, bing.com, JP
+DOMAIN-SUFFIX, bing.com.cn, JP
+DOMAIN-SUFFIX, bing.net, JP
+DOMAIN-SUFFIX, bingads.com, JP
+DOMAIN-SUFFIX, bingagencyawards.com, JP
+DOMAIN-SUFFIX, bingapistatistics.com, JP
+DOMAIN-SUFFIX, bingsandbox.com, JP
+DOMAIN-SUFFIX, bingvisualsearch.com, JP
+DOMAIN-SUFFIX, bingworld.com, JP
+
+[Script]
+Bing AI = type=http-request, pattern=^https:\/\/www\.bing\.com\/(search|new), script-path=https://raw.githubusercontent.com/luestr/ProxyResource/main/Resource/Script/Bing/BingAI.js
+
+[MITM]
+hostname = %APPEND% www.bing.com
