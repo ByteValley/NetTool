@@ -1,0 +1,27 @@
+#!name=全民K歌去广告
+#!desc=移除开屏广告、歌房页面弹窗广告、消息页广告和我的页面广告。
+#!author=可莉🅥
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/QQKSong.png
+#!category=广告都得死
+
+[Rule]
+DOMAIN,adsmind.gdtimg.com,REJECT
+DOMAIN,ii.gdt.qq.com,REJECT
+DOMAIN,sdk.e.qq.com,REJECT
+DOMAIN,us.l.qq.com,REJECT
+DOMAIN,tmead.y.qq.com,REJECT-NO-DROP
+DOMAIN,tmeadkg.y.qq.com,REJECT-NO-DROP
+URL-REGEX,^http:\/\/y\.gtimg\.cn\/music\/common\/upload\/t_k_main_page_banner\/,REJECT
+
+[Map Local]
+^https:\/\/wallpaper-\d+\.file\.myqcloud\.com\/dsl\/ data-type=text data="{}" status-code=200
+
+^https?:\/\/wallpaper-\d+\.file\.myqcloud\.com\/hikari\/ data-type=text data="{}" status-code=200
+
+^https:\/\/amsweb-cdn-\S+-\d+\.file\.myqcloud\.com\/video\/ad_profile\/ data-type=text data="{}" status-code=200
+
+# 右下角轮播动画
+^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ data-type=text data="{}" status-code=200
+
+[MITM]
+hostname = %APPEND% wallpaper-1258344696.file.myqcloud.com, amsweb-cdn-*-1258344696.file.myqcloud.com, wnsaviator.kg.qq.com
