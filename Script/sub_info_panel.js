@@ -16,7 +16,6 @@
   let total = info.total;
   let expire = args.expire || info.expire;
   let content = [`已用：${toPercent(used, total)} \t|  用量：${bytesToSize(used)} \n 剩余：${toPercent(toMultiply(total, used), total)} \t | 余量：${toMultiply(total, used)}`];
-  content.push([`用量：${bytesToSize(used)} | ${bytesToSize(total)}`];)
 
   if (resetDayLeft || expire) {
     if (resetDayLeft && expire && expire !== "false") {
