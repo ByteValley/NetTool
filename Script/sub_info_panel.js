@@ -125,11 +125,13 @@ function bytesToSizeNumber(bytes) {
 }
 
 function toPercent(num, total) {
-  return (Math.round((num / total) * 10000) / 100).toFixed(1) + "%";
+  // return (Math.round((num / total) * 10000) / 100).toFixed(1) + "%";
+  return (Math.round(num / total * 10000) / 100.0 + "%");
 }
 
 function toReversePercent(num, total) {
-  return (Math.round(((total - num) / total) * 10000) / 100).toFixed(1) + "%";
+  // return (Math.round(((total - num) / total) * 10000) / 100).toFixed(1) + "%";
+  return (Math.round((total - num) / total * 10000) / 100.0 + "%");
 }
 
 
