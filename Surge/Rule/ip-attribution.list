@@ -8,6 +8,9 @@ DOMAIN-SUFFIX,ksapisrv.com
 # ======= 小红书 ======= #
 DOMAIN-SUFFIX,xiaohongshu.com
 DOMAIN-SUFFIX,xhscdn.com
+IP-CIDR,81.68.0.0/14,proxy
+IP-CIDR,140.206.0.0/15,proxy
+IP-CIDR,182.50.0.0/20,proxy
 
 # ======= 微博 ======= #
 DOMAIN,api.weibo.cn
