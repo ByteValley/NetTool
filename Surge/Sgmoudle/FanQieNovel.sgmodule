@@ -17,45 +17,33 @@ DOMAIN, is.snssdk.com, DIRECT // 放行此条以确保广告联盟脚本的正�
 DOMAIN, log5-applog.fqnovel.com, REJECT
 DOMAIN, rtlog5-applog.fqnovel.com, REJECT
 
-# 七猫
-DOMAIN,cdn-ad.wtzw.com,REJECT
-DOMAIN,cdn-new-ad.wtzw.com,REJECT
-DOMAIN-SUFFIX,gdt.qq.com,REJECT
-
 [URL Rewrite]
-# 七猫
-# 开屏广告
-^https:\/\/api-cfg\.wtzw\.com\/v1\/splash\/ reject-dict header
-# 福利中心
-# ^https:\/\/xiaoshuo\.wtzw\.com\/app-h5\/freebook\/welfare-center reject header
-# 腾格尔打卡喵喵歌
-^https:\/\/api-bc\.wtzw\.com\/api\/v4\/search\/dispose reject-dict header
-# ^https:\/\/xiaoshuo\.wtzw\.com\/api\/v2\/init\/other-data reject-dict header
-# 必读榜弹窗
-^https:\/\/api-bc\.wtzw\.com\/api\/v1\/book-store\/config reject-dict header
-# 推荐书籍弹窗
-^https:\/\/api-bc\.wtzw\.com\/api\/v1\/book-store\/push-book reject-dict header
-# 有声阅读界面广告横幅
-^https:\/\/api-bc\.wtzw\.com\/api\/v1\/operation reject-dict header
 # 头条广告SDK
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
-# 听书赚金币
-^https:\/\/api-gw\.wtzw\.com\/welf\/app\/v1\/task\/red-packet reject-dict header
-# 正文底部推广
-^https:\/\/cdn\.wtzw\.com\/bookimg\/free\/api\/v1\/reader\/reader-copy-paragraph-all\.json reject-dict header
-# 底栏提现红点
-# ^https:\/\/xiaoshuo\.wtzw\.com\/api\/v1\/user\/red-point reject header
-# 其他广告
-^https:\/\/api-cfg\.wtzw\.com\/v1\/reward\/ reject header
-^https:\/\/api-cfg\.wtzw\.com\/v1\/adv\/ reject header
-^https:\/\/api-cfg\.wtzw\.com\/v1\/offline-adv\/index reject-dict header
-^https:\/\/api-cfg\.wtzw\.com\/v1\/operation\/index\?ad_personal_switch reject-dict header
-# ^https:\/\/xiaoshuo\.wtzw\.com\/api\/v1\/withdraw\/init reject-dict header
+
 # 番茄
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
 ^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
 # 域名解析
 ^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
+# 番茄小说去章末广告
+^https?:\/\/.+\.pangolin-sdk-toutiao\.com\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/ - reject
+^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4 - reject
+^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad)\/.+ - reject
+^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/web\.business\.image\/.+ - reject
+^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/obj\/ad-pattern\/renderer - reject
+^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
+^https?:\/\/.+\.byteimg.com/tos-cn-i-1yzifmftcy\/(.+)-jpeg\.jpeg - reject
+^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from\=ad - reject
+^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+ - reject
+^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4 - reject
+^https?:\/\/.+\.snssdk.com\/api\/ad\/.+ - reject
+# 下面两条来自他人,暂不知是哪个app
+^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/ - reject
+
+^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(ad-app-package|ad)\/.+ - reject
+^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+ - reject
+^https?:\/\/v(\d)+-novelapp\.fqnovelvod\.com\/.+\/video\/.+ - reject
 
 [MITM]
 hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com
