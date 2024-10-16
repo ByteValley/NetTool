@@ -14,7 +14,7 @@
 [Script]
 Availability响应处理 = type=http-response, pattern=^https?:\/\/weatherkit\.apple\.com\/api\/v1\/availability\/, script-path=https://github.com/NSRingo/WeatherKit/releases/latest/download/response.js, requires-body=true
 
-Weather响应处理 = type=http-response, pattern=^https?:\/\/weatherkit\.apple\.com\/api\/v2\/weather\/, script-path=https://github.com/NSRingo/WeatherKit/releases/latest/download/response.js, requires-body=true, binary-body-mode=true, argument="[{NextHour.Provider},{AQI.Provider},{AQI.ReplaceProviders},{AQI.Local.Scale},{AQI.Local.ReplaceScales},{AQI.Local.ConvertUnits},{API.ColorfulClouds.Token},{API.QWeather.Host},{API.QWeather.Token},{API.WAQI.Token}]"
+Weather响应处理 = type=http-response, pattern=^https?:\/\/weatherkit\.apple\.com\/api\/v2\/weather\/, script-path=https://github.com/NSRingo/WeatherKit/releases/latest/download/response.js, requires-body=true, binary-body-mode=true, argument=[未来一小时降水强度]数据源={{{NextHour.Provider}}}&[空气质量]数据源={{{AQI.Provider}}}&[空气质量]需要替换的供应商={{{AQI.ReplaceProviders}}}&[空气质量]本地替换算法={{{AQI.Local.Scale}}}&[空气质量]需要修改的标准={{{AQI.Local.ReplaceScales}}}&[空气质量]转换污染物计量单位={{{AQI.Local.ConvertUnits}}}&[API]彩云天气API令牌={{{API.ColorfulClouds.Token}}}&[API]和风天气API主机={{{API.QWeather.Host}}}&[API]和风天气API令牌={{{API.QWeather.Token}}}&[API]WAQI API令牌={{{API.WAQI.Token}}}
 
 [MITM]
 hostname = %APPEND% weatherkit.apple.com
