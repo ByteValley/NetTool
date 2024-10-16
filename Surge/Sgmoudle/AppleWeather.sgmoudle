@@ -5,7 +5,7 @@
 #!category=Enhancements
 #!homepage = https://gitlab.com/lodepuly/vpn_tool/-/blob/master/README.md
 #!icon = https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/AppleWeather.png
-#!arguments=[未来一小时降水强度]数据源:ColorfulClouds,[空气质量]数据源:ColorfulClouds,[空气质量]需要替换的供应商:,[空气质量]本地替换算法:WAQI_InstantCast,[空气质量]需要修改的标准:HJ6332012,[空气质量]转换污染物计量单位:true,[API]彩云天气API令牌:,[API]和风天气API主机:devapi.qweather.com,[API]和风天气API令牌:,[API]WAQI API令牌:
+#!arguments=[未来一小时降水强度]数据源:ColorfulClouds,[空气质量]数据源:ColorfulClouds,[空气质量]需要替换的供应商:"",[空气质量]本地替换算法:WAQI_InstantCast,[空气质量]需要修改的标准:HJ6332012,[空气质量]转换污染物计量单位:true,[API]彩云天气API令牌:"",[API]和风天气API主机:devapi.qweather.com,[API]和风天气API令牌:"",[API]WAQI API令牌:""
 #!arguments-desc=[Argument]\n⓵ NextHour.Provider = select, "ColorfulClouds", "WeatherKit", "QWeather", tag = [未来一小时降水强度]数据源, desc = 选择WeatherKit等同于不做修改 \n⓶ AQI.Provider = select, "ColorfulClouds", "WeatherKit", "QWeather", "WAQI", tag = [空气质量]数据源, desc = 选择WeatherKit等同于不做修改 \n⓷ AQI.ReplaceProviders = input, "", tag = [空气质量]需要替换的供应商, desc = 填写的空气质量数据源会被替换 \n⓸ AQI.Local.Scale = select, "WAQI_InstantCast", "NONE", tag = [空气质量]本地替换算法, desc = 本地替换时使用的算法 \n⓹ AQI.Local.ReplaceScales = input, "HJ6332012", tag = [空气质量]需要修改的标准, desc = 填写的空气质量标准会被替换 \n⓺ AQI.Local.ConvertUnits = switch, false, tag = [空气质量]转换污染物计量单位, desc = 将污染物数据替换为转换单位后的数据，方便对照转换后的标准。 \n⓻ API.ColorfulClouds.Token = input, "", tag = [API]彩云天气API令牌, desc = 填写此字段将自动使用彩云天气高级API \n⓻ API.QWeather.Host = select, "devapi.qweather.com", "api.qweather.com", tag = [API]和风天气API主机, desc = 和风天气API使用的主机名 \n⓻ API.QWeather.Token = input, "", tag = [API]和风天气API令牌, desc = 填写此字段将自动使用和风天气高级API \n⓻ API.WAQI.Token = input, "", tag = [API]WAQI API令牌, desc = 填写此字段将自动使用WAQI高级API
 
 [Rule]
