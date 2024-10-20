@@ -5,13 +5,24 @@
 #!date = 2024-06-16
 #!select = 选择试听音质,至臻音质,无损音质,超品音质
 
+[Map Local]
+# 广告
+^http:\/\/audiobookpay\.kuwo\.cn\/a\.p\?op=get_advertright_endtime data-type=text data="{}" status-code=200
+
 [Rule]
 # USER-AGENT,KWPlayer*,PROXY
 # HOST-SUFFIX,kuwo.cn,PROXY
 
 [Script]
-酷我音乐 = type=http-response, pattern=^(?!.*img).*?kuwo\.cn(/vip|/openapi)?(/enc|/audi.tion|/v[\d]/(user/vip\?(vers|apiVersion|platform|op\=ui|_t)|theme\?op=gd|sysinfo\?op=getRePayAndDoPayBoxNew|api(/pay)?/((user/personal/)?user/info|payInfo/kwplayer/payMiniBar|advert/(myPage|iListen|album))|album/(adBar|myRec/vipMusic))|/kuwopay/vip-tab/setting|/(audioApi/)?a\.p($|\?op\=getvip|.*?ptype\=vip)|/mobi\.s\?f\=kwxs|/music\.pay\?newver\=3$|/(EcomResource|(Mobile)?Ad)Serv(er|ice)), script-path=https://raw.githubusercontent.com/Yuheng0101/X/main/Scripts/kuwo.js, requires-body=true, timeout=60
+kuwo = type=http-response, pattern=^http:\/\/(mgxhtj|nmobi|searchrecterm)\.kuwo\.cn\/(mgxh|mobi|recterm)\.s, script-path=https://raw.githubusercontent.com/RuCu6/QuanX/main/Scripts/break/kuwo.js, requires-body=true, max-size=-1, timeout=60
+# 会员
+kuwo = type=http-response, pattern=^http:\/\/audiobookpay\.kuwo\.cn\/a\.p, script-path=https://raw.githubusercontent.com/RuCu6/QuanX/main/Scripts/break/kuwo.js, requires-body=true, max-size=-1, timeout=60
+kuwo = type=http-response, pattern=^http:\/\/musicpay\.kuwo\.cn\/music\.pay, script-path=https://raw.githubusercontent.com/RuCu6/QuanX/main/Scripts/break/kuwo.js, requires-body=true, max-size=-1, timeout=60
+kuwo = type=http-response, pattern=^http:\/\/vip1\.kuwo\.cn\/vip\/(enc\/user\/vip\?op=ui|v2\/theme\?op=gd), script-path=https://raw.githubusercontent.com/RuCu6/QuanX/main/Scripts/break/kuwo.js, requires-body=true, max-size=-1, timeout=60
+kuwo = type=http-response, pattern=^https:\/\/vip1\.kuwo\.cn\/vip\/v2\/user\/vip\?op=ui, script-path=https://raw.githubusercontent.com/RuCu6/QuanX/main/Scripts/break/kuwo.js, requires-body=true, max-size=-1, timeout=60
+
+# 酷我音乐 = type=http-response, pattern=^(?!.*img).*?kuwo\.cn(/##vip|/openapi)?(/enc|/audi.tion|/v[\d]/(user/vip\?(vers|apiVersion|platform|op\=ui|_t)|theme\?op=gd|sysinfo\?op=getRePayAndDoPayBoxNew|api(/pay)?/((user/personal/)?user/info|payInfo/kwplayer/payMiniBar|advert/(myPage|iListen|album))|album/(adBar|myRec/vipMusic))|/kuwopay/vip-tab/setting|/(audioApi/)?a\.p($|\?op\=getvip|.*?ptype\=vip)|/mobi\.s\?f\=kwxs|/music\.pay\?newver\=3$|/(EcomResource|(Mobile)?Ad)Serv(er|ice)), script-path=https://raw.githubusercontent.com/Yuheng0101/X/main/Scripts/kuwo.js, requires-body=true, timeout=60
 # http-response ^(?!.*img).*?kuwo\.cn(/vip|/openapi)?(/enc|/audi.tion|/v[\d]/(user/vip\?(vers|apiVersion|platform|op\=ui|_t)|theme\?op=gd|sysinfo\?op=getRePayAndDoPayBoxNew|api(/pay)?/((user/personal/)?user/info|payInfo/kwplayer/payMiniBar|advert/(myPage|iListen|album))|album/(adBar|myRec/vipMusic))|/kuwopay/vip-tab/setting|/(audioApi/)?a\.p($|\?op\=getvip|.*?ptype\=vip)|/mobi\.s\?f\=kwxs|/music\.pay\?newver\=3$|/(EcomResource|(Mobile)?Ad)Serv(er|ice)) script-path=https://raw.githubusercontent.com/Yuheng0101/X/main/Scripts/kuwo.js, requires-body=true, timeout=60, tag=酷我音乐, img-url=https://file.napi.ltd/Static/Image/KuWo.png
 
 [Mitm]
-hostname = *.kuwo.cn
+hostname = %APPEND% *.kuwo.cn
