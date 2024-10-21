@@ -2,7 +2,7 @@
 #!desc=将Safari浏览器伪装为Edge浏览器，以便绕过BingAI的使用限制。
 #!author=LiuYaChen 可莉🅥
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Bing.png
-#!category=Enhancements
+#!category=功能增强
 
 [Rule]
 DOMAIN-SUFFIX, bing.com, JP
