@@ -1,7 +1,7 @@
 #!name = 酷我音乐
 #!desc = 酷我广告屏蔽与会员解锁
 #!category = Enhancements
-#!icon = https://file.napi.ltd/Static/Image/KuWo.png
+#!icon = https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/Kuwo.png
 #!date = 2024-06-16
 #!select = 选择试听音质,至臻音质,无损音质,超品音质
 
