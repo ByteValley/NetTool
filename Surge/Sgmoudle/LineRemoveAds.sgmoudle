@@ -2,7 +2,7 @@
 #!desc=移除Line各类广告
 #!author=jkgtw
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Line.png
-#!category=广告都得死
+#!category=广告屏蔽
 
 [URL Rewrite]
 ^https:\/\/a\.line\.me\/lass\/api\/v\d\/ads$ - reject
