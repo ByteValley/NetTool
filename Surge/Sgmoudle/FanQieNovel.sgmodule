@@ -2,7 +2,7 @@
 #!desc=番茄小说广告屏蔽
 #!author=zqzess
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
-#!category=广告都得死
+#!category=广告屏蔽
 
 [Rule]
 URL-REGEX, ^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/, REJECT
