@@ -1,6 +1,6 @@
 #!name=去广告集合
 #!desc=转换自其他大佬规则
-#!categroy=广告屏蔽
+#!category=广告屏蔽
 
 [Url Rewrite]
 # > 云闪付 （默认关闭,只使用分流去云闪付广告）
