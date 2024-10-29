@@ -5,10 +5,11 @@
 [Url Rewrite]
 # >>>>>>>>>>>>>>> ✅ D ✅ <<<<<<<<<<<<<<
 # > 叮咚买菜
-# 开屏广告 #主机名maicai.api.ddxq.mobi
-^https:\/\/maicai\.api\.ddxq\.mobi\/advert\/getAd\?ad_id url reject-dict
+#主机名maicai.api.ddxq.mobi
+# 开屏广告
+^https:\/\/maicai\.api\.ddxq\.mobi\/advert\/getAd\?ad_id data-type=text data="{}" status-code=200
 # 新人弹窗
-^https:\/\/maicai\.api\.ddxq\.mobi\/homeApi\/getHomeAdPop url reject-dict
+^https:\/\/maicai\.api\.ddxq\.mobi\/homeApi\/getHomeAdPop data-type=text data="{}" status-code=200
 
 # > 滴滴出行
 https?://res\.xiaojukeji\.com\/resapi\/activity\/mget url reject-dict
