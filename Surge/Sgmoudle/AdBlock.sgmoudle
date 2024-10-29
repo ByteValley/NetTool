@@ -15,17 +15,22 @@
 # 主机名emdcadvertise.eastmoney.com
 ^https?:\/\/emdcadvertise\.eastmoney\.com\/infoService\/v2 data-type=text data=" " status-code=200
 
-# > 滴滴出行
-https?://res\.xiaojukeji\.com\/resapi\/activity\/mget url reject-dict
-https?:\/\/res\.xiaojukeji\.com\/resapi\/activity\/get(Ruled|Preload|PasMultiNotices) url reject
-^https?:\/\/img-ys011\.didistatic\.com\/static\/ad_oss\/.*.jpg url reject
-https?://res\.xiaojukeji\.com\/resapi\/activity\/mget url reject
-https?:\/\/res\.xiaojukeji\.com\/resapi\/activity\/get(Ruled|Preload|PasMultiNotices) url reject
+# > 滴滴出行 res.xiaojukeji.com
+# https?://res\.xiaojukeji\.com\/resapi\/activity\/mget url reject-dict
+# https?:\/\/res\.xiaojukeji\.com\/resapi\/activity\/get(Ruled|Preload|PasMultiNotices) url reject
+# ^https?:\/\/img-ys011\.didistatic\.com\/static\/ad_oss\/.*.jpg url reject
+# https?://res\.xiaojukeji\.com\/resapi\/activity\/mget url reject
+# https?:\/\/res\.xiaojukeji\.com\/resapi\/activity\/get(Ruled|Preload|PasMultiNotices) url reject
+https?://res\.xiaojukeji\.com\/resapi\/activity\/mget data-type=text data="{}" status-code=200
 
 # > 滴滴青桔
-^https?:\/\/pt-starimg\.didistatic\.com\/static\/starimg\/node\/.*.(jpg|png|gif) url reject-200
-^https?:\/\/omgup[0-9]{1}\.xiaojukeji\.com\/api url reject-200
-^https?:\/\/omgup*\.xiaojukeji\.com\/api url reject-200
+# ^https?:\/\/pt-starimg\.didistatic\.com\/static\/starimg\/node\/.*.(jpg|png|gif) url reject-200
+# ^https?:\/\/omgup[0-9]{1}\.xiaojukeji\.com\/api url reject-200
+# ^https?:\/\/omgup*\.xiaojukeji\.com\/api url reject-200
+^https?:\/\/pt-starimg\.didistatic\.com\/static\/starimg\/node\/.*.(jpg|png|gif) data-type=text data=" " status-code=200
+^https?:\/\/omgup[0-9]{1}\.xiaojukeji\.com\/api data-type=text data=" " status-code=200
+^https?:\/\/omgup*\.xiaojukeji\.com\/api data-type=text data=" " status-code=200
+
 
 # >>>>>>>>>>>>>>> ✅ E ✅ <<<<<<<<<<<<<<
 # > 饿了么
@@ -281,4 +286,5 @@ https?:\/\/cloud\.189\.cn\/include\/splash\/ data-type=text data=" " status-code
 
 
 [MITM]
-hostname = %APPEND% maicai.api.ddxq.mobi, *.xiaojukeji.com, *.didistatic.com, *.elecfans.com, *.icbc.com, ads.iconntech.com, smkmp.96225.com, m.ibuscloud.com, acs.m.taobao.com, gab.122.gov.cn, api.m.jd.com, *.meituan.net, *.meituan.com
+hostname = %APPEND% maicai.api.ddxq.mobi, emdcadvertise.eastmoney.com
+, res.xiaojukeji.com, *.xiaojukeji.com, *.didistatic.com, *.elecfans.com, *.icbc.com, ads.iconntech.com, smkmp.96225.com, m.ibuscloud.com, acs.m.taobao.com, gab.122.gov.cn, api.m.jd.com, *.meituan.net, *.meituan.com
