@@ -85,7 +85,7 @@ https?:\/\/res\.xiaojukeji\.com\/resapi\/activity\/get(Ruled|Preload|PasMultiNot
 ^https?:\/\/(s3plus|flowplus)\.meituan\.net\/v\d\/\w+\/linglong\/\w+\.(gif|jpg|mp4) url reject
 ^https?:\/\/apimobile\.meituan\.com\/appupdate\/mach\/checkUpdate? url reject
 ^https?:\/\/img\.meituan\.net\/(adunion|display|midas)\/\w+\.(gif|jpg|jpg\.webp)$ url reject
-^https?:\/\/p\d.meituan.net\/movie\/.*?\?may_covertWebp url reject-img
+^https?:\/\/p\d\.meituan\.net\/movie\/.*?\?may_covertWebp url reject-img
 ^https?:\/\/p\d{1}\.meituan\.net\/(adunion|display|mmc|wmbanner)\/ url reject
 
 # > 美团外卖
@@ -232,4 +232,4 @@ https://ccsp-egmas.sf-express.com/cx-app-base/base/app/ad/queryAdImages url reje
 ^https?:\/\/app\.10099\.com\.cn\/contact-web\/api\/version\/getFlashScreenPage url reject-200
 
 [MITM]
-hostname = %APPEND% maicai.api.ddxq.mobi, *.xiaojukeji.com, *.didistatic.com, *.elecfans.com, *.icbc.com, ads.iconntech.com, smkmp.96225.com, m.ibuscloud.com, acs.m.taobao.com, gab.122.gov.cn, api.m.jd.com
+hostname = %APPEND% maicai.api.ddxq.mobi, *.xiaojukeji.com, *.didistatic.com, *.elecfans.com, *.icbc.com, ads.iconntech.com, smkmp.96225.com, m.ibuscloud.com, acs.m.taobao.com, gab.122.gov.cn, api.m.jd.com, *.meituan.net, *.meituan.com
