@@ -5,11 +5,15 @@
 [Url Rewrite]
 # >>>>>>>>>>>>>>> ✅ D ✅ <<<<<<<<<<<<<<
 # > 叮咚买菜
-#主机名maicai.api.ddxq.mobi
+# 主机名maicai.api.ddxq.mobi
 # 开屏广告
 ^https:\/\/maicai\.api\.ddxq\.mobi\/advert\/getAd\?ad_id data-type=text data="{}" status-code=200
 # 新人弹窗
 ^https:\/\/maicai\.api\.ddxq\.mobi\/homeApi\/getHomeAdPop data-type=text data="{}" status-code=200
+
+# > 东方财富
+# 主机名emdcadvertise.eastmoney.com
+^https?:\/\/emdcadvertise\.eastmoney\.com\/infoService\/v2 data-type=text data=" " status-code=200
 
 # > 滴滴出行
 https?://res\.xiaojukeji\.com\/resapi\/activity\/mget url reject-dict
@@ -155,6 +159,10 @@ https://ccsp-egmas.sf-express.com/cx-app-base/base/app/ad/queryAdImages url reje
 ^https?:\/\/imeclient\.openspeech\.cn\/adservice\/ url reject-200
 
  >>>>>>>>>>>>>>> ✅ Y ✅ <<<<<<<<<<<<<<
+# > 永辉
+# 主机名api.yonghuivip.com
+^https?:\/\/api\.yonghuivip\.com\/web\/shensuan\/ad\/getAd data-type=text data=" " status-code=200
+
 # > 云闪付
 # 默认关闭,只使用分流去云闪付广告
 # > ^https:\/\/wallet\.95516\.com\/s\/wl\/icon\/long url reject
@@ -173,9 +181,10 @@ https://ccsp-egmas.sf-express.com/cx-app-base/base/app/ad/queryAdImages url reje
 
 # >>>>>>>>>>>>>>> ✅ Z ✅ <<<<<<<<<<<<<<
 # > 招商银行
-^https?:\/\/webappcfg\.paas\.cmbchina\.com\/v\d\/func\/getmarketconfig url reject-200
+# 主机名*.paas.cmbchina.com
+^https?:\/\/webappcfg\.paas\.cmbchina\.com\/v\d\/func\/getmarketconfig data-type=text data=" " status-code=200
 # 首页横幅广告
-^https:\/\/mbmodule-openapi\.paas\.cmbchina\.com\/graphic\/v2\/module\/graphic url reject-dict
+^https:\/\/mbmodule-openapi\.paas\.cmbchina\.com\/graphic\/v2\/module\/graphic data-type=text data="{}" status-code=200
 
 # > 掌上生活（需卸载重装）
 # 开屏广告 az1mbasecc.bas.cmbchina.com
@@ -193,11 +202,55 @@ https://ccsp-egmas.sf-express.com/cx-app-base/base/app/ad/queryAdImages url reje
 # 开屏广告
 ^https:\/\/imcs\.citicbank\.com\/cloud\/.+(1125.+2436|1242.+2688|750.+1638) url reject-dict
 
-# > 中国移动
-^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/DN\/init\/startInit url reject-200
-^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/DN\/explorePage\/getAdverList url reject
+# > 中国移动 client.app.coc.10086.cn, *.10086.cn
+# ^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/DN\/init\/startInit url reject-200
+^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/DN\/init\/startInit data-type=text data=" " status-code=200
+# ^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/DN\/explorePage\/getAdverList url reject
+^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/DN\/explorePage\/getAdverList data-type=text data=" " status-code=200
 # 多个悬浮窗 感谢#热心网友分享
-^https:\/\/(client\.app\.coc|h\.app\.coc|app)\.10086\.cn\/biz-orange\/DN\/emotionMarket url reject
+# ^https:\/\/(client\.app\.coc|h\.app\.coc|app)\.10086\.cn\/biz-orange\/DN\/emotionMarket url reject
+^https:\/\/(client\.app\.coc|h\.app\.coc|app)\.10086\.cn\/biz-orange\/DN\/emotionMarket data-type=text data=" " status-code=200
+
+
+
+# > 中国移动 江苏 开屏广告
+^https?:\/\/wap\.js\.10086\.cn\/jsmccClient\/cd\/market_content\/api\/v1\/market_content\.page\.queryHasIt data-type=text data="{}" status-code=200
+
+# > 中国移动云盘
+^https?:\/\/mcmm\.caiyun\.feixin\.10086\.cn:80\/mcmm\/api\/IAdvert data-type=text data=" " status-code=200
+
+^https?:\/\/mcmm\.caiyun\.feixin\.10086\.cn:80\/mcmm\/api\/v\d\/getAdverts data-type=text data=" " status-code=200
+
+^https?:\/\/middle\.yun\.139\.com\/openapi\/cardConfig\/queryCardInfoV3 data-type=text data=" " status-code=200
+
+^https?:\/\/ad\.mcloud\.139\.com\/advertapi\/adv-filter\/adv-filter\/AdInfoFilter\/getAdInfos data-type=text data="{}" status-code=200
+
+# > 中国联通
+^https?:\/\/m\.client\.10010\.com\/uniAdmsInterface\/getWelcomeAd data-type=text data=" " status-code=200
+
+^https?:\/\/m\.client\.10010\.com\/mobileService\/(activity|customer)\/(accountListData|get_client_adv|get_startadv) data-type=tiny-gif status-code=200
+
+^https?:\/\/m\.client\.10010\.com\/mobileService\/customer\/getclientconfig\.htm data-type=text data="{}" status-code=200
+
+^https?:\/\/m\.client\.10010\.com\/uniAdmsInterface\/(getHomePageAd|getWelcomeAd) data-type=tiny-gif status-code=200
+
+^https?:\/\/[^(apple|10010)]+\.(com|cn)\/(a|A)d(s|v)?(\/|\.js) data-type=tiny-gif status-code=200
+
+^https?:\/\/m1\.ad\.10010\.com\/noticeMag\/images\/imageUpload\/2\d{3} data-type=tiny-gif status-code=200
+
+^https?:\/\/res\.mall\.10010\.cn\/mall\/common\/js\/fa\.js?referer= data-type=tiny-gif status-code=200
+
+# > 中国电信 cloud.189.cn, zt-app.go189.cn
+# ^https?:\/\/cloud\.189\.cn\/include\/splash\/ url reject
+https?:\/\/cloud\.189\.cn\/include\/splash\/ data-type=text data=" " status-code=200
+# ^https?:\/\/zt-app\.go189\.cn\/zt-app\/welcome\/.*?Animation url reject-img
+^https?:\/\/zt-app\.go189\.cn\/zt-app\/welcome\/.*?Animation data-type=tiny-gif status-code=200
+
+# > 中国广电 app.10099.com.cn
+# ^https?:\/\/app\.10099\.com\.cn\/contact-web\/api\/version\/getFlashScreenPage url reject-200
+^https?:\/\/app\.10099\.com\.cn\/contact-web\/api\/version\/getFlashScreenPage data-type=text data=" " status-code=200
+
+
 
 # > 中国移动 江苏 开屏广告
 ^https?:\/\/wap\.js\.10086\.cn\/jsmccClient\/cd\/market_content\/api\/v1\/market_content\.page\.queryHasIt url reject-dict
@@ -225,12 +278,7 @@ https://ccsp-egmas.sf-express.com/cx-app-base/base/app/ad/queryAdImages url reje
 ^https?:\/\/m1\.ad\.10010\.com\/noticeMag\/images\/imageUpload\/2\d{3} url reject-img
 ^https?:\/\/res\.mall\.10010\.cn\/mall\/common\/js\/fa\.js?referer= url reject-img
 
-# > 中国电信
-^https?:\/\/cloud\.189\.cn\/include\/splash\/ url reject
-^https?:\/\/zt-app\.go189\.cn\/zt-app\/welcome\/.*?Animation url reject-img
 
-# > 中国广电
-^https?:\/\/app\.10099\.com\.cn\/contact-web\/api\/version\/getFlashScreenPage url reject-200
 
 [MITM]
 hostname = %APPEND% maicai.api.ddxq.mobi, *.xiaojukeji.com, *.didistatic.com, *.elecfans.com, *.icbc.com, ads.iconntech.com, smkmp.96225.com, m.ibuscloud.com, acs.m.taobao.com, gab.122.gov.cn, api.m.jd.com, *.meituan.net, *.meituan.com
