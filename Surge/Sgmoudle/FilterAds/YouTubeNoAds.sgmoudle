@@ -2,6 +2,7 @@
 #!desc=YouTube去广告
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/YouTube.png
 #!category=广告屏蔽
+# https://github.com/ddgksf2013/Rewrite/raw/master/AdBlock/YoutubeAds.conf
 
 [URL Rewrite]
 # ======= 视频广告请求 ======= #
