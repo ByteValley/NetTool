@@ -1,3 +1,7 @@
+/*
+引用地址https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/scripts/body-rewrite.js
+*/
+// 2024-10-15 10:50
 const NAME = 'body-rewrite'
 const TITLE = 'body-rewrite'
 const $ = new Env(NAME)
