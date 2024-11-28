@@ -1,0 +1,59 @@
+#!name=酷我音乐去广告
+#!desc=移除开屏广告、各类弹窗、悬浮窗、各类横幅广告、信息流广告、歌词评论区广告和播放器界面广告，精简侧边栏。
+#!author=可莉🅥[https://github.com/luestr/ProxyResource/blob/main/README.md]
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Kuwo.png
+#!openUrl=https://apps.apple.com/app/id588673713
+#!category=广告屏蔽
+#!date=2024-11-28 00:00:00
+
+[Rule]
+# 拦截HTTPDNS
+DOMAIN,serveraddr.service.kugou.com,REJECT
+DOMAIN,twns.p2ptun.qq.com,REJECT
+DOMAIN,tp2p.kg.qq.com,REJECT
+IP-CIDR,81.71.61.216/32,REJECT,no-resolve
+# 腾讯优量汇 - 广告服务商
+DOMAIN,ios.bugly.qq.com,REJECT
+DOMAIN,sdk.e.qq.com,REJECT
+DOMAIN,us.l.qq.com,REJECT
+DOMAIN-SUFFIX,ugdtimg.com,REJECT
+# DOMAIN,qzs.gdtimg.com,REJECT
+DOMAIN-SUFFIX,gdt.qq.com,REJECT
+# c2.gdt.qq.com,REJECT
+DOMAIN,tmeadcomm.y.qq.com,REJECT
+DOMAIN,mobilead.kuwo.cn,REJECT
+DOMAIN,adstats.tencentmusic.com,REJECT
+DOMAIN,adsmind.gdtimg.com,REJECT
+DOMAIN,ad.tencentmusic.com,REJECT
+DOMAIN,mc.tencentmusic.com,REJECT
+# 广告配置
+URL-REGEX,"^http:\/\/rich\.kuwo\.cn\/AdService\/",REJECT-TINYGIF
+URL-REGEX,"^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/user\/freeMode\/",REJECT-TINYGIF
+URL-REGEX,"^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/pasterAdvert\/",REJECT-TINYGIF
+URL-REGEX,"^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/startup\/config",REJECT-TINYGIF
+URL-REGEX,"^http:\/\/rich\.kuwo\.cn\/EcomResourceServer\/",REJECT-TINYGIF
+IP-CIDR,111.206.98.63/32,REJECT,no-resolve
+# 搜索填充词
+URL-REGEX,"^http:\/\/searchrecterm\.kuwo\.cn\/recterm\.s",REJECT-TINYGIF
+# 精简我的页面侧边栏
+URL-REGEX,"^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/newMenuList\/menuListInfo",REJECT-TINYGIF
+# 迷你播放器横幅
+URL-REGEX,"^http:\/\/vip\d\.kuwo\.cn\/vip\/v\d\/sysinfo\?op=getRePayAndDoPayBox",REJECT-TINYGIF
+# 听书页面广告
+URL-REGEX,"^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/album\/adBar\/",REJECT-TINYGIF
+
+[Map Local]
+# 首页 - 推广语
+^https:\/\/vip\d\.kuwo\.cn\/commercia\/vipconf\/projectPage\/getPageContent data-type=text data="{}" status-code=200
+
+^https:\/\/tingshu\.kuwo\.cn\/v2\/api\/pay\/user\/info data-type=text data="{}" status-code=200
+
+# 我的页面横幅
+^https:\/\/appi\.kuwo\.cn\/kuwopay\/personal\/cells data-type=text data="{}" status-code=200
+
+[Script]
+# 移除听书页面广告
+移除听书页面广告 = type=http-response, pattern=^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/tingshu\/index\/radio, script-path=https://kelee.one/Resource/Script/Kuwo/Kuwo_remove_ads.js, requires-body=true
+
+[MITM]
+hostname = %APPEND% appi.kuwo.cn, mc.tencentmusic.com, vip*.kuwo.cn, tingshu.kuwo.cn
