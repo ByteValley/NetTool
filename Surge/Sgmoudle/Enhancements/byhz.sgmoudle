@@ -1,0 +1,12 @@
+#!name=鲍鱼盒子18+
+#!desc=byhz
+
+[Map Local]
+^https?://siajksslwiso\.anningsh\.com/report data-type=text data=" " status-code=200
+
+[Script]
+# >鲍鱼盒子18+
+byhz = type=http-request, pattern=^https?:\/\/.+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/WeiGiegie/666/main/byhz.js, timeout=60
+
+[MITM]
+hostname = %APPEND% byapi.*.com, 211.99.98.*, 103.39.222.*, yubaoyu.oss-cn-shenzhen.aliyuncs.com, *api.h8h4h.com, 42.157.129.25, siajksslwiso.anningsh.com, 211.99.98.63:8001
