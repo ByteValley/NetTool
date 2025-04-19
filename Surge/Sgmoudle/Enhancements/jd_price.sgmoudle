@@ -5,7 +5,7 @@
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
 #!date=2025-04-19
 #!arguments=getToken:true,TableVersion:true,OriginalVersion:false,Pop-upWindowVersion:false
-#!arguments-desc=[参数设置]\n⓵ getToken: 京东比价获取token;\n⓶ TableVersion: 京东比价表格版;\n⓷ OriginalVersion: 京东比价原始版;\n⓸ Pop-upWindowVersion: 京东比价弹窗版
+#!arguments-desc=[参数设置]\n⓵ getToken: 运行【慢慢买】APP，点击【我的】获取token;\n⓶ TableVersion: 京东比价表格版;\n⓷ OriginalVersion: 京东比价原始版;\n⓸ Pop-upWindowVersion: 京东比价弹窗版
 
 [MITM]
 hostname=in.m.jd.com, apapia-sqk-weblogic.manmanbuy.com
