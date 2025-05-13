@@ -3,7 +3,7 @@
 #!category=功能增强
 #!author=小白脸,灰灰
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
-#!date=2025-04-19
+#!date=2025-05-14
 #!arguments=禁用通知:false,表格版:true,原始版:false,弹窗版:false,折线版:true
 
 [Script]
