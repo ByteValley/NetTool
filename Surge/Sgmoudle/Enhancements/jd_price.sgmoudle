@@ -1,5 +1,5 @@
 #!name=京东比价
-#!desc=原始/表格/弹窗/折线，原始，表格，折线不能同时开启, 点击商品详情页触发脚本/n1.打开慢慢买APP-我的页面（无需登录）获取cookie,会通知获取ck成功/n2.京东商品详情页会展示比价结果
+#!desc=原始/表格/弹窗/折线，原始，表格，折线不能同时开启, 点击商品详情页触发脚本\n1.打开慢慢买APP-我的页面（无需登录）获取cookie,会通知获取ck成功\n2.京东商品详情页会展示比价结果
 #!category=功能增强
 #!author=小白脸,灰灰
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
