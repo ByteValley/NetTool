@@ -11,7 +11,7 @@
 
 京东助手 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/.+?\.html, script-path=https://raw.githubusercontent.com/githubdulong/Script/master/jd_price1.js, requires-body=true, timeout=60, enable={{{京东助手(禁用通知)}}}
 
-# 京东比价表格版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/githubdulong/Script/master/jd_price.js, requires-body=true, timeout=30, enable={{{表格版}}}
+京东比价表格版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/githubdulong/Script/master/jd_price.js, requires-body=true, timeout=30, enable={{{表格版}}}
 
 京东比价原始版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/wf021325/qx/master/js/jd_price.js, requires-body=true, timeout=30, enable={{{原始版}}}
 
