@@ -4,12 +4,12 @@
 #!author=小白脸,灰灰
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
 #!date=2025-05-14
-#!arguments=禁用通知:false,表格版:true,原始版:false,弹窗版:false,折线版:true
+#!arguments=获取token:true,京东助手(禁用通知):false,表格版:false,原始版:false,弹窗版:false,折线版:true,折线不展示表格:false
 
 [Script]
-京东比价获取token = type=http-request, pattern=^https?:\/\/apapia-sqk-weblogic\.manmanbuy\.com\/baoliao\/center\/menu$, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js, requires-body=true, timeout=60
+京东比价获取token = type=http-request, pattern=^https?:\/\/apapia-sqk-weblogic\.manmanbuy\.com\/baoliao\/center\/menu$, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js, requires-body=true, timeout=60, enable={{{获取token}}}
 
-京东助手 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/.+?\.html, script-path=https://raw.githubusercontent.com/githubdulong/Script/master/jd_price1.js, requires-body=true, timeout=60, enable={{{禁用通知}}}
+京东助手 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/.+?\.html, script-path=https://raw.githubusercontent.com/githubdulong/Script/master/jd_price1.js, requires-body=true, timeout=60, enable={{{京东助手(禁用通知)}}}
 
 京东比价表格版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/githubdulong/Script/master/jd_price.js, requires-body=true, timeout=30, enable={{{表格版}}}
 
@@ -17,7 +17,7 @@
 
 京东比价弹窗版 = type=http-request, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js, requires-body=true, timeout=30, enable={{{弹窗版}}}
 
-京东比价折线版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js, requires-body=true, timeout=30, enable={{{折线版}}}
+京东比价折线版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js, requires-body=true, timeout=30, enable={{{折线版}}}, argument={{{折线不展示表格}}}
 
 [MITM]
 hostname = %APPEND% in.m.jd.com, apapia-sqk-weblogic.manmanbuy.com
