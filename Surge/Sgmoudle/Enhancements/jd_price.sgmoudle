@@ -17,7 +17,7 @@
 
 京东比价弹窗版 = type=http-request, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js, requires-body=true, timeout=30, enable={{{弹窗版}}}
 
-京东比价折线版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js, requires-body=true, timeout=30, enable={{{折线版}}}, argument={{{折线不展示表格}}}
+京东比价折线版 = type=http-response, pattern=^https:\/\/in\.m\.jd\.com\/product\/graphext\/\d+\.html, script-path=https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js, requires-body=true, timeout=30, enable={{{折线版(下面参数开关表格)}}}, argument={{{折线不展示表格}}}
 
 [MITM]
 hostname = %APPEND% in.m.jd.com, apapia-sqk-weblogic.manmanbuy.com
