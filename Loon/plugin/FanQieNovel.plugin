@@ -21,6 +21,11 @@ DOMAIN, is.snssdk.com, DIRECT // 放行此条以确保广告联盟脚本的正�
 DOMAIN, log5-applog.fqnovel.com, REJECT
 DOMAIN, rtlog5-applog.fqnovel.com, REJECT
 DOMAIN, vas-lf-x.snssdk.com, REJECT
+DOMAIN-SUFFIX,byteimg.com,REJECT // Added for: p3-novel.byteimg.com:443
+DOMAIN-SUFFIX,fqnovelpic.com,REJECT // Added for: lf3-reading.fqnovelpic.com:443
+DOMAIN-SUFFIX,v5-reading-video.fqnovelvod.com,REJECT // Added for: https://v5-reading-video.fqnovelvod.com/89568f094a3b083f577ff6f8136b3849/686e1db0/video/tos/cn/tos-cn-v-6fcc8e/osgBEQVIMqPlGCbfAQ8eHWg8gXftKQBXLSkz2E/?a=1967&ch=0&cr=7&dr=3&er=0&lr=default&cd=0%7C0%7C0%7C1&cv=1&br=511&bt=511&cs=4&ds=3&ft=Crz7b-WtDDhNJFVQ9wRoCAyhd.bStko73-ApQX&mime_type=video_mp4&qs=0&rc=OjY6Z2VmOzM5NzlpZzQ2NEBpM2lkeHQ5cmQ2MzMzNGhoM0AuNjUzYWEzNi4xLzYwYWAwYSNtZG9fMmRrNi5hLS1kXy9zcw%3D%3D&btag=80000e00228000&dy_q=1752025337&feature_id=a7cf5e93891b50e2b3f1f5b65d3df7cc&l=2025070909421779D6AAF8837864201631
+DOMAIN-SUFFIX,ecombdimg.com,REJECT // Added for: p9-aio.ecombdimg.com:443
+#DOMAIN-SUFFIX,fqnovel.com,REJECT // Added for: log0-applog-lf.fqnovel.com:443
 
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
 IP-CIDR,117.71.105.23/32,REJECT,no-resolve
