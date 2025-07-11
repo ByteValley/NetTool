@@ -13,8 +13,8 @@
 {{{AIRPORT_NAME_3}}} = script-name={{{AIRPORT_NAME_3}}},update-interval={{{UPDATE_INTERVAL_3}}}
 {{{AIRPORT_NAME_4}}} = script-name={{{AIRPORT_NAME_4}}},update-interval={{{UPDATE_INTERVAL_4}}}
 {{{AIRPORT_NAME_5}}} = script-name={{{AIRPORT_NAME_5}}},update-interval={{{UPDATE_INTERVAL_5}}}
-{{{AIRPORT_NAME_6}}} = script-name={{{AIRPORT_NAME_6}}},update-interval={{{UPDATE_INTERVAL_6}}}
-{{{AIRPORT_NAME_7}}} = script-name={{{AIRPORT_NAME_7}}},update-interval={{{UPDATE_INTERVAL_7}}}
+#{{{AIRPORT_NAME_6}}} = script-name={{{AIRPORT_NAME_6}}},update-interval={{{UPDATE_INTERVAL_6}}}
+#{{{AIRPORT_NAME_7}}} = script-name={{{AIRPORT_NAME_7}}},update-interval={{{UPDATE_INTERVAL_7}}}
 
 [Script] 
 {{{AIRPORT_NAME_1}}} = type=generic,timeout=30,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/refs/heads/main/Surge/Scripts/sub_info_panel.js,script-update-interval=0,argument=url={{{URL_1}}}&reset_day={{{RESET_DAY_1}}}&title={{{TITLE_1}}}&icon={{{ICON_1}}}&color={{{COLOR_1}}}
