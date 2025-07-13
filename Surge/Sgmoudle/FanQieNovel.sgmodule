@@ -17,26 +17,29 @@ DOMAIN, dig.zjurl.cn, REJECT
 DOMAIN, log5-applog.fqnovel.com, REJECT
 DOMAIN, rtlog5-applog.fqnovel.com, REJECT
 DOMAIN, vas-lf-x.snssdk.com, REJECT
-# byteimg / ecombdimg / bytegoofy CDN
-DOMAIN-REGEX,^(?:p\d+-(?:novel|ad-sign)\.byteimg\.com|p\d+-aio\.ecombdimg\.com|lf\d+-cdn-tos\.bytegoofy\.com)$,REJECT
+# 精确匹配番茄小说和广告子域
+AND, ((DOMAIN-KEYWORD, -novel), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -ad-sign), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -aio), (DOMAIN-SUFFIX, ecombdimg.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
 # 番茄小说专用子域
-DOMAIN-REGEX,^(?:lf\d+-reading\.fqnovelpic\.com|log\d+-applog-lf\.fqnovel\.com|v\d+-reading-video\.fqnovelvod\.com)$,REJECT
-# —— SNI 级别精准拦截 ——  
-DOMAIN-REGEX,^[^.]+-lf\.zijieapi\.com$,REJECT  
-DOMAIN-REGEX,^[^.]+-lf\.fqnovel\.com$,REJECT  
-DOMAIN-REGEX,^p3-reading-sign\.fqnovelpic\.com$,REJECT  
-DOMAIN-REGEX,^p6-novel\.byteimg\.com$,REJECT  
-DOMAIN,open.douyin.com,REJECT  
-# ——— SNI 级别拦截所有 “*-lf.xxx.com” 广告子域 ———
-DOMAIN-REGEX,^[^.]+-lf\.(?:zijieapi\.com|ecombdapi\.com|fqnovelpic\.com|bytegecko\.com|fqnovelvod\.com)$,REJECT
-# ——— 专门拦 misc-lf.fqnovel.com —— 
-DOMAIN-REGEX,^[^.]+-misc-lf\.fqnovel\.com$,REJECT
-# ——— 拦 p*-reading-sign.fqnovelpic.com —— 
-DOMAIN-REGEX,^p\d+-reading-sign\.fqnovelpic\.com$,REJECT
-# ——— 拦 lf-webcast-gr-sourcecdn.bytegecko.com —— 
-DOMAIN-REGEX,^lf\d+-webcast-gr-sourcecdn\.bytegecko\.com$,REJECT
-# ——— 拦 open.douyin.com —— 
-DOMAIN-SUFFIX,douyin.com,REJECT
+AND, ((DOMAIN-KEYWORD, -reading), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -applog-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
+# 精准拦截 SNI 级别精准匹配
+AND, ((DOMAIN-KEYWORD, -reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -novel), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+# 精准拦截 *-lf 子域（多个域名后缀）
+AND, ((DOMAIN-KEYWORD, -lf), (OR, ((DOMAIN-SUFFIX, zijieapi.com), (DOMAIN-SUFFIX, ecombdapi.com), (DOMAIN-SUFFIX, bytegecko.com), (DOMAIN-SUFFIX, fqnovel.com), (DOMAIN-SUFFIX, fqnovelvod.com), (DOMAIN-SUFFIX, fqnovelpic.com)))), REJECT
+# 精准拦截 misc-lf.fqnovel.com
+AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
+# 精确匹配 p*-reading-sign.fqnovelpic.com
+AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
+# 精确拦截 lf-webcast-gr-sourcecdn.bytegecko.com
+AND, ((DOMAIN-KEYWORD, lf-webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
+# 拦截 open.douyin.com
+DOMAIN, open.douyin.com, REJECT
+
 # ——— 拦 p*-novelapp.fqnovelvod.com 下所有视频路径 —— 
 URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT
 
