@@ -1,5 +1,5 @@
 #!name=番茄去广告
-#!desc=彻底屏蔽番茄小说广告资源（视频贴片、图像封面、接口、直播流、电商推广等），保留小说封面/头像及字节系关键功能。
+#!desc=彻底屏蔽番茄小说广告资源（视频贴片、图片封面、接口、直播流、电商推广、打点日志等），保留正常封面/头像及字节系关键功能。
 #!author=zqzess & ChatGPT
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
@@ -7,15 +7,22 @@
 [Rule]
 # —— 核心视频广告 ——  
 DOMAIN-REGEX,^v\d+-(reading-video|novelapp)\.fqnovelvod\.com$,REJECT  
-URL-REGEX,^https?://v\d+-(reading-video|novelapp)\.fqnovelvod\.com/.+\.mp4,REJECT  
-DOMAIN,lf-reward-video.bytedcdn.com,REJECT   # 奖励视频
+URL-REGEX,^https?://v\d+-(reading-video|novelapp)\.fqnovelvod\.com/.+\.mp4$,REJECT  
+DOMAIN-REGEX,^v3-novelapp\.fqnovelvod\.com$,REJECT  
+DOMAIN-REGEX,^v5-novelapp\.fqnovelvod\.com$,REJECT  
+DOMAIN,lf-reward-video.bytedcdn.com,REJECT    # 奖励视频广告  
 
 # —— 精准图像广告 ——  
 DOMAIN,p3-ad-sign.byteimg.com,REJECT  
 DOMAIN,p3-reading-sign.fqnovelpic.com,REJECT  
 DOMAIN,lf3-reading.fqnovelpic.com,REJECT  
 DOMAIN,lf-fe.fqnovelstatic.com,REJECT  
+DOMAIN,p6-novel.byteimg.com,REJECT  
+DOMAIN-SUFFIX,ecombdimg.com,REJECT            # 电商广告图像  
+DOMAIN,p9-aio.ecombdimg.com,REJECT  
+DOMAIN,p3-aio.ecombdimg.com,REJECT  
 DOMAIN-KEYWORD,novel.byteimg.com,REJECT  
+
 URL-REGEX,^https?://.+\.byteimg\.com/.+(ad|ad-img|ad-pattern).+\.jpeg,REJECT  
 URL-REGEX,^https?://.+\.byteimg\.com/.+/ad-pattern/.+,REJECT  
 URL-REGEX,^https?://.+\.fqnovelpic\.com/.+/ad/.+,REJECT  
@@ -105,4 +112,9 @@ IP-CIDR,101.36.166.16/32,REJECT,no-resolve
 ^https://tnc3-alisc1\.zijieapi\.com/get_domains/ reject  
 
 [MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.snssdk.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
+hostname = %APPEND% \
+  *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com, \
+  *.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com, \
+  *.zijieapi.com,*.ecombdapi.com,*.bytedcdn.com, \
+  *.douyincdn.com,*.douyin.com,*.bytegecko.com,*.snssdk.com,*.bytedance.com, \
+  gurd.snssdk.com,adim.pinduoduo.com
