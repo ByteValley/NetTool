@@ -31,14 +31,6 @@ URL-REGEX,(?i)(?=.*api)(?=.*-dual-event-)(?=.*\.pangle\.io).+,REJECT
 URL-REGEX,(?i)(?=.*api)(?=.*pangolin)(?=.*\.sgsnssdk\.com).+,REJECT
 URL-REGEX,(?i)(?=.*ads)(?=.*-normal-lq)(?=.*zijieapi\.com).+,REJECT
 
-# —— 特殊路径拦截 ——
-URL-REGEX,^http://p\d+-be-pack-sign\.pglstatp-toutiao\.com/(ad-app-package|web\.business\.image)/,REJECT
-
-# —— Surge 核心视频广告 ——
-DOMAIN-REGEX,^v\d+-(reading-video|novelapp)\.fqnovelvod\.com$,REJECT
-URL-REGEX,^https?://v\d+-(reading-video|novelapp)\.fqnovelvod\.com/.+\.mp4,REJECT
-DOMAIN,lf-reward-video.bytedcdn.com,REJECT  
-
 # —— 常规 DOMAIN 拦截 ——
 DOMAIN, dig.bdurl.net, REJECT
 DOMAIN, dig.zjurl.cn, REJECT
