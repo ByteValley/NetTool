@@ -1,5 +1,5 @@
 #!name=番茄去广告
-#!desc=全面封锁番茄小说及相关字节系广告资源，包含视频、图像、直播流、接口与 IPv6/CDN IP 精准封禁。
+#!desc=封锁番茄小说及字节系视频、广告、封面、API、直播流、IP段，适配 Surge，尽量不误伤功能。
 #!author=zqzess & ChatGPT
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
@@ -9,18 +9,19 @@
 DOMAIN-REGEX,^v\d+-(reading-video|novelapp)\.fqnovelvod\.com$,REJECT
 URL-REGEX,^https?:\/\/v\d+-(reading-video|novelapp)\.fqnovelvod\.com\/.+\.mp4,REJECT
 
-# 图片广告域名与路径
+# 广告图像、封面、奖励视频
+DOMAIN,lf-reward-video.bytedcdn.com,REJECT
 DOMAIN,p3-ad-sign.byteimg.com,REJECT
 DOMAIN,p3-reading-sign.fqnovelpic.com,REJECT
-DOMAIN,p3-novel.byteimg.com,REJECT
 DOMAIN,lf3-reading.fqnovelpic.com,REJECT
 DOMAIN,lf-fe.fqnovelstatic.com,REJECT
+DOMAIN,p3-novel.byteimg.com,REJECT
 DOMAIN-KEYWORD,novel.byteimg.com,REJECT
 URL-REGEX,^https?:\/\/.+\.byteimg\.com\/.+(ad|ad-img|ad-pattern).+\.jpeg,REJECT
 URL-REGEX,^https?:\/\/.+\.byteimg\.com\/.+\/ad-pattern\/.+,REJECT
 URL-REGEX,^https?:\/\/.+\.fqnovelpic\.com\/.+\/ad\/.+,REJECT
 
-# 广告接口与资源文件
+# 广告接口、追踪配置
 URL-REGEX,^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/,REJECT
 URL-REGEX,^https?:\/\/.+\.pangolin-sdk-toutiao.*\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/,REJECT
 URL-REGEX,^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad|web\.business\.image)\/.+,REJECT
@@ -35,18 +36,28 @@ URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
 DOMAIN-KEYWORD,douyincdn.com,REJECT
 URL-REGEX,^http:\/\/pull-flv-l\d+\.douyincdn\.com\/third\/stream-.+\.flv,REJECT
 
-# 广告服务平台域名补充
+# 广告服务平台与电商类扩展
+DOMAIN,ecom3-normal-lf.ecombdapi.com,REJECT
+DOMAIN,ecom5-normal-lf.ecombdapi.com,REJECT
+DOMAIN,ec3-core-lf.ecombdapi.com,REJECT
+DOMAIN,ec5-core-lf.ecombdapi.com,REJECT
+DOMAIN,isaas5-normal-lf.ecombdapi.com,REJECT
+DOMAIN,rtlog5-applog-lf.fqnovel.com,REJECT
 DOMAIN,bsync3-normal-lf.zijieapi.com,REJECT
 DOMAIN,gecko5-lf.zijieapi.com,REJECT
 DOMAIN,frontier100-toutiao-lf.fqnovel.com,REJECT
+DOMAIN-KEYWORD,ecombdapi.com,REJECT
 DOMAIN-KEYWORD,zijieapi.com,REJECT
 
-# 必要功能保留
+# 保留 SDK 功能
 DOMAIN,is.snssdk.com,DIRECT
 DOMAIN,i.snssdk.com,DIRECT
 
-# 精准 IP 拦截
+# 广告相关 IP 精准封锁（含新补充）
 IP-CIDR,47.246.38.0/24,REJECT,no-resolve
+IP-CIDR,61.170.77.65/32,REJECT,no-resolve
+IP-CIDR,103.136.221.67/32,REJECT,no-resolve
+IP-CIDR,163.181.35.203/32,REJECT,no-resolve
 IP-CIDR,180.163.145.52/32,REJECT,no-resolve
 IP-CIDR,2404:2280:109:0:3::19/128,REJECT,no-resolve
 IP-CIDR,2408:8756:2cff:e410:5e::10/128,REJECT,no-resolve
@@ -67,4 +78,4 @@ IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 ^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
 
 [MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,gurd.snssdk.com,adim.pinduoduo.com,douyincdn.com
+hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,*.ecombdapi.com,gurd.snssdk.com,adim.pinduoduo.com,douyincdn.com,*.bytedcdn.com
