@@ -21,6 +21,25 @@ DOMAIN, vas-lf-x.snssdk.com, REJECT
 DOMAIN-REGEX,^(?:p\d+-(?:novel|ad-sign)\.byteimg\.com|p\d+-aio\.ecombdimg\.com|lf\d+-cdn-tos\.bytegoofy\.com)$,REJECT
 # 番茄小说专用子域
 DOMAIN-REGEX,^(?:lf\d+-reading\.fqnovelpic\.com|log\d+-applog-lf\.fqnovel\.com|v\d+-reading-video\.fqnovelvod\.com)$,REJECT
+# —— SNI 级别精准拦截 ——  
+DOMAIN-REGEX,^[^.]+-lf\.zijieapi\.com$,REJECT  
+DOMAIN-REGEX,^[^.]+-lf\.fqnovel\.com$,REJECT  
+DOMAIN-REGEX,^p3-reading-sign\.fqnovelpic\.com$,REJECT  
+DOMAIN-REGEX,^p6-novel\.byteimg\.com$,REJECT  
+DOMAIN,open.douyin.com,REJECT  
+# ——— SNI 级别拦截所有 “*-lf.xxx.com” 广告子域 ———
+DOMAIN-REGEX,^[^.]+-lf\.(?:zijieapi\.com|ecombdapi\.com|fqnovelpic\.com|bytegecko\.com|fqnovelvod\.com)$,REJECT
+# ——— 专门拦 misc-lf.fqnovel.com —— 
+DOMAIN-REGEX,^[^.]+-misc-lf\.fqnovel\.com$,REJECT
+# ——— 拦 p*-reading-sign.fqnovelpic.com —— 
+DOMAIN-REGEX,^p\d+-reading-sign\.fqnovelpic\.com$,REJECT
+# ——— 拦 lf-webcast-gr-sourcecdn.bytegecko.com —— 
+DOMAIN-REGEX,^lf\d+-webcast-gr-sourcecdn\.bytegecko\.com$,REJECT
+# ——— 拦 open.douyin.com —— 
+DOMAIN-SUFFIX,douyin.com,REJECT
+# ——— 拦 p*-novelapp.fqnovelvod.com 下所有视频路径 —— 
+URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT
+
 
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
 IP-CIDR,117.71.105.23/32,REJECT,no-resolve
