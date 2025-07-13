@@ -20,10 +20,10 @@ AND, ((DOMAIN-KEYWORD, -applog), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 # AND, ((DOMAIN-KEYWORD, -applog-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -lf-), (DOMAIN-SUFFIX, snssdk.com)), REJECT
 # 精确匹配番茄小说和广告子域
-AND, ((OR, (DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign)), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+AND, ((OR, ((DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign))), (DOMAIN-SUFFIX, byteimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -aio), (DOMAIN-SUFFIX, ecombdimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
-AND, ((OR, (DOMAIN-KEYWORD, -reading), (DOMAIN-KEYWORD, -reading-sign)), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
+AND, ((OR, ((DOMAIN-KEYWORD, -reading), (DOMAIN-KEYWORD, -reading-sign))), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
 # 精确匹配 p*-reading-sign.fqnovelpic.com
 # AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
