@@ -45,6 +45,9 @@ IP-CIDR,218.94.207.205/32,REJECT,no-resolve
 IP-CIDR,117.92.229.188/32,REJECT,no-resolve
 IP-CIDR,101.36.166.16/32,REJECT,no-resolve
 IP-CIDR,180.96.2.114/32,REJECT,no-resolve
+# p3-ad-sign.byteimg.com 广告节点封锁（精准 IP 拦截）
+IP-CIDR,47.246.38.177/32,REJECT,no-resolve
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve
 
 [URL Rewrite]
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
