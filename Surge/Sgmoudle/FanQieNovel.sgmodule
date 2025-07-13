@@ -20,11 +20,10 @@ AND, ((DOMAIN-KEYWORD, -applog), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 # AND, ((DOMAIN-KEYWORD, -applog-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -lf-), (DOMAIN-SUFFIX, snssdk.com)), REJECT
 # 精确匹配番茄小说和广告子域
-AND, ((OR, ((DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign))), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+AND, ((OR, ((DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign))), (OR, ((DOMAIN-SUFFIX, byteimg.com), (DOMAIN-SUFFIX, fqnovelvod.com)))), REJECT
 AND, ((DOMAIN-KEYWORD, -aio), (DOMAIN-SUFFIX, ecombdimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
-AND, ((OR, ((DOMAIN-KEYWORD, -reading), (DOMAIN-KEYWORD, -reading-sign))), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
-# 精确匹配 p*-reading-sign.fqnovelpic.com
+# AND, ((OR, ((DOMAIN-KEYWORD, -reading), (DOMAIN-KEYWORD, -reading-sign))), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT // 放行，可能是封面
 # AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
 # 精准拦截 *-lf 子域（多个域名后缀）
@@ -76,4 +75,4 @@ IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 ^https?:\/\/v(\d)+-novelapp\.fqnovelvod\.com\/.+\/video\/.+ - reject
 
 [MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com
+hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com,*.ecombdapi.com
