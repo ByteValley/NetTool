@@ -1,65 +1,60 @@
 #!name=番茄去广告
-#!desc=彻底去除番茄小说开屏广告、章末广告、视频贴片等，不影响头条类 App 正常使用
-#!author=zqzess & ChatGPT优化版
+#!desc=彻底移除番茄小说广告（开屏、章末、贴片、听书等），确保今日头条等字节系 App 正常运行。
+#!author=zqzess + ChatGPT优化
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
 
 [Rule]
-# ✅ 主要广告域名拦截
+# 广告资源域名封锁
 DOMAIN,log5-applog.fqnovel.com,REJECT
 DOMAIN,rtlog5-applog.fqnovel.com,REJECT
-DOMAIN,vas-lf-x.snssdk.com,REJECT
-DOMAIN,dig.bdurl.net,REJECT
-DOMAIN,dig.zjurl.cn,REJECT
-
-# ✅ 视频广告相关域名拦截
+DOMAIN-SUFFIX,byteimg.com,REJECT
+DOMAIN-SUFFIX,ecombdimg.com,REJECT
 DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^v\d+-novelapp\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
 
-# ✅ 广告分发与资源获取接口封锁
+# 追踪与广告接口封锁
+AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
+AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
+AND, ((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))), REJECT
+DOMAIN,dig.bdurl.net,REJECT
+DOMAIN,dig.zjurl.cn,REJECT
+DOMAIN,vas-lf-x.snssdk.com,REJECT
+
+# 放行必要功能
+DOMAIN,is.snssdk.com,DIRECT
+
+# 视频广告触发接口及下载包
+URL-REGEX,^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/,REJECT
 URL-REGEX,^https?:\/\/.+\.pangolin-sdk-toutiao.*\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/,REJECT
 URL-REGEX,^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4,REJECT
 URL-REGEX,^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad|web\.business\.image)\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.snssdk\.com\/api\/ad\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.byteimg.com\/tos-cn-i-1yzifmftcy\/.+-jpeg\.jpeg,REJECT
+URL-REGEX,^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from=ad,REJECT
 URL-REGEX,^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+,REJECT
 URL-REGEX,^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package,REJECT
+URL-REGEX,^https?:\/\/.+\.byteimg\.com\/tos-cn-i-1yzifmftcy\/.+-jpeg\.jpeg,REJECT
+URL-REGEX,^https?:\/\/.+\.snssdk\.com\/api\/ad\/.+,REJECT
+URL-REGEX,^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4,REJECT
 URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/,REJECT
-
-# ✅ 视频广告资源补充拦截
-URL-REGEX,^https?:\/\/v\d+-reading-video\.fqnovelvod\.com\/.+\.mp4,REJECT
-URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\.mp4,REJECT
-URL-REGEX,^https?:\/\/lf\d+-cdn-tos\.bytegoofy\.com\/.+\.mp4,REJECT
-
-# ✅ 图文广告包下载封锁
-URL-REGEX,^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/,REJECT
-
-# ✅ 广告请求特征组合拦截
-AND,((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)),REJECT
-AND,((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)),REJECT
-AND,((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)),REJECT
-AND,((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))),REJECT
-
-# ✅ 保留必要接口确保字节SDK正常
-DOMAIN,is.snssdk.com,DIRECT
-
-# ✅ 拼多多嵌套广告
 URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
+URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\/video\/.+,REJECT
+
+# 可疑广告IP
+IP-CIDR,49.71.37.101/32,REJECT,no-resolve
+IP-CIDR,117.71.105.23/32,REJECT,no-resolve
+IP-CIDR,218.94.207.205/32,REJECT,no-resolve
+IP-CIDR,117.92.229.188/32,REJECT,no-resolve
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve
+IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 
 [URL Rewrite]
-# 头条/番茄广告资源样式文件拦截
+# 拦截样式伪装资源广告
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
 ^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
 ^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
 
 [MITM]
-hostname = %APPEND%
-*.pangolin-sdk-toutiao,
-*.pangolin-sdk-toutiao.*,
-*.pstatp.com,
-*.pglstatp-toutiao.com,
-gurd.snssdk.com,
-*.fqnovelvod.com,
-adim.pinduoduo.com
+hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com
