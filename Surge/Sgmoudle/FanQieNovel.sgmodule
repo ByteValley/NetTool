@@ -5,7 +5,9 @@
 #!category=广告屏蔽
 
 [Rule]
-[Rule]
+# ——— 放行番茄小说“预约领番茄”接口 ———
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/reserve_info\? ,DIRECT
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/reserve$,DIRECT
 # ——— 放行签到状态查询 & 执行签到 接口 ———
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info)\?\,DIRECT
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT
