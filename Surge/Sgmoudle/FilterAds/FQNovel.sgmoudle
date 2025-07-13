@@ -14,6 +14,8 @@ DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^v\d+-novelapp\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
 DOMAIN-KEYWORD,novel.byteimg.com,REJECT  # 更精细匹配小说广告相关资源
+DOMAIN,p3-ad-sign.byteimg.com,REJECT
+DOMAIN-KEYWORD,ad-sign.byteimg.com,REJECT
 
 # 追踪与广告接口封锁
 AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
