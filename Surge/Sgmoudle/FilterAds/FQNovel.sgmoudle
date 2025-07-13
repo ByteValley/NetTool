@@ -144,6 +144,7 @@ IP-CIDR,2408:871a:6010:302::1:13a/128,REJECT,no-resolve
 ^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject header
 ^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject
 ^https://lf-cdn-tos\.bytescm\.com/obj/static/ad/ reject
+^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
 
 [MITM]
 hostname = %APPEND% \
