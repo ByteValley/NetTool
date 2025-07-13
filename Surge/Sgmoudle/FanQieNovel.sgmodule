@@ -5,6 +5,10 @@
 #!category=广告屏蔽
 
 [Rule]
+[Rule]
+# ——— 放行签到状态查询 & 执行签到 接口 ———
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info)\?\,DIRECT
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT
 # —— 放行番茄小说催更接口 ——
 URL-REGEX, ^https:\/\/api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com\/api\/(?:book|novel|article)\/urge, DIRECT
 URL-REGEX, ^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/, REJECT
