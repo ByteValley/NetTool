@@ -83,9 +83,9 @@ URL-REGEX,^https?://.+\.byteimg\.com/.+/ad-pattern/.+,REJECT
 URL-REGEX,^https?://.+\.fqnovelpic\.com/.+/ad/.+,REJECT
 
 # —— 广告接口 & 资源包 ——
-URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT  
-URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/(get_ads|stats|settings)/,REJECT  
-URL-REGEX,^https?://.+\.(pglstatp-toutiao|pstatp)\.com/(obj|img)/(ad-app-package|ad|web\.business\.image)/.+,REJECT  
+URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT
+URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/(get_ads|stats|settings)/,REJECT
+URL-REGEX,^https?://.+\.(pglstatp-toutiao|pstatp)\.com/(obj|img)/(ad-app-package|ad|web\.business\.image)/.+,REJECT
 
 # —— 电商 & 分析 ——
 # —— 精简版：拦所有 “-lf” 子域 ——
@@ -107,26 +107,42 @@ DOMAIN,content-open.douyin.com,REJECT
 DOMAIN,p11-sign.douyinpic.com,REJECT
 DOMAIN,p26-sign.douyinpic.com,REJECT
 DOMAIN-KEYWORD,open.douyin.com,REJECT
-# —— 通用关键词 & 组合过滤 ——  
-AND,((DOMAIN-KEYWORD,minigame),(DOMAIN-SUFFIX,zijieapi.com)),REJECT  
-AND,((DOMAIN-KEYWORD,tnc),(AND,((OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,-alisc),(DOMAIN-KEYWORD,-aliec))),((OR,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,bytedance.com),(DOMAIN-SUFFIX,zijieapi.com)))))),REJECT  
+# —— 通用关键词 & 组合过滤 ——
+AND,((DOMAIN-KEYWORD,minigame),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
+AND,((DOMAIN-KEYWORD,tnc),(AND,((OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,-alisc),(DOMAIN-KEYWORD,-aliec))),((OR,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,bytedance.com),(DOMAIN-SUFFIX,zijieapi.com)))))),REJECT
 
-# —— IP & 历史广告 IP ——  
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve  
-IP-CIDR,47.246.38.175/32,REJECT,no-resolve  
-IP-CIDR,47.246.38.176/32,REJECT,no-resolve  
-IP-CIDR,47.246.38.178/32,REJECT,no-resolve  
-IP-CIDR,47.246.38.181/32,REJECT,no-resolve  
-IP-CIDR,49.71.37.101/32,REJECT,no-resolve  
-IP-CIDR,117.71.105.23/32,REJECT,no-resolve  
-IP-CIDR,218.94.207.205/32,REJECT,no-resolve  
-IP-CIDR,117.92.229.188/32,REJECT,no-resolve  
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve  
-IP-CIDR,180.96.2.114/32,REJECT,no-resolve  
+# —— IPv4 列表 ——
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve
+IP-CIDR,49.71.37.101/32,REJECT,no-resolve
+IP-CIDR,58.251.62.58/32,REJECT,no-resolve
+IP-CIDR,61.170.77.65/32,REJECT,no-resolve
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve
+IP-CIDR,103.136.221.67/32,REJECT,no-resolve
+IP-CIDR,106.117.245.59/32,REJECT,no-resolve
+IP-CIDR,107.155.58.209/32,REJECT,no-resolve
+IP-CIDR,117.71.105.23/32,REJECT,no-resolve
+IP-CIDR,117.92.229.188/32,REJECT,no-resolve
+IP-CIDR,122.14.230.132/32,REJECT,no-resolve
+IP-CIDR,155.102.4.4/32,REJECT,no-resolve
+IP-CIDR,155.102.4.6/32,REJECT,no-resolve
+IP-CIDR,155.102.4.142/32,REJECT,no-resolve
+IP-CIDR,155.102.4.146/32,REJECT,no-resolve
+IP-CIDR,163.181.35.180/32,REJECT,no-resolve
+IP-CIDR,163.181.35.184/32,REJECT,no-resolve
+IP-CIDR,163.181.35.203/32,REJECT,no-resolve
+IP-CIDR,163.181.228.147/32,REJECT,no-resolve
+IP-CIDR,180.96.2.114/32,REJECT,no-resolve
+IP-CIDR,218.12.77.96/32,REJECT,no-resolve
+IP-CIDR,218.94.207.205/32,REJECT,no-resolve
 
-[URL Rewrite]  
-^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject header  
-^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject  
+# —— IPv6 列表 ——
+IP-CIDR,2404:2280:109:0:3::19/128,REJECT,no-resolve
+IP-CIDR,2408:8756:2cff:e410:5e::10/128,REJECT,no-resolve
+IP-CIDR,2408:871a:6010:302::1:13a/128,REJECT,no-resolve
+
+[URL Rewrite]
+^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject header
+^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject
 ^https://lf-cdn-tos\.bytescm\.com/obj/static/ad/ reject
 
 [MITM]
