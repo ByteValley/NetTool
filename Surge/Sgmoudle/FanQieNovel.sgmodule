@@ -23,6 +23,8 @@ DOMAIN-SUFFIX,byteimg.com,REJECT // Added for: p3-novel.byteimg.com:443
 DOMAIN-SUFFIX,ecombdimg.com,REJECT // Added for: p9-aio.ecombdimg.com:443
 # DOMAIN-SUFFIX,fqnovel.com,REJECT // Added for: log0-applog-lf.fqnovel.com:443
 DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
+# 屏蔽所有以 lf*-cdn-tos.bytegoofy.com 结构的请求
+DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
 
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
 IP-CIDR,117.71.105.23/32,REJECT,no-resolve
