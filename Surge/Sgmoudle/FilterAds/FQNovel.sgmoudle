@@ -13,6 +13,7 @@ DOMAIN-SUFFIX,ecombdimg.com,REJECT
 DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^v\d+-novelapp\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
+DOMAIN-KEYWORD,novel.byteimg.com,REJECT  # 更精细匹配小说广告相关资源
 
 # 追踪与广告接口封锁
 AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
@@ -41,6 +42,9 @@ URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/con
 URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
 URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\/video\/.+,REJECT
 URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\.mp4,REJECT
+URL-REGEX,^https?:\/\/.+\.fqnovelpic\.com\/.+\/(ad|ad-pattern)\/.+,REJECT
+URL-REGEX,^https?:\/\/.+\.byteimg\.com\/(tos|ad|obj)\/.+(ad|ad-img).+\.jpeg,REJECT
+URL-REGEX,^https?:\/\/.+\.byteimg\.com\/.+\/ad-pattern\/.+,REJECT
 
 # 可疑广告IP
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
