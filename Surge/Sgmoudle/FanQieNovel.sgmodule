@@ -11,31 +11,26 @@ AND, ((DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, applog), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
+# AND, ((DOMAIN-KEYWORD, applog), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
 AND, ((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))), REJECT
 DOMAIN, dig.bdurl.net, REJECT
 DOMAIN, dig.zjurl.cn, REJECT
 # DOMAIN, is.snssdk.com, DIRECT // 放行此条以确保广告联盟脚本的正常执行
 AND, ((DOMAIN-KEYWORD, -applog), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
+# AND, ((DOMAIN-KEYWORD, -applog-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -lf-), (DOMAIN-SUFFIX, snssdk.com)), REJECT
 # 精确匹配番茄小说和广告子域
-AND, ((DOMAIN-KEYWORD, -novel), (DOMAIN-SUFFIX, byteimg.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -ad-sign), (DOMAIN-SUFFIX, byteimg.com)), REJECT
+AND, ((OR, (DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign)), (DOMAIN-SUFFIX, byteimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -aio), (DOMAIN-SUFFIX, ecombdimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
-# 番茄小说专用子域
-AND, ((DOMAIN-KEYWORD, -reading), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -applog-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
+AND, ((OR, (DOMAIN-KEYWORD, -reading), (DOMAIN-KEYWORD, -reading-sign)), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
+# 精确匹配 p*-reading-sign.fqnovelpic.com
+# AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
-# 精准拦截 SNI 级别精准匹配
-AND, ((DOMAIN-KEYWORD, -reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -novel), (DOMAIN-SUFFIX, byteimg.com)), REJECT
 # 精准拦截 *-lf 子域（多个域名后缀）
 AND, ((DOMAIN-KEYWORD, -lf), (OR, ((DOMAIN-SUFFIX, zijieapi.com), (DOMAIN-SUFFIX, ecombdapi.com), (DOMAIN-SUFFIX, bytegecko.com), (DOMAIN-SUFFIX, fqnovel.com), (DOMAIN-SUFFIX, fqnovelvod.com), (DOMAIN-SUFFIX, fqnovelpic.com)))), REJECT
 # 精准拦截 misc-lf.fqnovel.com
 AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-# 精确匹配 p*-reading-sign.fqnovelpic.com
-AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
 # 精确拦截 lf-webcast-gr-sourcecdn.bytegecko.com
 AND, ((DOMAIN-KEYWORD, lf-webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
 # 拦截 open.douyin.com
