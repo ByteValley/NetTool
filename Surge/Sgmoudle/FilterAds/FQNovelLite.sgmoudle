@@ -65,40 +65,6 @@ DOMAIN,rtlog5-applog-lf.fqnovel.com,REJECT
 # 保留 SDK 关键服务域名
 DOMAIN,is.snssdk.com,DIRECT
 DOMAIN,i.snssdk.com,DIRECT
-
-# IP & IPv6 广告节点封锁
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve
-IP-CIDR,103.136.221.67/32,REJECT,no-resolve
-IP-CIDR,155.102.4.4/32,REJECT,no-resolve
-IP-CIDR,155.102.4.6/32,REJECT,no-resolve
-IP-CIDR,155.102.4.142/32,REJECT,no-resolve
-IP-CIDR,155.102.4.146/32,REJECT,no-resolve
-IP-CIDR,61.170.77.65/32,REJECT,no-resolve
-IP-CIDR,163.181.35.203/32,REJECT,no-resolve
-IP-CIDR,163.181.35.180/32,REJECT,no-resolve
-IP-CIDR,163.181.35.184/32,REJECT,no-resolve
-IP-CIDR,107.155.58.209/32,REJECT,no-resolve
-IP-CIDR,2408:8756:2cff:e410:5e::10/128,REJECT,no-resolve
-IP-CIDR,2408:871a:6010:302::1:13a/128,REJECT,no-resolve
-IP-CIDR,2404:2280:109:0:3::19/128,REJECT,no-resolve
-
-# 历史广告追踪 IP
-IP-CIDR,49.71.37.101/32,REJECT,no-resolve
-IP-CIDR,117.71.105.23/32,REJECT,no-resolve
-IP-CIDR,218.94.207.205/32,REJECT,no-resolve
-IP-CIDR,117.92.229.188/32,REJECT,no-resolve
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve
-IP-CIDR,180.96.2.114/32,REJECT,no-resolve
-
-[URL Rewrite]
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
-^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
-^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
-
-[MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.snssdk.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
-
 # 新增广告域名补充（v3 novelapp + 广告图像服务器）
 DOMAIN,p3-ad-sign.byteimg.com,REJECT
 DOMAIN,v3-novelapp.fqnovelvod.com,REJECT
@@ -121,6 +87,18 @@ DOMAIN,p3-novel.byteimg.com,REJECT
 DOMAIN,p6-novel.byteimg.com,REJECT
 DOMAIN,open.douyin.com,REJECT
 
+# IP & IPv6 广告节点封锁
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve
+IP-CIDR,103.136.221.67/32,REJECT,no-resolve
+IP-CIDR,155.102.4.4/32,REJECT,no-resolve
+IP-CIDR,155.102.4.6/32,REJECT,no-resolve
+IP-CIDR,155.102.4.142/32,REJECT,no-resolve
+IP-CIDR,155.102.4.146/32,REJECT,no-resolve
+IP-CIDR,61.170.77.65/32,REJECT,no-resolve
+IP-CIDR,163.181.35.203/32,REJECT,no-resolve
+IP-CIDR,163.181.35.180/32,REJECT,no-resolve
+IP-CIDR,163.181.35.184/32,REJECT,no-resolve
+IP-CIDR,107.155.58.209/32,REJECT,no-resolve
 IP-CIDR,58.251.62.58/32,REJECT,no-resolve
 IP-CIDR,218.12.77.96/32,REJECT,no-resolve
 IP-CIDR,47.246.38.175/32,REJECT,no-resolve
@@ -131,3 +109,23 @@ IP-CIDR,103.136.221.67/32,REJECT,no-resolve
 IP-CIDR,106.117.245.59/32,REJECT,no-resolve
 IP-CIDR,122.14.230.132/32,REJECT,no-resolve
 IP-CIDR,107.155.58.209/32,REJECT,no-resolve
+IP-CIDR,2408:8756:2cff:e410:5e::10/128,REJECT,no-resolve
+IP-CIDR,2408:871a:6010:302::1:13a/128,REJECT,no-resolve
+IP-CIDR,2404:2280:109:0:3::19/128,REJECT,no-resolve
+
+# 历史广告追踪 IP
+IP-CIDR,49.71.37.101/32,REJECT,no-resolve
+IP-CIDR,117.71.105.23/32,REJECT,no-resolve
+IP-CIDR,218.94.207.205/32,REJECT,no-resolve
+IP-CIDR,117.92.229.188/32,REJECT,no-resolve
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve
+IP-CIDR,180.96.2.114/32,REJECT,no-resolve
+
+[URL Rewrite]
+^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
+^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
+^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
+^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
+
+[MITM]
+hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.snssdk.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
