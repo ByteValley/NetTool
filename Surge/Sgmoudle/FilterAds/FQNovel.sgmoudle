@@ -1,68 +1,65 @@
-#!name=番茄小说去广告
-#!desc=去除番茄小说开屏广告、章节底部广告、听书页广告。保留核心功能，避免影响今日头条等字节系 App。
-#!author=zqzess & chatgpt
+#!name=番茄去广告
+#!desc=彻底去除番茄小说开屏广告、章末广告、视频贴片等，不影响头条类 App 正常使用
+#!author=zqzess & ChatGPT优化版
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
 
 [Rule]
-# ✅ 明确拦截番茄小说广告源
+# ✅ 主要广告域名拦截
 DOMAIN,log5-applog.fqnovel.com,REJECT
 DOMAIN,rtlog5-applog.fqnovel.com,REJECT
-DOMAIN-SUFFIX,byteimg.com,REJECT
-DOMAIN-SUFFIX,ecombdimg.com,REJECT
+DOMAIN,vas-lf-x.snssdk.com,REJECT
+DOMAIN,dig.bdurl.net,REJECT
+DOMAIN,dig.zjurl.cn,REJECT
+
+# ✅ 视频广告相关域名拦截
 DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
+DOMAIN-REGEX,^v\d+-novelapp\.fqnovelvod\.com$,REJECT
 DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
 
-# ✅ 尽量避免影响其他字节系 App，放行必要接口
-DOMAIN,is.snssdk.com,DIRECT
-URL-REGEX,^https:\/\/(api-access\.pangolin-sdk-toutiao(\d|-b)?|is\.snssdk)\.com\/api\/ad\/union\/sdk\/get_ads,DIRECT
+# ✅ 广告分发与资源获取接口封锁
+URL-REGEX,^https?:\/\/.+\.pangolin-sdk-toutiao.*\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/,REJECT
+URL-REGEX,^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4,REJECT
+URL-REGEX,^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad|web\.business\.image)\/.+,REJECT
+URL-REGEX,^https?:\/\/.+\.snssdk\.com\/api\/ad\/.+,REJECT
+URL-REGEX,^https?:\/\/.+\.byteimg.com\/tos-cn-i-1yzifmftcy\/.+-jpeg\.jpeg,REJECT
+URL-REGEX,^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+,REJECT
+URL-REGEX,^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package,REJECT
+URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/,REJECT
 
-# ✅ 屏蔽广告下载包、资源
+# ✅ 视频广告资源补充拦截
+URL-REGEX,^https?:\/\/v\d+-reading-video\.fqnovelvod\.com\/.+\.mp4,REJECT
+URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\.mp4,REJECT
+URL-REGEX,^https?:\/\/lf\d+-cdn-tos\.bytegoofy\.com\/.+\.mp4,REJECT
+
+# ✅ 图文广告包下载封锁
 URL-REGEX,^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/,REJECT
+
+# ✅ 广告请求特征组合拦截
 AND,((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)),REJECT
 AND,((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)),REJECT
 AND,((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)),REJECT
 AND,((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))),REJECT
 
-# ✅ 补充广告分析/追踪域名
-DOMAIN,dig.bdurl.net,REJECT
-DOMAIN,dig.zjurl.cn,REJECT
-DOMAIN,vas-lf-x.snssdk.com,REJECT
-
-# ✅ 针对疑似广告视频来源
-URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\/video\/.+,REJECT
-
-# ✅ 可能的静态资源广告图片
-URL-REGEX,^https?:\/\/.+\.byteimg\.com\/tos-cn-i-1yzifmftcy\/.+-jpeg\.jpeg,REJECT
-
-# ✅ 屏蔽其他图文广告包、追踪资源
-URL-REGEX,^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad|web\.business\.image)\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.snssdk\.com\/api\/ad\/.+,REJECT
-
-# ✅ 可疑监听/数据回传接口
-URL-REGEX,^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package,REJECT
-
-# ✅ 补充未知用途广告接口（暂保留）
-URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/,REJECT
-
-# ✅ 屏蔽视频广告静态资源
-URL-REGEX,^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4,REJECT
-
-# ✅ 移除 Pangolin SDK 相关章末广告
-URL-REGEX,^https?:\/\/.+\.pangolin-sdk-toutiao\.com\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/,REJECT
-
-# ✅ 拦截头条下载资源广告
-URL-REGEX,^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/,REJECT
+# ✅ 保留必要接口确保字节SDK正常
+DOMAIN,is.snssdk.com,DIRECT
 
 # ✅ 拼多多嵌套广告
 URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
 
 [URL Rewrite]
-# 拦截图文广告样式资源
+# 头条/番茄广告资源样式文件拦截
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
+^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
 ^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
 ^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
 
 [MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,gurd.snssdk.com,adim.pinduoduo.com
+hostname = %APPEND%
+*.pangolin-sdk-toutiao,
+*.pangolin-sdk-toutiao.*,
+*.pstatp.com,
+*.pglstatp-toutiao.com,
+gurd.snssdk.com,
+*.fqnovelvod.com,
+adim.pinduoduo.com
