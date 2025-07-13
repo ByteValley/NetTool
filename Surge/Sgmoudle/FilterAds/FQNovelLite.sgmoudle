@@ -1,4 +1,4 @@
-#!name=番茄去广告
+#!name=番茄小说去广告（全维增强版）
 #!desc=集成封锁番茄小说广告资源、视频流、电商流量、图像广告、直播推流及可疑字节服务域名。
 #!author=zqzess & ChatGPT
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
@@ -98,3 +98,36 @@ IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 
 [MITM]
 hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.snssdk.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
+
+# 新增广告域名补充（v3 novelapp + 广告图像服务器）
+DOMAIN,p3-ad-sign.byteimg.com,REJECT
+DOMAIN,v3-novelapp.fqnovelvod.com,REJECT
+URL-REGEX,^https?:\/\/v3-novelapp\.fqnovelvod\.com\/.+\.mp4,REJECT
+
+# 🔄 用户新抓包广告域名封锁补丁（2025/07/13）
+DOMAIN,p11-sign.douyinpic.com,REJECT
+DOMAIN,p26-sign.douyinpic.com,REJECT
+DOMAIN,api5-normal-lf.fqnovel.com,REJECT
+DOMAIN,api5-normal-sinfonlinec.fqnovel.com,REJECT
+DOMAIN,imapi5-oth-lf.zijieapi.com,REJECT
+DOMAIN,saveu5-normal-lf.zijieapi.com,REJECT
+DOMAIN,ads5-normal-lf.zijieapi.com,REJECT
+DOMAIN,bsync3-normal-lf.zijieapi.com,REJECT
+DOMAIN,log0-applog-lf.fqnovel.com,REJECT
+DOMAIN,frontier100-toutiao-lf.fqnovel.com,REJECT
+DOMAIN,mon11-misc-lf.fqnovel.com,REJECT
+DOMAIN,lf3-reading.fqnovelpic.com,REJECT
+DOMAIN,p3-novel.byteimg.com,REJECT
+DOMAIN,p6-novel.byteimg.com,REJECT
+DOMAIN,open.douyin.com,REJECT
+
+IP-CIDR,58.251.62.58/32,REJECT,no-resolve
+IP-CIDR,218.12.77.96/32,REJECT,no-resolve
+IP-CIDR,47.246.38.175/32,REJECT,no-resolve
+IP-CIDR,47.246.38.176/32,REJECT,no-resolve
+IP-CIDR,47.246.38.178/32,REJECT,no-resolve
+IP-CIDR,47.246.38.181/32,REJECT,no-resolve
+IP-CIDR,103.136.221.67/32,REJECT,no-resolve
+IP-CIDR,106.117.245.59/32,REJECT,no-resolve
+IP-CIDR,122.14.230.132/32,REJECT,no-resolve
+IP-CIDR,107.155.58.209/32,REJECT,no-resolve
