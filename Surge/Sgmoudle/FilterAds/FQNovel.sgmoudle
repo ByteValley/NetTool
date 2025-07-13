@@ -40,6 +40,7 @@ URL-REGEX,^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4,REJECT
 URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/,REJECT
 URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
 URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\/video\/.+,REJECT
+URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\.mp4,REJECT
 
 # 可疑广告IP
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
