@@ -1,75 +1,108 @@
 #!name=番茄去广告
-#!desc=彻底移除番茄小说广告（开屏、章末、贴片、听书等），确保今日头条等字节系 App 正常运行。
-#!author=zqzess + ChatGPT优化
+#!desc=彻底屏蔽番茄小说广告资源（视频贴片、图像封面、接口、直播流、电商推广等），保留小说封面/头像及字节系关键功能。
+#!author=zqzess & ChatGPT
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
 
 [Rule]
-# 广告资源域名封锁
-DOMAIN,log5-applog.fqnovel.com,REJECT
-DOMAIN,rtlog5-applog.fqnovel.com,REJECT
-DOMAIN-SUFFIX,byteimg.com,REJECT
-DOMAIN-SUFFIX,ecombdimg.com,REJECT
-DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
-DOMAIN-REGEX,^v\d+-novelapp\.fqnovelvod\.com$,REJECT
-DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
-DOMAIN-KEYWORD,novel.byteimg.com,REJECT  # 更精细匹配小说广告相关资源
-DOMAIN,p3-ad-sign.byteimg.com,REJECT
-DOMAIN-KEYWORD,ad-sign.byteimg.com,REJECT
-DOMAIN-KEYWORD,reading-sign.fqnovelpic.com,REJECT
-DOMAIN-REGEX,^lf\d+-reading\.fqnovelpic\.com$,REJECT
-DOMAIN-KEYWORD,fqnovelstatic.com,REJECT
+# —— 核心视频广告 ——  
+DOMAIN-REGEX,^v\d+-(reading-video|novelapp)\.fqnovelvod\.com$,REJECT  
+URL-REGEX,^https?://v\d+-(reading-video|novelapp)\.fqnovelvod\.com/.+\.mp4,REJECT  
+DOMAIN,lf-reward-video.bytedcdn.com,REJECT   # 奖励视频
 
-# 追踪与广告接口封锁
-AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT
-AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))), REJECT
-DOMAIN,dig.bdurl.net,REJECT
-DOMAIN,dig.zjurl.cn,REJECT
-DOMAIN,vas-lf-x.snssdk.com,REJECT
+# —— 精准图像广告 ——  
+DOMAIN,p3-ad-sign.byteimg.com,REJECT  
+DOMAIN,p3-reading-sign.fqnovelpic.com,REJECT  
+DOMAIN,lf3-reading.fqnovelpic.com,REJECT  
+DOMAIN,lf-fe.fqnovelstatic.com,REJECT  
+DOMAIN-KEYWORD,novel.byteimg.com,REJECT  
+URL-REGEX,^https?://.+\.byteimg\.com/.+(ad|ad-img|ad-pattern).+\.jpeg,REJECT  
+URL-REGEX,^https?://.+\.byteimg\.com/.+/ad-pattern/.+,REJECT  
+URL-REGEX,^https?://.+\.fqnovelpic\.com/.+/ad/.+,REJECT  
 
-# 放行必要功能
-DOMAIN,is.snssdk.com,DIRECT
+# —— 广告触发接口 & 资源包 ——  
+URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT  
+URL-REGEX,^https?://.+\.pangolin-sdk-toutiao.*?/api/ad/union/sdk/(get_ads|stats|settings)/,REJECT  
+URL-REGEX,^https?://.+\.(pglstatp-toutiao|pstatp)\.com/(obj|img)/(ad-app-package|ad|web\.business\.image)/.+,REJECT  
+URL-REGEX,^https?://.+\.pglstatp-toutiao\.com/.+/toutiao\.mp4,REJECT  
+URL-REGEX,^https?://.+\.pstatp\.com/obj/mosaic-legacy/.+\?from=ad,REJECT  
+URL-REGEX,^https?://.+\.pstatp\.com/bytecom/resource/track_log/src/.+,REJECT  
+URL-REGEX,^https?://gurd\.snssdk\.com/src/server/v3/package,REJECT  
+URL-REGEX,^https?://.+?\.snssdk\.com/motor/operation/activity/display/config/V2/,REJECT  
+URL-REGEX,^https?://adim\.pinduoduo\.com/.+/toutiao\?.+,REJECT  
 
-# 视频广告触发接口及下载包
-URL-REGEX,^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/,REJECT
-URL-REGEX,^https?:\/\/.+\.pangolin-sdk-toutiao.*\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/,REJECT
-URL-REGEX,^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4,REJECT
-URL-REGEX,^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad|web\.business\.image)\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from=ad,REJECT
-URL-REGEX,^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+,REJECT
-URL-REGEX,^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package,REJECT
-URL-REGEX,^https?:\/\/.+\.byteimg\.com\/tos-cn-i-1yzifmftcy\/.+-jpeg\.jpeg,REJECT
-URL-REGEX,^https?:\/\/.+\.snssdk\.com\/api\/ad\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4,REJECT
-URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/,REJECT
-URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
-URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\/video\/.+,REJECT
-URL-REGEX,^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\.mp4,REJECT
-URL-REGEX,^https?:\/\/.+\.fqnovelpic\.com\/.+\/(ad|ad-pattern)\/.+,REJECT
-URL-REGEX,^https?:\/\/.+\.byteimg\.com\/(tos|ad|obj)\/.+(ad|ad-img).+\.jpeg,REJECT
-URL-REGEX,^https?:\/\/.+\.byteimg\.com\/.+\/ad-pattern\/.+,REJECT
+# —— 电商 & 字节广告服务 ——  
+DOMAIN,bsync3-normal-lf.zijieapi.com,REJECT  
+DOMAIN,mon11-misc-lf.fqnovel.com,REJECT  
+DOMAIN,frontier100-toutiao-lf.fqnovel.com,REJECT  
+DOMAIN,rtlog5-applog-lf.fqnovel.com,REJECT  
+DOMAIN,ecom3-normal-lf.ecombdapi.com,REJECT  
+DOMAIN,ecom5-normal-lf.ecombdapi.com,REJECT  
+DOMAIN,ec3-core-lf.ecombdapi.com,REJECT  
+DOMAIN,ec5-core-lf.ecombdapi.com,REJECT  
+DOMAIN,isaas5-normal-lf.ecombdapi.com,REJECT  
+DOMAIN,api5-normal-lf.fqnovel.com,REJECT  
+DOMAIN,api5-normal-sinfonlinec.fqnovel.com,REJECT  
+DOMAIN,saveu5-normal-lf.zijieapi.com,REJECT  
+DOMAIN,ads5-normal-lf.ecombdapi.com,REJECT  
+DOMAIN,imapi5-oth-lf.zijieapi.com,REJECT  
+DOMAIN,ma.zijieapi.com,REJECT  
+DOMAIN,vas.snssdk.com,REJECT  
+DOMAIN,effect.snssdk.com,REJECT  
+DOMAIN,pitaya.bytedance.com,REJECT  
+DOMAIN,lf-webcast-gr-sourcecdn.bytegecko.com,REJECT  
+DOMAIN-KEYWORD,zijieapi.com,REJECT  
+DOMAIN-KEYWORD,bytegecko.com,REJECT  
 
-# 可疑广告IP
-IP-CIDR,49.71.37.101/32,REJECT,no-resolve
-IP-CIDR,117.71.105.23/32,REJECT,no-resolve
-IP-CIDR,218.94.207.205/32,REJECT,no-resolve
-IP-CIDR,117.92.229.188/32,REJECT,no-resolve
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve
-IP-CIDR,180.96.2.114/32,REJECT,no-resolve
-# p3-ad-sign.byteimg.com 广告节点封锁（精准 IP 拦截）
-IP-CIDR,47.246.38.177/32,REJECT,no-resolve
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve
-IP-CIDR,47.246.38.174/32,REJECT,no-resolve
-IP-CIDR,47.246.38.219/32,REJECT,no-resolve
+# —— 直播流 & 跨平台资源 ——  
+DOMAIN-KEYWORD,douyincdn.com,REJECT  
+URL-REGEX,^http://pull-flv-l\d+\.douyincdn\.com/third/stream-.+\.flv,REJECT  
+DOMAIN,webcast5-open-lf.douyin.com,REJECT  
+DOMAIN,content-open.douyin.com,REJECT  
+DOMAIN,p11-sign.douyinpic.com,REJECT  
+DOMAIN,p26-sign.douyinpic.com,REJECT  
+DOMAIN-KEYWORD,open.douyin.com,REJECT  
+
+# —— 域名关键词组合监控 ——  
+AND,((DOMAIN-KEYWORD,ads),(DOMAIN-KEYWORD,normal),(DOMAIN-SUFFIX,zijieapi.com)),REJECT  
+AND,((DOMAIN-KEYWORD,-ad-),(DOMAIN-SUFFIX,byteimg.com)),REJECT  
+AND,((DOMAIN-KEYWORD,minigame),(DOMAIN-SUFFIX,zijieapi.com)),REJECT  
+AND,((DOMAIN-KEYWORD,tnc),(AND,((OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,-alisc),(DOMAIN-KEYWORD,-aliec))),((OR,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,bytedance.com),(DOMAIN-SUFFIX,zijieapi.com)))))),REJECT  
+
+# —— 必要功能保留 ——  
+DOMAIN,is.snssdk.com,DIRECT  
+DOMAIN,i.snssdk.com,DIRECT  
+
+# —— IP & IPv6 精准封锁 ——  
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve  
+IP-CIDR,47.246.38.175/32,REJECT,no-resolve  
+IP-CIDR,47.246.38.176/32,REJECT,no-resolve  
+IP-CIDR,47.246.38.178/32,REJECT,no-resolve  
+IP-CIDR,47.246.38.181/32,REJECT,no-resolve  
+IP-CIDR,58.251.62.58/32,REJECT,no-resolve  
+IP-CIDR,61.170.77.65/32,REJECT,no-resolve  
+IP-CIDR,103.136.221.67/32,REJECT,no-resolve  
+IP-CIDR,106.117.245.59/32,REJECT,no-resolve  
+IP-CIDR,122.14.230.132/32,REJECT,no-resolve  
+IP-CIDR,155.102.4.4/32,REJECT,no-resolve  
+IP-CIDR,155.102.4.6/32,REJECT,no-resolve  
+IP-CIDR,155.102.4.142/32,REJECT,no-resolve  
+IP-CIDR,155.102.4.146/32,REJECT,no-resolve  
+IP-CIDR,163.181.35.180/32,REJECT,no-resolve  
+IP-CIDR,163.181.35.184/32,REJECT,no-resolve  
+IP-CIDR,163.181.35.203/32,REJECT,no-resolve  
+IP-CIDR,180.96.2.114/32,REJECT,no-resolve  
+IP-CIDR,49.71.37.101/32,REJECT,no-resolve  
+IP-CIDR,117.71.105.23/32,REJECT,no-resolve  
+IP-CIDR,218.94.207.205/32,REJECT,no-resolve  
+IP-CIDR,117.92.229.188/32,REJECT,no-resolve  
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve  
 
 [URL Rewrite]
-# 拦截样式伪装资源广告
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
-^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
-^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
+^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject header  
+^https://sf3-fe-tos\.pglstatp-toutiao\.com/obj/ad-pattern/ reject  
+^https://lf-cdn-tos\.bytescm\.com/obj/static/ad/ reject  
+^https://tnc3-alisc1\.zijieapi\.com/get_domains/ reject  
 
 [MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com
+hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.snssdk.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
