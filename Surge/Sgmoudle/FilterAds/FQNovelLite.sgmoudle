@@ -1,27 +1,26 @@
-#!name=番茄去广告
-#!desc=封锁番茄小说广告域名、视频贴片、广告图片资源，并通过 IP 精准封禁残余广告服务。
+#!name=番茄小说去广告（全量增强版）
+#!desc=全面封锁番茄小说及相关字节系广告资源，包含视频、图像、直播流、接口与 IPv6/CDN IP 精准封禁。
 #!author=zqzess & ChatGPT
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
 
 [Rule]
-# 视频广告 CDN
+# 视频广告域名
 DOMAIN-REGEX,^v\d+-(reading-video|novelapp)\.fqnovelvod\.com$,REJECT
 URL-REGEX,^https?:\/\/v\d+-(reading-video|novelapp)\.fqnovelvod\.com\/.+\.mp4,REJECT
 
-# 精准图片广告域名
+# 图片广告域名与路径
 DOMAIN,p3-ad-sign.byteimg.com,REJECT
-DOMAIN,lf-fe.fqnovelstatic.com,REJECT
+DOMAIN,p3-reading-sign.fqnovelpic.com,REJECT
+DOMAIN,p3-novel.byteimg.com,REJECT
 DOMAIN,lf3-reading.fqnovelpic.com,REJECT
-DOMAIN,p9-reading-sign.fqnovelpic.com,REJECT
-
-# 精准路径广告图资源拦截
+DOMAIN,lf-fe.fqnovelstatic.com,REJECT
 DOMAIN-KEYWORD,novel.byteimg.com,REJECT
 URL-REGEX,^https?:\/\/.+\.byteimg\.com\/.+(ad|ad-img|ad-pattern).+\.jpeg,REJECT
 URL-REGEX,^https?:\/\/.+\.byteimg\.com\/.+\/ad-pattern\/.+,REJECT
 URL-REGEX,^https?:\/\/.+\.fqnovelpic\.com\/.+\/ad\/.+,REJECT
 
-# 广告接口资源
+# 广告接口与资源文件
 URL-REGEX,^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/,REJECT
 URL-REGEX,^https?:\/\/.+\.pangolin-sdk-toutiao.*\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/,REJECT
 URL-REGEX,^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad|web\.business\.image)\/.+,REJECT
@@ -32,23 +31,28 @@ URL-REGEX,^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package,REJECT
 URL-REGEX,^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/,REJECT
 URL-REGEX,^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+,REJECT
 
-# 广告相关关键词域名组合
-AND,((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)),REJECT
-AND,((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)),REJECT
-AND,((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)),REJECT
-AND,((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))),REJECT
+# 广告直播流拦截
+DOMAIN-KEYWORD,douyincdn.com,REJECT
+URL-REGEX,^http:\/\/pull-flv-l\d+\.douyincdn\.com\/third\/stream-.+\.flv,REJECT
 
-# 必要放行
+# 广告服务平台域名补充
+DOMAIN,bsync3-normal-lf.zijieapi.com,REJECT
+DOMAIN,gecko5-lf.zijieapi.com,REJECT
+DOMAIN,frontier100-toutiao-lf.fqnovel.com,REJECT
+DOMAIN-KEYWORD,zijieapi.com,REJECT
+
+# 必要功能保留
 DOMAIN,is.snssdk.com,DIRECT
+DOMAIN,i.snssdk.com,DIRECT
 
-# IP 拦截：p3-ad-sign.byteimg.com 和 fqnovelpic 广告节点
-IP-CIDR,47.246.38.181/32,REJECT,no-resolve
-IP-CIDR,47.246.38.177/32,REJECT,no-resolve
-IP-CIDR,47.246.38.174/32,REJECT,no-resolve
-IP-CIDR,47.246.38.219/32,REJECT,no-resolve
+# 精准 IP 拦截
 IP-CIDR,47.246.38.0/24,REJECT,no-resolve
+IP-CIDR,180.163.145.52/32,REJECT,no-resolve
+IP-CIDR,2404:2280:109:0:3::19/128,REJECT,no-resolve
+IP-CIDR,2408:8756:2cff:e410:5e::10/128,REJECT,no-resolve
+IP-CIDR,2408:871a:6010:302::1:13a/128,REJECT,no-resolve
 
-# 旧版广告监控 IP
+# 历史广告追踪 IP
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
 IP-CIDR,117.71.105.23/32,REJECT,no-resolve
 IP-CIDR,218.94.207.205/32,REJECT,no-resolve
@@ -63,4 +67,4 @@ IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 ^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
 
 [MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,gurd.snssdk.com,adim.pinduoduo.com
+hostname = %APPEND% *.pangolin-sdk-toutiao,*.pstatp.com,*.pglstatp-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.zijieapi.com,gurd.snssdk.com,adim.pinduoduo.com,douyincdn.com
