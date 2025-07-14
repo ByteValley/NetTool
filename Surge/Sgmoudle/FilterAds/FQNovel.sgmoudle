@@ -33,7 +33,7 @@ AND, ((DOMAIN-KEYWORD, webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), R
 
 # ——— 通用广告拦截 ———
 AND, ((DOMAIN-KEYWORD, -lf), (DOMAIN-SUFFIX, ecombdapi.com)), REJECT # 拦截所有 -lf.ecombdapi.com
-AND, ((OR, (DOMAIN-KEYWORD, minigame), (DOMAIN-KEYWORD, -lf)), (DOMAIN-SUFFIX, zijieapi.com)), REJECT # 拦截zijieapi
+AND, ((OR, ((DOMAIN-KEYWORD, minigame), (DOMAIN-KEYWORD, -lf))), (DOMAIN-SUFFIX, zijieapi.com)), REJECT # 拦截zijieapi
 AND, ((DOMAIN-KEYWORD, dig), (OR, ((DOMAIN-SUFFIX, bdurl.net), (DOMAIN-SUFFIX, zjurl.cn)))), REJECT  # dig.* 短链跟踪  
 DOMAIN, dig.bdurl.net, REJECT
 DOMAIN, dig.zjurl.cn, REJECT
