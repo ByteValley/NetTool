@@ -5,55 +5,31 @@
 #!category=广告屏蔽
 
 [Rule]
-# ——— 1. 放行业务接口：预约／签到／催更 ———
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(reserve_info|reserve),DIRECT
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info),DIRECT
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/(?:book|novel|article)/urge,DIRECT
+# ——— 放行业务接口：预约／签到／催更/封面/头像 ———
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(reserve_info|reserve),DIRECT # 预约查询 & 执行
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info),DIRECT # 查询签到状态
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT # 执行签到
+URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/(?:book|novel|article)/urge, DIRECT # 催更接口
 
-# ——— 2. 放行封面 & 头像 ———
-URL-REGEX,^https?://p\d+-reading-sign\.fqnovelpic\.com/(?:novel-pic|avatar|user-avatar|author-avatar)/,DIRECT
+# ——— 激励／联盟广告 SDK ———
+URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(?:\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/get_ads,DIRECT # 放行去广告脚本调用
+URL-REGEX,^https?://.+\.pangolin-sdk-toutiao.*?/api/ad/union/sdk/(get_ads|stats|settings)/,REJECT # 拦截广告脚本资源包
 
-# ——— 3. 激励／联盟广告 SDK ———
-URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(?:\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/get_ads,DIRECT
-URL-REGEX,^https?://.+\.pangolin-sdk-toutiao.*?/api/ad/union/sdk/(get_ads|stats|settings)/,REJECT
+# ——— 视频广告 ———
+AND, ((DOMAIN-KEYWORD, reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT # 拦截视频类广告域
+URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT # 拦截视频广告路径
 
-# ——— 4. 视频广告 ———
-AND, ((DOMAIN-KEYWORD, reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)),REJECT
-AND, ((DOMAIN-KEYWORD, novelapp), (DOMAIN-SUFFIX, fqnovelvod.com)),REJECT
-URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT
+# ——— 图片广告 ———
+AND, ((OR, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-KEYWORD, api), (DOMAIN-KEYWORD, toutiao))), (DOMAIN-SUFFIX, fqnovel.com)), REJECT # 拦截 fqnovel 广告图
+AND, ((OR, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, ad-sign))), (DOMAIN-SUFFIX, byteimg.com)), REJECT # 拦截 byteimg 广告图
+# AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT # 拦截番茄小说图像广告
 
-# ——— 5. 图像广告 & 奖励视频 —— 
-AND, ((DOMAIN-KEYWORD, bytednsdoc), (DOMAIN-SUFFIX, bytednsdoc.com)),REJECT  # lf3-static.bytednsdoc.com
-AND, ((OR, ((DOMAIN-KEYWORD, luckycat), (DOMAIN-KEYWORD, ad-sign), (DOMAIN-KEYWORD, novel)), (DOMAIN-SUFFIX, byteimg.com))), REJECT  # byteimg.com
-AND, ((DOMAIN-KEYWORD, sign), (OR, ((DOMAIN-SUFFIX, douyinpic.com), (DOMAIN-SUFFIX, byteimg.com)))), REJECT  # sign
-AND, ((DOMAIN-KEYWORD, -open), (DOMAIN-SUFFIX, douyin.com)), REJECT  # -open.douyin.com
-AND, ((DOMAIN-KEYWORD, -lf), (OR, ((DOMAIN-SUFFIX, ecombdimg.com), (DOMAIN-SUFFIX, ecombdapi.com), (DOMAIN-SUFFIX, snssdk.com)))), REJECT  # -lf
-AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
-AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-AND, ((DOMAIN-KEYWORD, webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
-AND, ((OR, ((DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign))), (OR, ((DOMAIN-SUFFIX, byteimg.com), (DOMAIN-SUFFIX, fqnovelvod.com)))), REJECT
-AND, ((DOMAIN-KEYWORD, -aio), (DOMAIN-SUFFIX, ecombdimg.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -applog), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT # 拦截所有 -ad- byteimg
-AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT # 拦截小游戏广告
-AND, ((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))), REJECT
+# ——— 其它已知广告子域／伪装资源 ———
 URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT # 拦截下载包广告
+AND, ((DOMAIN-KEYWORD, cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
+AND, ((DOMAIN-KEYWORD, webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
 
-# ——— 6. 短链／跳转跟踪 ———
-DOMAIN, dig.zjurl.cn,REJECT
-
-# ——— 7. IP 精准封锁 ——
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve  # p3-ad-sign.byteimg.com 整网段
-IP-CIDR,163.181.228.147/32,REJECT,no-resolve  # 新增 p3-ad-sign IP
-IP-CIDR,49.71.37.101/32,REJECT,no-resolve
-IP-CIDR,117.71.105.23/32,REJECT,no-resolve
-IP-CIDR,218.94.207.205/32,REJECT,no-resolve
-IP-CIDR,117.92.229.188/32,REJECT,no-resolve
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve
-IP-CIDR,180.96.2.114/32,REJECT,no-resolve
-
-[MITM]
-hostname = sf3-fe-tos.pglstatp-toutiao.com,lf-cdn-tos.bytescm.com,tnc3-alisc1.zijieapi.com
+# ——— 通用广告拦截 ———
+AND, ((DOMAIN-KEYWORD, -lf), (DOMAIN-SUFFIX, ecombdapi.com)), REJECT # 拦截所有 -lf.ecombdapi.com
+AND, ((OR, ((DOMAIN-KEYWORD, minigame), (DOMAIN-KEYWORD, -lf))), (DOMAIN-SUFFIX, zijieapi.com)), REJECT # 拦截zijieapi
+AND, ((DOMAIN-KEYWORD, dig), (OR, ((DOMAIN-SUFFIX, bdurl.net), (DOMAIN-SUFFIX, zjurl.cn)))), REJECT # dig.* 短链跟踪
