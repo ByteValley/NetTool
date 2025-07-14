@@ -15,7 +15,7 @@ URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign
 URL-REGEX, ^https:\/\/api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com\/api\/(?:book|novel|article)\/urge, DIRECT
 URL-REGEX, ^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/, REJECT
 URL-REGEX, ^https:\/\/(api-access\.pangolin-sdk-toutiao(\d|-b)?|is\.snssdk)\.com\/api\/ad\/union\/sdk\/get_ads, DIRECT // 放行此条以确保字节跳动去广告脚本的正常执行
-AND, ((DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
+# AND, ((DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT
 AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
@@ -35,7 +35,7 @@ AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
 # AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
 AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
 # 精准拦截 *-lf 子域（多个域名后缀）
-AND, ((DOMAIN-KEYWORD, -lf), (OR, ((DOMAIN-SUFFIX, zijieapi.com), (DOMAIN-SUFFIX, ecombdapi.com), (DOMAIN-SUFFIX, bytegecko.com), (DOMAIN-SUFFIX, fqnovel.com), (DOMAIN-SUFFIX, fqnovelvod.com), (DOMAIN-SUFFIX, fqnovelpic.com)))), REJECT
+# AND, ((DOMAIN-KEYWORD, -lf), (OR, ((DOMAIN-SUFFIX, zijieapi.com), (DOMAIN-SUFFIX, ecombdapi.com), (DOMAIN-SUFFIX, bytegecko.com), (DOMAIN-SUFFIX, fqnovel.com), (DOMAIN-SUFFIX, fqnovelvod.com), (DOMAIN-SUFFIX, fqnovelpic.com)))), REJECT
 # 精准拦截 misc-lf.fqnovel.com
 AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 # 精确拦截 lf-webcast-gr-sourcecdn.bytegecko.com
