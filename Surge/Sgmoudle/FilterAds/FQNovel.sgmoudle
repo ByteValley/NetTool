@@ -22,19 +22,17 @@ AND, ((DOMAIN-KEYWORD, reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT 
 URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT                  # 拦截视频广告路径
 
 # ——— 图片广告 ———
-AND, ((OR, (DOMAIN-KEYWORD, api), (DOMAIN-KEYWORD, toutiao)), (DOMAIN-SUFFIX, fqnovel.com)), REJECT # 拦截 byteimg 广告图
-AND, ((OR, (DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, ad-sign)), (DOMAIN-SUFFIX, byteimg.com)), REJECT # 拦截 byteimg 广告图
+AND, ((OR, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-KEYWORD, api), (DOMAIN-KEYWORD, toutiao))), (DOMAIN-SUFFIX, fqnovel.com)), REJECT # 拦截 fqnovel 广告图
+AND, ((OR, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, ad-sign))), (DOMAIN-SUFFIX, byteimg.com)), REJECT # 拦截 byteimg 广告图
 AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT       # 拦截番茄小说图像广告
 
 # ——— 其它已知广告子域／伪装资源 ———
 URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT        # 拦截下载包广告
 AND, ((DOMAIN-KEYWORD, cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
-AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
 AND, ((DOMAIN-KEYWORD, webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
 
 # ——— 通用广告拦截 ———
 AND, ((DOMAIN-KEYWORD, -lf), (DOMAIN-SUFFIX, ecombdapi.com)), REJECT # 拦截所有 -lf.ecombdapi.com
-AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT # 拦截所有 -ad- byteimg
 AND, ((OR, (DOMAIN-KEYWORD, minigame), (DOMAIN-KEYWORD, -lf)), (DOMAIN-SUFFIX, zijieapi.com)), REJECT # 拦截zijieapi
 AND, ((DOMAIN-KEYWORD, dig), (OR, ((DOMAIN-SUFFIX, bdurl.net), (DOMAIN-SUFFIX, zjurl.cn)))), REJECT  # dig.* 短链跟踪  
 DOMAIN, dig.bdurl.net, REJECT
