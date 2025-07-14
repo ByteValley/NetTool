@@ -10,6 +10,7 @@
 AND,((DOMAIN-KEYWORD,reading-video),(DOMAIN-SUFFIX,fqnovelvod.com)),REJECT
 # 2. 拦截 /video/ 路径下的 novelapp
 AND,((DOMAIN-SUFFIX,fqnovelvod.com),(URL-REGEX,/video/)),REJECT
+AND,((DOMAIN-KEYWORD,video),(DOMAIN-SUFFIX,bytedcdn.com)),REJECT
 
 # —— 图片广告 —— 
 AND,((DOMAIN-KEYWORD,misc-lf),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
@@ -17,8 +18,11 @@ AND,((DOMAIN-KEYWORD,toutiao),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
 AND,((DOMAIN-KEYWORD,-ad-),(DOMAIN-SUFFIX,byteimg.com)),REJECT
 AND,((DOMAIN-KEYWORD,novel),(DOMAIN-SUFFIX,byteimg.com)),REJECT
 AND,((DOMAIN-KEYWORD,ad-sign),(DOMAIN-SUFFIX,byteimg.com)),REJECT
+AND,((DOMAIN-KEYWORD,sign),(DOMAIN-SUFFIX,ecombdimg.com)),REJECT
 
 # —— 脚本／SDK 广告 —— 
+AND,((DOMAIN-KEYWORD,tos),(DOMAIN-SUFFIX,pstatp.com)),REJECT
+AND,((DOMAIN-KEYWORD,tos),(DOMAIN-SUFFIX,pglstatp-toutiao.com)),REJECT
 AND,((DOMAIN-SUFFIX,pangolin-sdk-toutiao.com),(URL-REGEX,/api/ad/union/sdk/)),REJECT
 AND,((DOMAIN-SUFFIX,pglstatp-toutiao.com),(URL-REGEX,/obj/ad-app-package/)),REJECT
 AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytescm.com)),REJECT
