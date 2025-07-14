@@ -112,9 +112,9 @@ function getRmainingDays(resetDay) {
 
 function bytesToSize(bytes) {
   if (bytes === 0) return "0B";
-  let k = 1024;
-  sizes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-  let i = Math.floor(Math.log(bytes) / Math.log(k));
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
   return (bytes / Math.pow(k, i)).toFixed(2) + " " + sizes[i];
 }
 
@@ -139,19 +139,19 @@ function toReversePercent(num, total) {
 function toMultiply(total, num) {
   let totalDecimalLen, numDecimalLen, maxLen, multiple;
   try {
-    totalDecimalLen = total.toString().split(".").length;
+    totalDecimalLen = (total.toString().split(".")[1] || "").length;
   } catch (e) {
     totalDecimalLen = 0;
   }
   try {
-    numDecimalLen = num.toString().split(".").length;
+    numDecimalLen = (num.toString().split(".")[1] || "").length;
   } catch (e) {
     numDecimalLen = 0;
   }
   maxLen = Math.max(totalDecimalLen, numDecimalLen);
   multiple = Math.pow(10, maxLen);
-  const numberSize = ((total * multiple - num * multiple) / multiple).toFixed(maxLen);
-  return bytesToSize(numberSize);
+  const diff = (total * multiple - num * multiple) / multiple;
+  return bytesToSize(Number(diff.toFixed(maxLen)));
 }
 
 function formatTime(time) {
