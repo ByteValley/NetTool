@@ -25,14 +25,12 @@ AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT  
 
 # ——— 其它已知广告子域／伪装资源 ———
 URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT        # 拦截下载包广告
-DOMAIN-REGEX,^[^.]+-cdn-tos\.bytegoofy\.com$,REJECT                                  # 拦截 bytegoofy CDN
-DOMAIN-REGEX,^[^.]+-misc-lf\.fqnovel\.com$,REJECT                                    # 拦截 misc-lf.fqnovel.com
-DOMAIN-REGEX,^[^.]+-webcast-gr-sourcecdn\.bytegecko\.com$,REJECT                     # 拦截 bytegecko 直播推流
-
+AND, ((DOMAIN-KEYWORD, cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
+AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
+AND, ((DOMAIN-KEYWORD, webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
 # ——— 通用广告拦截 ———
 AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT                  # 拦截所有 -ad- byteimg
 AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT            # 拦截小游戏广告
-#… 如有新漏网域，可按此格式补充精确规则 …
 
 # ——— 放行必要 SDK 服务 ———
 DOMAIN,is.snssdk.com,DIRECT  
