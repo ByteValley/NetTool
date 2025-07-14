@@ -24,7 +24,7 @@ URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT           
 
 # ——— 图片广告 ———
 AND, ((DOMAIN-KEYWORD, ad-sign), (DOMAIN-SUFFIX, byteimg.com)), REJECT                # 拦截 byteimg 广告图
-# AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT       # 拦截番茄小说图像广告
+AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT       # 拦截番茄小说图像广告
 
 # ——— 其它已知广告子域／伪装资源 ———
 URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT        # 拦截下载包广告
@@ -66,4 +66,4 @@ IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 ^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
 
 [MITM]
-hostname = %APPEND% *.snssdk.com,*.pstatp.com,*.pglstatp-toutiao.com,*.pangle.io,*.ibyteimg.com,*.pangolin-sdk-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
+# hostname = %APPEND% *.snssdk.com,*.byteimg.com,*.zijieapi.com,*.pstatp.com,*.pglstatp-toutiao.com,*.pangle.io,*.ibyteimg.com,*.pangolin-sdk-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
