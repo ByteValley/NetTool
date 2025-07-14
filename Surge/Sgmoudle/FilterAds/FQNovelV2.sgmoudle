@@ -10,8 +10,8 @@ URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(res
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info),DIRECT  # 查询签到状态
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT                     # 执行签到
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/(?:book|novel|article)/urge, DIRECT   # 催更接口
-URL-REGEX,^https?://p\d+-reading-sign\.fqnovelpic\.com/novel-pic/.+~, DIRECT   # 封面接口
-URL-REGEX,^https?://p\d+-reading-sign\.fqnovelpic\.com/(?:avatar|user-avatar|author-avatar)/.+~, DIRECT   # 头像接口
+# URL-REGEX,^https?://p\d+-reading-sign\.fqnovelpic\.com/novel-pic/.+~, DIRECT   # 封面接口
+# URL-REGEX,^https?://p\d+-reading-sign\.fqnovelpic\.com/(?:avatar|user-avatar|author-avatar)/.+~, DIRECT   # 头像接口
 
 # ——— 激励／联盟广告 SDK ———
 URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(?:\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/get_ads,DIRECT  # 放行去广告脚本调用
@@ -23,7 +23,7 @@ URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT           
 
 # ——— 图片广告 ———
 AND, ((DOMAIN-KEYWORD, ad-sign), (DOMAIN-SUFFIX, byteimg.com)), REJECT                # 拦截 byteimg 广告图
-AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT       # 拦截番茄小说图像广告
+# AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT       # 拦截番茄小说图像广告
 
 # ——— 其它已知广告子域／伪装资源 ———
 URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT        # 拦截下载包广告
