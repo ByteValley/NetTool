@@ -8,6 +8,7 @@
 # ——— 视频广告 ———
 AND, ((DOMAIN-KEYWORD, reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT # 拦截视频类广告域
 URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT # 拦截视频广告路径
+URL-REGEX,^https?://v\d+-reading-video\.fqnovelvod\.com/.+,REJECT
 
 # ——— 图片广告 ———
 AND, ((OR, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-KEYWORD, toutiao))), (DOMAIN-SUFFIX, fqnovel.com)), REJECT # 拦截 fqnovel 广告图
