@@ -23,9 +23,9 @@ AND,((DOMAIN-KEYWORD,ad-sign),(DOMAIN-SUFFIX,byteimg.com)),REJECT
 AND,((DOMAIN-KEYWORD,sign),(DOMAIN-SUFFIX,ecombdimg.com)),REJECT
 AND,((DOMAIN-KEYWORD,-lf),(DOMAIN-SUFFIX,ecombdapi.com)),REJECT
 AND,((DOMAIN-KEYWORD,tos),(DOMAIN-SUFFIX,pstatp.com)),REJECT
-AND,((DOMAIN-KEYWORD,tos),(DOMAIN-SUFFIX,pglstatp-toutiao.com)),REJECT
+AND,((DOMAIN-KEYWORD,api-access),(DOMAIN-SUFFIX,pglstatp-toutiao.com)),DIRECT
+DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
 AND,((DOMAIN-SUFFIX,pangolin-sdk-toutiao.com),(URL-REGEX,/api/ad/union/sdk/)),REJECT
-AND,((DOMAIN-SUFFIX,pglstatp-toutiao.com),(URL-REGEX,/obj/ad-app-package/)),REJECT
 AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytescm.com)),REJECT
 AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegoofy.com)),REJECT
 AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegecko.com)),REJECT
