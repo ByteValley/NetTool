@@ -10,6 +10,10 @@ URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(res
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info),DIRECT  # 查询签到状态
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT                     # 执行签到
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/(?:book|novel|article)/urge, DIRECT   # 催更接口
+# 放行封面图（路径里带 cover，常见后缀 jpg/jpeg/png/webp）
+URL-REGEX,(?i)://p\d+-novel\.byteimg\.com/.*/cover/.*\.(?:jpg|jpeg|png|webp)$,DIRECT
+# 放行头像图（路径里带 avatar，常见后缀 jpg/jpeg/png/webp）
+URL-REGEX,(?i)://p\d+-novel\.byteimg\.com/.*/avatar/.*\.(?:jpg|jpeg|png|webp)$,DIRECT
 
 # ——— 激励／联盟广告 SDK ———
 URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(?:\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/get_ads,DIRECT  # 放行去广告脚本调用
