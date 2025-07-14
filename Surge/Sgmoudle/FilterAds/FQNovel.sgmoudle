@@ -5,11 +5,17 @@
 #!category=广告屏蔽
 
 [Rule]
-# ——— 放行业务接口：预约／签到／催更/封面/头像 ———
+# ——— 放行业务接口：预约／签到／催更 ———
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(reserve_info|reserve),DIRECT # 预约查询 & 执行
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info),DIRECT # 查询签到状态
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT # 执行签到
 URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/(?:book|novel|article)/urge, DIRECT # 催更接口
+
+# ——— 放行评论相关接口 ———
+URL-REGEX,^https?://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/comment/(?:list|count|reply_list|reply|post),DIRECT
+URL-REGEX,^https?://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/comment/(?:list|comment),DIRECT
+URL-REGEX,^https?://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/novel/comment/(?:list|comment),DIRECT
+URL-REGEX,^https?://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/article/comment/(?:list|comment),DIRECT
 
 # ——— 激励／联盟广告 SDK ———
 URL-REGEX,^https?://(api-access\.pangolin-sdk-toutiao(?:\d|-b)?|is\.snssdk)\.com/api/ad/union/sdk/get_ads,DIRECT # 放行去广告脚本调用
