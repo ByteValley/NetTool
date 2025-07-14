@@ -15,14 +15,22 @@ AND,((DOMAIN-SUFFIX,fqnovelvod.com),(URL-REGEX,/video/)),REJECT
 AND,((DOMAIN-KEYWORD,misc-lf),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
 AND,((DOMAIN-KEYWORD,toutiao),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
 AND,((DOMAIN-KEYWORD,-ad-),(DOMAIN-SUFFIX,byteimg.com)),REJECT
-AND,((DOMAIN-KEYWORD,-novel),(DOMAIN-SUFFIX,byteimg.com)),REJECT
+AND,((DOMAIN-KEYWORD,novel),(DOMAIN-SUFFIX,byteimg.com)),REJECT
 AND,((DOMAIN-KEYWORD,ad-sign),(DOMAIN-SUFFIX,byteimg.com)),REJECT
 
 # —— 脚本／SDK 广告 —— 
 AND,((DOMAIN-SUFFIX,pangolin-sdk-toutiao.com),(URL-REGEX,/api/ad/union/sdk/)),REJECT
 AND,((DOMAIN-SUFFIX,pglstatp-toutiao.com),(URL-REGEX,/obj/ad-app-package/)),REJECT
-DOMAIN-SUFFIX,cdn-tos.bytegoofy.com,REJECT
+AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytescm.com)),REJECT
+AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegoofy.com)),REJECT
 DOMAIN-SUFFIX,webcast-gr-sourcecdn.bytegecko.com,REJECT
+URL-REGEX,^https?://lf-cdn-tos\.bytescm\.com/obj/static/ad/,REJECT
+
+# —— 一刀切：拦截所有带 get_ads 或 /ad/ 的链接 ——  
+URL-REGEX,(?i)\bget_ads\b,REJECT          # 只拦 Pangolin SDK 拉广告的接口
+URL-REGEX,(?i)/ad-app-package/,REJECT     # 只拦下载包广告
+URL-REGEX,(?i)/ad-pattern/,REJECT         # 只拦样式伪装广告
+URL-REGEX,(?i)(?:get_ads|/ad/),REJECT
 
 # —— 通用短链／埋点 拦截 —— 
 AND,((DOMAIN-KEYWORD,-lf),(DOMAIN-SUFFIX,ecombdapi.com)),REJECT
