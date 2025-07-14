@@ -58,5 +58,4 @@ AND, ((DOMAIN-KEYWORD, bdurl),     (DOMAIN-SUFFIX, bdurl.net)),     REJECT   # d
 ^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
 
 [MITM]
-# hostname = %APPEND% *.snssdk.com,*.byteimg.com,*.zijieapi.com,*.pstatp.com,*.pglstatp-toutiao.com,*.pangle.io,*.ibyteimg.com,*.pangolin-sdk-toutiao.com,*.fqnovelvod.com,*.fqnovelpic.com,*.fqnovelstatic.com,*.ecombdapi.com,*.bytedcdn.com,*.douyincdn.com,*.douyin.com,*.bytegecko.com,*.bytedance.com,gurd.snssdk.com,adim.pinduoduo.com
 hostname = %APPEND% sf3-fe-tos.pglstatp-toutiao.com,lf-cdn-tos.bytescm.com,tnc3-alisc1.zijieapi.com
