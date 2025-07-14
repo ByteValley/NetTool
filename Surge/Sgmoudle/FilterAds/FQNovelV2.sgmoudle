@@ -23,7 +23,8 @@ AND,((DOMAIN-SUFFIX,pangolin-sdk-toutiao.com),(URL-REGEX,/api/ad/union/sdk/)),RE
 AND,((DOMAIN-SUFFIX,pglstatp-toutiao.com),(URL-REGEX,/obj/ad-app-package/)),REJECT
 AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytescm.com)),REJECT
 AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegoofy.com)),REJECT
-DOMAIN-SUFFIX,webcast-gr-sourcecdn.bytegecko.com,REJECT
+AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegecko.com)),REJECT
+AND,((DOMAIN-KEYWORD,webcast),(DOMAIN-SUFFIX,bytegecko.com)),REJECT
 URL-REGEX,^https?://lf-cdn-tos\.bytescm\.com/obj/static/ad/,REJECT
 
 # —— 一刀切：拦截所有带 get_ads 或 /ad/ 的链接 ——  
