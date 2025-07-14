@@ -45,5 +45,15 @@ URL-REGEX,^http://sf3-be-pack\.pglstatp-toutiao\.com/obj/ad-app-package/,REJECT 
 # ——— 6. 短链／跳转跟踪 ———
 DOMAIN, dig.zjurl.cn,REJECT
 
+# ——— 7. IP 精准封锁 ——
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve  # p3-ad-sign.byteimg.com 整网段
+IP-CIDR,163.181.228.147/32,REJECT,no-resolve  # 新增 p3-ad-sign IP
+IP-CIDR,49.71.37.101/32,REJECT,no-resolve
+IP-CIDR,117.71.105.23/32,REJECT,no-resolve
+IP-CIDR,218.94.207.205/32,REJECT,no-resolve
+IP-CIDR,117.92.229.188/32,REJECT,no-resolve
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve
+IP-CIDR,180.96.2.114/32,REJECT,no-resolve
+
 [MITM]
 hostname = sf3-fe-tos.pglstatp-toutiao.com,lf-cdn-tos.bytescm.com,tnc3-alisc1.zijieapi.com
