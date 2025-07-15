@@ -5,31 +5,24 @@
 #!category=广告屏蔽
 
 [Rule]
-# —— 视频广告 ——  
-AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT  
+# —— 视频广告 ——
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT
 
-# —— 图片广告 ——  
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  
-AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  
+# —— 图片广告 ——
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 
-# —— 其它已知广告子域／伪装资源 ——  
-DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT  
-DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT  
-DOMAIN-SUFFIX,bytegoofy.com,REJECT  
-DOMAIN-SUFFIX,bytegecko.com,REJECT  
+# —— 其它已知广告子域／伪装资源 ——
+DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
+DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
+DOMAIN-SUFFIX,bytegoofy.com,REJECT
+DOMAIN-SUFFIX,bytegecko.com,REJECT
 
-# —— 通用广告拦截 ——  
-AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT  
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  
+# —— 通用广告拦截 ——
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 
-# —— 短链跟踪 ——  
-DOMAIN-SUFFIX,bdurl.net,REJECT  
-DOMAIN-SUFFIX,zjurl.cn,REJECT  
-
-
-[MITM]
-hostname = %APPEND% \
-  sf3-fe-tos.pglstatp-toutiao.com,\
-  lf-cdn-tos.bytescm.com,\
-  tnc3-alisc1.zijieapi.com
+# —— 短链跟踪 ——
+DOMAIN-SUFFIX,bdurl.net,REJECT
+DOMAIN-SUFFIX,zjurl.cn,REJECT
