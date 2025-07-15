@@ -4,26 +4,32 @@
 #!category=广告屏蔽
 
 [Rule]
-# —— 广告 SDK & 播放器容器 ——  
-DOMAIN-KEYWORD,novelvod,REJECT           # 拦截所有 fqnovelvod.com 子域  
-DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT # 拦截 SDK 脚本、容器、配置请求  
+# —— 视频 & SDK 容器 ——
+DOMAIN-KEYWORD,novelvod,REJECT  # 拦截所有 fqnovelvod.com 子域
+DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT  # 拦截 SDK 脚本与容器
 
-# —— 奖励视频 & 其它流媒体广告 ——  
-DOMAIN-SUFFIX,bytedcdn.com,REJECT         # 拦截 reward-video.bytedcdn.com 等  
+# —— 奖励视频 & 流媒体广告 ——
+DOMAIN-SUFFIX,bytedcdn.com,REJECT  # 拦截 reward-video.bytedcdn.com 等
 
-# —— 图片广告 & 样式包 ——  
-DOMAIN-SUFFIX,fqnovelpic.com,REJECT       # 图像广告  
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  
-AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  
-DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT  
+# —— 图片广告 & 样式包 ——
+# 1) 保留 fqnovelpic.com 全域名，解除封面断链
+# DOMAIN-SUFFIX,fqnovelpic.com,REJECT
+
+# 2) 只拦真正的图片广告子域（如果你在日志里看到有 misc-lf 或 ad-sign 出现在 fqnovelpic.com 下，就放开下面两行）
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
 DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT  
 
-# —— 通用跟踪/短链 ——  
-DOMAIN-SUFFIX,bdurl.net,REJECT  
-DOMAIN-SUFFIX,zjurl.cn,REJECT  
-DOMAIN-SUFFIX,ecombdapi.com,REJECT  
-DOMAIN-SUFFIX,zijieapi.com,REJECT  
+# —— 通用跟踪/短链 ——
+DOMAIN-SUFFIX,bdurl.net,REJECT
+DOMAIN-SUFFIX,zjurl.cn,REJECT
+DOMAIN-SUFFIX,ecombdapi.com,REJECT
+DOMAIN-SUFFIX,zijieapi.com,REJECT
 
-# —— IP 兜底 ——  
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve  
+# —— IP 兜底 ——
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve
 IP-CIDR,101.36.166.16/32,REJECT,no-resolve
