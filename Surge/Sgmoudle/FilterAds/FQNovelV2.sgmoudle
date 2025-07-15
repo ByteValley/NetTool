@@ -6,19 +6,19 @@
 
 [Rule]
 # —— 视频广告 ——
-# 先放白名单，让主业务走通
-DOMAIN-SUFFIX,novelapp.fqnovelvod.com,DIRECT
-# 再大范围拦截剩下的子域（大概率都是广告）
 DOMAIN-SUFFIX,fqnovelvod.com,REJECT
-AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT
 
 # —— 图片广告 ——
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao)),REJECT
+DOMAIN-SUFFIX,fqnovelpic.com,REJECT # 图像广告常见域
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 
-# —— 其它已知广告子域／伪装资源 ——
+# —— 其它广告资源 ——
 DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT
 DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
+DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
+DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT
 DOMAIN-SUFFIX,bytegoofy.com,REJECT
 DOMAIN-SUFFIX,bytegecko.com,REJECT
 
