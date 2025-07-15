@@ -1,46 +1,35 @@
 #!name=番茄去广告
 #!author=ByteValley & ChatGPT
-#!desc=移除番茄小说开屏／贴片／听书／图像／视频／脚本广告，保留核心业务。
+#!desc=移除番茄小说开屏／贴片/视频等广告，保留核心业务。
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
 
 [Rule]
-# —— 视频广告 —— 
-# 1. 专门拦截 reading-video 子域
-AND,((DOMAIN-KEYWORD,reading-video),(DOMAIN-SUFFIX,fqnovelvod.com)),REJECT
-# 2. 拦截 /video/ 路径下的 novelapp
-AND,((DOMAIN-SUFFIX,fqnovelvod.com),(URL-REGEX,/video/)),REJECT
-AND,((DOMAIN-KEYWORD,video),(DOMAIN-SUFFIX,bytedcdn.com)),REJECT
+# —— 视频广告 ——  
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT  
 
-# —— 图片广告 —— 
-AND,((DOMAIN-KEYWORD,misc-lf),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
-AND,((DOMAIN-KEYWORD,toutiao),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
-AND,((DOMAIN-KEYWORD,-ad-),(DOMAIN-SUFFIX,byteimg.com)),REJECT
-AND,((DOMAIN-KEYWORD,novel),(DOMAIN-SUFFIX,byteimg.com)),REJECT
-AND,((DOMAIN-KEYWORD,ad-sign),(DOMAIN-SUFFIX,byteimg.com)),REJECT
+# —— 图片广告 ——  
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  
+AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  
 
-# —— SDK 广告 —— 
-AND,((DOMAIN-KEYWORD,sign),(DOMAIN-SUFFIX,ecombdimg.com)),REJECT
-AND,((DOMAIN-KEYWORD,-lf),(DOMAIN-SUFFIX,ecombdapi.com)),REJECT
-AND,((DOMAIN-KEYWORD,tos),(DOMAIN-SUFFIX,pstatp.com)),REJECT
-AND,((DOMAIN-KEYWORD,api-access),(DOMAIN-SUFFIX,pglstatp-toutiao.com)),DIRECT
-DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT
-AND,((DOMAIN-SUFFIX,pangolin-sdk-toutiao.com),(URL-REGEX,/api/ad/union/sdk/)),REJECT
-AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytescm.com)),REJECT
-AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegoofy.com)),REJECT
-AND,((DOMAIN-KEYWORD,cdn-tos),(DOMAIN-SUFFIX,bytegecko.com)),REJECT
-AND,((DOMAIN-KEYWORD,webcast),(DOMAIN-SUFFIX,bytegecko.com)),REJECT
-URL-REGEX,^https?://lf-cdn-tos\.bytescm\.com/obj/static/ad/,REJECT
+# —— 其它已知广告子域／伪装资源 ——  
+DOMAIN-SUFFIX,pangolin-sdk-toutiao.com,REJECT  
+DOMAIN-SUFFIX,pglstatp-toutiao.com,REJECT  
+DOMAIN-SUFFIX,bytegoofy.com,REJECT  
+DOMAIN-SUFFIX,bytegecko.com,REJECT  
 
-# —— 一刀切：拦截所有带 get_ads 或 /ad/ 的链接 ——  
-URL-REGEX,(?i)\bget_ads\b,REJECT          # 只拦 Pangolin SDK 拉广告的接口
-URL-REGEX,(?i)/ad-app-package/,REJECT     # 只拦下载包广告
-URL-REGEX,(?i)/ad-pattern/,REJECT         # 只拦样式伪装广告
-URL-REGEX,(?i)(?:get_ads|/ad/),REJECT
+# —— 通用广告拦截 ——  
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT  
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  
 
-# —— 通用短链／埋点 拦截 —— 
-AND,((DOMAIN-KEYWORD,-lf),(DOMAIN-SUFFIX,ecombdapi.com)),REJECT
-AND,((DOMAIN-KEYWORD,minigame),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
-AND,((DOMAIN-KEYWORD,-lf),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
-AND,((DOMAIN-KEYWORD,dig),(DOMAIN-SUFFIX,bdurl.net)),REJECT
-AND,((DOMAIN-KEYWORD,dig),(DOMAIN-SUFFIX,zjurl.cn)),REJECT
+# —— 短链跟踪 ——  
+DOMAIN-SUFFIX,bdurl.net,REJECT  
+DOMAIN-SUFFIX,zjurl.cn,REJECT  
+
+
+[MITM]
+hostname = %APPEND% \
+  sf3-fe-tos.pglstatp-toutiao.com,\
+  lf-cdn-tos.bytescm.com,\
+  tnc3-alisc1.zijieapi.com
