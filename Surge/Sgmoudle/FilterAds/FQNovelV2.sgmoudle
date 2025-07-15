@@ -10,6 +10,8 @@ DOMAIN-SUFFIX,fqnovelvod.com,REJECT # 直接丢弃视频流
 
 # —— 图片广告 ——
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+# —— 精准拦所有 misc-lf.fqnovel.com 子域 ——
+DOMAIN-REGEX,^[^.]+-misc-lf\.fqnovel\.com$,REJECT
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao)),REJECT
 DOMAIN-SUFFIX,fqnovelpic.com,REJECT # 图像广告常见域
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
