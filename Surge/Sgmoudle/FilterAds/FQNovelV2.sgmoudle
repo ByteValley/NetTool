@@ -15,6 +15,7 @@ DOMAIN-REGEX,^[^.]+-misc-lf\.fqnovel\.com$,REJECT
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao)),REJECT
 DOMAIN-SUFFIX,fqnovelpic.com,REJECT # 图像广告常见域
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+AND,((DOMAIN-KEYWORD,reward-video),(DOMAIN-SUFFIX,bytedcdn.com)),REJECT  # 拦截 lf-reward-video.bytedcdn.com 奖励视频广告
 
 # —— 通用广告拦截 ——
 AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
