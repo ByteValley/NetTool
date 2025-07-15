@@ -6,6 +6,10 @@
 
 [Rule]
 # —— 视频广告 ——
+# 先放白名单，让主业务走通
+DOMAIN-SUFFIX,novelapp.fqnovelvod.com,DIRECT
+# 再大范围拦截剩下的子域（大概率都是广告）
+DOMAIN-SUFFIX,fqnovelvod.com,REJECT
 AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT
 
 # —— 图片广告 ——
