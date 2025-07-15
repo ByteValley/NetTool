@@ -27,8 +27,11 @@ DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT
 # —— 通用跟踪/短链 ——
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
-DOMAIN-SUFFIX,ecombdapi.com,REJECT
-DOMAIN-SUFFIX,zijieapi.com,REJECT
+
+# —— 广告专属接口 ——
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 
 # —— IP 兜底 ——
 IP-CIDR,47.246.38.0/24,REJECT,no-resolve
