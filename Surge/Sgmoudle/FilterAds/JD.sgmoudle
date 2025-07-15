@@ -1,0 +1,21 @@
+#!name=京东去广告
+#!author=ByteValley & ChatGPT
+#!desc=移除京东APP开屏广告及列表内广告，保留商品浏览、下单等核心功能
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
+#!category=广告屏蔽
+
+[Rule]
+# —— 屏蔽开屏广告 ——
+URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=start$,REJECT-TINYGIF
+
+# —— 屏蔽广告物料列表 ——
+URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=queryMaterialAdverts$,REJECT
+
+# —— 屏蔽首页推广模块 ——
+URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=getTabHomeInfo$,REJECT
+
+# —— 屏蔽猜你喜欢/猜你喜欢广告 ——
+URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=unionBaseAdverts$,REJECT
+
+[MITM]
+hostname = %APPEND% api.m.jd.com
