@@ -28,7 +28,9 @@ rules:
   - AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
   - DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
   - DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT
-#     精准拦截番茄小说用来插广告卡片的接口
+# 1）拦截 misc-lf 子域（章中/章末卡片广告容器）
+  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+# 3）拦截 toutiao-lf 接口（今日头条卡片广告）
   - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 #     拦截所有 misc-lf 及 -lf 子域的 zijieapi 广告埋点/配置请求
   - AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
