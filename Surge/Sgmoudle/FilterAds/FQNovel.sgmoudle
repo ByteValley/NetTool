@@ -5,56 +5,71 @@
 #!category=广告屏蔽  
 
 [Rule]
-# —— 1. 抖音跳转白名单 ——  
+# —— 1. 白名单（DIRECT） ——  
+#      抖音跳转域（Universal Link），避免白屏
 DOMAIN,www.douyin.com,DIRECT
 DOMAIN,aweme.snssdk.com,DIRECT
 
-# —— 2. 精准拦“misc-lf”卡片广告 ——  
-#    mon11-misc-lf.fqnovel.com 等
+# —— 2. 阻断章中/章末卡片及埋点广告 ——  
+# 2.1 精准拦截misc-lf 卡片广告
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 
-# —— 3. 精准拦“applog-lf”埋点广告 ——  
-#    log0-applog-lf.fqnovel.com
+# 2.2 精准拦截 applog-lf 埋点广告
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,applog-lf)),REJECT
 
-# —— 4. 精准拦“normal-lf”广告接口 ——  
+# 2.3 精准拦截 normal-lf 接口
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
 
-# —— 5. 核心业务白名单 ——  
+# 2.4 精准拦截 toutiao-lf 接口（今日头条卡片广告）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
+
+# —— 3. 核心业务接口白名单（DIRECT） ——  
+#      放行所有 api*-normal-*.fqnovel.com，保证书城/签到/最新上架/听书流畅
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT
 
-# —— 6. 视频流 & SDK 容器 ——  
+# —— 4. 广告拦截（REJECT） ——  
+# 4.1 番茄内部视频流 & SDK 容器
+#     拦截所有 fqnovelvod.com 子域（视频内容）和 pangolin-sdk-toutiao.com（广告 SDK）
 DOMAIN-KEYWORD,novelvod,REJECT
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
 
-# —— 7. 奖励视频 & 流媒体广告 ——  
+# 4.2 奖励视频 & 其它流媒体广告
+#     拦截 reward-video.bytedcdn.com 及类似 bytedcdn.com 底层流媒体广告
 DOMAIN-SUFFIX,bytedcdn.com,REJECT
 
-# —— 8. 图片广告 & 样式包 ——  
-#    拦截阅读广告子域 p9-reading-sign、lf3-reading 等
+# 4.3 图片广告 & 样式包
+#     只拦带 misc-lf/ad-sign 的子域，防止误拦正常插画
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
-DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
-DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT
+DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT   # 样式脚本广告
+DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT # 样式包/埋点脚本
 
-# —— 9. 抖音 LF 广告接口 ——  
+# 4.4 zijieapi 广告接口
+#     拦截所有 misc-lf & -lf & minigame 子域的 zijieapi 广告埋点/配置请求
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
+
+# 4.5 抖音 LF 广告接口
+#     拦截番茄小说中使用的抖音 LF 广告配置请求
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
 
-# —— 10. ByteGecko 广告素材 CDN ——  
+# 4.6 ByteGecko 广告源 CDN
+#     拦截 bytegecko.com 下的 sourcecdn 子域，用于分发广告素材
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT
 
-# —— 11. 通用跟踪 / 短链 ——  
+# 4.7 通用跟踪 / 短链
+#     拦截常见短链与统计域，防止广告跳转或动态推荐
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
 
-# —— 12. 其他广告专属接口 ——  
+# 4.8 其他广告专属接口
+#     拦截 ecombdapi.com 下的 -lf 子域
 AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 
-# —— 13. IP 兜底 ——  
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve
+# —— 5. IP 兜底 ——  
+#     根据常见广告 IP 段加以拦截，防止 DNS/CDN 切片绕过
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve 
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve6.16/32,REJECT,no-resolve
