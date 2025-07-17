@@ -33,7 +33,6 @@ DOMAIN-SUFFIX,bytedcdn.com,REJECT
 # —— 8. 图片广告 & 样式包 ——  
 #    拦截阅读广告子域 p9-reading-sign、lf3-reading 等
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,reading-sign)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
