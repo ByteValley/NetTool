@@ -1,69 +1,60 @@
-#!name = 番茄小说去广告
-#!desc = 移除番茄小说开屏广告、移除文章底部和章末广告、移除听书页面广告、移除悬浮部件和底栏多余的福利标签。
+#!name = 番茄去广告
+#!desc = 拦截番茄小说广告（开屏/贴片/视频/章中/章末/浮窗），保留抖音跳转、书城/最新上架/签到、封面/听书等核心业务
 #!openUrl = https://apps.apple.com/app/id1468454200
 #!tag = 去广告
 #!system = 
 #!system_version = 
-#!loon_version = 3.2.1(749)
-#!homepage = https://gitlab.com/lodepuly/vpn_tool/-/blob/master/README.md
+#!loon_version = 3.2.4(787)
+#!homepage = 
 #!icon = https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 
 [Rule]
-URL-REGEX, ^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/, REJECT
-URL-REGEX, ^https:\/\/(api-access\.pangolin-sdk-toutiao(\d|-b)?|is\.snssdk)\.com\/api\/ad\/union\/sdk\/get_ads, DIRECT // 放行此条以确保字节跳动去广告脚本的正常执行
-AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT
-AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))), REJECT
-DOMAIN, dig.bdurl.net, REJECT
-DOMAIN, dig.zjurl.cn, REJECT
-DOMAIN, is.snssdk.com, DIRECT // 放行此条以确保广告联盟脚本的正常执行
-DOMAIN, log5-applog.fqnovel.com, REJECT
-DOMAIN, rtlog5-applog.fqnovel.com, REJECT
-DOMAIN, vas-lf-x.snssdk.com, REJECT
-DOMAIN-SUFFIX,byteimg.com,REJECT // Added for: p3-novel.byteimg.com:443
-# DOMAIN-SUFFIX,fqnovelpic.com,REJECT // Added for: lf3-reading.fqnovelpic.com:443
-# DOMAIN-SUFFIX,v5-reading-video.fqnovelvod.com,REJECT // Added for: https://v5-reading-video.fqnovelvod.com/89568f094a3b083f577ff6f8136b3849/686e1db0/video/tos/cn/tos-cn-v-6fcc8e/osgBEQVIMqPlGCbfAQ8eHWg8gXftKQBXLSkz2E/?a=1967&ch=0&cr=7&dr=3&er=0&lr=default&cd=0%7C0%7C0%7C1&cv=1&br=511&bt=511&cs=4&ds=3&ft=Crz7b-WtDDhNJFVQ9wRoCAyhd.bStko73-ApQX&mime_type=video_mp4&qs=0&rc=OjY6Z2VmOzM5NzlpZzQ2NEBpM2lkeHQ5cmQ2MzMzNGhoM0AuNjUzYWEzNi4xLzYwYWAwYSNtZG9fMmRrNi5hLS1kXy9zcw%3D%3D&btag=80000e00228000&dy_q=1752025337&feature_id=a7cf5e93891b50e2b3f1f5b65d3df7cc&l=2025070909421779D6AAF8837864201631
-DOMAIN-SUFFIX,ecombdimg.com,REJECT // Added for: p9-aio.ecombdimg.com:443
-# DOMAIN-SUFFIX,fqnovel.com,REJECT // Added for: log0-applog-lf.fqnovel.com:443
-DOMAIN-REGEX,^v\d+-reading-video\.fqnovelvod\.com$,REJECT
-# 屏蔽所有以 lf*-cdn-tos.bytegoofy.com 结构的请求
-DOMAIN-REGEX,^lf\d+-cdn-tos\.bytegoofy\.com$,REJECT
+# —— 1. 白名单（DIRECT） ——  
+# 1.1 抖音跳转域（Universal Link）  
+DOMAIN,www.douyin.com,DIRECT  
+DOMAIN,aweme.snssdk.com,DIRECT  
 
-IP-CIDR,49.71.37.101/32,REJECT,no-resolve
-IP-CIDR,117.71.105.23/32,REJECT,no-resolve
-IP-CIDR,218.94.207.205/32,REJECT,no-resolve
-IP-CIDR,117.92.229.188/32,REJECT,no-resolve
+# 1.2 核心业务接口：书城/签到/最新上架 等  
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT  
+
+# 1.3 静态资源封面/插画，听书互动窗口  
+DOMAIN-SUFFIX,ecombdimg.com,DIRECT  
+DOMAIN,praisewindow-sinfonlinec.ugsdk.cn,DIRECT  
+
+# —— 2. 广告拦截（REJECT） ——  
+# 2.1 番茄内部视频 & SDK 容器  
+DOMAIN-KEYWORD,novelvod,REJECT  
+DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT  
+
+# 2.2 奖励视频 & 其它流媒体广告  
+DOMAIN-SUFFIX,bytedcdn.com,REJECT  
+
+# 2.3 图片广告、样式包  
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  
+AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  
+DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT  
+DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT  
+
+# 2.4 章中/章末卡片广告  
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT  
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  
+
+# 2.5 抖音 LF 广告接口  
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT  
+
+# 2.6 ByteGecko 广告源 CDN  
+AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT  
+
+# 2.7 通用跟踪 / 短链  
+DOMAIN-SUFFIX,bdurl.net,REJECT  
+DOMAIN-SUFFIX,zjurl.cn,REJECT  
+
+# 2.8 广告专属接口  
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT  
+
+# —— 3. IP 兜底 ——  
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve  
 IP-CIDR,101.36.166.16/32,REJECT,no-resolve
-IP-CIDR,180.96.2.114/32,REJECT,no-resolve
-
-[URL Rewrite]
-# 头条广告SDK
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
-
-# 番茄
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
-^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
-# 域名解析
-^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
-# 番茄小说去章末广告
-^https?:\/\/.+\.pangolin-sdk-toutiao\.com\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/ - reject
-^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4 - reject
-^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad)\/.+ - reject
-^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/web\.business\.image\/.+ - reject
-^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/obj\/ad-pattern\/renderer - reject
-^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
-^https?:\/\/.+\.byteimg.com/tos-cn-i-1yzifmftcy\/(.+)-jpeg\.jpeg - reject
-^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from\=ad - reject
-^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+ - reject
-^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4 - reject
-^https?:\/\/.+\.snssdk.com\/api\/ad\/.+ - reject
-# 下面两条来自他人,暂不知是哪个app
-^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/ - reject
-
-^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(ad-app-package|ad)\/.+ - reject
-^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+ - reject
-^https?:\/\/v(\d)+-novelapp\.fqnovelvod\.com\/.+\/video\/.+ - reject
-
-[MITM]
-hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com
