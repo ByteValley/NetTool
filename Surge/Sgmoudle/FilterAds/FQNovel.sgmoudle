@@ -1,6 +1,7 @@
 #!name=番茄去广告
 #!author=ByteValley & ChatGPT
 #!desc=全面拦截番茄小说广告（开屏/贴片/视频/章中/章末/浮窗），保留核心业务。
+#!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽  
 
 [Rule]
