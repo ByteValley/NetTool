@@ -15,9 +15,18 @@
 DOMAIN,www.douyin.com,DIRECT
 DOMAIN,aweme.snssdk.com,DIRECT
 
-# —— 2. “normal-lf” 广告接口先 REJECT ——  
-#      阻断章中/章末卡片及埋点广告
+# —— 2. 阻断章中/章末卡片及埋点广告 ——  
+# 2.1 精准拦截misc-lf 卡片广告
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+
+# 2.2 精准拦截 applog-lf 埋点广告
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,applog-lf)),REJECT
+
+# 2.3 精准拦截 normal-lf 接口
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
+
+# 2.4 精准拦截 toutiao-lf 接口（今日头条卡片广告）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 
 # —— 3. 核心业务接口白名单（DIRECT） ——  
 #      放行所有 api*-normal-*.fqnovel.com，保证书城/签到/最新上架/听书流畅
@@ -35,46 +44,35 @@ DOMAIN-SUFFIX,bytedcdn.com,REJECT
 
 # 4.3 图片广告 & 样式包
 #     只拦带 misc-lf/ad-sign 的子域，防止误拦正常插画
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT   # 样式脚本广告
 DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT # 样式包/埋点脚本
 
-# 4.4 章中/章末卡片广告
-#     精准拦截番茄小说用来插广告卡片的接口
-# 1）拦截 misc-lf 子域（章中/章末卡片广告容器）
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
-
-# 2）拦截 normal-lf 接口（广告配置）
-# 因放行规则冲突已前置
-# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
-
-# 3）拦截 toutiao-lf 接口（今日头条卡片广告）
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
-
-# 4.5 zijieapi 广告接口
-#     拦截所有 misc-lf 及 -lf 子域的 zijieapi 广告埋点/配置请求
+# 4.4 zijieapi 广告接口
+#     拦截所有 misc-lf & -lf & minigame 子域的 zijieapi 广告埋点/配置请求
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 
-# 4.6 抖音 LF 广告接口
+# 4.5 抖音 LF 广告接口
 #     拦截番茄小说中使用的抖音 LF 广告配置请求
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
 
-# 4.7 ByteGecko 广告源 CDN
+# 4.6 ByteGecko 广告源 CDN
 #     拦截 bytegecko.com 下的 sourcecdn 子域，用于分发广告素材
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT
 
-# 4.8 通用跟踪 / 短链
+# 4.7 通用跟踪 / 短链
 #     拦截常见短链与统计域，防止广告跳转或动态推荐
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
 
-# 4.9 其他广告专属接口
-#     拦截 ecombdapi.com 下的 -lf 子域及 ZijieAPI 的 minigame 子域
+# 4.8 其他广告专属接口
+#     拦截 ecombdapi.com 下的 -lf 子域
 AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 
 # —— 5. IP 兜底 ——  
 #     根据常见广告 IP 段加以拦截，防止 DNS/CDN 切片绕过
