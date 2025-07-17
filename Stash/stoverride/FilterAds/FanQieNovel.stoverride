@@ -13,8 +13,14 @@ rules:
 #      抖音跳转域（Universal Link），避免白屏
   - DOMAIN,www.douyin.com,DIRECT
   - DOMAIN,aweme.snssdk.com,DIRECT
-#      阻断章中/章末卡片及埋点广告
+# 2.1 精准拦截misc-lf 卡片广告
+  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+# 2.2 精准拦截 applog-lf 埋点广告
+  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,applog-lf)),REJECT
+# 2.3 精准拦截 normal-lf 接口
   - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
+# 2.4 精准拦截 toutiao-lf 接口（今日头条卡片广告）
+  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 #      放行所有 api*-normal-*.fqnovel.com，保证书城/签到/最新上架/听书流畅
   - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT
 #     拦截所有 fqnovelvod.com 子域（视频内容）和 pangolin-sdk-toutiao.com（广告 SDK）
@@ -23,18 +29,16 @@ rules:
 #     拦截 reward-video.bytedcdn.com 及类似 bytedcdn.com 底层流媒体广告
   - DOMAIN-SUFFIX,bytedcdn.com,REJECT
 #     只拦带 misc-lf/ad-sign 的子域，防止误拦正常插画
+  - AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT
   - AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
   - AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
   - AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
   - DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
   - DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT
-# 1）拦截 misc-lf 子域（章中/章末卡片广告容器）
-  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
-# 3）拦截 toutiao-lf 接口（今日头条卡片广告）
-  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
-#     拦截所有 misc-lf 及 -lf 子域的 zijieapi 广告埋点/配置请求
+#     拦截所有 misc-lf & -lf & minigame 子域的 zijieapi 广告埋点/配置请求
   - AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
   - AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
+  - AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 #     拦截番茄小说中使用的抖音 LF 广告配置请求
   - AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
 #     拦截 bytegecko.com 下的 sourcecdn 子域，用于分发广告素材
@@ -42,9 +46,7 @@ rules:
 #     拦截常见短链与统计域，防止广告跳转或动态推荐
   - DOMAIN-SUFFIX,bdurl.net,REJECT
   - DOMAIN-SUFFIX,zjurl.cn,REJECT
-#     拦截 ecombdapi.com 下的 -lf 子域及 ZijieAPI 的 minigame 子域
+#     拦截 ecombdapi.com 下的 -lf 子域
   - AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
-  - AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 #     根据常见广告 IP 段加以拦截，防止 DNS/CDN 切片绕过
   - IP-CIDR,47.246.38.0/24,REJECT,no-resolve
-  - IP-CIDR,101.36.166.16/32,REJECT,no-resolve
