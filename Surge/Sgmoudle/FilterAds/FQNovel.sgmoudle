@@ -38,6 +38,14 @@ DOMAIN-SUFFIX,tnc3-alisc1.zijieapi.com,REJECT # 样式包/埋点脚本
 
 # 4.4 章中/章末卡片广告
 #     精准拦截番茄小说用来插广告卡片的接口
+# 1）拦截 misc-lf 子域（章中/章末卡片广告容器）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+
+# 2）拦截 normal-lf 接口（广告配置）
+# 因放行规则冲突已前置
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
+
+# 3）拦截 toutiao-lf 接口（今日头条卡片广告）
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 
 # 4.5 zijieapi 广告接口
