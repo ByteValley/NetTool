@@ -1,14 +1,17 @@
 #!name=番茄去广告
-#!author=ByteValley & ChatGPT
+#!author=ByteValley
 #!desc=全面拦截番茄小说广告（开屏/贴片/视频/章中/章末/浮窗），保留核心业务。
-#!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
-#!category=广告屏蔽  
+#!icon = https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
+#!category=广告屏蔽
+
+[General]
+# 对于 ecomuser.snssdk.com 完全不走代理/SSL 代理（skip-proxy），直接系统直连
+skip-proxy = %APPEND% ecomuser.snssdk.com
 
 [Rule]
 # —— 1. 白名单（DIRECT） ——  
-#      抖音跳转域（Universal Link），避免白屏
-DOMAIN,www.douyin.com,DIRECT
-DOMAIN,aweme.snssdk.com,DIRECT
+#      用户中心 / 电商接口白名单
+DOMAIN,ecomuser.snssdk.com,DIRECT
 
 # —— 2. 阻断章中/章末卡片及埋点广告 ——  
 # 2.1 精准拦截misc-lf 卡片广告
@@ -24,8 +27,15 @@ AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 
 # —— 3. 核心业务接口白名单（DIRECT） ——  
-#      放行所有 api*-normal-*.fqnovel.com，保证书城/签到/最新上架/听书流畅
+# 3.1 放行所有 api*-normal-*.fqnovel.com，保证书城/签到/最新上架/听书流畅
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT
+
+# 3.2 放行所有 fqnovelvod.com 下的 TTS 音频流
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,tts)),DIRECT
+
+# 3.3 听书核心接口白名单
+#      放行 api*-normal-sinfonlinec.fqnovel.com 及其它 sinfonlinec 子域
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),DIRECT
 
 # —— 4. 广告拦截（REJECT） ——  
 # 4.1 番茄内部视频流 & SDK 容器
