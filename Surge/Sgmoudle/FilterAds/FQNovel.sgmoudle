@@ -35,7 +35,7 @@ AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,tts)),DIRECT
 
 # 3.3 听书核心接口白名单
 #      放行 api*-normal-sinfonlinec.fqnovel.com 及其它 sinfonlinec 子域
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),DIRECT
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),DIRECT
 
 # —— 4. 广告拦截（REJECT） ——  
 # 4.1 番茄内部视频流 & SDK 容器
@@ -62,6 +62,10 @@ AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 
+# —— applog 广告埋点接口 ——  
+# 拦掉 applog.zijieapi.com  
+DOMAIN,applog.zijieapi.com,REJECT 
+
 # 4.5 抖音 LF 广告接口
 #     拦截番茄小说中使用的抖音 LF 广告配置请求
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
@@ -82,4 +86,4 @@ AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 # —— 5. IP 兜底 ——  
 #     根据常见广告 IP 段加以拦截，防止 DNS/CDN 切片绕过
 IP-CIDR,47.246.38.0/24,REJECT,no-resolve 
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve6.16/32,REJECT,no-resolve
+IP-CIDR,101.36.166.16/32,REJECT,no-resolve
