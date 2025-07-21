@@ -1,6 +1,6 @@
 #!name = 番茄去广告
 #!desc = 拦截番茄小说广告（开屏/贴片/视频/章中/章末/浮窗），保留抖音跳转、书城/最新上架/签到、封面/听书等核心业务
-#!author=ByteValley & ChatGPT
+#!author=ByteValley
 #!openUrl = https://apps.apple.com/app/id1468454200
 #!tag = 去广告
 #!system = 
