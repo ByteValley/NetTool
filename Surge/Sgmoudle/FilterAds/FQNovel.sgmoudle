@@ -26,8 +26,8 @@ AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 # 2.5 视频流拉取广告（pull-flv）
 AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT
 # 2.6 sinfonlinec 子域广告埋点
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),REJECT
-DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),REJECT
+# DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT
 
 # —— 3. 图片广告 & 样式包（REJECT） ——  
 # 3.1 “阅读签”图片广告
@@ -59,6 +59,7 @@ AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-alisc1)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
+
 # 5.5 字节跳动通用埋点 CDN
 DOMAIN,tnc3-bjlgy.snssdk.com,REJECT
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
@@ -66,6 +67,13 @@ AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
 DOMAIN,applog.zijieapi.com,REJECT
 # 5.7 ByteGecko 素材源
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT
+
+# 5.8 弹框卡片广告 & 跟踪接口
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc1)),REJECT
+DOMAIN,tnc3-alisc1.snssdk.com,REJECT
+DOMAIN,timon.zijieapi.com,REJECT
+DOMAIN,feedback-c.zijieapi.com,REJECT
+DOMAIN,ma.zijieapi.com,REJECT
 
 # —— 6. 通用短链 & 跟踪（REJECT） ——  
 DOMAIN-SUFFIX,bdurl.net,REJECT
