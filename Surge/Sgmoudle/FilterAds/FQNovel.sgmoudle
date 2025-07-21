@@ -26,11 +26,12 @@ AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 # 2.5 视频流拉取广告（pull-flv）
 AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT
 # 2.6 sinfonlinec 子域广告埋点
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),REJECT
 DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT
 
 # —— 3. 图片广告 & 样式包（REJECT） ——  
 # 3.1 “阅读签”图片广告
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,reading-sign)),REJECT
+# AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,reading-sign)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT
 # 3.2 插画 misc-lf / ad-sign 样式包
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
@@ -39,38 +40,38 @@ AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 # 3.3 样式脚本广告
 DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
 
-# —— 4. 其它广告 & 埋点接口（REJECT） ——  
-# 4.1 番茄内部视频 SDK 容器
+# —— 4. 核心业务接口白名单（DIRECT） ——  
+# 注意：此条须放在所有拦截规则之后，确保“normal”流量放行
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,tts)),DIRECT
+
+# —— 5. 其它广告 & 埋点接口（REJECT） ——  
+# 5.1 番茄内部视频 SDK 容器
 DOMAIN-KEYWORD,novelvod,REJECT
-# 4.2 穿山甲 / 抖音 LF 广告配置
+# 5.2 穿山甲 / 抖音 LF 广告配置
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
-# 4.3 奖励视频 & 流媒体广告
+# 5.3 奖励视频 & 流媒体广告
 DOMAIN-SUFFIX,bytedcdn.com,REJECT
-# 4.4 zijieapi 子域广告 & minigame
+# 5.4 zijieapi 子域广告 & minigame
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-alisc1)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
-# 4.5 字节跳动通用埋点 CDN
+# 5.5 字节跳动通用埋点 CDN
 DOMAIN,tnc3-bjlgy.snssdk.com,REJECT
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
-# 4.6 applog 埋点上报
+# 5.6 applog 埋点上报
 DOMAIN,applog.zijieapi.com,REJECT
-# 4.7 ByteGecko 素材源
+# 5.7 ByteGecko 素材源
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT
 
-# —— 5. 通用短链 & 跟踪（REJECT） ——  
+# —— 6. 通用短链 & 跟踪（REJECT） ——  
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
 AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
-
-# —— 6. 核心业务接口白名单（DIRECT） ——  
-# 注意：此条须放在所有拦截规则之后，确保“normal”流量放行
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT
-AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,tts)),DIRECT
-
+ 
 # —— 7. IP 兜底策略（REJECT, no-resolve） ——  
 #     防止通过 DNS/CDN 绕过域名匹配的广告内容
 # 7.1 通用广告 IP
