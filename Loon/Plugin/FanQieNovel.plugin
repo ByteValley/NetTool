@@ -74,8 +74,11 @@ DOMAIN,applog.zijieapi.com,REJECT
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT
 
 # 5.8 弹框卡片广告 & 跟踪接口
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc)),REJECT
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc1)),REJECT
 DOMAIN,tnc3-alisc1.snssdk.com,REJECT
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc2)),REJECT
+DOMAIN,tnc3-alisc2.snssdk.com,REJECT
 DOMAIN,timon.zijieapi.com,REJECT
 DOMAIN,feedback-c.zijieapi.com,REJECT
 DOMAIN,ma.zijieapi.com,REJECT
