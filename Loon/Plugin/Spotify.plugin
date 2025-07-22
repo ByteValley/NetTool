@@ -25,4 +25,4 @@ URL-REGEX,^https?://([^.]+\.)?heads-[a-z0-9]+\.spotify\.com/.*,REJECT
 
 [MITM]
 # HTTPS 拦截，才能生效 URL Rewrite
-hostname = %APPEND% spclient.wg.spotify.com, adeventtracker.spotify.com, ads-akp.spotify.com, mp3ad.scdn.co, spotxchange.com, video-fa.scdn.co
+hostname = spclient.wg.spotify.com, adeventtracker.spotify.com, ads-akp.spotify.com, mp3ad.scdn.co, spotxchange.com, video-fa.scdn.co
