@@ -1,8 +1,9 @@
 #!name=Spotify去广告
-#!author=ByteValley & ChatGPT
+#!author=ByteValley
 #!desc=拦截 Spotify Free 版的音频、横幅、视频广告，兼容 iOS/macOS Surge
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 #!category=广告屏蔽
+#!tag = 去广告
 
 [Rule]
 # —— 基于域名的绝对拦截 ——
