@@ -1,0 +1,27 @@
+#!name=Spotify去广告
+#!author=ByteValley & ChatGPT
+#!desc=拦截 Spotify Free 版的音频、横幅、视频广告，兼容 iOS/macOS Surge
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
+#!category=广告屏蔽
+
+[Rule]
+# —— 基于域名的绝对拦截 ——
+DOMAIN-SUFFIX,adeventtracker.spotify.com,REJECT  # 广告事件埋点
+DOMAIN-SUFFIX,ads-akp.spotify.com,REJECT  # 广告素材分发
+DOMAIN-SUFFIX,audio-ak.spotify.com,REJECT  # 音频广告
+DOMAIN-SUFFIX,audio-akp.spotify.com,REJECT  # 音频广告
+DOMAIN-SUFFIX,mp3ad.scdn.co,REJECT  # 音频广告
+DOMAIN-SUFFIX,spotxchange.com,REJECT  # 视频/横幅广告
+DOMAIN-SUFFIX,video-fa.scdn.co,REJECT  # 视频广告
+# —— 泛匹配剩余可能的 audio-* 与 heads-* 避免遗漏 ——
+URL-REGEX,^https?://([^.]+\.)?audio-[a-z0-9]+\.spotify\.com/.*,REJECT
+URL-REGEX,^https?://([^.]+\.)?heads-[a-z0-9]+\.spotify\.com/.*,REJECT
+
+[URL Rewrite]
+# —— 拦截 Spotify 客户端拉取广告配置的接口 ——
+^https?:\/\/spclient\.wg\.spotify\.com\/ads\/v2\/config.* - reject
+^https?:\/\/spclient\.wg\.spotify\.com\/ad-logic\/state\/config.* - reject
+
+[MITM]
+# HTTPS 拦截，才能生效 URL Rewrite
+hostname = %APPEND% spclient.wg.spotify.com, adeventtracker.spotify.com, ads-akp.spotify.com, mp3ad.scdn.co, spotxchange.com, video-fa.scdn.co
