@@ -12,7 +12,7 @@
 [General]
 # —— 强制直连 ——  
 # ecomuser.snssdk.com：电商模块 / 用户中心接口，避免被代理导致加载失败
-skip-proxy = %APPEND% ecomuser.snssdk.com
+skip-proxy = ecomuser.snssdk.com
 
 [Rule]
 # —— 1. 核心业务白名单（DIRECT） ——  
