@@ -30,13 +30,9 @@ AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT
 # 2.5 视频流拉取广告（pull-flv）
 AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT
-# 2.6 sinfonlinec 子域广告埋点
-# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinec)),REJECT
-# DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT
 
 # —— 3. 图片广告 & 样式包（REJECT） ——  
 # 3.1 “阅读签”图片广告
-# AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,reading-sign)),REJECT
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT
 # 3.2 插画 misc-lf / ad-sign 样式包
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
@@ -44,6 +40,7 @@ AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 # 3.3 样式脚本广告
 DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT
+DOMAIN,api5-normal-sinfonlinec.fqnovel.com,REJECT
 
 # —— 4. 核心业务接口白名单（DIRECT） ——  
 # 注意：此条须放在所有拦截规则之后，确保“normal”流量放行
@@ -62,23 +59,18 @@ DOMAIN-SUFFIX,bytedcdn.com,REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,tnc0)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-alisc1)),REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
-
 # 5.5 字节跳动通用埋点 CDN
-DOMAIN,tnc3-bjlgy.snssdk.com,REJECT
+# 通用拦截所有 tnc3.snssdk.com 子域
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,tnc3)),REJECT
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
 # 5.6 applog 埋点上报
 DOMAIN,applog.zijieapi.com,REJECT
 # 5.7 ByteGecko 素材源
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT
-
 # 5.8 弹框卡片广告 & 跟踪接口
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc)),REJECT
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc1)),REJECT
-DOMAIN,tnc3-alisc1.snssdk.com,REJECT
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-alisc2)),REJECT
-DOMAIN,tnc3-alisc2.snssdk.com,REJECT
 DOMAIN,timon.zijieapi.com,REJECT
 DOMAIN,feedback-c.zijieapi.com,REJECT
 DOMAIN,ma.zijieapi.com,REJECT
@@ -87,7 +79,7 @@ DOMAIN,ma.zijieapi.com,REJECT
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
 AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT
- 
+
 # —— 7. IP 兜底策略（REJECT, no-resolve） ——  
 #     防止通过 DNS/CDN 绕过域名匹配的广告内容
 # 7.1 通用广告 IP
