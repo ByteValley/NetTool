@@ -6,74 +6,75 @@
 
 [General]
 # —— 强制直连 ——  
-# 电商模块 / 用户中心接口，避免被代理导致加载失败
-skip-proxy = %APPEND% ecomuser.snssdk.com
+skip-proxy = %APPEND% ecomuser.snssdk.com  # 电商模块 / 用户中心接口，避免被代理导致加载失败
 
 [Rule]
 # —— 1. 核心业务白名单（DIRECT） ——  
 DOMAIN,ecomuser.snssdk.com,DIRECT  # 电商模块 / 用户中心接口
 
-# —— 2. 精准拦截章中/章末卡片 & 埋点广告（REJECT） ——  
+# —— 2. 精准拦截章中/章末卡片与埋点广告 ——  
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  # 卡片广告接口
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,applog-lf)),REJECT  # 埋点广告接口
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT  # 普通埋点广告
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,applog-lf)),REJECT  # 埋点广告上报接口
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT  # 普通行为数据上报接口
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT  # 弹框卡片广告
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT  # 今日头条样式广告
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-hl)),REJECT  # 今日头条样式广告（补充）
-AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT  # 视频流拉取广告（短剧类）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-lf)),REJECT  # 今日头条样式广告（页面接口）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,toutiao-hl)),REJECT  # 今日头条样式广告（卡片接口）
+AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT  # 短剧类视频广告流接口
 
-# —— 章节图像资源：精准放行头像/封面，拦截广告签图 ——  
-DOMAIN,p3-reading-sign.fqnovelpic.com,DIRECT  # 放行封面图资源（如首页推荐卡片）
-DOMAIN,p9-reading-sign.fqnovelpic.com,DIRECT  # 放行头像图资源（如用户头像）
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,reading-sign)),REJECT  # 拦截章节内广告签图（reading-sign）
-DOMAIN-SUFFIX,ad.us.sinaimg.cn,REJECT  # 新浪联盟图像广告
+# —— 3. 图像资源控制（精准放行头像/封面，拦截广告签图） ——  
+DOMAIN,p3-reading-sign.fqnovelpic.com,DIRECT  # 放行封面图资源（如推荐页）
+DOMAIN,p9-reading-sign.fqnovelpic.com,DIRECT  # 放行头像图资源（如用户页）
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,reading-sign)),REJECT  # 拦截章节广告签图
+DOMAIN-SUFFIX,ad.us.sinaimg.cn,REJECT  # 新浪联盟广告图
 
-# —— 3. ecombdapi 相关章中广告（REJECT） ——  
-AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,normal-lf)),REJECT  # 卡片广告接口
-AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,core-lf)),REJECT  # 核心广告接口
-AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,isaas)),REJECT  # 埋点广告接口
+# —— 4. ecombdapi 广告接口 ——  
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,normal-lf)),REJECT  # ecombdapi 卡片广告接口
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,core-lf)),REJECT  # ecombdapi 核心广告接口
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,isaas)),REJECT  # ecombdapi 行为埋点接口
+AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  # ecombdapi 后缀模糊兜底广告接口
 
-# —— 4. 图片广告 & 样式资源（REJECT） ——  
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT  # “阅读签”图片广告
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  # 插画类广告图（misc-lf）
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  # 样式图广告
-AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  # 字节样式图广告
-AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,novel)),REJECT  # 章节广告图（p3/p6/p26-novel.byteimg.com）
-DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT  # 样式脚本广告
-DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT  # 页面加载脚本广告
+# —— 5. 样式图广告与页面脚本 ——  
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  # 插画类广告图
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  # 样式图资源（fqnovelpic）
+AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT  # 样式图资源（字节图床）
+AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,novel)),REJECT  # 章节广告图（如 p6/p3/p26）
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(AND,((DOMAIN-KEYWORD,lf),(DOMAIN-KEYWORD,reading)))),REJECT  # 阅读签广告图（复合关键词）
+DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT  # 样式脚本资源
+DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT  # 页面脚本资源
 
-# —— 5. 核心接口白名单（DIRECT） ——  
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT  # 正常阅读接口（如正文加载）
-AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,tts)),DIRECT  # 朗读合成语音接口
-DOMAIN-SUFFIX,fqnovelvod.com,REJECT  # 拦截除 TTS 外的 fqnovelvod 请求
+# —— 6. 核心接口白名单（DIRECT） ——  
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal)),DIRECT  # 正文内容加载接口
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,tts)),DIRECT  # TTS 合成语音接口
+DOMAIN-SUFFIX,fqnovelvod.com,REJECT  # 兜底拦截 fqnovelvod 非语音请求
 
-# —— 6. 其它广告与埋点接口（REJECT） ——  
+# —— 7. 其它广告与埋点接口 ——  
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT  # 巨量引擎广告 SDK
-AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT  # 抖音类短剧广告接口
-DOMAIN-SUFFIX,bytedcdn.com,REJECT  # 字节跳动公共资源 CDN 广告
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  # 埋点广告接口
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT  # 抖音短剧广告接口
+DOMAIN-SUFFIX,bytedcdn.com,REJECT  # 字节跳动公共 CDN 广告资源
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  # 埋点广告接口（misc）
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT  # 小游戏广告接口
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,tnc0)),REJECT  # 行为监测接口
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,tnc3)),REJECT  # 行为监测接口（补充）
-DOMAIN,applog.zijieapi.com,REJECT  # 行为统计上报
-AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT  # 字节资源 SDK
-DOMAIN,timon.zijieapi.com,REJECT  # 签名验证接口（广告相关）
-DOMAIN,feedback-c.zijieapi.com,REJECT  # 用户反馈/行为收集接口
-DOMAIN,ma.zijieapi.com,REJECT  # 营销广告接口
-DOMAIN,p26-sign.douyinpic.com,REJECT  # 抽奖类图片广告（开屏图）
-DOMAIN-SUFFIX,toutiaocloud.com,REJECT  # 字节系云服务广告可能来源
-# DOMAIN-KEYWORD,novelvod,REJECT  # 已由 fqnovelvod 控制，默认注释
-# AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  # 模糊匹配，误杀风险大，默认注释
-# AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT  # 同上
-# AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT  # 同上
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,tnc0)),REJECT  # 行为分析接口（A/B 测试）
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,tnc3)),REJECT  # 行为分析接口（补充）
+DOMAIN,applog.zijieapi.com,REJECT  # 广告行为日志上报
+AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT  # 字节 SDK 模块
+DOMAIN,timon.zijieapi.com,REJECT  # 签名校验（广告服务）
+DOMAIN,feedback-c.zijieapi.com,REJECT  # 用户行为反馈接口
+DOMAIN,ma.zijieapi.com,REJECT  # 营销活动接口
+DOMAIN,p26-sign.douyinpic.com,REJECT  # 开屏图/抽奖类广告资源
+DOMAIN-SUFFIX,toutiaocloud.com,REJECT  # 字节云服务潜在广告
 
-# —— 7. 通用短链追踪类拦截（REJECT） ——  
+# —— ⚠️ 默认注释的高风险模糊匹配规则 ——  
+# DOMAIN-KEYWORD,novelvod,REJECT  # 已被 fqnovelvod 精准控制
+# AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  # 模糊后缀误杀风险大，建议保持注释
+# AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
+# AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,-bjlgy)),REJECT
+
+# —— 8. 通用短链追踪域名 ——  
 DOMAIN-SUFFIX,bdurl.net,REJECT  # 百度短链追踪
-DOMAIN-SUFFIX,zjurl.cn,REJECT  # 字节短链追踪
-AND,((DOMAIN-SUFFIX,ecombdapi.com),(DOMAIN-KEYWORD,-lf)),REJECT  # 可疑接口兜底拦截
+DOMAIN-SUFFIX,zjurl.cn,REJECT  # 字节跳动短链跳转追踪
 
-# —— 8. IP 兜底策略（REJECT, no-resolve） ——  
-IP-CIDR,47.246.38.0/24,REJECT,no-resolve  # fqnovel 图像广告源
+# —— 9. IP 广告源兜底拦截（REJECT, no-resolve） ——  
+IP-CIDR,47.246.38.0/24,REJECT,no-resolve  # fqnovel 图像广告源段
 IP-CIDR,101.36.166.16/32,REJECT,no-resolve
 IP-CIDR,115.238.190.84/32,REJECT,no-resolve
 IP-CIDR,115.223.42.181/32,REJECT,no-resolve
@@ -88,7 +89,7 @@ IP-CIDR,122.228.52.98/32,REJECT,no-resolve
 IP-CIDR,122.14.229.147/32,REJECT,no-resolve
 IP-CIDR,221.194.130.40/32,REJECT,no-resolve
 
-# —— 9. IPv6 广告地址兜底（REJECT, no-resolve） ——  
+# —— 10. IPv6 广告地址兜底（REJECT, no-resolve） ——  
 IP-CIDR6,2408:8710:102e:8:66fc::102/128,REJECT,no-resolve
 IP-CIDR6,2408:8740:71fc:401:8000:0:b00:57/128,REJECT,no-resolve
 IP-CIDR6,2408:8740:71fc:401:8000:0:b00:41/128,REJECT,no-resolve  # ecombdapi 广告接口 IPv6
