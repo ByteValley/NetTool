@@ -1,21 +1,32 @@
 #!name=京东去广告
+#!desc=彻底屏蔽京东 App 启动广告、摇一摇广告及埋点，保留购物核心功能。
 #!author=ByteValley & ChatGPT
-#!desc=移除京东APP开屏广告及列表内广告，保留商品浏览、下单等核心功能
-#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
 #!category=广告屏蔽
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
+
+[General]
+skip-proxy = %APPEND% api.m.jd.com
+skip-proxy = %APPEND% wq.jd.com
+skip-proxy = %APPEND% wqs.jd.com
 
 [Rule]
-# —— 屏蔽开屏广告 ——
-URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=start$,REJECT-TINYGIF
+# —— 1. 广告 & 埋点接口 ——  
+DOMAIN,blackhole.m.jd.com,REJECT
+DOMAIN,rjsb-token-m.jd.com,REJECT
+DOMAIN,mars.jd.com,REJECT
+DOMAIN,perf.m.jd.com,REJECT
+DOMAIN,ex.m.jd.com,REJECT
+DOMAIN,jpushjd.m.jd.com,REJECT
 
-# —— 屏蔽广告物料列表 ——
-URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=queryMaterialAdverts$,REJECT
+# —— 2. 广告图 & 开屏图 ——  
+URL-REGEX,^https:\/\/m\d*\.360buyimg\.com\/mobilecms\/.*\.(png|jpg|webp)$,REJECT
+URL-REGEX,^https:\/\/.*\.360buyimg\.com\/imagetools\/.*\.(png|jpg|webp)$,REJECT
 
-# —— 屏蔽首页推广模块 ——
-URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=getTabHomeInfo$,REJECT
-
-# —— 屏蔽猜你喜欢/猜你喜欢广告 ——
-URL-REGEX,https?:\/\/api\.m\.jd\.com\/client\.action\?functionId=unionBaseAdverts$,REJECT
+# —— 3. 其他广告关键字 ——  
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,splash)),REJECT
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,launch)),REJECT
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,startAd)),REJECT
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,shake)),REJECT
 
 [MITM]
-hostname = %APPEND% api.m.jd.com
+hostname = %APPEND% *.jd.com,*.360buyimg.com
