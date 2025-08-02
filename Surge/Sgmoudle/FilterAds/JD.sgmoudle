@@ -1,32 +1,50 @@
 #!name=京东去广告
 #!desc=彻底屏蔽京东 App 启动广告、摇一摇广告及埋点，保留购物核心功能。
-#!author=ByteValley & ChatGPT
+#!author=ByteValley
 #!category=广告屏蔽
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
 
 [General]
+# —— 直连核心接口，避免代理干扰购物功能 ——
 skip-proxy = %APPEND% api.m.jd.com
 skip-proxy = %APPEND% wq.jd.com
 skip-proxy = %APPEND% wqs.jd.com
 
 [Rule]
-# —— 1. 广告 & 埋点接口 ——  
-DOMAIN,blackhole.m.jd.com,REJECT
-DOMAIN,rjsb-token-m.jd.com,REJECT
-DOMAIN,mars.jd.com,REJECT
-DOMAIN,perf.m.jd.com,REJECT
-DOMAIN,ex.m.jd.com,REJECT
-DOMAIN,jpushjd.m.jd.com,REJECT
+# —— 1. 广告/埋点 域名拦截 ——
+DOMAIN,blackhole.m.jd.com,REJECT           # 埋点收集
+DOMAIN,rjsb-token-m.jd.com,REJECT          # SDK Token 下发
+DOMAIN,mars.jd.com,REJECT                  # 日志收集
+DOMAIN,perf.m.jd.com,REJECT                # 性能上报
+DOMAIN,ex.m.jd.com,REJECT                  # 异常监控
+DOMAIN,jpushjd.m.jd.com,REJECT             # 推送埋点
 
-# —— 2. 广告图 & 开屏图 ——  
-URL-REGEX,^https:\/\/m\d*\.360buyimg\.com\/mobilecms\/.*\.(png|jpg|webp)$,REJECT
+# —— 2. 开屏广告图（精准匹配路径含 splash / welcome 等关键词） ——
+AND,((DOMAIN-SUFFIX,360buyimg.com),(URL-REGEX,\/(splash|startup|welcome|launch|open)[^\/]*\.(png|jpg|webp|dpg\.webp)(\?.*)?$)),REJECT
 URL-REGEX,^https:\/\/.*\.360buyimg\.com\/imagetools\/.*\.(png|jpg|webp)$,REJECT
 
-# —— 3. 其他广告关键字 ——  
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,splash)),REJECT
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,launch)),REJECT
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,startAd)),REJECT
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,shake)),REJECT
+# —— 3. 广告关键字拦截（含启动/摇一摇等） ——
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,splash)),REJECT           # 启动广告
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,launch)),REJECT           # 启动相关
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,startAd)),REJECT          # 启动广告标识
+AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,shake)),REJECT            # 摇一摇活动
+
+# —— 4. 域名形式调试埋点拦截 ——
+URL-REGEX,^http:\/\/\w{32}\.jddebug\.com\/diagnose\?,REJECT           # 调试信息收集
+
+[Body Rewrite]
+# —— 5. 阻止 JD SDK 提前建立连接、上传 DNS 等功能 ——
+http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig 'if (getpath(["data","JDMessage","socketmonitor"]) | has("isSocketEstablishedAhead")) then (setpath(["data","JDMessage","socketmonitor","isSocketEstablishedAhead"]; 0)) else . end'
+http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig 'if (getpath(["data","JDMessage","socketmonitor"]) | has("isSocketReport")) then (setpath(["data","JDMessage","socketmonitor","isSocketReport"]; 0)) else . end'
+http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig 'if (getpath(["data","JDHttpToolKit","httpdns"]) | has("httpdns")) then (setpath(["data","JDHttpToolKit","httpdns","httpdns"]; 0)) else . end'
+
+[Map Local]
+# —— 6. 清空推荐/弹层等干扰数据 ——
+^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=(searchBoxWord|stationPullService|uniformRecommend[06]) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+
+[Script]
+# —— 7. 移除首页弹层广告、推荐、欢迎页等内容 ——
+移除京东广告 = type=http-response, pattern=^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=(deliverLayer|getTabHomeInfo|myOrderInfo|orderTrackBusiness|personinfoBusiness|start|welcomeHome), script-path=https://kelee.one/Resource/JavaScript/JD/JD_remove_ads.js, requires-body=true
 
 [MITM]
-hostname = %APPEND% *.jd.com,*.360buyimg.com
+hostname = %APPEND% api.m.jd.com,*.jd.com,*.360buyimg.com
