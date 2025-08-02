@@ -1,52 +1,46 @@
-#!name=番茄去广告
-#!desc=移除番茄小说开屏广告、移除文章底部和章末广告、移除听书页面广告。
-#!author=zqzess
+#!name=番茄小说去广告
+#!desc=移除番茄小说开屏广告、章末广告、听书页广告，全面拦截广告内容。
+#!author=ByteValley
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=广告屏蔽
 
 [Rule]
-# ——— 放行番茄小说“预约领番茄”接口 ———
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/reserve_info\? ,DIRECT
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/reserve$,DIRECT
-# ——— 放行签到状态查询 & 执行签到 接口 ———
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/(sign_info|get_sign_info)\?\,DIRECT
-URL-REGEX,^https://api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com/api/book/sign$,DIRECT
-# —— 放行番茄小说催更接口 ——
-URL-REGEX, ^https:\/\/api-access\.pangolin-sdk-toutiao(?:\d|-b)?\.com\/api\/(?:book|novel|article)\/urge, DIRECT
-URL-REGEX, ^http:\/\/sf3-be-pack\.pglstatp-toutiao\.com\/obj\/ad-app-package\/, REJECT
-URL-REGEX, ^https:\/\/(api-access\.pangolin-sdk-toutiao(\d|-b)?|is\.snssdk)\.com\/api\/ad\/union\/sdk\/get_ads, DIRECT // 放行此条以确保字节跳动去广告脚本的正常执行
-# AND, ((DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-AND, ((DOMAIN-KEYWORD, ads), (DOMAIN-KEYWORD, normal), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -ad-), (DOMAIN-SUFFIX, byteimg.com)), REJECT
-AND, ((DOMAIN-KEYWORD, minigame), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-# AND, ((DOMAIN-KEYWORD, applog), (DOMAIN-SUFFIX, zijieapi.com)), REJECT
-AND, ((DOMAIN-KEYWORD, tnc), (AND, ((OR, ((DOMAIN-KEYWORD, -bjlgy), (DOMAIN-KEYWORD, -alisc), (DOMAIN-KEYWORD, -aliec))), (OR, ((DOMAIN-SUFFIX, snssdk.com), (DOMAIN-SUFFIX, toutiaoapi.com), (DOMAIN-SUFFIX, bytedance.com), (DOMAIN-SUFFIX, zijieapi.com)))))), REJECT
-DOMAIN, dig.bdurl.net, REJECT
-DOMAIN, dig.zjurl.cn, REJECT
-# DOMAIN, is.snssdk.com, DIRECT // 放行此条以确保广告联盟脚本的正常执行
-AND, ((DOMAIN-KEYWORD, -applog), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-# AND, ((DOMAIN-KEYWORD, -applog-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -lf-), (DOMAIN-SUFFIX, snssdk.com)), REJECT
-# 精确匹配番茄小说和广告子域
-AND, ((OR, ((DOMAIN-KEYWORD, -novel), (DOMAIN-KEYWORD, -ad-sign))), (OR, ((DOMAIN-SUFFIX, byteimg.com), (DOMAIN-SUFFIX, fqnovelvod.com)))), REJECT
-AND, ((DOMAIN-KEYWORD, -aio), (DOMAIN-SUFFIX, ecombdimg.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -cdn-tos), (DOMAIN-SUFFIX, bytegoofy.com)), REJECT
-# AND, ((OR, ((DOMAIN-KEYWORD, -reading), (DOMAIN-KEYWORD, -reading-sign))), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT // 放行，可能是封面
-# AND, ((DOMAIN-KEYWORD, reading-sign), (DOMAIN-SUFFIX, fqnovelpic.com)), REJECT
-AND, ((DOMAIN-KEYWORD, -reading-video), (DOMAIN-SUFFIX, fqnovelvod.com)), REJECT
-# 精准拦截 *-lf 子域（多个域名后缀）
-# AND, ((DOMAIN-KEYWORD, -lf), (OR, ((DOMAIN-SUFFIX, zijieapi.com), (DOMAIN-SUFFIX, ecombdapi.com), (DOMAIN-SUFFIX, bytegecko.com), (DOMAIN-SUFFIX, fqnovel.com), (DOMAIN-SUFFIX, fqnovelvod.com), (DOMAIN-SUFFIX, fqnovelpic.com)))), REJECT
-# 精准拦截 misc-lf.fqnovel.com
-AND, ((DOMAIN-KEYWORD, misc-lf), (DOMAIN-SUFFIX, fqnovel.com)), REJECT
-# 精确拦截 lf-webcast-gr-sourcecdn.bytegecko.com
-AND, ((DOMAIN-KEYWORD, lf-webcast-gr-sourcecdn), (DOMAIN-SUFFIX, bytegecko.com)), REJECT
-# 拦截 open.douyin.com
-DOMAIN, open.douyin.com, REJECT
 
-# ——— 拦 p*-novelapp.fqnovelvod.com 下所有视频路径 —— 
+# ——— 1. 精准广告拦截（AND 逻辑） ———
+
+# 埋点广告
+AND,((DOMAIN-KEYWORD,ads),(DOMAIN-KEYWORD,normal),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
+AND,((DOMAIN-KEYWORD,-applog),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
+AND,((DOMAIN-KEYWORD,-lf-),(DOMAIN-SUFFIX,snssdk.com)),REJECT
+AND,((DOMAIN-KEYWORD,misc-lf),(DOMAIN-SUFFIX,fqnovel.com)),REJECT
+
+# 图像广告资源
+AND,((DOMAIN-KEYWORD,-ad-),(DOMAIN-SUFFIX,byteimg.com)),REJECT
+AND,((DOMAIN-KEYWORD,-aio),(DOMAIN-SUFFIX,ecombdimg.com)),REJECT
+AND,((DOMAIN-KEYWORD,-cdn-tos),(DOMAIN-SUFFIX,bytegoofy.com)),REJECT
+AND,((DOMAIN-KEYWORD,lf-webcast-gr-sourcecdn),(DOMAIN-SUFFIX,bytegecko.com)),REJECT
+
+# 视频浮窗广告
+AND,((DOMAIN-KEYWORD,-reading-video),(DOMAIN-SUFFIX,fqnovelvod.com)),REJECT
+
+# 小说相关广告子域
+AND,((OR,((DOMAIN-KEYWORD,-novel),(DOMAIN-KEYWORD,-ad-sign))),(OR,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-SUFFIX,fqnovelvod.com)))),REJECT
+
+# 小游戏推广
+AND,((DOMAIN-KEYWORD,minigame),(DOMAIN-SUFFIX,zijieapi.com)),REJECT
+
+# TNC 域名劫持及广告上报接口
+AND,((DOMAIN-KEYWORD,tnc),(OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,-alisc),(DOMAIN-KEYWORD,-aliec))),(OR,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,bytedance.com),(DOMAIN-SUFFIX,zijieapi.com)))),REJECT
+
+# ——— 2. 广告域名黑名单 ———
+DOMAIN,dig.bdurl.net,REJECT
+DOMAIN,dig.zjurl.cn,REJECT
+DOMAIN,open.douyin.com,REJECT
+
+# ——— 3. 视频广告路径拦截（REGEX） ———
 URL-REGEX,^https?://v\d+-novelapp\.fqnovelvod\.com/.+/video/.+,REJECT
 
-
+# ——— 4. 已知广告服务器 IP ———
 IP-CIDR,49.71.37.101/32,REJECT,no-resolve
 IP-CIDR,117.71.105.23/32,REJECT,no-resolve
 IP-CIDR,218.94.207.205/32,REJECT,no-resolve
@@ -55,32 +49,24 @@ IP-CIDR,101.36.166.16/32,REJECT,no-resolve
 IP-CIDR,180.96.2.114/32,REJECT,no-resolve
 
 [URL Rewrite]
-# 头条广告SDK
-^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
 
-# 番茄
+# 广告素材类资源
+^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject header
 ^https:\/\/sf3-fe-tos\.pglstatp-toutiao\.com\/obj\/ad-pattern\/ reject
 ^https:\/\/lf-cdn-tos\.bytescm\.com\/obj\/static\/ad\/ reject
-# 域名解析
 ^https:\/\/tnc3-alisc1\.zijieapi\.com\/get_domains\/ reject
-# 番茄小说去章末广告
 ^https?:\/\/.+\.pangolin-sdk-toutiao\.com\/api\/ad\/union\/sdk\/(get_ads|stats|settings)\/ - reject
-^https?:\/\/.+\.pglstatp-toutiao\.com\/.+\/toutiao\.mp4 - reject
 ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/(ad-app-package|ad)\/.+ - reject
-^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(obj|img)\/web\.business\.image\/.+ - reject
 ^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/obj\/ad-pattern\/renderer - reject
-^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
-^https?:\/\/.+\.byteimg.com/tos-cn-i-1yzifmftcy\/(.+)-jpeg\.jpeg - reject
-^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from\=ad - reject
+^https?:\/\/.+\.pstatp\.com\/obj\/mosaic-legacy\/.+\?from=ad - reject
 ^https?:\/\/.+\.pstatp\.com\/bytecom\/resource\/track_log\/src\/.+ - reject
+^https?:\/\/gurd\.snssdk\.com\/src\/server\/v3\/package - reject
+^https?:\/\/.+\.byteimg.com\/tos-cn-i-1yzifmftcy\/.+-jpeg\.jpeg - reject
 ^https?:\/\/.+\.snssdk\.com\/video\/play\/1\/toutiao\/.+\/mp4 - reject
-^https?:\/\/.+\.snssdk.com\/api\/ad\/.+ - reject
-# 下面两条来自他人,暂不知是哪个app
+^https?:\/\/.+\.snssdk\.com\/api\/ad\/.+ - reject
 ^https?:\/\/.+?\.snssdk\.com\/motor\/operation\/activity\/display\/config\/V2\/ - reject
-
-^https?:\/\/.+\.(pglstatp-toutiao|pstatp)\.com\/(ad-app-package|ad)\/.+ - reject
 ^https?:\/\/adim\.pinduoduo\.com\/.+\/toutiao\?.+ - reject
-^https?:\/\/v(\d)+-novelapp\.fqnovelvod\.com\/.+\/video\/.+ - reject
+^https?:\/\/v\d+-novelapp\.fqnovelvod\.com\/.+\/video\/.+ - reject
 
 [MITM]
 hostname = %APPEND% *.pangolin-sdk-toutiao,*.pangolin-sdk-toutiao.*,*.pstatp.com,*.pstatp.com.*,*.pglstatp-toutiao.com.*,*.pglstatp-toutiao.com,gurd.snssdk.com,gurd.snssdk.com.*,*default.ixigua.com,adim.pinduoduo.com,*.fqnovelvod.com,*.ecombdapi.com
