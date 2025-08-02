@@ -51,6 +51,7 @@ DOMAIN-SUFFIX,fqnovelvod.com,REJECT  # 兜底拦截 fqnovelvod 非语音请求
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT  # 巨量引擎广告 SDK
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT  # 抖音短剧广告接口
 DOMAIN-SUFFIX,bytedcdn.com,REJECT  # 字节跳动公共 CDN 广告资源
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),REJECT  # 拦截 saveu5-normal-lf 等广告/埋点接口
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,misc-lf)),REJECT  # 埋点广告接口（misc）
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,minigame)),REJECT  # 小游戏广告接口
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,tnc0)),REJECT  # 行为分析接口（A/B 测试）
