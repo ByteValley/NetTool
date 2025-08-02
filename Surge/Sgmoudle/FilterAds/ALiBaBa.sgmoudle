@@ -1,0 +1,74 @@
+#!name = 阿里系去广告
+#!desc = 屏蔽淘宝、闲鱼、饿了么开屏及内嵌广告，保留核心业务流程
+#!author = ByteValley & ChatGPT
+#!icon = https://raw.githubusercontent.com/ByteValley/IconResource/main/ads-block.png
+#!category = 广告屏蔽
+
+[Rule]
+# ===============================
+# 淘宝模块（开屏 + 埋点广告）
+# ===============================
+# —— 开屏广告 ——  
+URL-REGEX,^https?:\/\/acs\.m\.taobao\.com\/gw\/mtop\.alibaba\.advertisementservice\.getadv\/,REJECT
+URL-REGEX,^https?:\/\/acs\.m\.taobao\.com\/gw\/mtop\.alibaba\.cbu\.app\.homepage\.startup,REJECT
+
+# —— 埋点 & 静态广告资源 ——  
+DOMAIN-SUFFIX,amdc.m.taobao.com,REJECT
+DOMAIN-SUFFIX,tbcdn.com,REJECT
+
+# ===============================
+# 闲鱼模块（开屏广告）
+# ===============================
+# —— 开屏广告 ——  
+URL-REGEX,^https?:\/\/app\.dewu\.com\/api\/v1\/app\/advertisement\/,REJECT
+
+# ===============================
+# 饿了么模块（开屏广告 + 埋点 + 推广弹窗）
+# ===============================
+# —— 开屏广告图片 / 视频 ——  
+AND,((DOMAIN-SUFFIX,elemecdn.com),(DOMAIN-KEYWORD,splash)),REJECT
+URL-REGEX,^https://cube\.elemecdn\.com/.*/splash[^/]*\.(png|jpg|jpeg|webp),REJECT
+URL-REGEX,^https?:\/\/elemecdn\.com\/.+\/sitemap,REJECT
+AND,((DOMAIN-SUFFIX,elemecdn.com),(URL-REGEX,\/w\/(?:640|750)\/h\/\d{3,4})),REJECT
+URL-REGEX,^https?:\/\/fuss10\.elemecdn\.com\/.+\.mp4,REJECT
+URL-REGEX,^https?:\/\/www1\.elecfans\.com\/www\/delivery\/,REJECT
+
+# —— 营销广告接口 / 弹窗 ——  
+DOMAIN,tls-eleme.dingtalk.com,REJECT
+DOMAIN,air.tb.ele.me,REJECT
+# DOMAIN,alsc-buy2.ele.me,REJECT
+DOMAIN,nr-op.elemecdn.com,REJECT
+URL-REGEX,^https://air\.tb\.ele\.me/.*/svip-new-exchange-coupons/,REJECT
+URL-REGEX,^https://restapi\.ele\.me/im\.api/alsc/im/getEmojiVersion,REJECT
+
+# —— 埋点 / 推送 / 推荐广告 ——  
+DOMAIN-SUFFIX,log.mmstat.com,REJECT
+DOMAIN-SUFFIX,umeng.com,REJECT
+DOMAIN-SUFFIX,applog.uc.cn,REJECT
+DOMAIN-SUFFIX,push.ele.me,REJECT
+DOMAIN-SUFFIX,data.ele.me,REJECT
+DOMAIN-SUFFIX,recommend.ele.me,REJECT
+DOMAIN,log.umsns.com,REJECT
+DOMAIN,elelog-api.ele.me,REJECT
+
+# —— 异常上报 / 性能监控 ——  
+DOMAIN,crashlytics.ele.me,REJECT
+DOMAIN,monitor.ele.me,REJECT
+DOMAIN-SUFFIX,newrelic.com,REJECT
+DOMAIN-SUFFIX,bugly.qq.com,REJECT
+
+# —— 广告调度接口（含阿里 amdc IP） ——  
+DOMAIN-SUFFIX,aliapp.org,REJECT
+URL-REGEX,^http://(59\.82\.43\.77|203\.119\.204\.222)/amdc/mobileDispatch,REJECT
+
+# —— 高风险广告 IP 节点 ——  
+IP-CIDR,106.8.151.211/32,REJECT
+IP-CIDR,115.231.187.26/32,REJECT
+IP-CIDR,124.239.14.129/32,REJECT
+IP-CIDR,124.239.14.130/32,REJECT
+IP-CIDR,124.239.14.136/32,REJECT
+IP-CIDR,58.221.40.80/32,REJECT
+IP-CIDR,58.221.40.81/32,REJECT
+
+[MITM]
+hostname = acs.m.taobao.com, amdc.m.taobao.com, tbcdn.com, app.dewu.com, elemecdn.com, fuss10.elemecdn.com, www1.elecfans.com, *.ele.me, *.elemecdn.com, log.mmstat.com, *.umeng.com, aliapp.org, dingtalk.com
