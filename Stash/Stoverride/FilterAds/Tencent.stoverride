@@ -5,48 +5,48 @@ desc: |-
 author: |-
   ByteValley
 icon: |-
-  https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Tencent.png
+  https://raw.githubusercontent.com/luestr/IconResource/main/Website_icon/120px/TencentAd.png
 category: |-
   功能治理
 updated: |-
   2025-08-16 08:00
 
 rules:
-  # ===============================
+# ===============================
   - DOMAIN,ad.tencentmusic.com,REJECT
   - DOMAIN,adstats.tencentmusic.com,REJECT
   - DOMAIN,tmead.y.qq.com,REJECT
   - DOMAIN,tmeadcomm.y.qq.com,REJECT
-  # DOMAIN-SUFFIX,h.trace.qq.com,REJECT                      # 腾讯 Trace 埋点（可选）
+#DOMAIN-SUFFIX,h.trace.qq.com,REJECT                      # 腾讯 Trace 埋点（可选）
   - DOMAIN-SUFFIX,e.qq.com,REJECT
   - DOMAIN-SUFFIX,rdelivery.qq.com,REJECT
   - DOMAIN-SUFFIX,tangram.e.qq.com,REJECT
   - DOMAIN-SUFFIX,fp-it.portal101.cn,REJECT
   - DOMAIN-SUFFIX,tmeadcommquic.y.qq.com,REJECT
-  # ===============================
+# ===============================
   - DOMAIN,adcdn.tencentmusic.com,REJECT
   - DOMAIN,adcdn6.tencentmusic.com,REJECT
   - DOMAIN,adexpo.tencentmusic.com,REJECT
   - DOMAIN,adclick.tencentmusic.com,REJECT
   - DOMAIN,monitor.music.qq.com,REJECT
   - DOMAIN,stat.y.qq.com,REJECT
-  # DOMAIN,tmeadbak.y.qq.com,REJECT                          # 广告备用接口（可选）
+#DOMAIN,tmeadbak.y.qq.com,REJECT                          # 广告备用接口（可选）
   - DOMAIN,oth.str.mdt.qq.com,REJECT
   - DOMAIN-SUFFIX,imtmp.net,REJECT
   - AND,((DOMAIN-SUFFIX,sycdn.kuwo.cn),(DOMAIN-KEYWORD,trackmedia)),REJECT
-  # —— 广告点击打点 ——
+# —— 广告点击打点 ——
   - AND,((DOMAIN,g.kuwo.cn),(DOMAIN-KEYWORD,aid=text_ad_)),REJECT
-  # —— 开屏广告图 ——
+# —— 开屏广告图 ——
   - AND,((DOMAIN-SUFFIX,kugou.com),(DOMAIN-KEYWORD,splashimgbssdl)),REJECT
   - AND,((DOMAIN-SUFFIX,kugou.com),(DOMAIN-KEYWORD,splashimgretrybssdl)),REJECT
-  # —— 广告接口 ——
+# —— 广告接口 ——
   - DOMAIN,ads.service.kugou.com,REJECT
   - DOMAIN,adserviceretry.kugou.com,REJECT
   - DOMAIN,adserviceretry.kglink.cn,REJECT
   - DOMAIN,adservice.kugou.com,REJECT
   - DOMAIN,splashimgretrybssdl.cloud.kugou.com,REJECT
   - DOMAIN,splashimgbssdl.yun.kugou.com,REJECT
-  # ===============================
+# ===============================
   - DOMAIN,adsmind.gdtimg.com,REJECT
   - DOMAIN,adsmind.ugdtimg.com,REJECT
   - DOMAIN,c2.gdt.qq.com,REJECT
@@ -77,56 +77,116 @@ rules:
   - DOMAIN-SUFFIX,l.qq.com,REJECT
   - DOMAIN-SUFFIX,ugdtimg.com,REJECT
   - IP-CIDR,47.110.187.87/32,REJECT,no-resolve
-  # ===============================
+# ===============================
   - DOMAIN-SUFFIX,httpdns.kg.qq.com,REJECT
   - IP-CIDR,111.206.98.63/32,REJECT,no-resolve
 
 http:
+
   mitm:
-    hostnames:
-      - gateway.kugou.com
-      - gatewayretry.kugou.com
-      - fx.service.kugou.com
-      - hwstore.kugou.com
-      - ep.kugou.com
-      - gzacshow.kugou.com
-      - m1fxgroup.kugou.com
-      - appi.kuwo.cn
-      - vip*.kuwo.cn
-      - wapi.kuwo.cn
-      - rich.kuwo.cn
-      - mc.tencentmusic.com
-      - tingshu.kuwo.cn
-      - wallpaper-1258344696.file.myqcloud.com
-      - amsweb-cdn-*-1258344696.file.myqcloud.com
-      - wnsaviator.kg.qq.com
+    - "gateway.kugou.com"
+    - "gatewayretry.kugou.com"
+    - "fx.service.kugou.com"
+    - "hwstore.kugou.com"
+    - "ep.kugou.com"
+    - "gzacshow.kugou.com"
+    - "m1fxgroup.kugou.com"
+    - "appi.kuwo.cn"
+    - "vip*.kuwo.cn"
+    - "wapi.kuwo.cn"
+    - "rich.kuwo.cn"
+    - "mc.tencentmusic.com"
+    - "tingshu.kuwo.cn"
+    - "wallpaper-1258344696.file.myqcloud.com"
+    - "amsweb-cdn-*-1258344696.file.myqcloud.com"
+    - "wnsaviator.kg.qq.com"
 
   url-rewrite:
-    # ===============================
-    - "^http:\/\/p\.tencentmusic\.com\/dht\/api\/v3\/locate - reject"
-    # —— 开屏广告 ——
-    - "^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/startup\/config - reject-img"
-    # —— 弹窗 / 营销 ——
-    - "^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/pasterAdvert\/ - reject-img"
-    # —— Kaiping 开屏（除 getcache 外全部拦截） ——
-    - "^https?:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/(?!getcache).+ - reject-img"
-    # —— 常见广告位（开屏 / 启动 / 弹窗 / 横幅） ——
-    - "^https?:\/\/rich\.kuwo\.cn\/AdService\/(splash|startup|popup|banner)\/ - reject-img"
-    # —— 信息流 / 菜单广告 ——
-    - "^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/album\/adBar\/ - reject-img"
-    - "^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/newMenuList\/menuListInfo - reject-img"
-    - "^http:\/\/searchrecterm\.kuwo\.cn\/recterm\.s - reject-img"
-    # —— 日志广告上报 ——
-    - "^http:\/\/log\.stat\.kugou\.com\/mobile\/ad\.html - reject"
-    - "^http:\/\/y\.gtimg\.cn\/music\/common\/upload\/t_k_main_page_banner\/ - reject"
-    # ===============================
-    - "^https:\/\/fx\.service\.kugou\.com\/mfx-kugoulive\/ad\/ - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/adp\/(ad|bubble\/v\d\/song_play) - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/ads\.gateway\/ - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/v\d\/feeds\/follow_feed_fallback - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/mstc\/musicsymbol\/v\d\/system\/profile - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/searchnofocus\/v\d\/search_no_focus_word - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/singerdiscuss\/v\d\/entrance\/comment - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/r\/v\d\/general\/putin\/midad - reject-dict"
-    - "^https:\/\/gateway(retry)?\.kugou\.com\/ocean\/v\d\/sound\/banner - reject-dict"
-    #
+# ===============================
+    - >-
+      ^http:\/\/p\.tencentmusic\.com\/dht\/api\/v3\/locate - reject
+# —— 开屏广告 ——
+    - >-
+      ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/startup\/config - reject-img
+# —— 弹窗 / 营销 ——
+    - >-
+      ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/pasterAdvert\/ - reject-img
+# —— Kaiping 开屏（除 getcache 外全部拦截） ——
+    - >-
+      ^https?:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/(?!getcache).+ - reject-img
+# —— 常见广告位（开屏 / 启动 / 弹窗 / 横幅） ——
+    - >-
+      ^https?:\/\/rich\.kuwo\.cn\/AdService\/(splash|startup|popup|banner)\/ - reject-img
+# —— 信息流 / 菜单广告 ——
+    - >-
+      ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/album\/adBar\/ - reject-img
+    - >-
+      ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/newMenuList\/menuListInfo - reject-img
+    - >-
+      ^http:\/\/searchrecterm\.kuwo\.cn\/recterm\.s - reject-img
+# —— 日志广告上报 ——
+    - >-
+      ^http://log\.stat\.kugou\.com/mobile/ad\.html - reject
+    - >-
+      ^http:\/\/y\.gtimg\.cn\/music\/common\/upload\/t_k_main_page_banner\/ - reject
+# ===============================
+    - >-
+      ^https://fx\.service\.kugou\.com/mfx-kugoulive/ad/ - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/adp/(ad|bubble/v\d/song_play) - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/ads\.gateway/ - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/v\d/feeds/follow_feed_fallback - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/mstc/musicsymbol/v\d/system/profile - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/searchnofocus/v\d/search_no_focus_word - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/singerdiscuss/v\d/entrance/comment - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/r/v\d/general/putin/midad - reject-dict
+    - >-
+      ^https://gateway(retry)?\.kugou\.com/ocean/v\d/sound/banner - reject-dict
+# —— 酷狗直播 / 活动页广告 ——
+    - >-
+      ^https://gzacshow\.kugou\.com/mfanxing-home/cdn/room/index/list_v2 - reject-dict
+    - >-
+      ^https://gzacshow\.kugou\.com/mfx-rt-show/cdn/mo/show/headline - reject-dict
+    - >-
+      ^https://m1fxgroup\.kugou\.com/fxsing/yqc/alongInfo/getUserAlongInfo - reject-dict
+# —— 商城活动 / 专辑入口 ——
+    - >-
+      ^https://hwstore\.kugou\.com/v\d/get_store_data - reject-dict
+    - >-
+      ^https://ep\.kugou\.com/v\d/album_shop/get_entrance_info - reject-dict
+# ===============================
+    - >-
+      ^https:\/\/wallpaper-\d+\.file\.myqcloud\.com\/dsl\/ - reject-dict
+    - >-
+      ^https?:\/\/wallpaper-\d+\.file\.myqcloud\.com\/hikari\/ - reject-dict
+    - >-
+      ^https:\/\/amsweb-cdn-\S+-\d+\.file\.myqcloud\.com\/video\/ad_profile\/ - reject-dict
+    - >-
+      ^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ - reject-dict
+
+body-rewrite:
+  # ① 酷狗 Ocean tab 列表：全局删除 name 命中黑名单的条目（仅在数组中做过滤，避免误删对象字段）
+  - "^https://gateway(retry)?\\.kugou\\.com/ocean/v\\d/tab/list_v\\d response-jq '($blockers := [\"AI帮唱\",\"长相思2\",\"K歌\",\"小说\",\"游戏\"]) | walk( if type==\"array\" then map(select((.name? // \"\") as $n | ($blockers | index($n)) == null)) else . end )'"
+
+  # ② 酷我 听书首页：只去掉 type=stripAdvert 的子节点，保留其它结构
+  - "^http://wapi\\.kuwo\\.cn/openapi/v\\d/tingshu/index/radio response-jq 'walk( if (type==\"object\" and (.type? // \"\")==\"stripAdvert\") then del(.child) else . end )'"
+
+  script:
+# ===============================
+    - match: ^http:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/getcache
+      name: "echoResponse_124"
+      type: request
+      timeout: 60
+      argument: |-
+        text='%7B%22code%22%3A0%2C%22msg%22%3A%22ok%22%2C%22data%22%3A%7B%22ads%22%3A%5B%5D%7D%7D'&status-code=200
+
+script-providers:
+  "echoResponse_124":
+    url: https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/scripts/echo-response.js
+    interval: 86400
