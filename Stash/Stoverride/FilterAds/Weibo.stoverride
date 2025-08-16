@@ -1,0 +1,169 @@
+name: |-
+  微博去广告
+desc: |-
+  优化微博去广告，保留通知头像与深色皮肤更新功能，屏蔽开屏及信息流广告。
+author: |-
+  ByteValley
+icon: |-
+  https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/Weibo-00.png
+category: |-
+  广告屏蔽
+updated: |-
+  2025-08-02
+
+rules:
+# ——— 放行微博所有图标/皮肤 CDN 资源 ———
+  - DOMAIN-SUFFIX,sinaimg.cn,DIRECT
+  - DOMAIN-SUFFIX,weibocdn.com,DIRECT
+# ——— 推送服务器（通知头像加载依赖）———
+  - DOMAIN-SUFFIX,gw5.push.mcp.weibo.cn,DIRECT
+  - DOMAIN-SUFFIX,gw6.push.mcp.weibo.cn,DIRECT
+# ——— 微博开屏广告 ———
+  - DOMAIN,bootpreload.uve.weibo.com,REJECT
+  - DOMAIN,bootrealtime.uve.weibo.com,REJECT
+# ——— 常规广告域名拦截 ———
+  - DOMAIN-SUFFIX,fastimage.uve.weibo.com,REJECT
+  - DOMAIN-SUFFIX,adimg.vue.weibo.com,REJECT
+  - DOMAIN-SUFFIX,adimg.uve.weibo.com,REJECT
+  - DOMAIN-SUFFIX,sdkapp.uve.weibo.com,REJECT
+  - DOMAIN-SUFFIX,promote.biz.weibo.cn,REJECT
+  - DOMAIN-SUFFIX,click.uve.weibo.com,REJECT
+  - DOMAIN-SUFFIX,wbapp.uve.weibo.com,REJECT
+  - DOMAIN-SUFFIX,widget.weibo.com,REJECT
+  - DOMAIN-SUFFIX,dsp.edm.weibo.cn,REJECT
+  - DOMAIN-SUFFIX,tui.weibo.com,REJECT
+  - DOMAIN-SUFFIX,ad.weibo.com,REJECT
+  - DOMAIN-SUFFIX,zymo.mps.weibo.com,REJECT
+  - DOMAIN-SUFFIX,alitui.weibo.com,REJECT
+  - DOMAIN-SUFFIX,alitui.weibo.com.cn,REJECT
+  - DOMAIN-SUFFIX,biz.weibo.com.cn,REJECT
+  - DOMAIN-SUFFIX,weibomingzi.com,REJECT
+  - DOMAIN-SUFFIX,game.weibo.cn,REJECT
+  - DOMAIN-SUFFIX,game.weibo.com,REJECT
+
+http:
+
+  mitm:
+    - "*.weibo.cn"
+    - "*.weibo.com"
+    - "weibo.com"
+    - "skin.sinaimg.cn"
+    - "public.us.sinaimg.cn"
+    - "weibocdn.com"
+
+  url-rewrite:
+    - >-
+      ^https?:\/\/sdkapp\.uve\.weibo\.com\/interface\/sdk\/(get-lbs-cell-info\.php|sdkconfig\.php) - reject
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/logservice\/service\? - reject
+    - >-
+      ^https?:\/\/api\.weibo\.c(n|om)\/\d\/(cardlist\?v_f=\d|ad\/weibointl\?) - reject-dict
+    - >-
+      ^https?:\/\/weibointl\.api\.weibo\.c(n|om)\/portal\.php\?a=hot_search_users - reject-dict
+    - >-
+      ^https?:\/\/weibointl\.api\.weibo\.c(n|om)\/portal\.php\?a=treehole&auth= - reject-dict
+    - >-
+      ^https?:\/\/m?api\.weibo\.c(n|om)\/\d/push\/daily - reject-dict
+    - >-
+      ^https?:\/\/api\.weibo\.c(n|om)\/2\/!\/huati\/(discovery_home_bottom_getdotinfo|mobile_discovery_searchchange)\? - reject-dict
+    - >-
+      ^https:\/\/card\.weibo\.com\/article\/m\/aj\/(reward|uvead)\? - reject-dict
+    - >-
+      ^https:\/\/weibo\.com\/ttarticle\/x\/m\/aj\/(reward|uvead)\? - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/huati\/discovery_home_bottom_channels - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/chaohua\/discovery\/home_bottom\/switch - reject-dict
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/!\/was\/finder\/searchbarchange\? - reject-dict
+
+  body-rewrite:
+    - >-
+      ^https:\/\/api\.weibo\.cn\/2\/cardlist\? response-jq del(.items[] | select(.category == "group"))
+
+  script:
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/search\/(finder|container_timeline|container_discover)\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/(page|flowpage)\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/searchall\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/statuses\/container_timeline_topicpage\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/statuses\/container_timeline_topic\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/statuses\/(extend|container_detail)\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/(comments\/mix_comments|statuses\/(container_detail_comment|container_detail_mix))\?
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/statuses\/(container_detail_forward|repost_timeline)\?
+      name: "微博转发区广告_67"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)\/2\/groups\/allgroups\/v2
+      name: "微博移除发现页广告_60"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/m?api\.weibo\.c(n|om)/2/(cardlist|searchall|page|messageflow|statuses/(unread_)?friends(/|_)timeline|groups/timeline|statuses/(container_timeline(_hot)?|unread_hot_timeline|extend|video_mixtimeline)|profile/(me|container_timeline)|video/(community_tab|remind_info|tiny_stream_video_list)|checkin/show|\!/live/media_homelist|comments/build_comments|container/get_item)
+      name: "微博转发区广告_67"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/(sdk|wb)app\.uve\.weibo\.com/(interface/sdk/sdkad.php|wbapplua/wbpullad.lua)
+      name: "微博启动广告拦截_70"
+      type: response
+      require-body: true
+      timeout: 60
+
+    - match: ^https?:\/\/new\.vip\.weibo\.c(n|om)\/aj\/appicon\/list
+      name: "解锁会员图标_71"
+      type: response
+      require-body: true
+      timeout: 60
+
+script-providers:
+  "微博移除发现页广告_60":
+    url: https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/weibo/weibo_ads.js
+    interval: 86400
+  "微博转发区广告_67":
+    url: https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/weibo/weibo_main.js
+    interval: 86400
+  "微博启动广告拦截_70":
+    url: https://raw.githubusercontent.com/zmqcherish/proxy-script/main/weibo_launch.js
+    interval: 86400
+  "解锁会员图标_71":
+    url: https://github.com/fmz200/wool_scripts/raw/main/Scripts/weibo/weibo_vip.js
+    interval: 86400
