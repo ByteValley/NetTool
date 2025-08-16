@@ -171,9 +171,6 @@ http:
       ^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ - reject-dict
 
   body-rewrite:
-# —— 酷狗 Ocean Tab 列表：移除黑名单项 ——
-    - "^https://gateway(retry)?\\.kugou\\.com/ocean/v\\d/tab/list_v\\d response-jq '($blockers := [\"AI帮唱\",\"长相思2\",\"K歌\",\"小说\",\"游戏\"]) | walk( if type==\"array\" then map(select((.name? // \"\") as $n | ($blockers | index($n)) == null)) else . end )'"
-
 # —— 酷我 听书首页：去 stripAdvert 的子节点 ——
     - "^http://wapi\\.kuwo\\.cn/openapi/v\\d/tingshu/index/radio response-jq 'walk( if (type==\"object\" and (.type? // \"\")==\"stripAdvert\") then del(.child) else . end )'"
 
