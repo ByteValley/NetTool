@@ -170,10 +170,6 @@ http:
     - >-
       ^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ - reject-dict
 
-  body-rewrite:
-# —— 酷我 听书首页：去 stripAdvert 的子节点 ——
-    - "^http://wapi\\.kuwo\\.cn/openapi/v\\d/tingshu/index/radio response-jq 'walk( if (type==\"object\" and (.type? // \"\")==\"stripAdvert\") then del(.child) else . end )'"
-
   script:
 # ===============================
     - match: ^http:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/getcache
