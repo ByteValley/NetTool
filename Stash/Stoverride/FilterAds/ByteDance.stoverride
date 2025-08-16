@@ -1,0 +1,98 @@
+name: |-
+  字节系去广告
+desc: |-
+  整合拦截字节跳动系广告（蛋花小说/番茄小说/今日头条/抖音内嵌），重点移除阅读场景广告与埋点，兼容短剧播放。
+author: |-
+  ByteValley
+icon: |-
+  https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
+category: |-
+  功能治理
+
+rules:
+# 1) 分发/控制面：广告配置与下发
+  - DOMAIN,ad.zijieapi.com,REJECT
+  - AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
+  - AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT
+  - AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT
+# 2) 素材面：视频广告媒体与播放器组件
+  - DOMAIN,lf-reward-video.bytedcdn.com,REJECT
+  - AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT
+# 3) 广告监控/曝光与计费（不影响正文，但会触发贴片）
+  - AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,mon)),REJECT
+  - DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT
+  - DOMAIN-SUFFIX,toutiaocloud.com,REJECT
+# ——————————————————————————————
+  - DOMAIN-SUFFIX,log.toutiao.com,REJECT
+  - DOMAIN-SUFFIX,log.snssdk.com,REJECT
+  - DOMAIN-SUFFIX,mon.toutiao.com,REJECT
+  - DOMAIN-SUFFIX,data.bytedance.com,REJECT
+  - DOMAIN-SUFFIX,va.toutiao.com,REJECT
+  - DOMAIN-KEYWORD,log.snssdk.com,REJECT
+  - DOMAIN-SUFFIX,ibytedapm.com,REJECT
+# ——————————————————————————————
+  - DOMAIN,ad.toutiao.com,REJECT
+  - DOMAIN-SUFFIX,ads.toutiao.com,REJECT
+  - DOMAIN-SUFFIX,adbyte.bytedance.com,REJECT
+  - DOMAIN-SUFFIX,pangolin.snssdk.com,REJECT
+  - DOMAIN-KEYWORD,ads,REJECT
+  - DOMAIN-KEYWORD,promotion,REJECT
+  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT
+  - AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon)),REJECT
+# ——————————————————————————————
+  - DOMAIN-SUFFIX,partner.toutiao.com,REJECT
+  - DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT
+# ——————————————————————————————
+  - AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,frontier100)),REJECT
+#AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT       # 抖音视频拉流广告
+  - AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+  - DOMAIN,v26-reading-video.fqnovelvod.com,REJECT
+  - DOMAIN,rtlog5-applog-lf.fqnovel.com,REJECT
+  - DOMAIN,lf3-reading.fqnovelstatic.com,REJECT
+#DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT                                # 视频激励组件资源
+  - DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT
+#AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT    # 视频激励资源
+  - DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
+  - DOMAIN-SUFFIX,toutiaocloud.com,REJECT
+# ——————————————————————————————
+  - DOMAIN-SUFFIX,bdurl.net,REJECT
+  - DOMAIN-SUFFIX,zjurl.cn,REJECT
+#IP-CIDR,122.225.215.219/32,REJECT,no-resolve       # ads3-normal-lf.zijieapi.com
+  - IP-CIDR,122.225.215.224/32,REJECT,no-resolve
+  - IP-CIDR,116.253.60.185/32,REJECT,no-resolve
+# —— fqnovel 广告埋点与调度节点 ——
+  - IP-CIDR,122.225.215.222/32,REJECT,no-resolve
+#IP-CIDR,59.42.240.86/32,REJECT,no-resolve          # mon11-misc-lf.fqnovel.com
+  - IP-CIDR,59.42.240.90/32,REJECT,no-resolve
+  - IP-CIDR,115.231.182.14/32,REJECT,no-resolve
+# —— byteimg 图像广告源 ——
+  - IP-CIDR,60.188.118.235/32,REJECT,no-resolve
+  - IP-CIDR,36.27.222.242/32,REJECT,no-resolve
+  - IP-CIDR,36.27.222.246/32,REJECT,no-resolve
+# —— bytedcdn 激励视频广告源 ——
+  - IP-CIDR,36.150.28.82/32,REJECT,no-resolve
+  - IP-CIDR,220.185.170.57/32,REJECT,no-resolve
+  - IP-CIDR,36.27.222.253/32,REJECT,no-resolve
+# —— douyin 激励播放接口 ——
+  - IP-CIDR,117.86.183.25/32,REJECT,no-resolve
+# —— zjurl 跳转短链追踪节点 ——
+  - IP-CIDR,101.36.166.16/32,REJECT,no-resolve
+
+http:
+
+  mitm:
+    - "*.toutiao.com"
+
+  url-rewrite:
+    - >-
+      ^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/open_ad\b - reject
+# ——————————————————————————————
+    - >-
+      ^https?:\/\/[^\/]+\.snssdk\.com\/api\/launch\/open_ad\b - reject
+    - >-
+      ^https?:\/\/[^\/]+\.snssdk\.com\/api\/startup\/ad\b - reject
+# ——————————————————————————————
+    - >-
+      ^https?:\/\/[^\/]+\.toutiao\.com\/api\/news\/recommend\/v\d\/\?* - reject
+    - >-
+      ^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.* - reject
