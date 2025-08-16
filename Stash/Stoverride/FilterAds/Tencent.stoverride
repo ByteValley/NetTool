@@ -171,10 +171,10 @@ http:
       ^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ - reject-dict
 
   body-rewrite:
-# ① 酷狗 Ocean tab 列表：全局删除 name 命中黑名单的条目（仅在数组中做过滤，避免误删对象字段）
+# 酷狗 Ocean tab 列表：全局删除 name 命中黑名单的条目（仅在数组中做过滤，避免误删对象字段）
     - "^https://gateway(retry)?\\.kugou\\.com/ocean/v\\d/tab/list_v\\d response-jq '($blockers := [\"AI帮唱\",\"长相思2\",\"K歌\",\"小说\",\"游戏\"]) | walk( if type==\"array\" then map(select((.name? // \"\") as $n | ($blockers | index($n)) == null)) else . end )'"
 
-# ② 酷我 听书首页：只去掉 type=stripAdvert 的子节点，保留其它结构
+# 酷我 听书首页：只去掉 type=stripAdvert 的子节点，保留其它结构
     - "^http://wapi\\.kuwo\\.cn/openapi/v\\d/tingshu/index/radio response-jq 'walk( if (type==\"object\" and (.type? // \"\")==\"stripAdvert\") then del(.child) else . end )'"
 
   script:
