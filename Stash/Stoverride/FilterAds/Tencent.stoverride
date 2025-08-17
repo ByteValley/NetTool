@@ -170,6 +170,19 @@ http:
     - >-
       ^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ - reject-dict
 
+  body-rewrite:
+# ===============================
+# 酷狗音乐 | 首页模块精简
+# ===============================
+# —— 移除「AI帮唱」「小说」「游戏」等标签 ——
+    - "^https://gateway(retry)?\\.kugou\\.com/ocean/v\\d/tab/list_v\\d response-jq 'def namesToRemove:[\"AI帮唱\",\"长相思2\",\"K歌\",\"小说\",\"游戏\"]; def removeParentIfNameMatches: if type==\"object\" then with_entries(select(.value|(type==\"object\" and .name as $name | (namesToRemove | index($name)) == null))) | map_values(removeParentIfNameMatches) else . end; removeParentIfNameMatches'"
+
+# ===============================
+# 酷我音乐 | 听书页广告精简
+# ===============================
+# —— 移除 stripAdvert 组件（保留内容结构） ——
+    - "^http://wapi\\.kuwo\\.cn/openapi/v\\d/tingshu/index/radio response-jq 'walk(if type==\"object\" and .type==\"stripAdvert\" then del(.child) else . end)'"
+
   script:
 # ===============================
     - match: ^http:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/getcache
