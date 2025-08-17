@@ -184,6 +184,22 @@ http:
     - "^http://wapi\\.kuwo\\.cn/openapi/v\\d/tingshu/index/radio response-jq 'walk(if type==\"object\" and .type==\"stripAdvert\" then del(.child) else . end)'"
 
   script:
+    # —— 酷狗音乐 | 首页模块精简：移除黑名单标签 ——
+    - match: ^https://gateway(retry)?\.kugou\.com/ocean/v\d/tab/list_v\d
+      name: "json_mutate"
+      type: response
+      require-body: true
+      timeout: 60
+      argument: mode=tab_filter&blockers=AI帮唱,长相思2,K歌,小说,游戏
+
+    # —— 酷我音乐 | 听书页广告精简：去掉 stripAdvert 的 child ——
+    - match: ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/tingshu\/index\/radio
+      name: "json_mutate"
+      type: response
+      require-body: true
+      timeout: 60
+      argument: mode=stripadvert_prune
+
 # ===============================
     - match: ^http:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/getcache
       name: "echoResponse_124"
@@ -193,6 +209,10 @@ http:
         text='%7B%22code%22%3A0%2C%22msg%22%3A%22ok%22%2C%22data%22%3A%7B%22ads%22%3A%5B%5D%7D%7D'&status-code=200
 
 script-providers:
+  "json_mutate":
+    url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Stash/Scripts/TencentMusicJsonMutate.js
+    interval: 86400
+
   "echoResponse_124":
     url: https://raw.githubusercontent.com/Script-Hub-Org/Script-Hub/main/scripts/echo-response.js
     interval: 86400
