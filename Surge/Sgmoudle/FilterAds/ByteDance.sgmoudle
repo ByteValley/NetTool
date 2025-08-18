@@ -1,8 +1,8 @@
-#!name=字节系去广告
+#!name=字节系净化
 #!author=ByteValley
 #!desc=整合拦截字节跳动系广告（蛋花小说/番茄小说/今日头条/抖音内嵌），重点移除阅读场景广告与埋点，兼容短剧播放。
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
-#!category=广告屏蔽
+#!category=功能净化
 
 [MITM]
 hostname = %APPEND% *.toutiao.com                                           # 今日头条主域（接口改写/证书解密）
@@ -87,7 +87,9 @@ AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,frontier100)),REJECT   # 今
 # ——————————————————————————————
 #AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT       # 抖音视频拉流广告
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT       # 小说图像广告标记
-
+DOMAIN,v26-reading-video.fqnovelvod.com,REJECT-TINYGIF    # 章节短剧卡片广告
+DOMAIN,rtlog5-applog-lf.fqnovel.com,REJECT-TINYGIF    # 听书时长？
+DOMAIN,lf3-reading.fqnovelstatic.com,REJECT-TINYGIF    # 听书时长？
 # ——————————————————————————————
 # 番茄小说 | 激励广告接口与组件资源
 # ——————————————————————————————
@@ -133,5 +135,5 @@ IP-CIDR,36.27.222.253/32,REJECT,no-resolve         # reward-video.bytedcdn.com
 IP-CIDR,117.86.183.25/32,REJECT,no-resolve         # webcast5-open-lf.douyin.com
 
 # —— zjurl 跳转短链追踪节点 ——
-IP-CIDR,101.36.166.16/32,REJECT,no-resolve         # dig.zjurl.cn（激励视频）
-# 需要看视频领番茄时可放开
+#IP-CIDR,101.36.166.16/32,REJECT,no-resolve         # dig.zjurl.cn（激励视频）
+# 需要看视频领番茄时放行
