@@ -3,6 +3,7 @@
 #!desc=整合拦截字节跳动系广告（蛋花小说/番茄小说/今日头条/抖音内嵌），重点移除阅读场景广告与埋点，兼容短剧播放。
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
+#!arguments=incentiveVideo:REJECT
 
 [MITM]
 hostname = %APPEND% *.toutiao.com                                           # 今日头条主域（接口改写/证书解密）
@@ -135,5 +136,5 @@ IP-CIDR,36.27.222.253/32,REJECT,no-resolve         # reward-video.bytedcdn.com
 IP-CIDR,117.86.183.25/32,REJECT,no-resolve         # webcast5-open-lf.douyin.com
 
 # —— zjurl 跳转短链追踪节点 ——
-#IP-CIDR,101.36.166.16/32,REJECT,no-resolve         # dig.zjurl.cn（激励视频）
-# 需要看视频领番茄时放行
+IP-CIDR,101.36.166.16/32,{{{incentiveVideo}}},no-resolve         # dig.zjurl.cn（激励视频）
+# 需要看视频领番茄时可放开
