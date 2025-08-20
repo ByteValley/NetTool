@@ -1,183 +1,201 @@
-#!name=腾讯系去广告
-#!desc=拦截腾讯系旗下应用广告（QQ音乐/酷我音乐/酷狗音乐/全民K歌等）
+#!name=腾讯系净化
+#!desc=拦截腾讯系旗下应用广告（QQ音乐 / 酷我音乐 / 酷狗音乐 / 全民K歌等）
 #!author=ByteValley
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Tencent.png
-#!category=广告屏蔽
-#!updated=2025-08-14 16:20
+#!category=功能净化
+#!updated=2025-08-16 08:00
 
 [Rule]
+
 # ===============================
-# QQ音乐 | 广告域与埋点
+# 通用 | 腾讯音乐广告域与埋点（TME）
 # ===============================
-DOMAIN,adstats.tencentmusic.com,REJECT                   # QQ音乐广告统计
-DOMAIN,ad.tencentmusic.com,REJECT                        # QQ音乐广告接口
-DOMAIN,adcdn.tencentmusic.com,REJECT                     # QQ音乐广告资源
-DOMAIN,adcdn6.tencentmusic.com,REJECT                    # QQ音乐广告资源
-DOMAIN,adexpo.tencentmusic.com,REJECT                    # QQ音乐广告曝光
-DOMAIN,adclick.tencentmusic.com,REJECT                   # QQ音乐广告点击
-DOMAIN,monitor.music.qq.com,REJECT                       # QQ音乐监测接口
-DOMAIN,stat.y.qq.com,REJECT                              # QQ音乐数据统计
-#DOMAIN,tmead.y.qq.com,REJECT                            # QQ音乐广告接口（可选）
-DOMAIN,tmeadquic.y.qq.com,REJECT                         # QQ音乐广告接口QUIC
-DOMAIN,tmeadbak.y.qq.com,REJECT                          # QQ音乐广告接口备用
-DOMAIN,oth.str.mdt.qq.com,REJECT                         # QQ音乐广告资源分发
-DOMAIN-SUFFIX,imtmp.net,REJECT                           # QQ音乐临时广告域
+DOMAIN,ad.tencentmusic.com,REJECT                         # 腾讯音乐广告主域
+DOMAIN,adstats.tencentmusic.com,REJECT                    # 腾讯音乐广告统计
+DOMAIN,tmead.y.qq.com,REJECT                              # TME 广告接口
+DOMAIN,tmeadcomm.y.qq.com,REJECT                          # TME 通用广告接口
+#DOMAIN-SUFFIX,report.tencentmusic.com,REJECT             # TME 数据上报（可选）
+#DOMAIN-SUFFIX,receiver.tdm.qq.com,REJECT                 # 终端日志接收（可选）
+#DOMAIN-SUFFIX,h.trace.qq.com,REJECT                      # 腾讯 Trace 埋点（可选）
+DOMAIN-SUFFIX,e.qq.com,REJECT                             # 腾讯广告联盟
+DOMAIN-SUFFIX,rdelivery.qq.com,REJECT                     # 广告投放服务
+DOMAIN-SUFFIX,tangram.e.qq.com,REJECT                     # 广告投放引擎
+DOMAIN-SUFFIX,fp-it.portal101.cn,REJECT                   # 广告数据分发
+DOMAIN-SUFFIX,tmeadcommquic.y.qq.com,REJECT               # TME QUIC 广告接口
+
+# ===============================
+# QQ音乐 | 专用广告拦截
+# ===============================
+DOMAIN,adcdn.tencentmusic.com,REJECT                      # 广告素材 CDN
+DOMAIN,adcdn6.tencentmusic.com,REJECT                     # 广告素材 CDN
+DOMAIN,adexpo.tencentmusic.com,REJECT                     # 广告曝光上报
+DOMAIN,adclick.tencentmusic.com,REJECT                    # 广告点击上报
+DOMAIN,monitor.music.qq.com,REJECT                        # 播放行为监控
+DOMAIN,stat.y.qq.com,REJECT                               # 统计上报
+#DOMAIN,tmeadbak.y.qq.com,REJECT                          # 广告备用接口（可选）
+DOMAIN,oth.str.mdt.qq.com,REJECT                          # 资源广告域
+DOMAIN-SUFFIX,imtmp.net,REJECT                            # 广告资源缓存
+
+# ===============================
+# QQ音乐 | 阻断 DHT 定位接口（直接拒绝）
+# ===============================
+URL-REGEX,^http:\/\/p\.tencentmusic\.com\/dht\/api\/v3\/locate,REJECT
 
 # ===============================
 # 酷我音乐 | 广告域与埋点
 # ===============================
-# —— 开屏广告（配置与资源加载） ——
-URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/startup\/config,REJECT-TINYGIF         # 酷我开屏配置
-AND,((DOMAIN-SUFFIX,sycdn.kuwo.cn),(DOMAIN-KEYWORD,trackmedia)),REJECT                       # 酷我开屏资源
+# —— 开屏广告 ——
+URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/startup\/config,REJECT-TINYGIF
+AND,((DOMAIN-SUFFIX,sycdn.kuwo.cn),(DOMAIN-KEYWORD,trackmedia)),REJECT
 
-# —— 弹窗广告（粘贴广告/会员营销） ——
-URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/pasterAdvert\/,REJECT-TINYGIF          # 粘贴广告接口
-URL-REGEX,^http:\/\/rich\.kuwo\.cn\/AdService\/,REJECT-TINYGIF                               # 会员营销弹窗
-AND,((DOMAIN-SUFFIX,mobilead.kuwo.cn),(DOMAIN-KEYWORD,EcomResourceServer)),REJECT            # 电商推广弹窗
+# —— 开屏缓存放行（必须在 AdService 拦截之前） ——
+URL-REGEX,^http:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/getcache,DIRECT
 
-# —— 信息流广告 / 首页菜单广告 ——
-URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/album\/adBar\/,REJECT-TINYGIF               # 专辑广告条
-URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/newMenuList\/menuListInfo,REJECT-TINYGIF # 首页菜单广告
-URL-REGEX,^http:\/\/searchrecterm\.kuwo\.cn\/recterm\.s,REJECT-TINYGIF                        # 搜索推荐广告
+# —— 弹窗 / 营销 ——
+URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/pasterAdvert\/,REJECT-TINYGIF
+#URL-REGEX,^http:\/\/rich\.kuwo\.cn\/AdService\/,REJECT-TINYGIF            # 广义拦截（可选）
 
-# —— 广告图资源（精确匹配） ——
-AND,((DOMAIN-SUFFIX,kuwo.cn),(AND,((DOMAIN-KEYWORD,img),(DOMAIN-KEYWORD,star)))),REJECT       # 明星广告图
-AND,((DOMAIN-SUFFIX,kuwo.cn),(AND,((DOMAIN-KEYWORD,kwimg),(DOMAIN-KEYWORD,star/upload)))),REJECT # 明星上传广告图
+# —— Kaiping 开屏（除 getcache 外全部拦截） ——
+URL-REGEX,^https?:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/(?!getcache).+,REJECT-TINYGIF
 
-# —— 广告点击打点路径 ——
-AND,((DOMAIN,g.kuwo.cn),(DOMAIN-KEYWORD,aid=text_ad_)),REJECT                                 # 广告点击打点
+# —— 常见广告位（开屏 / 启动 / 弹窗 / 横幅） ——
+URL-REGEX,^https?:\/\/rich\.kuwo\.cn\/AdService\/(splash|startup|popup|banner)\/,REJECT-TINYGIF
 
-# —— 日志追踪 / 行为上报 ——
-#DOMAIN-SUFFIX,log.kuwo.cn,REJECT                                                             # 酷我日志追踪（可选）
-#DOMAIN-SUFFIX,logwebs.kugou.com,REJECT                                                       # 酷狗日志追踪（可选）
-DOMAIN-SUFFIX,report.tencentmusic.com,REJECT                                                  # 腾讯音乐数据上报
-DOMAIN-SUFFIX,receiver.tdm.qq.com,REJECT                                                      # 行为上报
-#DOMAIN-SUFFIX,hc.tdm.qq.com,REJECT                                                            # 行为上报（可选）
-DOMAIN-SUFFIX,h.trace.qq.com,REJECT                                                           # 行为追踪
-DOMAIN-SUFFIX,e.qq.com,REJECT                                                                 # 腾讯广告联盟
-DOMAIN-SUFFIX,rdelivery.qq.com,REJECT                                                         # 广告投放接口
-#DOMAIN-SUFFIX,cloud.tgpa.qq.com,REJECT                                                        # 云广告服务（可选）
-DOMAIN-SUFFIX,accesstpush.tencentmusic.com,REJECT                                             # 推送广告
-DOMAIN-SUFFIX,tangram.e.qq.com,REJECT                                                         # 广告模块Tangram
-#DOMAIN-SUFFIX,ship.tencentmusic.com,REJECT                                                    # 业务接口（保守禁用）
-DOMAIN-SUFFIX,fp-it.portal101.cn,REJECT                                                       # 指纹采集接口
-DOMAIN-SUFFIX,ipv6.kg.qq.com,REJECT                                                           # IPv6广告接口
-DOMAIN-SUFFIX,tmeadcommquic.y.qq.com,REJECT                                                   # QQ音乐广告QUIC
+# —— 信息流 / 菜单广告 ——
+URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/album\/adBar\/,REJECT-TINYGIF
+URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/newMenuList\/menuListInfo,REJECT-TINYGIF
+URL-REGEX,^http:\/\/searchrecterm\.kuwo\.cn\/recterm\.s,REJECT-TINYGIF
 
-# —— DNS绕过 / 广告图 CDN IP ——
-DOMAIN-SUFFIX,httpdns.kg.qq.com,REJECT                                                        # DNS广告接口
-#IP-CIDR,60.188.67.206/32,REJECT,no-resolve                                                   # 广告图IP（可选）
-#IP-CIDR,49.7.249.167/32,REJECT,no-resolve                                                    # 广告图IP（可选）
-#IP-CIDR,101.226.142.110/32,REJECT,no-resolve                                                 # 广告图IP（可选）
-#IP-CIDR,101.227.134.190/32,REJECT,no-resolve                                                 # 广告图IP（可选）
-IP-CIDR,111.206.98.63/32,REJECT,no-resolve                                                    # 广告图IP
+# —— 广告点击打点 ——
+AND,((DOMAIN,g.kuwo.cn),(DOMAIN-KEYWORD,aid=text_ad_)),REJECT
 
-# —— 功能保留（赚钱页/活动弹窗） ——
-# URL-REGEX,^http:\/\/vip\d\.kuwo\.cn\/vip\/v\d\/sysinfo\?op=getRePayAndDoPayBox,REJECT       # 会员弹窗（可屏蔽）
-# URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/user\/freeMode\/,REJECT                   # 免费模式（可屏蔽）
+# —— 功能保留（会员弹窗 / 免费模式等，默认不拦） ——
+#URL-REGEX,^http:\/\/vip\d\.kuwo\.cn\/vip\/v\d\/sysinfo\?op=getRePayAndDoPayBox,REJECT
+#URL-REGEX,^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/user\/freeMode\/,REJECT
+
+# —— 会员活动广告数据（惊喜任务，可选） ——
+#URL-REGEX,^https?:\/\/vip\d\.kuwo\.cn\/vip_adv\/datamode\/datasetbycode,REJECT-TINYGIF
+
+# —— 埋点日志（可选） ——
+#URL-REGEX,^http:\/\/log\.kuwo\.cn\/music\.yl,REJECT
 
 # ===============================
 # 酷狗音乐 | 广告域与埋点
 # ===============================
-# —— 开屏广告图（酷我共用） ——
-AND,((DOMAIN-SUFFIX,kugou.com),(DOMAIN-KEYWORD,splashimgbssdl)),REJECT                        # 开屏广告图
-AND,((DOMAIN-SUFFIX,kugou.com),(DOMAIN-KEYWORD,splashimgretrybssdl)),REJECT                   # 开屏广告图重试
+# —— 开屏广告图 ——
+AND,((DOMAIN-SUFFIX,kugou.com),(DOMAIN-KEYWORD,splashimgbssdl)),REJECT
+AND,((DOMAIN-SUFFIX,kugou.com),(DOMAIN-KEYWORD,splashimgretrybssdl)),REJECT
 
-# —— 广告域拦截 ——
-DOMAIN,ads.service.kugou.com,REJECT                                                           # 广告服务
-DOMAIN,adstats.tencentmusic.com,REJECT                                                        # 腾讯音乐广告统计
-DOMAIN,adsmind.gdtimg.com,REJECT                                                              # 广点通广告
-DOMAIN,adserviceretry.kugou.com,REJECT                                                        # 广告服务重试
-DOMAIN,adserviceretry.kglink.cn,REJECT                                                        # 广告服务重试
-DOMAIN,ad.tencentmusic.com,REJECT                                                             # 腾讯音乐广告
-DOMAIN,adservice.kugou.com,REJECT                                                             # 广告服务
-DOMAIN,splashimgretrybssdl.cloud.kugou.com,REJECT                                             # 开屏广告资源
-DOMAIN,splashimgbssdl.yun.kugou.com,REJECT                                                    # 开屏广告资源
+# —— 广告接口 ——
+DOMAIN,ads.service.kugou.com,REJECT
+DOMAIN,adserviceretry.kugou.com,REJECT
+DOMAIN,adserviceretry.kglink.cn,REJECT
+DOMAIN,adservice.kugou.com,REJECT
+DOMAIN,splashimgretrybssdl.cloud.kugou.com,REJECT
+DOMAIN,splashimgbssdl.yun.kugou.com,REJECT
 
-# —— 日志广告上报接口 ——
-URL-REGEX,^http://log\.stat\.kugou\.com/mobile/ad\.html,REJECT                                 # 广告上报接口
+# —— 日志广告上报 ——
+URL-REGEX,^http://log\.stat\.kugou\.com/mobile/ad\.html,REJECT
 
 # ===============================
 # 全民K歌 | 广告域与埋点
 # ===============================
-DOMAIN,adsmind.gdtimg.com,REJECT                                                              # 广点通广告
-DOMAIN,adsmind.ugdtimg.com,REJECT                                                             # 广点通广告
-DOMAIN,c2.gdt.qq.com,REJECT                                                                   # 广点通广告
-DOMAIN,huatuocode.huatuo.qq.com,REJECT                                                        # 华佗广告接口
-DOMAIN,info4.video.qq.com,REJECT                                                              # 视频广告信息
-DOMAIN,info6.video.qq.com,REJECT                                                              # 视频广告信息
-DOMAIN,ios.bugly.qq.com,REJECT                                                                # Bugly相关
-DOMAIN,ios.video.mpush.qq.com,REJECT                                                          # 视频推送广告
-DOMAIN,mi.gdt.qq.com,REJECT                                                                   # 广点通广告
-DOMAIN,otheve.beacon.qq.com,REJECT                                                            # 行为上报
-DOMAIN,pgdt.gtimg.cn,REJECT                                                                   # 广点通广告
-DOMAIN,pgdt.ugdtimg.com,REJECT                                                                # 广点通广告
-DOMAIN,qzs.gdtimg.com,REJECT                                                                  # 广点通广告
-DOMAIN,qzs.qq.com,REJECT                                                                      # 广点通广告
-DOMAIN,rmonitor.qq.com,REJECT                                                                 # 监控上报
-DOMAIN,sdk.e.qq.com,REJECT                                                                    # 广告SDK
-DOMAIN,sdkconfig.video.qq.com,REJECT                                                          # 视频广告配置
-DOMAIN,t.gdt.qq.com,REJECT                                                                    # 广点通广告
-DOMAIN,tmead.y.qq.com,REJECT                                                                  # QQ音乐广告
-DOMAIN,tmeadbak.y.qq.com,REJECT                                                               # QQ音乐广告备用
-DOMAIN,tmeadcomm.y.qq.com,REJECT                                                              # QQ音乐广告通用
-DOMAIN,tpns.qq.com,REJECT                                                                     # 推送服务广告
-DOMAIN,v.gdt.qq.com,REJECT                                                                    # 广点通广告
-DOMAIN,v2.gdt.qq.com,REJECT                                                                   # 广点通广告
-DOMAIN,win.gdt.qq.com,REJECT                                                                  # 广点通广告
-DOMAIN,wup.imtt.qq.com,REJECT                                                                 # 上报接口
-DOMAIN,tpstelemetry.tencent.com,REJECT                                                        # 遥测上报
-DOMAIN-KEYWORD,trace.qq.com,REJECT                                                            # 行为追踪
-DOMAIN-KEYWORD,trace.video.qq.com,REJECT                                                      # 视频追踪
-DOMAIN-SUFFIX,gdt.qq.com,REJECT                                                               # 广点通域
-DOMAIN-SUFFIX,l.qq.com,REJECT                                                                 # 广告域
-DOMAIN-SUFFIX,ugdtimg.com,REJECT                                                              # 广点通广告图
-IP-CIDR,47.110.187.87/32,REJECT,no-resolve                                                    # 广告IP
-URL-REGEX,"^http:\/\/y\.gtimg\.cn\/music\/common\/upload\/t_k_main_page_banner\/",REJECT      # 主页面横幅
-
-[Body Rewrite]
-# ===============================
-# 酷狗音乐 | 首页模块精简
-# ===============================
-# —— 移除「AI帮唱」「小说」「游戏」等标签 ——
-http-response-jq ^https://gateway(retry)?\.kugou\.com/ocean/v\d/tab/list_v\d 'def namesToRemove:["AI帮唱","长相思2","K歌","小说","游戏"]; def removeParentIfNameMatches: if type=="object" then with_entries(select(.value|(type=="object" and .name as $name | $name | IN(namesToRemove[]) | not))) | map_values(removeParentIfNameMatches) else . end; removeParentIfNameMatches'  # 首页标签精简
+DOMAIN,adsmind.gdtimg.com,REJECT
+DOMAIN,adsmind.ugdtimg.com,REJECT
+DOMAIN,c2.gdt.qq.com,REJECT
+DOMAIN,huatuocode.huatuo.qq.com,REJECT
+DOMAIN,info4.video.qq.com,REJECT
+DOMAIN,info6.video.qq.com,REJECT
+DOMAIN,ios.bugly.qq.com,REJECT
+DOMAIN,ios.video.mpush.qq.com,REJECT
+DOMAIN,mi.gdt.qq.com,REJECT
+DOMAIN,otheve.beacon.qq.com,REJECT
+DOMAIN,pgdt.gtimg.cn,REJECT
+DOMAIN,pgdt.ugdtimg.com,REJECT
+DOMAIN,qzs.gdtimg.com,REJECT
+DOMAIN,qzs.qq.com,REJECT
+DOMAIN,rmonitor.qq.com,REJECT
+DOMAIN,sdk.e.qq.com,REJECT
+DOMAIN,sdkconfig.video.qq.com,REJECT
+DOMAIN,t.gdt.qq.com,REJECT
+DOMAIN,tpns.qq.com,REJECT
+DOMAIN,v.gdt.qq.com,REJECT
+DOMAIN,v2.gdt.qq.com,REJECT
+DOMAIN,win.gdt.qq.com,REJECT
+DOMAIN,wup.imtt.qq.com,REJECT
+DOMAIN,tpstelemetry.tencent.com,REJECT
+DOMAIN-KEYWORD,trace.qq.com,REJECT
+DOMAIN-KEYWORD,trace.video.qq.com,REJECT
+DOMAIN-SUFFIX,gdt.qq.com,REJECT
+DOMAIN-SUFFIX,l.qq.com,REJECT
+DOMAIN-SUFFIX,ugdtimg.com,REJECT
+IP-CIDR,47.110.187.87/32,REJECT,no-resolve
+URL-REGEX,"^http:\/\/y\.gtimg\.cn\/music\/common\/upload\/t_k_main_page_banner\/",REJECT
 
 # ===============================
-# 酷我音乐 | 听书页广告精简
+# 通用 | DNS 绕过与广告图 IP
 # ===============================
-# —— 移除 stripAdvert 组件（保留内容结构） ——
-http-response-jq ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/tingshu\/index\/radio 'walk(if type == "object" and .type == "stripAdvert" then del(.child) else . end)'  # 听书页去广告
+DOMAIN-SUFFIX,httpdns.kg.qq.com,REJECT
+IP-CIDR,111.206.98.63/32,REJECT,no-resolve
+
 
 [Map Local]
+
 # ===============================
-# 酷狗音乐 | 主要广告数据伪装为空
+# 酷我音乐 | 开屏缓存 → 返回空广告（JSON 伪装）
 # ===============================
-^https://fx\.service\.kugou\.com/mfx-kugoulive/ad/ data-type=text data="{}" status-code=200                                   # 直播广告
-^https://gateway(retry)?\.kugou\.com/adp/(ad|bubble/v\d/song_play) data-type=text data="{}" status-code=200                 # 播放页弹泡
-^https://gateway(retry)?\.kugou\.com/ads\.gateway/ data-type=text data="{}" status-code=200                                  # 广告聚合
-^https://gateway(retry)?\.kugou\.com/v\d/feeds/follow_feed_fallback data-type=text data="{}" status-code=200                # 关注兜底
-^https://gateway(retry)?\.kugou\.com/mstc/musicsymbol/v\d/system/profile data-type=text data="{}" status-code=200           # 图标特效
-^https://gateway(retry)?\.kugou\.com/searchnofocus/v\d/search_no_focus_word data-type=text data="{}" status-code=200        # 搜索热词
-^https://gateway(retry)?\.kugou\.com/singerdiscuss/v\d/entrance/comment data-type=text data="{}" status-code=200            # 歌手讨论
-^https://gateway(retry)?\.kugou\.com/r/v\d/general/putin/midad data-type=text data="{}" status-code=200                     # 中插广告
-^https://gateway(retry)?\.kugou\.com/ocean/v\d/sound/banner data-type=text data="{}" status-code=200                        # 横幅入口
+^http:\/\/rich\.kuwo\.cn\/AdService\/kaiping\/getcache data-type=text data='{"code":0,"msg":"ok","data":{"ads":[]}}' status-code=200 header="Content-Type:application/json"
+
+# ===============================
+# 酷我音乐 | 会员活动广告数据集（清空套餐促销，避免误伤其它）
+# ===============================
+#^https?:\/\/vip\d\.kuwo\.cn\/vip_adv\/datamode\/datasetbycode\?.*codes=.*charge_gear_list data-type=text data='{"code":0,"msg":"ok","data":{}}' status-code=200 header="Content-Type:application/json"
+
+# ===============================
+# 酷狗音乐 | 主要广告数据 → 伪装为空
+# ===============================
+^https://fx\.service\.kugou\.com/mfx-kugoulive/ad/ data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/adp/(ad|bubble/v\d/song_play) data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/ads\.gateway/ data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/v\d/feeds/follow_feed_fallback data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/mstc/musicsymbol/v\d/system/profile data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/searchnofocus/v\d/search_no_focus_word data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/singerdiscuss/v\d/entrance/comment data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/r/v\d/general/putin/midad data-type=text data="{}" status-code=200
+^https://gateway(retry)?\.kugou\.com/ocean/v\d/sound/banner data-type=text data="{}" status-code=200
 
 # —— 酷狗直播 / 活动页广告 ——
-^https://gzacshow\.kugou\.com/mfanxing-home/cdn/room/index/list_v2 data-type=text data="{}" status-code=200                 # 直播房间
-^https://gzacshow\.kugou\.com/mfx-rt-show/cdn/mo/show/headline data-type=text data="{}" status-code=200                     # 直播头条
-^https://m1fxgroup\.kugou\.com/fxsing/yqc/alongInfo/getUserAlongInfo data-type=text data="{}" status-code=200               # 活动信息
+^https://gzacshow\.kugou\.com/mfanxing-home/cdn/room/index/list_v2 data-type=text data="{}" status-code=200
+^https://gzacshow\.kugou\.com/mfx-rt-show/cdn/mo/show/headline data-type=text data="{}" status-code=200
+^https://m1fxgroup\.kugou\.com/fxsing/yqc/alongInfo/getUserAlongInfo data-type=text data="{}" status-code=200
 
 # —— 商城活动 / 专辑入口 ——
-^https://hwstore\.kugou\.com/v\d/get_store_data data-type=text data="{}" status-code=200                                     # 商城入口
-^https://ep\.kugou\.com/v\d/album_shop/get_entrance_info data-type=text data="{}" status-code=200                           # 专辑入口
+^https://hwstore\.kugou\.com/v\d/get_store_data data-type=text data="{}" status-code=200
+^https://ep\.kugou\.com/v\d/album_shop/get_entrance_info data-type=text data="{}" status-code=200
 
 # ===============================
-# 全民K歌 | 广告数据伪装为空
+# 全民K歌 | 广告数据 → 伪装为空
 # ===============================
-^https:\/\/wallpaper-\d+\.file\.myqcloud\.com\/dsl\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"      # DSL壁纸
-^https?:\/\/wallpaper-\d+\.file\.myqcloud\.com\/hikari\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"  # Hikari壁纸
-^https:\/\/amsweb-cdn-\S+-\d+\.file\.myqcloud\.com\/video\/ad_profile\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"  # 视频广告配置
-^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ data-type=text data="{}" status-code=200 header="Content-Type:application/json"  # 活动入口
+^https:\/\/wallpaper-\d+\.file\.myqcloud\.com\/dsl\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https?:\/\/wallpaper-\d+\.file\.myqcloud\.com\/hikari\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/amsweb-cdn-\S+-\d+\.file\.myqcloud\.com\/video\/ad_profile\/ data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/wnsaviator\.kg\.qq\.com\/wnsaviator\/api\/v1\/transMerge\?_webcgikey=get_activity_entry$ data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+
+[Body Rewrite]
+
+# ===============================
+# 酷狗音乐 | 首页模块精简（移除不必要 Tab）
+# ===============================
+http-response-jq ^https://gateway(retry)?\.kugou\.com/ocean/v\d/tab/list_v\d 'def namesToRemove:["AI帮唱","长相思2","K歌","小说","游戏"]; def removeParentIfNameMatches: if type=="object" then with_entries(select(.value|(type=="object" and .name as $name | $name | IN(namesToRemove[]) | not))) | map_values(removeParentIfNameMatches) else . end; removeParentIfNameMatches'
+
+# ===============================
+# 酷我音乐 | 听书页广告精简（去 stripAdvert）
+# ===============================
+http-response-jq ^http:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/tingshu\/index\/radio 'walk(if type == "object" and .type == "stripAdvert" then del(.child) else . end)'
+
 
 [MITM]
-hostname = %APPEND% gateway.kugou.com, gatewayretry.kugou.com, fx.service.kugou.com, hwstore.kugou.com, ep.kugou.com, gzacshow.kugou.com, m1fxgroup.kugou.com, appi.kuwo.cn, vip*.kuwo.cn, mc.tencentmusic.com, tingshu.kuwo.cn, wallpaper-1258344696.file.myqcloud.com, amsweb-cdn-*-1258344696.file.myqcloud.com, wnsaviator.kg.qq.com
+# ===============================
+# 中间人解密域名
+# ===============================
+hostname = %APPEND% gateway.kugou.com, gatewayretry.kugou.com, fx.service.kugou.com, hwstore.kugou.com, ep.kugou.com, gzacshow.kugou.com, m1fxgroup.kugou.com, appi.kuwo.cn, vip*.kuwo.cn, wapi.kuwo.cn, rich.kuwo.cn, mc.tencentmusic.com, tingshu.kuwo.cn, wallpaper-1258344696.file.myqcloud.com, amsweb-cdn-*-1258344696.file.myqcloud.com, wnsaviator.kg.qq.com
