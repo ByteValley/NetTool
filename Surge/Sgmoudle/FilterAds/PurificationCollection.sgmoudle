@@ -3,6 +3,7 @@
 #!author=奶思[https://github.com/fmz200]
 #!icon=https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/AdblockPlus.png
 #!category=功能净化
+#!arguments= 12306-脚本开关:true,51信用卡管家-脚本开关:true,前程无忧-脚本开关:true,阿里巴巴-脚本开关:true,阿里云盘-脚本开关:true,Blued-脚本开关:true,百度地图-脚本开关:true,百度贴吧-脚本开关:true,菜鸟裹裹-脚本开关:true,大众点评-脚本开关:true,滴滴出行-脚本开关:true,叮咚买菜-脚本开关:true,粉笔-脚本开关:true,航旅纵横-脚本开关:true,盒马-脚本开关:true,建行生活-脚本开关:true,京喜-脚本开关:true,夸克-脚本开关:true,酷我音乐-脚本开关:true,广告联盟-脚本开关:true,买单吧-脚本开关:true,脉脉-脚本开关:true,美柚-脚本开关:true,前程无忧-脚本开关:true,Reddit-脚本开关:true,Spotify-移除底栏创建按钮:true,Spotify-启用Apple设备接力:true,淘宝-脚本开关:true,解除微信链接限制-脚本开关:true,网易云音乐-脚本开关:true,网易云音乐-隐藏底部漫游标签:true,网易云音乐-隐藏底部笔记标签:true,网易云音乐-隐藏底部发现标签:true,网易云音乐-隐藏首页问候语:true,网易云音乐-隐藏首页排行榜:true,网易云音乐-隐藏首页每日推荐:false,网易云音乐-隐藏首页推荐歌单:true,网易云音乐-隐藏首页最近常听:true,网易云音乐-隐藏首页雷达歌单:true,网易云音乐-隐藏首页音乐合伙人:true,网易云音乐-隐藏首页推荐专属歌单:true,网易云音乐-隐藏首页你的专属歌单:true,小米商城-脚本开关:true,小红书-脚本开关:true,YouTube-脚本开关:true,知乎-脚本开关:true,掌上公交-脚本开关:true,转转-脚本开关:true,中国国际航空-脚本开关:true
 
 [Rule]
 # > Line
