@@ -3,7 +3,7 @@
 #!desc=整合拦截字节跳动系广告（蛋花小说/番茄小说/今日头条/抖音内嵌），重点移除阅读场景广告与埋点，兼容短剧播放。
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
-#!arguments=incentiveVideo:REJECT
+#!arguments=激励视频:REJECT-DROP
 
 [MITM]
 hostname = %APPEND% *.toutiao.com                                           # 今日头条主域（接口改写/证书解密）
@@ -16,21 +16,18 @@ hostname = %APPEND% *.toutiao.com                                           # �
 
 # 1) 分发/控制面：广告配置与下发
 DOMAIN,ad.zijieapi.com,REJECT                                               # 广告分发主域
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),REJECT        # normal-lf 线路：广告/活动下发
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),{{{激励视频}}}        # normal-lf 线路：广告/活动下发
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT             # vas-lf：Video Ad Server 广告控制
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT            # open_ad：开屏/前贴片控制接口
-URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/open_ad\b,REJECT  # 兜底开屏/前贴片
 
 # 2) 素材面：视频广告媒体与播放器组件
-DOMAIN,lf-reward-video.bytedcdn.com,REJECT                                   # bytedcdn 激励视频媒体
+#DOMAIN,lf-reward-video.bytedcdn.com,REJECT                                   # bytedcdn 激励视频媒体
 AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT      # 其他 reward-video 变体
 # 若确认广告拉流走 douyincdn，并且不影响正片，可开启下行（先保持关闭）：
 # AND,((DOMAIN-SUFFIX,douyincdn.com),(OR,((DOMAIN-KEYWORD,ad-),(DOMAIN-KEYWORD,ads-)))),REJECT  # 广告前缀段落（需确认再启用）
 
 # 3) 广告监控/曝光与计费（不影响正文，但会触发贴片）
 AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,mon)),REJECT                 # mon：曝光/监控上报
-DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT                                        # 实时广告日志
-DOMAIN-SUFFIX,toutiaocloud.com,REJECT                                        # 云端埋点/分析
 
 # 4) 风险项优化：撤销过粗拦截，避免破图/正片断流
 # 建议删除整域：DOMAIN-SUFFIX,365yg.com,REJECT                              # 365yg 是正文/封面常用域，整域误伤重
@@ -39,19 +36,22 @@ DOMAIN-SUFFIX,toutiaocloud.com,REJECT                                        # �
 # ——————————————————————————————
 # 番茄小说 | 启动配置与开屏广告
 # ——————————————————————————————
-URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/launch\/open_ad\b,REJECT    # 启动页开屏广告（旧版接口）
-URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/startup\/ad\b,REJECT        # 启动页开屏广告（新版接口）
+URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT  # 兜底开屏/前贴片
+#URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/launch\/open_ad\b,REJECT    # 启动页开屏广告（旧版接口）
+#URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/startup\/ad\b,REJECT        # 启动页开屏广告（新版接口）
 
 # ——————————————————————————————
 # 通用 | 埋点行为与数据分析拦截
 # ——————————————————————————————
-DOMAIN-SUFFIX,log.toutiao.com,REJECT                                        # 埋点上报
-DOMAIN-SUFFIX,log.snssdk.com,REJECT                                         # 行为统计
-DOMAIN-SUFFIX,mon.toutiao.com,REJECT                                        # 监控接口
-DOMAIN-SUFFIX,data.bytedance.com,REJECT                                     # 数据分析平台
-DOMAIN-SUFFIX,va.toutiao.com,REJECT                                         # 用户行为追踪
-DOMAIN-KEYWORD,log.snssdk.com,REJECT                                        # 通用埋点上报
-DOMAIN-SUFFIX,ibytedapm.com,REJECT                                          # 性能分析 SDK
+DOMAIN-SUFFIX,log.toutiao.com,REJECT-DROP                                   # 埋点上报
+DOMAIN-SUFFIX,log.snssdk.com,REJECT-DROP                                    # 行为统计
+DOMAIN-SUFFIX,mon.toutiao.com,REJECT-DROP                                   # 监控接口
+DOMAIN-SUFFIX,data.bytedance.com,REJECT-DROP                                # 数据分析平台
+DOMAIN-KEYWORD,log.snssdk.com,REJECT-DROP                                   # 通用埋点上报
+DOMAIN-SUFFIX,ibytedapm.com,REJECT-DROP                                     # 性能分析 SDK
+DOMAIN-SUFFIX,toutiaocloud.com,REJECT-DROP                                  # 云端埋点/分析
+DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT-DROP                                  # 实时广告日志收集
+DOMAIN-SUFFIX,va.toutiao.com,REJECT-DROP                                    # 用户行为追踪
 
 # ——————————————————————————————
 # 今日头条 | 广告平台与业务接口
@@ -86,11 +86,12 @@ AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,frontier100)),REJECT   # 今
 # ——————————————————————————————
 # 番茄小说 / 抖音 | 视频广告与图像资源
 # ——————————————————————————————
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,lf3-reading)),REJECT-DROP   # 章节短剧/图文广告图
 #AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT       # 抖音视频拉流广告
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT       # 小说图像广告标记
-DOMAIN,v26-reading-video.fqnovelvod.com,REJECT-TINYGIF    # 章节短剧卡片广告
-DOMAIN,rtlog5-applog-lf.fqnovel.com,REJECT-TINYGIF    # 听书时长？
-DOMAIN,lf3-reading.fqnovelstatic.com,REJECT-TINYGIF    # 听书时长？
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT
+#DOMAIN,v26-reading-video.fqnovelvod.com,REJECT-TINYGIF    # 章节短剧卡片广告
+
 # ——————————————————————————————
 # 番茄小说 | 激励广告接口与组件资源
 # ——————————————————————————————
@@ -99,6 +100,7 @@ DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT                               # 小
 #AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT    # 视频激励资源
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT                                  # 巨量引擎 SDK 关键字
 DOMAIN-SUFFIX,toutiaocloud.com,REJECT                                       # 字节全域埋点平台
+DOMAIN,vc-brain.ndcpp.com,REJECT
 
 # ——————————————————————————————
 # 通用 | 跳转短链追踪域名
@@ -112,14 +114,15 @@ DOMAIN-SUFFIX,zjurl.cn,REJECT                                              # 广
 
 # —— zijieapi 广告源 ——
 #IP-CIDR,122.225.215.219/32,REJECT,no-resolve       # ads3-normal-lf.zijieapi.com
-IP-CIDR,122.225.215.224/32,REJECT,no-resolve       # ads3-normal-lf.zijieapi.com
+IP-CIDR6,2408:8740:c2ff:5:8000:0:b00:35/128,REJECT-DROP,no-resolve  # ads5-normal-lf.zijieapi.com（番茄小说章节广告）
+IP-CIDR,122.225.215.224/32,REJECT-DROP,no-resolve       # ads3-normal-lf.zijieapi.com
 IP-CIDR,116.253.60.185/32,REJECT,no-resolve        # tnc0-alisc1.zijieapi.com
 
 # —— fqnovel 广告埋点与调度节点 ——
-IP-CIDR,122.225.215.222/32,REJECT,no-resolve       # mon3-misc-lf.fqnovel.com
+IP-CIDR,122.225.215.222/32,REJECT-DROP,no-resolve       # mon3-misc-lf.fqnovel.com
 #IP-CIDR,59.42.240.86/32,REJECT,no-resolve          # mon11-misc-lf.fqnovel.com
-IP-CIDR,59.42.240.90/32,REJECT,no-resolve          # mon11-misc-lf.fqnovel.com
-IP-CIDR,115.231.182.14/32,REJECT,no-resolve        # mon11-misc-lf.fqnovel.com 监控/广告卡下发
+IP-CIDR,59.42.240.90/32,REJECT-DROP,no-resolve          # mon11-misc-lf.fqnovel.com
+IP-CIDR,115.231.182.14/32,REJECT-DROP,no-resolve        # mon11-misc-lf.fqnovel.com 监控/广告卡下发
 #IP-CIDR,49.7.47.98/32,REJECT,no-resolve            # frontier100-toutiao-lf.fqnovel.com
 
 # —— byteimg 图像广告源 ——
@@ -136,5 +139,5 @@ IP-CIDR,36.27.222.253/32,REJECT,no-resolve         # reward-video.bytedcdn.com
 IP-CIDR,117.86.183.25/32,REJECT,no-resolve         # webcast5-open-lf.douyin.com
 
 # —— zjurl 跳转短链追踪节点 ——
-IP-CIDR,101.36.166.16/32,{{{incentiveVideo}}},no-resolve         # dig.zjurl.cn（激励视频）
+IP-CIDR,101.36.166.16/32,{{{激励视频}}},no-resolve         # dig.zjurl.cn（激励视频）
 # 需要看视频领番茄时可放开
