@@ -1,0 +1,235 @@
+name: 字节系净化
+description: 整合拦截字节跳动系广告（蛋花小说/番茄小说/今日头条/抖音内嵌），重点移除阅读场景广告与埋点，兼容短剧播放。
+compat_arguments:
+  激励视频: REJECT-DROP
+author: ByteValley
+icon: https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
+rules:
+- domain:
+    match: ad.zijieapi.com
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: zijieapi.com
+    - domain_keyword:
+        match: normal-lf
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: snssdk.com
+    - domain_keyword:
+        match: vas-lf
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: snssdk.com
+    - domain_keyword:
+        match: open_ad
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: bytedcdn.com
+    - domain_keyword:
+        match: reward-video
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: snssdk.com
+    - domain_keyword:
+        match: mon
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b
+    policy: REJECT
+- domain_suffix:
+    match: log.toutiao.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: log.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: mon.toutiao.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: data.bytedance.com
+    policy: REJECT-DROP
+- domain_keyword:
+    match: log.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: ibytedapm.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: toutiaocloud.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: rtlog.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: va.toutiao.com
+    policy: REJECT-DROP
+- domain:
+    match: ad.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: ads.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: adbyte.bytedance.com
+    policy: REJECT
+- domain_suffix:
+    match: pangolin.snssdk.com
+    policy: REJECT
+- domain_keyword:
+    match: ads
+    policy: REJECT
+- domain_keyword:
+    match: promotion
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.toutiao\.com\/api\/news\/recommend\/v\d\/\?*
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: misc-lf
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: mon
+    policy: REJECT
+- domain_suffix:
+    match: partner.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: rtlog.snssdk.com
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: toutiaoapi.com
+    - domain_keyword:
+        match: frontier100
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: frontier100
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovelpic.com
+    - domain_keyword:
+        match: lf3-reading
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovelpic.com
+    - domain_keyword:
+        match: ad-sign
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovelvod.com
+    - domain_keyword:
+        match: reading-video
+    policy: REJECT-DROP
+- domain_suffix:
+    match: sinfonlinec.fqnovel.com
+    policy: REJECT
+- domain_keyword:
+    match: pangolin-sdk-toutiao
+    policy: REJECT
+- domain_suffix:
+    match: toutiaocloud.com
+    policy: REJECT
+- domain:
+    match: vc-brain.ndcpp.com
+    policy: REJECT
+- domain_suffix:
+    match: bdurl.net
+    policy: REJECT
+- domain_suffix:
+    match: zjurl.cn
+    policy: REJECT
+- domain:
+    match: tr.byteurl.cn
+    policy: REJECT
+- ip_cidr6:
+    match: 2408:8740:c2ff:5:8000:0:b00:35/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 122.225.215.224/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 116.253.60.185/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 122.225.215.222/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 59.42.240.90/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 115.231.182.14/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 60.188.118.235/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 36.27.222.242/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 36.27.222.246/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 36.150.28.82/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 220.185.170.57/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 36.27.222.253/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 117.86.183.25/32
+    policy: REJECT
+    no_resolve: true
+- ip_cidr:
+    match: 101.36.166.16/32
+    policy: REJECT-DROP
+    no_resolve: true
+mitm:
+  hostnames:
+    includes:
+    - '*.toutiao.com'
