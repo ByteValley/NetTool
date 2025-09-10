@@ -12,55 +12,59 @@
  *
  */
 
-// 仅处理请求阶段
-if (typeof $response !== 'undefined') {
-  $done({});
-  return;
-}
+/**
+ * 用途：为匹配到的请求设置 Authorization 头，token 通过外部参数传入
+ * 只处理请求阶段；未提供 token 时不做任何修改
+ *
+ * 传参方式（任选其一）：
+ * 1) argument=token=Bearer%20xxxx
+ * 2) argument=token=xxxx                // 自动补上 "Bearer "
+ *
+ * 也兼容 $argument 为对象：{ "token": "xxxx" } 或 { "token": "Bearer xxxx" }
+ */
 
-// 默认值，如果未从参数中获取到
-let token = '';
+(function () {
+  // 仅处理请求阶段
+  if (typeof $response !== 'undefined') { $done({}); return; }
 
-try {
-  // 兼容 $argument 是字符串或对象的情况
-  if (typeof $argument === 'string') {
-    // 解析如 "token=baoyuvip" 的字符串
-    const params = new URLSearchParams($argument.replace(/;/g, '&'));
-    token = params.get('token');
-  } else if ($argument && typeof $argument === 'object') {
-    token = $argument.token || '';
-  }
-} catch (e) {
-  console.log('[byhz] 解析 argument 失败:', e.message);
-}
-
-// 如果没有获取到 token，则使用一个默认值（可以根据需要修改）
-if (!token) {
-  token = 'baoyuvip';
-  console.log('[byhz] 未从参数获取到token，使用默认值');
-}
-
-// 准备修改请求头
-const headers = $request.headers;
-const outHeaders = {};
-
-// 复制所有现有请求头，并确保 Authorization 头是唯一的
-for (let key in headers) {
-  if (Object.prototype.hasOwnProperty.call(headers, key)) {
-    // 如果存在，移除旧的 Authorization 头
-    if (key.toLowerCase() === 'authorization') {
-      continue;
+  // 读取并解析参数
+  var TOKEN = '';
+  try {
+    if (typeof $argument === 'string') {
+      // 例：token=Bearer%20xxxx&foo=bar 或 token=xxxx;foo=bar
+      var dec = decodeURIComponent($argument);
+      dec.split(/[&;,]/).forEach(function (pair) {
+        var kv = pair.split('=');
+        if (kv.length >= 2 && kv[0].trim() === 'token') {
+          TOKEN = kv.slice(1).join('=').trim();
+        }
+      });
+    } else if ($argument && typeof $argument === 'object') {
+      TOKEN = ($argument.token || '').trim();
     }
-    outHeaders[key] = headers[key];
+  } catch (e) {}
+
+  var headers = ($request && $request.headers) ? $request.headers : {};
+
+  if (!TOKEN) {
+    // 没传 token 就原样放行
+    $done({ headers });
+    return;
   }
-}
 
-// 设置新的 Authorization 请求头，格式为 Bearer + token
-outHeaders['Authorization'] = `${token}`;
+  // 如果未带前缀就自动补上
+  if (!/^Bearer\s+/i.test(TOKEN)) {
+    TOKEN = 'Bearer ' + TOKEN;
+  }
 
-console.log(`[byhz] 成功替换Authorization: Bearer ${token}`);
+  // 找到已存在的 Authorization（大小写不敏感），没有就用标准写法
+  var authKey = 'Authorization';
+  for (var k in headers) {
+    if (Object.prototype.hasOwnProperty.call(headers, k)) {
+      if (String(k).toLowerCase() === 'authorization') { authKey = k; break; }
+    }
+  }
 
-// 完成并返回修改后的请求
-$done({
-  headers: outHeaders
-});
+  headers[authKey] = TOKEN;
+  $done({ headers });
+})();
