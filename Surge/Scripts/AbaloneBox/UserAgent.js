@@ -10,9 +10,8 @@
  * # 鲍鱼盒子增强
  * 鲍鱼盒子增强 = type=http-request, pattern=^https?:\/\/.+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/你的用户名/你的仓库/path/to/DecryptedScript.js, argument=token=baoyuvip
  *
- */
-
-/**
+ *
+ *
  * 用途：为匹配到的请求设置 Authorization 头，token 通过外部参数传入
  * 只处理请求阶段；未提供 token 时不做任何修改
  *
