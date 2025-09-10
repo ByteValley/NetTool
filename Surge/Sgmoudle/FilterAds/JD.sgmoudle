@@ -1,50 +1,169 @@
-#!name=京东去广告
-#!desc=彻底屏蔽京东 App 启动广告、摇一摇广告及埋点，保留购物核心功能。
+#!name=京东系净化
+#!desc=移除京东/京东金融开屏广告与首页推广，保留核心业务。
 #!author=ByteValley
-#!category=广告屏蔽
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/JD.png
-
-[General]
-# —— 直连核心接口，避免代理干扰购物功能 ——
-skip-proxy = %APPEND% api.m.jd.com
-skip-proxy = %APPEND% wq.jd.com
-skip-proxy = %APPEND% wqs.jd.com
+#!category=功能净化
+#!openUrl=https://apps.apple.com/app/id414245413
+#!date=2025-09-10
 
 [Rule]
-# —— 1. 广告/埋点 域名拦截 ——
-DOMAIN,blackhole.m.jd.com,REJECT           # 埋点收集
-DOMAIN,rjsb-token-m.jd.com,REJECT          # SDK Token 下发
-DOMAIN,mars.jd.com,REJECT                  # 日志收集
-DOMAIN,perf.m.jd.com,REJECT                # 性能上报
-DOMAIN,ex.m.jd.com,REJECT                  # 异常监控
-DOMAIN,jpushjd.m.jd.com,REJECT             # 推送埋点
+# ===============================
+# DNS/HTTPDNS（禁用以免走自管解析）
+# ===============================
+DOMAIN-SUFFIX,httpdns.jd.com,REJECT
+DOMAIN-SUFFIX,dns.jd.com,REJECT
+DOMAIN-SUFFIX,doh.jd.com,REJECT
+DOMAIN-SUFFIX,hdns.jd.com,REJECT
+URL-REGEX,"^http:\/\/\w{32}\.jddebug\.com\/diagnose\?",REJECT,extended-matching
 
-# —— 2. 开屏广告图（精准匹配路径含 splash / welcome 等关键词） ——
-AND,((DOMAIN-SUFFIX,360buyimg.com),(URL-REGEX,\/(splash|startup|welcome|launch|open)[^\/]*\.(png|jpg|webp|dpg\.webp)(\?.*)?$)),REJECT
-URL-REGEX,^https:\/\/.*\.360buyimg\.com\/imagetools\/.*\.(png|jpg|webp)$,REJECT
+# ===============================
+# 投放/上报/策略（主因通道）
+# ===============================
+# —— 投放拉取 ——
+DOMAIN,im-x.jd.com,REJECT
+URL-REGEX,^https?:\/\/(im|im-x|dsp|dsp-x)\.jd\.com\/dsp\/,REJECT
 
-# —— 3. 广告关键字拦截（含启动/摇一摇等） ——
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,splash)),REJECT           # 启动广告
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,launch)),REJECT           # 启动相关
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,startAd)),REJECT          # 启动广告标识
-AND,((DOMAIN-SUFFIX,jd.com),(DOMAIN-KEYWORD,shake)),REJECT            # 摇一摇活动
+# —— 短链投放入口 ——
+URL-REGEX,^https?:\/\/sh\.jd\.com\/d(\?|$),REJECT
 
-# —— 4. 域名形式调试埋点拦截 ——
-URL-REGEX,^http:\/\/\w{32}\.jddebug\.com\/diagnose\?,REJECT           # 调试信息收集
+# —— 行为/策略/监控与日志（经常伴随启动阶段） ——
+DOMAIN,blackhole.m.jd.com,REJECT
+DOMAIN,perf.m.jd.com,REJECT
+DOMAIN,mars.jd.com,REJECT
+DOMAIN,ex.m.jd.com,REJECT
+DOMAIN,policy.jd.com,REJECT
+DOMAIN,anti-sdk-report.m.jd.com,REJECT
+DOMAIN,anti-sdk-ccs-pre.m.jd.com,REJECT
+DOMAIN,mllog.jd.com,REJECT
+
+# ===============================
+# 预热/内置策略文件（疑似用于冷启动拉起素材/策略）
+# ===============================
+URL-REGEX,^https?:\/\/heracles\.jd\.com\/download\/policy_eids\/,REJECT
+URL-REGEX,^https?:\/\/storage\.jd\.com\/file-no\.2\/CDNWarmUp\.json,REJECT
+URL-REGEX,^https?:\/\/sdkfp\.jd\.com\/stg\.json,REJECT
+URL-REGEX,^https?:\/\/ccfjma\.m\.jd\.com\/config,REJECT
+
+# ===============================
+# 素材兜底（图片/视频关键字 + 常见目录）
+# ===============================
+# —— 关键词命中（最安全）：支持 webp/avif 与双后缀（如 !q70.jpg.webp）
+URL-REGEX,^https?:\/\/(?:m\d*|img\d+)\.360buyimg\.com\/.*(?:splash|start(?:up)?|welcome|launch|ad)[^\/]*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+URL-REGEX,^https?:\/\/(?:storage|jdcache|jdstatic|jdcdn)\.jd\.com\/.*(?:splash|start(?:up)?|welcome|launch|ad)[^\/]*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+
+# —— 常见目录（保守命中，避免过度扩大）：同样兼容 webp/avif/双后缀
+URL-REGEX,^https?:\/\/(?:storage|jdcache|jdstatic|jdcdn)\.jd\.com\/(?:splash|start|startup|welcome|launch|resource|res)\/.*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+
+# —— 开屏皮肤与常用素材目录（结合 HAR 实际路径）：支持 webp/avif/双后缀 + s{wxh}_jfs 变体 ——
+URL-REGEX,^https?:\/\/storage\.360buyimg\.com\/mobileskin\/.*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+URL-REGEX,^https?:\/\/(?:m\d*|img\d+)\.360buyimg\.com\/mobilecms\/(?:s\d+x\d+_)?jfs\/.*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+# （可选）更宽松的 mobilecms 目录兜底，可能增加误杀率，请按需开启
+# URL-REGEX,^https?:\/\/(?:m\d*|img\d+)\.360buyimg\.com\/mobilecms\/.*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+URL-REGEX,^https?:\/\/img\d+\.360buyimg\.com\/jdg\/jfs\/.*\.(?:jpg|jpeg|png|gif|mp4|webp|avif)(?:![^?]*)?(?:\.(?:webp|avif))?(?:\?|$),REJECT-TINYGIF
+
+# ===============================
+# 主 App 业务接口兜底（谨慎：默认开启轻度模式）
+# ===============================
+URL-REGEX,^https?:\/\/(blackhole|perf)\.m\.jd\.com\/,REJECT-TINYGIF
+URL-REGEX,^https?:\/\/mars\.jd\.com\/log\/sdk\/v\d,REJECT-TINYGIF
+
+# 可选：硬拦开屏接口（出现漏网再开启）
+# URL-REGEX,^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=(?i)(start|splash|welcome|launch)[A-Za-z_0-9]*,REJECT
+
+# ===============================
+# 京东金融 App（投放/推荐）
+# ===============================
+URL-REGEX,^https?:\/\/(ms|mapi)\.jr\.jd\.com\/gw\/generic\/ad\/,REJECT
+# 可选：若仍见金融开屏再上硬拦（默认注释，避免误杀首页）
+# URL-REGEX,^https:\/\/ms\.jr\.jd\.com\/gw\/generic\/base\/client\?functionId=(?i)(welcomeAd|start|splash|welcome|launch),REJECT
 
 [Body Rewrite]
-# —— 5. 阻止 JD SDK 提前建立连接、上传 DNS 等功能 ——
+# ===============================
+# 主 App 通用响应净化（不限 functionId；先定点后递归去“可疑键名”）
+# ===============================
+http-response-jq ^https:\/\/api\.m\.jd\.com\/(client\.action|client|api|gw|router) '
+  def wipe(v): ([],{},"",null)[0];
+  def zap(p): if getpath(p)!=null then setpath(p; wipe(0)) else . end;
+  def strip:
+    if type=="object" then
+      with_entries(
+        select( (.key|tostring|test("(?i)(splash|launch|start|startup|welcome|openScreen|fullScreen|ad|ads|advertise|promotion|marketing|popup|banner|layerAds)")) | not )
+        | .value = (.value|strip)
+      )
+    elif type=="array" then map(strip) else . end;
+  .
+  | zap(["data","splash"]) | zap(["data","splashAd"]) | zap(["data","splashConfig"])
+  | zap(["data","ads"]) | zap(["data","adList"]) | zap(["data","advertise"]) | zap(["data","advertiseList"])
+  | zap(["data","popup"]) | zap(["data","popupInfo"]) | zap(["data","popupList"]) | zap(["data","layerAds"])
+  | zap(["data","promotion"]) | zap(["data","marketing"]) | zap(["data","marketingWindow"])
+  | zap(["data","banner"]) | zap(["data","bannerList"])
+  | zap(["data","startPage"]) | zap(["data","startImg"]) | zap(["data","startImage"]) | zap(["data","startVideo"]) | zap(["data","startup"]) | zap(["data","startupImage"]) | zap(["data","launch"]) | zap(["data","launchScreen"]) | zap(["data","launchImg"])
+  | zap(["result","splash"]) | zap(["result","splashAd"]) | zap(["result","splashConfig"])
+  | zap(["result","ads"]) | zap(["result","adList"]) | zap(["result","advertise"]) | zap(["result","bannerList"])
+  | strip
+'
+
+# ===============================
+# 主 App basicConfig 关键开关“总阀门”
+# ===============================
+http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig '
+  def off(p): if getpath(p)!=null then setpath(p; (0,false|.)[0]) else . end;
+  .
+  | off(["data","JDMessage","socketmonitor","isSocketEstablishedAhead"])
+  | off(["data","JDMessage","socketmonitor","isSocketReport"])
+  | off(["data","JDHttpToolKit","httpdns","httpdns"])
+  | off(["data","LaunchOption","LaunchMainSwitch","LaunchMainSwitchIsOn"])
+  | off(["data","JDReact","appLaunchSwitch","switch"])
+  | off(["data","JDMyJd","firstLaunchClose","isClose"])
+  | off(["data","jdma","launchOptimizationEnable","enable"])
+  | off(["data","JDLBS","locMode","launchLoc"])
+'
+
+# ===============================
+# 金融 App 响应净化（welcomeAd/通用）
+# ===============================
+http-response-jq ^https:\/\/ms\.jr\.jd\.com\/(gw|client|api) '
+  def wipe(v): ([],{},"",null)[0];
+  def zap(p): if getpath(p)!=null then setpath(p; wipe(0)) else . end;
+  def strip:
+    if type=="object" then
+      with_entries(
+        select( (.key|tostring|test("(?i)(splash|launch|start|startup|welcome|openScreen|fullScreen|ad|ads|advertise|promotion|marketing|popup|banner|recommend)")) | not )
+        | .value = (.value|strip)
+      )
+    elif type=="array" then map(strip) else . end;
+  .
+  | zap(["data","splash"]) | zap(["data","splashAd"]) | zap(["data","splashConfig"])
+  | zap(["data","ads"]) | zap(["data","adList"]) | zap(["data","advertise"]) | zap(["data","advertiseList"])
+  | zap(["data","popup"]) | zap(["data","popupInfo"]) | zap(["data","popupList"])
+  | zap(["data","marketing"]) | zap(["data","promotion"]) | zap(["data","recommendList"])
+  | zap(["data","banner"]) | zap(["data","bannerList"])
+  | zap(["data","startPage"]) | zap(["data","startImg"]) | zap(["data","startImage"]) | zap(["data","startVideo"]) | zap(["data","launch"]) | zap(["data","launchScreen"])
+  | strip
+'
+
 http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig 'if (getpath(["data","JDMessage","socketmonitor"]) | has("isSocketEstablishedAhead")) then (setpath(["data","JDMessage","socketmonitor","isSocketEstablishedAhead"]; 0)) else . end'
 http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig 'if (getpath(["data","JDMessage","socketmonitor"]) | has("isSocketReport")) then (setpath(["data","JDMessage","socketmonitor","isSocketReport"]; 0)) else . end'
 http-response-jq ^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=basicConfig 'if (getpath(["data","JDHttpToolKit","httpdns"]) | has("httpdns")) then (setpath(["data","JDHttpToolKit","httpdns","httpdns"]; 0)) else . end'
 
 [Map Local]
-# —— 6. 清空推荐/弹层等干扰数据 ——
-^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=(searchBoxWord|stationPullService|uniformRecommend[06]) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+# ===============================
+# 直返空对象（脚本/Rewrite 被绕过时兜底）
+# ===============================
+^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=(searchBoxWord|stationPullService|uniformRecommend[06]) data-type=text data="{}" status-code=200
+#^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=.* data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/ms\.jr\.jd\.com\/gw\/generic\/base\/client\?functionId=welcomeAd data-type=text data="{}" status-code=200 header="Content-Type:application/json"
+^https:\/\/ms\.jr\.jd\.com\/gw\/generic\/base\/client\?functionId=.* data-type=text data="{}" status-code=200 header="Content-Type:application/json"
 
 [Script]
-# —— 7. 移除首页弹层广告、推荐、欢迎页等内容 ——
-移除京东广告 = type=http-response, pattern=^https:\/\/api\.m\.jd\.com\/client\.action\?functionId=(deliverLayer|getTabHomeInfo|myOrderInfo|orderTrackBusiness|personinfoBusiness|start|welcomeHome), script-path=https://kelee.one/Resource/JavaScript/JD/JD_remove_ads.js, requires-body=true
+# ===============================
+# 响应层净化脚本（与 Rewrite 双保险）
+# ===============================
+移除京东广告 = type=http-response, pattern=^https:\/\/api\.m\.jd\.com\/(client\.action|client|api|gw|router), script-path=https://kelee.one/Resource/JavaScript/JD/JD_remove_ads.js, requires-body=true
+移除京东金融广告 = type=http-response, pattern=^https:\/\/ms\.jr\.jd\.com\/(gw|client|api), script-path=https://kelee.one/Resource/JavaScript/JD/JD_remove_ads.js, requires-body=true
 
 [MITM]
-hostname = %APPEND% api.m.jd.com,*.360buyimg.com
+# ===============================
+# 证书解密（仅需改写的域名）
+# ===============================
+hostname = %APPEND% api.m.jd.com,ms.jr.jd.com,mapi.jr.jd.com
