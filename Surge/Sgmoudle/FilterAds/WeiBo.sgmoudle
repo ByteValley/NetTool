@@ -1,9 +1,9 @@
-#!name=微博去广告
+#!name=微博净化
 #!desc=优化微博去广告，保留头像显示、深色皮肤与图标资源加载，彻底修复误杀。
 #!author=ByteValley
 #!icon=https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/Weibo-00.png
-#!category=广告屏蔽
-#!updated=2025-08-02
+#!category=功能净化
+#!updated=2025-09-10
 
 [Rule]
 # ——— 放行客户端行为/皮肤状态同步接口（防止误杀）———
@@ -55,6 +55,9 @@ DOMAIN-SUFFIX,game.weibo.com,REJECT
 [Body Rewrite]
 http-response-jq ^https:\/\/api\.weibo\.cn\/2\/cardlist\? 'del(.items[] | select(.category == "group"))'
 
+# 信息流主接口广告（statuses/unread_friends_timeline）
+http-response-jq ^https:\/\/api\.weibo\.cn\/2\/statuses\/unread_friends_timeline\? 'del(.statuses[] | select(.promotion != null))'
+
 [Map Local]
 ^https?:\/\/api\.weibo\.c(n|om)\/\d\/(cardlist\?v_f=\d|ad\/weibointl\?) data-type=text data="{}" status-code=200 header="Content-Type:application/json"
 ^https?:\/\/weibointl\.api\.weibo\.c(n|om)\/portal\.php\?a=hot_search_users data-type=text data="{}" status-code=200 header="Content-Type:application/json"
@@ -68,6 +71,8 @@ http-response-jq ^https:\/\/api\.weibo\.cn\/2\/cardlist\? 'del(.items[] | select
 ^https:\/\/api\.weibo\.cn\/2\/!\/was\/finder\/searchbarchange\? data-type=text data="{}" status-code=200 header="Content-Type:application/json"
 
 [Script]
+# 信息流主接口广告（statuses/unread_friends_timeline）
+微博信息流广告 = type=http-response, pattern=^https?:\/\/m?api\.weibo\.c(n|om)\/2\/statuses\/(unread_friends_timeline|friends_timeline)\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/weibo/weibo_ads.js, requires-body=true, timeout=60
 微博移除发现页广告 = type=http-response, pattern=^https?:\/\/m?api\.weibo\.c(n|om)\/2\/search\/(finder|container_timeline|container_discover)\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/weibo/weibo_ads.js, requires-body=true, timeout=60
 微博热搜页面广告 = type=http-response, pattern=^https?:\/\/m?api\.weibo\.c(n|om)\/2\/(page|flowpage)\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/weibo/weibo_ads.js, requires-body=true, timeout=60
 微博话题页面广告 = type=http-response, pattern=^https?:\/\/m?api\.weibo\.c(n|om)\/2\/searchall\?, script-path=https://raw.githubusercontent.com/fmz200/wool_scripts/main/Scripts/weibo/weibo_ads.js, requires-body=true, timeout=60
