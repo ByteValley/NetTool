@@ -1,6 +1,6 @@
 #!name=微博去广告
 #!desc=优化微博去广告，保留头像显示、深色皮肤与图标资源加载，彻底修复误杀。
-#!author=ByteValley & 奶思[https://github.com/fmz200]
+#!author=ByteValley
 #!icon=https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/Weibo-00.png
 #!category=广告屏蔽
 #!updated=2025-08-02
