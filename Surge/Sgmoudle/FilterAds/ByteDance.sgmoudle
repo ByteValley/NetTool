@@ -10,6 +10,7 @@ hostname = %APPEND% *.toutiao.com                                           # �
 # hostname = %APPEND% *.toutiao.com,*.bytegecko.com                         # 如播放器组件走 bytegecko 时启用
 
 [Rule]
+
 # ——————————————————————————————
 # 蛋花小说 | 视频广告精细拦截（前贴片/激励/拉流）
 # ——————————————————————————————
@@ -52,6 +53,8 @@ DOMAIN-SUFFIX,ibytedapm.com,REJECT-DROP                                     # �
 DOMAIN-SUFFIX,toutiaocloud.com,REJECT-DROP                                  # 云端埋点/分析
 DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT-DROP                                  # 实时广告日志收集
 DOMAIN-SUFFIX,va.toutiao.com,REJECT-DROP                                    # 用户行为追踪
+# —— tnc0 实验/埋点（阿里线路） ——
+DOMAIN,tnc0-alisc1.zijieapi.com,REJECT
 
 # ——————————————————————————————
 # 今日头条 | 广告平台与业务接口
@@ -61,15 +64,19 @@ DOMAIN-SUFFIX,ads.toutiao.com,REJECT                                        # �
 DOMAIN-SUFFIX,adbyte.bytedance.com,REJECT                                   # 广告资源聚合接口
 DOMAIN-SUFFIX,pangolin.snssdk.com,REJECT                                    # 巨量引擎广告平台
 DOMAIN-KEYWORD,ads,REJECT                                                   # 广告关键字域名（泛拦截）
-DOMAIN-KEYWORD,promotion,REJECT                                             # 推广关键字域名（泛拦截）
+# DOMAIN-KEYWORD,promotion,REJECT                                             # 推广关键字域名（泛拦截）误杀美团
 
 # ——————————————————————————————
 # 今日头条 | 信息流与推荐广告
 # ——————————————————————————————
 URL-REGEX,^https?:\/\/[^\/]+\.toutiao\.com\/api\/news\/recommend\/v\d\/\?*,REJECT  # 推荐内容流
 URL-REGEX,^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*,REJECT           # 广告通用接口
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT                 # misc-lf 线：广告卡/活动位/实验
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon)),REJECT                     # mon 线：埋点监控/日志
+
+# misc-lf 线：广告卡/活动位/实验
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
+
+# mon 线：埋点监控/日志
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon)),REJECT
 
 # ——————————————————————————————
 # 通用 | CDN 素材与广告图资源
@@ -82,20 +89,32 @@ DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT                                      # 实
 # 今日头条 | frontier100 广告接口
 # ——————————————————————————————
 AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,frontier100)),REJECT   # 今日头条广告接口
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT    # frontier100-toutiao-lf.fqnovel.com
+# —— frontier100 精确域（避免漏匹配） ——
+DOMAIN,frontier100-toutiao-lf.fqnovel.com,REJECT
 
 # ——————————————————————————————
 # 番茄小说 / 抖音 | 视频广告与图像资源
 # ——————————————————————————————
+# —— 章节卡片广告图床（电商推卡） ——
+DOMAIN,webcast5-open-lf.douyin.com,REJECT-DROP
+DOMAIN,p26-item.ecombdimg.com,REJECT
+
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,lf3-reading)),REJECT-DROP   # 章节短剧/图文广告图
 #AND,((DOMAIN-SUFFIX,douyincdn.com),(DOMAIN-KEYWORD,pull-flv)),REJECT       # 抖音视频拉流广告
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT       # 小说图像广告标记
-AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT
+AND,((DOMAIN-SUFFIX,fqnovelvod.com),(DOMAIN-KEYWORD,reading-video)),REJECT-DROP
 #DOMAIN,v26-reading-video.fqnovelvod.com,REJECT-TINYGIF    # 章节短剧卡片广告
+#URL-REGEX,^http:\/\/[^\/]*reading-sign\.fqnovelpic\.com\/tos-cn-i.*tplv-.*,REJECT-DROP
+#AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,novel)),REJECT    # p6-novel.byteimg.com:443
+#AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+#AND,((DOMAIN-SUFFIX,byteimg.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 
 # ——————————————————————————————
 # 番茄小说 | 激励广告接口与组件资源
 # ——————————————————————————————
 #DOMAIN-SUFFIX,lf-cdn-tos.bytescm.com,REJECT                                # 视频激励组件资源
+#DOMAIN,lf-normal-gr-sourcecdn.bytegecko.com,REJECT
 DOMAIN-SUFFIX,sinfonlinec.fqnovel.com,REJECT                               # 小说组件资源
 #AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT    # 视频激励资源
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT                                  # 巨量引擎 SDK 关键字
@@ -107,6 +126,7 @@ DOMAIN,vc-brain.ndcpp.com,REJECT
 # ——————————————————————————————
 DOMAIN-SUFFIX,bdurl.net,REJECT                                             # 短链跳转
 DOMAIN-SUFFIX,zjurl.cn,REJECT                                              # 广告短链追踪
+DOMAIN,tr.byteurl.cn,REJECT
 
 # ——————————————————————————————
 # 通用 | IPv4 广告源与调度节点
