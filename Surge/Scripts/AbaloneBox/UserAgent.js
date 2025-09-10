@@ -24,7 +24,12 @@
 
 (function () {
   // 仅处理请求阶段
-  if (typeof $response !== 'undefined') { $done({}); return; }
+  if (typeof $response !== 'undefined') { $done({}); return; } else {
+    try {
+      console.log('[byhz][hit] ' + ($request && $request.url));
+    } catch (e) {}
+    $done({});
+  }
 
   // 读取并解析参数
   var TOKEN = '';
