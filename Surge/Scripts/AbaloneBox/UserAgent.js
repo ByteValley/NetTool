@@ -56,7 +56,7 @@ for (let key in headers) {
 }
 
 // 设置新的 Authorization 请求头，格式为 Bearer + token
-outHeaders['Authorization'] = `Bearer ${token}`;
+outHeaders['Authorization'] = `${token}`;
 
 console.log(`[byhz] 成功替换Authorization: Bearer ${token}`);
 
