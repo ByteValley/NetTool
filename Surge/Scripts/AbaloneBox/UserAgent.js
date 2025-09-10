@@ -1,56 +1,66 @@
 /*
- * 脚本功能: 替换 HTTP 请求的 User-Agent
- * 作者: AI Assistant
- * 更新时间: 2025年9月10日
+ * 脚本功能：鲍鱼盒子18+，支持外部参数传递token
+ * 脚本作者：基于@WeiGiegie脚本解密重写
+ * 更新时间：2025年9月10日
+ * 电报频道：https://t.me/GieGie777
+ * 使用声明：此脚本仅供学习与交流，请在下载使用24小时内删除！
+ *
+ * 配置文件示例：
+ * [Script]
+ * # 鲍鱼盒子增强
+ * 鲍鱼盒子增强 = type=http-request, pattern=^https?:\/\/.+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/你的用户名/你的仓库/path/to/DecryptedScript.js, argument=token=baoyuvip
+ *
  */
 
-const userAgentKey = 'User-Agent';
-let userAgentValue = '';
-
-// 检查是否为请求阶段
-if (typeof $request !== 'undefined' && $request.headers) {
-
-  // 尝试从 argument 中获取 userAgent 的值
-  try {
-    if (typeof $argument === 'string') {
-      const decodedArg = decodeURIComponent($argument);
-      // Surge 的 argument 格式通常是 key=value
-      const match = decodedArg.match(/userAgent=(.*)/);
-      if (match && match[1]) {
-        userAgentValue = match[1];
-      }
-    } else if (typeof $argument === 'object') {
-      // 兼容某些工具将 argument 解析为对象的情况
-      userAgentValue = $argument.userAgent || '';
-    }
-  } catch (e) {
-    console.log('[UserAgent.js] 获取 argument 失败:', e.message);
-  }
-
-  // 如果成功获取到值
-  if (userAgentValue) {
-    const headers = $request.headers;
-    let oldUserAgent = headers[userAgentKey] || headers[userAgentKey.toLowerCase()];
-
-    // 移除旧的 User-Agent 头（不区分大小写）
-    delete headers[userAgentKey];
-    delete headers[userAgentKey.toLowerCase()];
-
-    // 添加新的 User-Agent 头
-    headers[userAgentKey] = userAgentValue;
-
-    // 记录日志，方便调试
-    console.log(`[UserAgent.js] 替换 User-Agent: "${oldUserAgent}" => "${userAgentValue}"`);
-
-    // 完成并返回修改后的请求头
-    $done({ headers });
-  } else {
-    // 未能获取到值，不做任何修改
-    console.log('[UserAgent.js] 未传入 User-Agent 参数，请求未修改');
-    $done({});
-  }
-
-} else {
-  // 如果不是请求阶段，直接结束
+// 仅处理请求阶段
+if (typeof $response !== 'undefined') {
   $done({});
+  return;
 }
+
+// 默认值，如果未从参数中获取到
+let token = '';
+
+try {
+  // 兼容 $argument 是字符串或对象的情况
+  if (typeof $argument === 'string') {
+    // 解析如 "token=baoyuvip" 的字符串
+    const params = new URLSearchParams($argument.replace(/;/g, '&'));
+    token = params.get('token');
+  } else if ($argument && typeof $argument === 'object') {
+    token = $argument.token || '';
+  }
+} catch (e) {
+  console.log('[byhz] 解析 argument 失败:', e.message);
+}
+
+// 如果没有获取到 token，则使用一个默认值（可以根据需要修改）
+if (!token) {
+  token = 'baoyuvip';
+  console.log('[byhz] 未从参数获取到token，使用默认值');
+}
+
+// 准备修改请求头
+const headers = $request.headers;
+const outHeaders = {};
+
+// 复制所有现有请求头，并确保 Authorization 头是唯一的
+for (let key in headers) {
+  if (Object.prototype.hasOwnProperty.call(headers, key)) {
+    // 如果存在，移除旧的 Authorization 头
+    if (key.toLowerCase() === 'authorization') {
+      continue;
+    }
+    outHeaders[key] = headers[key];
+  }
+}
+
+// 设置新的 Authorization 请求头，格式为 Bearer + token
+outHeaders['Authorization'] = `Bearer ${token}`;
+
+console.log(`[byhz] 成功替换Authorization: Bearer ${token}`);
+
+// 完成并返回修改后的请求
+$done({
+  headers: outHeaders
+});
