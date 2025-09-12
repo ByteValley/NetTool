@@ -28,18 +28,46 @@ const secret = "3E41D1331F5DDAFCD0A38FE2D52FF66F";
 /* ==================== token 捕获 ==================== */
 function handleTokenCapture() {
   try {
-    const body = ($request && $request.body) || "";
-    let devId = "";
-    try { devId = new URLSearchParams(body || "").get("c_mmbDevId") || ""; } catch {}
-    if (devId) {
-      set(STORE_ID, devId);
-      set(STORE_TS, String(Date.now()));
-      notify(`${NAME}｜获取ck成功🎉`, `c_mmbDevId: ${mask(devId)}`, "已写入本地");
-    } else {
-      notify(`${NAME}｜未解析到 c_mmbDevId`, "请在慢慢买App-我的 再触发", body ? body.slice(0,200) : "请求体为空");
+    var url = ($request && $request.url) || "";
+    var body = ($request && $request.body) || "";
+    // 明确提示：命中了但 body 为空的场景
+    if (!body) {
+      notify("京东比价｜捕获开始(无请求体)", "命中慢慢买接口", url);
+      return done({});
     }
-  } catch (e) { notify(`${NAME}｜捕获异常`, "", String(e && (e.stack||e))); }
-  finally { done({}); }
+    // 手写 x-www-form-urlencoded 解析（兼容旧引擎）
+    var devId = "";
+    try {
+      var pairs = String(body).split("&");
+      for (var i = 0; i < pairs.length; i++) {
+        var kv = pairs[i].split("=");
+        var k = decodeURIComponent(kv[0] || "");
+        if (k === "c_mmbDevId") {
+          devId = decodeURIComponent(kv[1] || "");
+          break;
+        }
+      }
+    } catch (e) {
+      // 解析异常也给出原始前 200 字以便自查
+      notify("京东比价｜解析异常", "", String(e && e.message || e));
+      notify("京东比价｜原始请求体(200)", "", body.slice(0, 200));
+      return done({});
+    }
+
+    if (devId) {
+      set("mmb_dev_id", devId);
+      set("mmb_dev_id_last_update", String(Date.now()));
+      notify("京东比价｜获取ck成功🎉", "已写入本地", "c_mmbDevId: " + mask(devId));
+    } else {
+      // 没解析到也告知，并回显前 200 字
+      notify("京东比价｜未解析到 c_mmbDevId", "请在慢慢买App-我的 再触发", body.slice(0, 200));
+    }
+  } catch (e) {
+    // 把原本“no stack”的错误替换成明确文本
+    notify("京东比价｜UNHANDLED ERROR", "", String(e && (e.stack || e)));
+  } finally {
+    done({});
+  }
 }
 
 /* ==================== 弹窗版 ==================== */
