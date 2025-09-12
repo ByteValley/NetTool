@@ -40,15 +40,34 @@ function intCryptoJS(){CryptoJS=function(t,r){var n;if("undefined"!=typeof windo
 function $http(op, t = 6) {
   const { promise, resolve, reject } = Promise.withResolvers();
   const HTTPError = (e, req, res) => Object.assign(new Error(e), { name: "HTTPError", request: req, response: res });
+
   const handleRes = ({ bodyBytes, ...res }) => {
     res.status ??= res.statusCode;
-    res.json = () => JSON.parse(res.body);
+    // 修复点①：res.json 兼容字符串 / 对象
+    res.json = () => {
+      try {
+        if (res && typeof res.body === "object") return res.body;
+        return JSON.parse(res.body || "{}");
+      } catch (_) {
+        // 有些环境把数据放在 bodyBytes
+        if (bodyBytes) {
+          try { return JSON.parse(new TextDecoder().decode(bodyBytes)); } catch (_) {}
+        }
+        return {};
+      }
+    };
     if (res.headers?.["binary-mode"] && bodyBytes) res.body = new Uint8Array(bodyBytes);
-    (res.error || res.status < 200 || res.status > 307) ? reject(HTTPError(res.error, op, res)) : resolve(res);
+
+    (res.error || res.status < 200 || res.status > 307)
+      ? reject(HTTPError(res.error || `HTTP ${res.status}`, op, res))
+      : resolve(res);
   };
+
   const timer = setTimeout(() => reject(HTTPError("timeout", op)), op.$timeout ?? t * 1000);
-  try { this.$httpClient?.[op.method || "get"](op, (error, resp, body) => handleRes({ error, ...resp, body })); }catch(_){}
-  try { this.$task?.fetch({ url: op, ...op }).then(handleRes, handleRes); }catch(_){}
+
+  try { this.$httpClient?.[op.method || "get"](op, (error, resp, body) => handleRes({ error, ...resp, body })); } catch (_) {}
+  try { this.$task?.fetch({ url: op, ...op }).then(handleRes, handleRes); } catch (_) {}
+
   return promise.finally(() => clearTimeout(timer));
 }
 
@@ -88,28 +107,54 @@ function requestHistoryPrice(id){
     "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_1_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 - mmbWebBrowse - ios",
   };
 
-  // 1) /app/share 获取 shareId / sign
+  // 1) /app/share：拿 shareId/sign
   const reqShare = { method: "post", url: "https://apapia-history-weblogic.manmanbuy.com/app/share", headers, body: toQS(shareBody) };
 
-  // 2) /h5/share/trendData 用 form-data 上传
+  // 2) /h5/share/trendData：表单上传
   function buildMultipart(fields){
     const boundary="----WebKitFormBoundary"+Math.random().toString(36).slice(2);
-    let body=""; for(const [k,v] of Object.entries(fields)){ body+=`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`; }
-    body+=`--${boundary}--\r\n`;
+    let body="";
+    for (const [k,v] of Object.entries(fields||{})) {
+      body += `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v??""}\r\n`;
+    }
+    body += `--${boundary}--\r\n`;
     return {body, boundary};
   }
 
   return $http(reqShare).then(res=>{
-    const { code, msg, data } = res.json();
-    if (code !== 2000) throw new Error(msg || "share 接口异常");
-    if (!data) throw new Error("share 返回空");
-    const params = new URL(data).searchParams;
+    const json = res.json() || {};
+    const { code, msg, data } = json;
+
+    // 修复点②：更清晰的错误 & 容错
+    if (code !== 2000) throw new Error(msg || `share 接口异常 (code=${code})`);
+    if (!data) throw new Error("share 返回空数据");
+
+    // 兼容 data 既可能是完整 URL，也可能是纯查询串
+    let params;
+    try {
+      params = new URL(data).searchParams;
+    } catch (_) {
+      // 修复点③：data 非 URL 时做兜底解析
+      const q = (String(data).split("?")[1] || String(data));
+      const tmp = {};
+      q.split("&").forEach(s=>{
+        const i = s.indexOf("=");
+        if (i > 0) tmp[decodeURIComponent(s.slice(0,i))] = decodeURIComponent(s.slice(i+1));
+      });
+      params = { get: (k)=> tmp[k] || "" };
+    }
+
     const fields = {
       shareId: params.get("shareId"),
-      sign: params.get("sign"),
-      spbh: params.get("spbh"),
-      url: params.get("url"),
+      sign:   params.get("sign"),
+      spbh:   params.get("spbh"),
+      url:    params.get("url"),
     };
+
+    if (!fields.shareId || !fields.sign) {
+      throw new Error("share 参数缺失（shareId/sign）");
+    }
+
     const { body, boundary } = buildMultipart(fields);
     const reqTrend = {
       method: "post",
@@ -118,7 +163,11 @@ function requestHistoryPrice(id){
       body,
     };
     return $http(reqTrend);
-  }).then(res=>res.json());
+  }).then(res=>{
+    const jd = res.json() || {};
+    // 这里不强做校验，外层按 ok===1 分支处理
+    return jd;
+  });
 }
 
 /* ========== 文本格式化 ========== */
