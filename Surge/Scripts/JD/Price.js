@@ -1,6 +1,6 @@
 /**
  * 京东比价 · 统一渲染器（秒加载 / 互斥 / 去重 / 缓存优先）
- * Author: ByteValley & ChatGPT
+ * Author: ByteValley
  *
  * 传参方式（Surge/Loon 的 argument）：
  *   - action=token                // 仅用于慢慢买 token 获取（挂在 apapia-sqk-weblogic 的请求上）
