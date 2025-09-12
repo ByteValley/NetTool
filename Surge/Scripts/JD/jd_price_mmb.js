@@ -110,19 +110,30 @@ async function fetchHistoryAndNotify(id) {
 
 function handleTokenCapture() {
   try {
-    const body = getReqBody() || "";
-    setStore(STORE_KEY_REQBODY, body);
-    // 直接解析 c_mmbDevId
-    const params = new URLSearchParams(body);
-    const devId = params.get("c_mmbDevId") || "";
+    const url = ($request && $request.url) || "";
+    const body = ($request && $request.body) || "";
+    // ① 命中提示：证明脚本确实执行了
+    notify("京东比价｜捕获开始", "命中慢慢买接口", url.slice(0, 120));
+
+    setStore(STORE_KEY_REQBODY, body || "");
+    let devId = "";
+    try {
+      const params = new URLSearchParams(body || "");
+      devId = params.get("c_mmbDevId") || "";
+    } catch (e) {}
+
     if (devId) {
       setStore(STORE_KEY_DEVID, devId);
-      notify(`${NAME} | 获取ck成功🎉`, `c_mmbDevId: ${mask(devId)}`, body.slice(0, 180));
+      setStore(STORE_KEY_DEVID + "_last_update", String(Date.now()));
+      // ② 结果提示：明确显示已解析并保存
+      notify("京东比价｜获取ck成功🎉", `c_mmbDevId: ${mask(devId)}`, "已写入本地，稍后可用「状态查询」自检");
     } else {
-      notify(`${NAME} | 未发现 c_mmbDevId`, "请确认在慢慢买App-我的页面触发", "");
+      // ③ 失败也明确提示：便于知道为啥没生效
+      notify("京东比价｜未解析到 c_mmbDevId", "请在慢慢买App-我的 页面再次触发", body ? body.slice(0, 200) : "请求体为空");
     }
   } catch (e) {
     logErr(e);
+    notify("京东比价｜捕获异常", "", String(e && (e.stack || e)));
   } finally {
     done();
   }
