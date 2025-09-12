@@ -1,251 +1,317 @@
-/* ===== 京东比价 · 统一脚本（token / 弹窗 / 表格 / 原始 / 折线 / 助手）===== */
-/* 兼容：Surge / Loon / Stash / Egern / Quantumult X */
+/* ===== 京东比价 · 单脚本整合版 =====
+ * - 获取 token（慢慢买）/ 弹窗（request）/ 页面内渲染（response：表格/原始/折线）
+ * - token 分支沿用“可用”实现，避免 0:0 报错
+ * - 兼容：Surge / Loon / Stash / Egern / Quantumult X
+ */
 
-var NAME = "京东比价";
-var SECRET = "3E41D1331F5DDAFCD0A38FE2D52FF66F"; // mmb token 盐
-var STORE_KEY = "manmanbuy_val";      // 保存原始 body（含 c_mmbDevId）
-var STORE_ID  = "mmb_dev_id";          // 直接保存的 c_mmbDevId
-var STORE_TS  = "mmb_dev_id_last_update";
+const NAME = "京东比价";
+const SECRET = "3E41D1331F5DDAFCD0A38FE2D52FF66F";
+const MMB_KEY = "manmanbuy_val"; // 原始 body（含 c_mmbDevId）
+const MMB_ID  = "慢慢买CK";       // 直接保存的 devId（与原脚本字段一致）
 
-/* ---- 公共工具（不依赖任何重库） ---- */
-function parseArgument(a){ var o={}; try{ if(a){ var s=decodeURIComponent(a); var arr=s.split(/[&;,]/); for (var i=0;i<arr.length;i++){ var kv=arr[i].split("="); if(kv[0]) o[kv[0].trim()]=(kv.slice(1).join("=")||"").trim(); } } }catch(e){} return o; }
-function notify(t,s,b,e){ try{ if(typeof $task!=="undefined") $notify(t||"",s||"",b||"",e||{}); else $notification.post(t||"",s||"",b||"",e||{});}catch(_){} }
-function done(v){ try{$done(v||{});}catch(_){} }
-function get(k){ try{ return (typeof $task!=="undefined")?$prefs.valueForKey(k):$persistentStore.read(k);}catch(_){ return null; } }
-function set(k,v){ try{ return (typeof $task!=="undefined")?$prefs.setValueForKey(v,k):$persistentStore.write(v,k);}catch(_){ return false; } }
-
-/* ---- 入口参数 ---- */
-var url = ($request && $request.url) || "";
-var arg = parseArgument(typeof $argument === "string" ? $argument : "");
-var mode = (arg.mode || "").toLowerCase();
-
-/* =========================
- *  A. 抓 token 分支 —— 极简版
- *  提前 return：不加载任何重代码，避免 0:0 崩溃
- * ========================= */
-if (mode === "token") {
+/* ====== 通用工具 ====== */
+function parseArg(a) {
+  let o = {}; if (!a) return o;
   try {
-    var body = ($request && $request.body) || "";
-    set(STORE_KEY, body);
+    String(a).split(/[&;,]/).forEach(kv => {
+      const i = kv.indexOf("=");
+      if (i === -1) return;
+      const k = decodeURIComponent(kv.slice(0, i));
+      const v = decodeURIComponent(kv.slice(i + 1));
+      o[k] = v;
+    });
+  } catch(_) {}
+  return o;
+}
+const ARG = parseArg(typeof $argument === "string" ? $argument : "");
+const MODE = (ARG.mode || "").toLowerCase();
 
-    // 把 c_mmbDevId 单独提取保存（避免后来再解析失败）
-    var devId = "";
+function notify(t,s,b,ext){ try{
+  if (typeof $task !== "undefined") $notify(t||"",s||"",b||"",ext||{});
+  else $notification.post(t||"",s||"",b||"",ext||{});
+}catch(_){ } }
+function done(v){ try{ $done(v||{});}catch(_){} }
+function getval(k){ try{ return (typeof $task!=="undefined")?$prefs.valueForKey(k):$persistentStore.read(k);}catch(_){return null;} }
+function setval(k,v){ try{ return (typeof $task!=="undefined")?$prefs.setValueForKey(v,k):$persistentStore.write(v,k);}catch(_){return false;} }
+
+/* ====== 与你“能用版本”一致的补丁（避免 0:0 报错）====== */
+// ① Promise.withResolvers 兼容
+if (typeof Promise.withResolvers !== "function") {
+  Promise.withResolvers = function () {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+}
+
+// ② CryptoJS（保持原样）
+function intCryptoJS(){CryptoJS=function(t,r){var n;if("undefined"!=typeof window&&window.crypto&&(n=window.crypto),"undefined"!=typeof self&&self.crypto&&(n=self.crypto),"undefined"!=typeof globalThis&&globalThis.crypto&&(n=globalThis.crypto),!n&&"undefined"!=typeof window&&window.msCrypto&&(n=window.msCrypto),!n&&"undefined"!=typeof global&&global.crypto&&(n=global.crypto),!n&&"function"==typeof require)try{n=require("crypto")}catch(t){}var e=function(){if(n){if("function"==typeof n.getRandomValues)try{return n.getRandomValues(new Uint32Array(1))[0]}catch(t){}if("function"==typeof n.randomBytes)try{return n.randomBytes(4).readInt32LE()}catch(t){}}throw new Error("Native crypto module could not be used to get secure random number.")},i=Object.create||function(){function t(){}return function(r){var n;return t.prototype=r,n=new t,t.prototype=null,n}}(),o={},a=o.lib={},s=a.Base={extend:function(t){var r=i(this);return t&&r.mixIn(t),r.hasOwnProperty("init")&&this.init!==r.init||(r.init=function(){r.$super.init.apply(this,arguments)}),r.init.prototype=r,r.$super=this,r},create:function(){var t=this.extend();return t.init.apply(this,arguments),t},init:function(){},mixIn:function(t){for(var r in t)t.hasOwnProperty(r)&&(this[r]=t[r]);t.hasOwnProperty("toString")&&(this.toString=t.toString)},clone:function(){return this.init.prototype.extend(this)}},c=a.WordArray=s.extend({init:function(t,r){t=this.words=t||[],this.sigBytes=null!=r?r:4*t.length},toString:function(t){return(t||f).stringify(this)},concat:function(t){var r=this.words,n=t.words,e=this.sigBytes,i=t.sigBytes;if(this.clamp(),e%4)for(var o=0;o<i;o++){var a=n[o>>>2]>>>24-o%4*8&255;r[e+o>>>2]|=a<<24-(e+o)%4*8}else for(var s=0;s<i;s+=4)r[e+s>>>2]=n[s>>>2];return this.sigBytes+=i,this},clamp:function(){var r=this.words,n=this.sigBytes;r[n>>>2]&=4294967295<<32-n%4*8,r.length=t.ceil(n/4)},clone:function(){var t=s.clone.call(this);return t.words=this.words.slice(0),t},random:function(r){var n,i=[],o=function(r){r=r;var n=987654321,e=4294967295;return function(){var i=((n=36969*(65535&n)+(n>>16)&e)<<16)+(r=18e3*(65535&r)+(r>>16)&e)&e;return i/=4294967296,(i+=.5)*(t.random()>.5?1:-1)}},a=!1;try{e(),a=!0}catch(t){}for(var s,u=0;u<r;u+=4)a?i.push(e()):(s=987654071*(n=o(4294967296*(s||t.random())))(),i.push(4294967296*n()|0));return new c.init(i,r)}}),u=o.enc={},f=u.Hex={stringify:function(t){for(var r=t.words,n=t.sigBytes,e=[],i=0;i<n;i++){var o=r[i>>>2]>>>24-i%4*8&255;e.push((o>>>4).toString(16)),e.push((15&o).toString(16))}return e.join("")},parse:function(t){for(var r=t.length,n=[],e=0;e<r;e+=2)n[e>>>3]|=parseInt(t.substr(e,2),16)<<24-e%8*4;return new c.init(n,r/2)}},h=u.Latin1={stringify:function(t){for(var r=t.words,n=t.sigBytes,e=[],i=0;i<n;i++){var o=r[i>>>2]>>>24-i%4*8&255;e.push(String.fromCharCode(o))}return e.join("")},parse:function(t){for(var r=t.length,n=[],e=0;e<r;e++)n[e>>>2]|=(255&t.charCodeAt(e))<<24-e%4*8;return new c.init(n,r)}},p=u.Utf8={stringify:function(t){try{return decodeURIComponent(escape(h.stringify(t)))}catch(t){throw new Error("Malformed UTF-8 data")}},parse:function(t){return h.parse(unescape(encodeURIComponent(t)))}},d=a.BufferedBlockAlgorithm=s.extend({reset:function(){this._data=new c.init,this._nDataBytes=0},_append:function(t){"string"==typeof t&&(t=p.parse(t)),this._data.concat(t),this._nDataBytes+=t.sigBytes},_process:function(r){var n,e=this._data,i=e.words,o=e.sigBytes,a=this.blockSize,s=o/(4*a),u=(s=r?t.ceil(s):t.max((0|s)-this._minBufferSize,0))*a,f=t.min(4*u,o);if(u){for(var h=0;h<u;h+=a)this._doProcessBlock(i,h);n=i.splice(0,u),e.sigBytes-=f}return new c.init(n,f)},clone:function(){var t=s.clone.call(this);return t._data=this._data.clone(),t},_minBufferSize:0}),l=(a.Hasher=d.extend({cfg:s.extend(),init:function(t){this.cfg=this.cfg.extend(t),this.reset()},reset:function(){d.reset.call(this),this._doReset()},update:function(t){return this._append(t),this._process(),this},finalize:function(t){return t&&this._append(t),this._doFinalize()},blockSize:16,_createHelper:function(t){return function(r,n){return new t.init(n).finalize(r)}},_createHmacHelper:function(t){return function(r,n){return new l.HMAC.init(t,n).finalize(r)}}}),o.algo={});return o}(Math);!function(t){var r=CryptoJS,n=r.lib,e=n.WordArray,i=n.Hasher,o=r.algo,a=[];!function(){for(var r=0;r<64;r++)a[r]=4294967296*t.abs(t.sin(r+1))|0}();var s=o.MD5=i.extend({_doReset:function(){this._hash=new e.init([1732584193,4023233417,2562383102,271733878])},_doProcessBlock:function(t,r){for(var n=0;n<16;n++){var e=r+n,i=t[e];t[e]=16711935&(i<<8|i>>>24)|4278255360&(i<<24|i>>>8)}var o=this._hash.words,s=t[r+0],p=t[r+1],d=t[r+2],l=t[r+3],y=t[r+4],v=t[r+5],g=t[r+6],w=t[r+7],_=t[r+8],m=t[r+9],B=t[r+10],b=t[r+11],C=t[r+12],S=t[r+13],x=t[r+14],A=t[r+15],H=o[0],z=o[1],M=o[2],D=o[3];z=h(z=h(z=h(z=h(z=f(z=f(z=f(z=f(z=u(z=u(z*u(z*u(z=c(z*c(z*c(z*c(z,M=c(M,D=c(D,H=c(H,z,M,D,s,7,a[0]),z,M,p,12,a[1]),H,z,d,17,a[2]),D,H,l,22,a[3]),M=c(M,D=c(D,H=c(H,z,M,D,y,7,a[4]),z,M,v,12,a[5]),H,z,g,17,a[6]),D,H,w,22,a[7]),M=c(M,D=c(D,H=c(H,z,M,D,_,7,a[8]),z,M,m,12,a[9]),H,z,B,17,a[10]),D,H,b,22,a[11]),M=c(M,D=c(D,H=c(H,z,M,D,C,7,a[12]),z,M,S,12,a[13]),H,z,x,17,a[14]),D,H,A,22,a[15]),M=u(M,D=u(D,H=u(H,z,M,D,p,5,a[16]),z,M,g,9,a[17]),H,z,b,14,a[18]),D,H,s,20,a[19]),M=u(M,D=u(D,H=u(H,z,M,D,v,5,a[20]),z,M,B,9,a[21]),H,z,A,14,a[22]),D,H,y,20,a[23]),M=u(M,D=u(D,H=u(H,z,M,D,m,5,a[24]),z,M,x,9,a[25]),H,z,l,14,a[26]),D,H,_,20,a[27]),M=u(M,D=u(D,H=u(H,z,M,D,S,5,a[28]),z,M,d,9,a[29]),H,z,w,14,a[30]),D,H,C,20,a[31]),M=f(M,D=f(D,H=f(H,z,M,D,v,4,a[32]),z,M,_,11,a[33]),H,z,b,16,a[34]),D,H,x,23,a[35]),M=f(M,D=f(D,H=f(H,z,M,D,p,4,a[36]),z,M,y,11,a[37]),H,z,w,16,a[38]),D,H,B,23,a[39]),M=f(M,D=f(D,H=f(H,z,M,D,S,4,a[40]),z,M,s,11,a[41]),H,z,l,16,a[42]),D,H,g,23,a[43]),M=f(M,D=f(D,H=f(H,z,M,D,m,4,a[44]),z,M,C,11,a[45]),H,z,A,16,a[46]),D,H,d,23,a[47]),M=h(M,D=h(D,H=h(H,z,M,D,s,6,a[48]),z,M,w,10,a[49]),H,z,x,15,a[50]),D,H,v,21,a[51]),M=h(M,D=h(D,H=h(H,z,M,D,C,6,a[52]),z,M,l,10,a[53]),H,z,B,15,a[54]),D,H,p,21,a[55]),M=h(M,D=h(D,H=h(H,z,M,D,_,6,a[56]),z,M,A,10,a[57]),H,z,g,15,a[58]),D,H,S,21,a[59]),M=h(M,D=h(D,H=h(H,z,M,D,y,6,a[60]),z,M,b,10,a[61]),H,z,d,15,a[62]),D,H,m,21,a[63]),o[0]=o[0]+H|0,o[1]=o[1]+z|0,o[2]=o[2]+M|0,o[3]=o[3]+D|0},_doFinalize:function(){var r=this._data,n=r.words,e=8*this._nDataBytes,i=8*r.sigBytes;n[i>>>5]|=128<<24-i%32;var o=t.floor(e/4294967296),a=e;n[15+(i+64>>>9<<4)]=16711935&(o<<8|o>>>24)|4278255360&(o<<24|o>>>8),n[14+(i+64>>>9<<4)]=16711935&(a<<8|a>>>24)|4278255360&(a<<24|a>>>8),r.sigBytes=4*(n.length+1),this._process();for(var s=this._hash,c=s.words,u=0;u<4;u++){var f=c[u];c[u]=16711935&(f<<8|f>>>24)|4278255360&(f<<24|f>>>8)}return s},clone:function(){var t=i.clone.call(this);return t._hash=this._hash.clone(),t}});function c(t,r,n,e,i,o,a){var s=t+(r&n|~r&e)+i+a;return(s<<o|s>>>32-o)+r}function u(t,r,n,e,i,o,a){var s=t+(r&e|n&~e)+i+a;return(s<<o|s>>>32-o)+r}function f(t,r,n,e,i,o,a){var s=t+(r^n^e)+i+a;return(s<<o|s>>>32-o)+r}function h(t,r,n,e,i,o,a){var s=t+(n^(r|~e))+i+a;return(s<<o|s>>>32-o)+r}r.MD5=i._createHelper(s),r.HmacMD5=i._createHmacHelper(s)}(Math),function(){var t=CryptoJS,r=t.lib.WordArray;t.enc.Base64={stringify:function(t){var r=t.words,n=t.sigBytes,e=this._map;t.clamp();for(var i=[],o=0;o<n;o+=3)for(var a=(r[o>>>2]>>>24-o%4*8&255)<<16|(r[o+1>>>2]>>>24-(o+1)%4*8&255)<<8|r[o+2>>>2]>>>24-(o+2)%4*8&255,s=0;s<4&&o+.75*s<n;s++)i.push(e.charAt(a>>>6*(3-s)&63));var c=e.charAt(64);if(c)for(;i.length%4;)i.push(c);return i.join("")},parse:function(t){var n=t.length,e=this._map,i=this._reverseMap;if(!i){i=this._reverseMap=[];for(var o=0;o<e.length;o++)i[e.charCodeAt(o)]=o}var a=e.charAt(64);if(a){var s=t.indexOf(a);-1!==s&&(n=s)}return function(t,n,e){for(var i=[],o=0,a=0;a<n;a++)if(a%4){var s=e[t.charCodeAt(a-1)]<<a%4*2,c=e[t.charCodeAt(a)]>>>6-a%4*2;i[o>>>2]|=(s|c)<<24-o%4*8,o++}return r.create(i,o)}(t,n,i)},_map:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="}}();};function md5(word){return CryptoJS.MD5(word).toString();}
+
+/* ====== 兼容版 HTTP 工具（保留你可用写法） ====== */
+function $http(op, t = 4) {
+  const { promise, resolve, reject } = Promise.withResolvers();
+  const HTTPError = (e, req, res) => Object.assign(new Error(e), { name: "HTTPError", request: req, response: res });
+  const handleRes = ({ bodyBytes, ...res }) => {
+    res.status ??= res.statusCode;
+    res.json = () => JSON.parse(res.body);
+    if (res.headers?.["binary-mode"] && bodyBytes) res.body = new Uint8Array(bodyBytes);
+    res.error || res.status < 200 || res.status > 307 ? reject(HTTPError(res.error, op, res)) : resolve(res);
+  };
+  const timer = setTimeout(() => reject(HTTPError("timeout", op)), op.$timeout ?? t * 1000);
+  this.$httpClient?.[op.method || "get"](op, (error, resp, body) => { handleRes({ error, ...resp, body }); });
+  this.$task?.fetch({ url: op, ...op }).then(handleRes, handleRes);
+  return promise.finally(() => clearTimeout(timer));
+}
+
+/* ====== token 分支（与可用脚本一致）====== */
+const reqUrl = ($request && $request.url) || "";
+const tokenPath = '/baoliao/center/menu';
+if (MODE === "token" && reqUrl.indexOf(tokenPath) !== -1) {
+  try {
+    const body = $request.body || "";
+    // 原样保存
+    setval(MMB_KEY, body);
+
+    // 兼容 URLSearchParams 不可用的环境：手动解析
+    let devId = "";
     try {
-      var pairs = String(body).split("&");
-      for (var i=0;i<pairs.length;i++){
-        var kv = pairs[i].split("=");
-        var k = decodeURIComponent(kv[0]||"");
-        if (k === "c_mmbDevId") { devId = decodeURIComponent(kv[1]||""); break; }
+      if (typeof URLSearchParams === "function") {
+        const params = new URLSearchParams(body);
+        devId = params.get('c_mmbDevId') || "";
+      } else {
+        const pairs = String(body).split("&");
+        for (let i = 0; i < pairs.length; i++) {
+          const kv = pairs[i].split("=");
+          const k = decodeURIComponent(kv[0] || "");
+          if (k === "c_mmbDevId") { devId = decodeURIComponent(kv[1] || ""); break; }
+        }
       }
     } catch(_) {}
-    if (devId) {
-      set(STORE_ID, devId);
-      set(STORE_TS, String(Date.now()));
-    }
 
-    notify(NAME, "获取ck成功🎉", body.slice(0, 200));
+    setval(MMB_ID, devId);
+    notify(NAME, '获取ck成功🎉', body.slice(0, 300));
   } catch (e) {
-    notify(NAME+"｜获取token异常", "", String(e && (e.stack || e)));
+    notify(NAME + '｜获取token异常', '', String(e && (e.stack || e)));
   }
-  done({});
-  // 提前结束，后续任何代码都不执行
+  return done({});
 }
 
-/* =========================
- *  B. 之后的分支才需要较重的工具
- * ========================= */
+/* ====== 之后是比价逻辑（与可用脚本一致基础上扩展样式）====== */
+const manmanbuy_key = MMB_KEY;
+function parseQueryString(queryString) { const jsonObject = {}; const pairs = (queryString||"").split('&'); pairs.forEach(pair => { const kv = pair.split('='); const key = decodeURIComponent(kv[0] || ''); const val = decodeURIComponent(kv[1] || ''); jsonObject[key] = val; }); return jsonObject; }
+function jsonToQueryString(jsonObject) { return Object.keys(jsonObject).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(jsonObject[key])}`).join('&'); }
+function jsonToCustomString(jsonObject) { return Object.keys(jsonObject).filter(key => jsonObject[key] !== '' && key.toLowerCase() !== 'token').sort().map(key => `${key.toUpperCase()}${String(jsonObject[key]).toUpperCase()}`).join(''); }
 
-/* 可兼容的 Promise.withResolvers（少量环境用得到） */
-if (typeof Promise.withResolvers !== "function") {
-  Promise.withResolvers = function () { var resolve, reject; var promise = new Promise(function(res, rej){ resolve=res; reject=rej; }); return { promise: promise, resolve: resolve, reject: reject }; };
+function getck() {
+  const ck = getval(manmanbuy_key);
+  if (!ck) { notify(NAME, '请先打开【慢慢买】APP--我的', '请确保已成功获取ck'); return null; }
+  const c_mmbDevId = parseQueryString(ck)?.c_mmbDevId || getval(MMB_ID);
+  return c_mmbDevId || (notify(NAME, '数据异常', '请联系脚本作者检查ck格式'), null);
 }
 
-/* HTTP 帮助函数（最小依赖） */
-function httpPost(u,h,b,cb){ try{
-  if (typeof $task!=="undefined"){ // QX
-    $task.fetch({url:u,method:"POST",headers:h,body:b}).then(function(resp){ cb(null,{status:resp.statusCode,headers:resp.headers,body:resp.body}); },function(err){ cb(err); });
-  } else { // Surge/Loon/Egern/Stash
-    $httpClient.post({url:u,headers:h,body:b,timeout:15000}, function(err,resp,data){ cb(err,{status:(resp&&(resp.status||resp.statusCode)),headers:resp&&resp.headers,body:data}); });
-  }
-}catch(e){ cb(String(e)); } }
+function lowerMsgs(single) {
+  const lower = single.priceRemark.lowestPrice;
+  const lowerDate = (single.priceRemark.lowestDate||'').slice(0, 10);
+  return "历史最低:¥" + String(lower) + (lowerDate?`(${lowerDate}) `:"");
+}
 
-function toQuery(o){ var a=[], k; for (k in o){ if(Object.prototype.hasOwnProperty.call(o,k)) a.push(encodeURIComponent(k)+"="+encodeURIComponent(String(o[k])));} return a.join("&"); }
-function toMultipart(fields){ var boundary="----WebKitFormBoundary"+Math.random().toString(36).substr(2); var body=""; var k; for (k in fields){ body += "--"+boundary+"\r\nContent-Disposition: form-data; name=\""+k+"\"\r\n\r\n"+fields[k]+"\r\n"; } body += "--"+boundary+"--\r\n"; return { body: body, boundary: boundary }; }
-function safeJson(t){ try{ return JSON.parse(t||"{}"); }catch(e){ return {}; } }
-function parseQueryFromUrl(u){ var out={}, q=""; try{ if(u.indexOf("?")>=0) q=u.split("?")[1]; else if(u.indexOf("#")>=0) q=u.split("#")[1]; var arr=(q||"").split("&"); for(var i=0;i<arr.length;i++){ var kv=arr[i].split("="); var kk=decodeURIComponent(kv[0]||""); var vv=decodeURIComponent(kv[1]||""); out[kk]=vv; } }catch(e){} return out; }
+function historySummary(result) {
+  const toDate = (t = Date.now()) => {
+    const d = new Date(t - new Date().getTimezoneOffset() * 60000);
+    return d.toISOString().split("T")[0];
+  };
+  const getJdData = (data) => {
+    return data.flatMap(({ Name, Difference, Price, Date }) => {
+      const re = /历史最高|常购价/;
+      if (re.test(Name)) return [];
+      return [{ Name: Name, Date: Date || toDate(), Price: Price, Difference: Difference }];
+    });
+  };
+  const { ListPriceDetail } = result.priceRemark;
+  return getJdData(ListPriceDetail);
+}
+
+function priceSummary(data) {
+  let summary = "";
+  let list = historySummary(data);
+  const maxWidth = list.reduce((max, item) => Math.max(max, String(item.Price||"-").length), 0);
+  list.forEach(item => {
+    const nameMap = {"双11价格":"双十一价格","618价格":"六一八价格","30天最低价":"三十天最低","60天最低价":"六十天最低","180天最低价":"一百八最低"};
+    item.Name = nameMap[item.Name] || item.Name;
+    const Delimiter = '  ';
+    if (item.Price == '-') return;
+    let price = String(item.Price||"-");
+    if (price.length < maxWidth) {
+      price = price.includes('.') || (price.length + 1 == maxWidth) ? price : `${price}.`;
+      const flag = price.includes('.') ? '0' : ' ';
+      while (price.length < maxWidth) price += flag;
+    }
+    summary += `${item.Name}${Delimiter}${price}${Delimiter}${item.Date}${Delimiter}${item.Difference=='-'?'':item.Difference}\n`;
+  });
+  return summary.replace(/\n$/, "");
+}
+
 function extractId(u){
-  var m=u.match(/\/product\/(?:[A-Za-z]+\/)?(\d+)\.html/); if(m&&m[1])return m[1];
+  let m=u.match(/\/product\/(?:[A-Za-z]+\/)?(\d+)\.html/); if(m&&m[1])return m[1];
   m=u.match(/[?&](?:wareId|sku|id)=(\d+)/); if(m&&m[1])return m[1];
   m=u.match(/\/(\d+)\.html(?:[#?]|$)/); if(m&&m[1])return m[1];
   return null;
 }
-function getToken(){ // 先读独立存储，再兜底原始 body
-  var raw = get(STORE_ID);
-  if (raw) return raw;
-  var ck = get(STORE_KEY);
-  if (!ck) return "";
-  try{
-    var pairs=String(ck).split("&");
-    for (var i=0;i<pairs.length;i++){ var kv=pairs[i].split("="); var k=decodeURIComponent(kv[0]||""); if(k==="c_mmbDevId") return decodeURIComponent(kv[1]||""); }
-  }catch(_){}
-  return "";
-}
 
-/* ====== 价格/渲染相关轻工具（无 CryptoJS 依赖）====== */
-function lowestMsg(r){
-  var p = r && r.priceRemark && r.priceRemark.lowestPrice;
-  var d = (r && r.priceRemark && r.priceRemark.lowestDate || "").slice(0,10);
-  return p==null ? "历史最低：无数据" : ("历史最低：¥"+p+(d?("（"+d+"）"):""));
-}
-function summaryText(r){
-  var arr = (r && r.priceRemark && r.priceRemark.ListPriceDetail) || [];
-  var list = [];
-  for (var i=0;i<arr.length;i++){ var it = arr[i]||{}; if (/历史最高|常购价/.test(it.Name||"")) continue; list.push(it); }
-  if (!list.length) return "暂无有效历史摘要";
-  var map={"双11价格":"双十一价格","618价格":"六一八价格","30天最低价":"三十天最低","60天最低价":"六十天最低","180天最低价":"一百八最低"};
-  var width=0, j, k;
-  for (j=0;j<list.length;j++){ var pr=String(list[j].Price||"-"); width=Math.max(width,pr.length); }
-  var out="";
-  for (k=0;k<list.length;k++){
-    var it=list[k], nm=map[it.Name]||it.Name, pr2=String(it.Price||"-"), dt=it.Date||"", diff=(it.Difference==="-"?"":it.Difference);
-    var price = pr2;
-    if (pr2!=="-" && pr2.length<width){
-      if (price.indexOf(".")<0 && pr2.length+1===width) price+=".";
-      price = padEnd(price, width, price.indexOf(".")>=0 ? "0" : " ");
+function request_history_price(id) {
+  const getmmCK = getck();
+
+  const buildMultipart = (fields) => {
+    const boundary = "----WebKitFormBoundary" + Math.random().toString(36).substr(2);
+    let body = "";
+    for (const [name, value] of Object.entries(fields)) {
+      body += `--${boundary}\r\n`;
+      body += `Content-Disposition: form-data; name="${name}"\r\n\r\n`;
+      body += `${value}\r\n`;
     }
-    out += nm+"  "+price+"  "+dt+"  "+diff+"\n";
-  }
-  return out.replace(/\n$/,"");
-}
-function toTable(r){
-  var arr = (r && r.priceRemark && r.priceRemark.ListPriceDetail) || [];
-  var map={"双11价格":"双十一价格","618价格":"六一八价格","30天最低价":"三十天最低","60天最低价":"六十天最低","180天最低价":"一百八最低"};
-  var rows="", i, it;
-  for (i=0;i<arr.length;i++){
-    it=arr[i]||{}; if (/历史最高|常购价/.test(it.Name||"")) continue;
-    rows += "<tr><td>"+esc(map[it.Name]||it.Name)+"</td><td>"+esc(it.Price||"-")+"</td><td>"+esc(it.Date||"")+"</td><td>"+esc(it.Difference==="-"?"":it.Difference)+"</td></tr>";
-  }
-  if (!rows) return '<div class="jd-price-muted">暂无表格数据</div>';
-  return '<table class="jd-price-table"><thead><tr><th>名称</th><th>价格</th><th>日期</th><th>差异</th></tr></thead><tbody>'+rows+'</tbody></table>';
-}
-function toLineChart(list){
-  var pts=[], i, x;
-  for (i=0;i<(list||[]).length;i++){ x=list[i]; var p=Number(x && (x.price!=null?x.price:(x.Price!=null?x.Price:x.p))); if(!isNaN(p)) pts.push({p:p}); }
-  if (!pts.length) return '<div class="jd-price-muted">暂无折线数据</div>';
-  var W=320,H=120,P=10,xmax=Math.max(1,pts.length-1);
-  var ymin=Infinity,ymax=-Infinity, j;
-  for (j=0;j<pts.length;j++){ ymin=Math.min(ymin,pts[j].p); ymax=Math.max(ymax,pts[j].p); }
-  if (ymin===Infinity){ymin=0;ymax=1;}
-  var sx=(W-2*P)/xmax, sy=(H-2*P)/Math.max(1,(ymax-ymin)||1);
-  var points="", k;
-  for (k=0;k<pts.length;k++){ var xx=P+k*sx; var yy=H-P-((pts[k].p-ymin)*sy); points+=(k?",":"")+xx+","+yy; }
-  return '<svg class="jd-price-chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none"><polyline fill="none" stroke="#007aff" stroke-width="2" points="'+points+'"/></svg>';
-}
-function padEnd(s,len,ch){ s=String(s); while(s.length<len){ s+=ch; } return s; }
-function esc(s){ return String(s).replace(/[&<>"']/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];}); }
-function injectAfterHead(html,sn){ if(/<\/head>/i.test(html)) return html.replace(/<\/head>/i,"</head>"+sn); if(/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, function(m){return m+sn;}); return sn+html; }
-function isTrue(v){ return String(v).toLowerCase()==="true"||v==="1"; }
+    body += `--${boundary}--\r\n`;
+    return { body, boundary };
+  };
 
-/* =========================
- *  C. 需要 CryptoJS 的部分才加载（弹窗/渲染）
- * ========================= */
-function md5(e){return CryptoJS.MD5(e).toString()}
-function intCryptoJS(){ /* —— 精简 CryptoJS：仅 MD5，略 —— */ 
-/* 为节省篇幅，这里保持你现有的 CryptoJS MD5 实现，完整粘贴在此处（与之前版本相同） */
+  const shareBody = {
+    methodName: "trendJava",
+    spbh: `1|${id}`,
+    url: `https://item.jd.com/${id}.html`,
+    t: Date.now().toString(),
+    c_appver: "4.8.3.1",
+    c_mmbDevId: getmmCK,
+  };
+
+  // 这里沿用你的 CryptoJS 计算 token 的方式
+  const tokenStr = encodeURIComponent(SECRET + jsonToCustomString(shareBody) + SECRET);
+  const tokenVal = md5(tokenStr).toUpperCase();
+  shareBody.token = tokenVal;
+
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_1_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 - mmbWebBrowse - ios",
+  };
+
+  const reqShare = { method: "post", url: "https://apapia-history-weblogic.manmanbuy.com/app/share", headers, body: jsonToQueryString(shareBody) };
+
+  return $http(reqShare)
+    .then((res) => {
+      const { msg, code, data } = res.json();
+      if (code !== 2000) throw new Error(msg);
+      if (!data) throw new Error(`${reqShare.url}: 无效数据`);
+      return new URL(data).searchParams;
+    })
+    .then((params) => {
+      const fields = {
+        shareId: params.get("shareId"),
+        sign: params.get("sign"),
+        spbh: params.get("spbh"),
+        url: params.get("url"),
+      };
+      const { body, boundary } = buildMultipart(fields);
+      const reqTrendData = {
+        method: "post",
+        url: "https://apapia-history-weblogic.manmanbuy.com/h5/share/trendData",
+        headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+        body,
+      };
+      return $http(reqTrendData);
+    })
+    .then((res) => res.json());
 }
 
-/* ====== MMB 调用 ====== */
-function jsonToCustomString(obj){ var keys=[], k; for (k in obj){ if(Object.prototype.hasOwnProperty.call(obj,k)){ if(String(k).toLowerCase()==="token") continue; if(obj[k]==="") continue; keys.push(k); } } keys.sort(); var s=""; for (var i=0;i<keys.length;i++){ var kk=keys[i]; s+=kk.toUpperCase()+String(obj[kk]).toUpperCase(); } return s; }
-function fetchHistory(jdId, devId, cb) {
+/* ====== 运行分支 ====== */
+// A) 弹窗（request 钩子）
+if (MODE === "popup" && typeof $response === "undefined") {
   try {
-    // 懒加载：只在真正用到时才加载 CryptoJS，避免 token 分支崩溃
-    if (typeof CryptoJS === "undefined") intCryptoJS();
+    const m = reqUrl && extractId(reqUrl);
+    if (!m) return done({});
+    intCryptoJS(); // 与可用脚本一致，保证 md5 可用
+    request_history_price(m).then((data)=>{
+      if (data && data.ok === 1) {
+        const r = data.result;
+        const detail = priceSummary(r);
+        const lower = lowerMsgs(r);
+        const tip = (r.priceRemark.Tip || "") + "(仅供参考)";
+        notify(r.trendData.title || ("商品 " + m), `${lower} ${tip}`, detail, {"open-url": `https://item.jd.com/${m}.html`, "update-pasteboard": detail});
+      } else if (data && data.ok === 0 && data.msg) {
+        notify('比价结果', '', "慢慢买提示您：" + data.msg);
+      }
+      done({});
+    }).catch(e=>{ notify(NAME+"｜接口异常", "", String(e)); done({}); });
+  } catch (e) { done({}); }
+  return;
+}
 
-    var shareBody = {
-      methodName: "trendJava",
-      spbh: "1|"+jdId,
-      url: "https://item.jd.com/"+jdId+".html",
-      t: String(Date.now()),
-      c_appver: "4.8.3.1",
-      c_mmbDevId: devId
-    };
-    shareBody.token = md5(encodeURIComponent(SECRET + jsonToCustomString(shareBody) + SECRET)).toUpperCase();
+// B) 页面渲染（response 钩子：表格/原始/折线）
+if (MODE === "render" && typeof $response !== "undefined") {
+  try {
+    const m = reqUrl && extractId(reqUrl);
+    if (!m) return $done($response);
+    intCryptoJS();
+    request_history_price(m).then((data)=>{
+      if (!(data && data.ok === 1)) return $done($response);
 
-    var headers1 = {"Content-Type":"application/x-www-form-urlencoded; charset=utf-8","User-Agent":"Mozilla/5.0 (iPhone) mmbWebBrowse ios"};
-    httpPost("https://apapia-history-weblogic.manmanbuy.com/app/share", headers1, toQuery(shareBody), function(e1, r1){
-      if (e1) return cb(e1);
-      var j1 = safeJson(r1 && r1.body);
-      if (!j1 || j1.code !== 2000 || !j1.data) return cb(null, { ok:0, msg: (j1 && j1.msg) || "share无data" });
-      var sp = parseQueryFromUrl(j1.data);
-      var mp = toMultipart({ shareId: sp.shareId||"", sign: sp.sign||"", spbh: sp.spbh||"", url: sp.url||"" });
-      var headers2 = {"content-type":"multipart/form-data; boundary="+mp.boundary};
-      httpPost("https://apapia-history-weblogic.manmanbuy.com/h5/share/trendData", headers2, mp.body, function(e2, r2){
-        if (e2) return cb(e2);
-        var j2 = safeJson(r2 && r2.body) || {};
-        cb(null, j2);
-      });
-    });
+      const r = data.result;
+      const title = (r.trendData && r.trendData.title) || ("商品 "+m);
+      const tip = ((r.priceRemark && r.priceRemark.Tip) || "") + "（仅供参考）";
+      const lower = lowerMsgs(r);
+      const summary = priceSummary(r);
+
+      // 构造样式 & 内容
+      const css = '<style>.jd-price-panel{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,PingFang SC,Helvetica,Arial;line-height:1.35;box-shadow:0 6px 18px rgba(0,0,0,.08);border:1px solid #eee;border-radius:12px;padding:12px 14px;margin:10px 8px;background:#fff}.jd-price-panel h3{font-size:15px;margin:0 0 8px 0}.jd-price-meta{color:#666;font-size:12px;margin-bottom:8px}.jd-price-pre{font-size:12px;background:#fafafa;border:1px dashed #ddd;border-radius:8px;padding:8px;white-space:pre-wrap}.jd-price-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}.jd-price-table th,.jd-price-table td{border:1px solid #eee;padding:6px 8px;text-align:left}.jd-price-muted{color:#999}.jd-price-chart{width:100%;height:120px;margin-top:6px}</style>';
+      const tableHtml = (function toTable(){ 
+        const arr = (r && r.priceRemark && r.priceRemark.ListPriceDetail) || [];
+        const map={"双11价格":"双十一价格","618价格":"六一八价格","30天最低价":"三十天最低","60天最低价":"六十天最低","180天最低价":"一百八最低"};
+        let rows = "";
+        for (const it of arr) {
+          if (/历史最高|常购价/.test(it.Name||"")) continue;
+          rows += `<tr><td>${(map[it.Name]||it.Name)||""}</td><td>${it.Price||"-"}</td><td>${it.Date||""}</td><td>${it.Difference==='-'?"":(it.Difference||"")}</td></tr>`;
+        }
+        if (!rows) return '<div class="jd-price-muted">暂无表格数据</div>';
+        return `<table class="jd-price-table"><thead><tr><th>名称</th><th>价格</th><th>日期</th><th>差异</th></tr></thead><tbody>${rows}</tbody></table>`;
+      })();
+      const chartHtml = (function toLine(){
+        const list = r.priceTrend || [];
+        let pts=[]; for (const x of list){ const p=Number(x && (x.price!=null?x.price:(x.Price!=null?x.Price:x.p))); if(!isNaN(p)) pts.push(p); }
+        if (!pts.length) return '<div class="jd-price-muted">暂无折线数据</div>';
+        const W=320,H=120,P=10,xmax=Math.max(1,pts.length-1);
+        let ymin=Infinity,ymax=-Infinity; for (const p of pts){ ymin=Math.min(ymin,p); ymax=Math.max(ymax,p); }
+        if (ymin===Infinity){ymin=0;ymax=1;}
+        const sx=(W-2*P)/xmax, sy=(H-2*P)/Math.max(1,(ymax-ymin)||1);
+        let points=""; for (let k=0;k<pts.length;k++){ const xx=P+k*sx; const yy=H-P-((pts[k]-ymin)*sy); points+=(k?",":"")+xx+","+yy; }
+        return `<svg class="jd-price-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline fill="none" stroke="#007aff" stroke-width="2" points="${points}"/></svg>`;
+      })();
+
+      let content = "";
+      const style_table = String(ARG.style_table||"").toLowerCase()==="true";
+      const style_raw   = String(ARG.style_raw||"").toLowerCase()==="true";
+      const style_line  = String(ARG.style_line||"").toLowerCase()==="true";
+      const line_only   = String(ARG.line_only||"").toLowerCase()==="true";
+
+      if (style_table) {
+        content = tableHtml;
+      } else if (style_line) {
+        content = line_only ? "" : tableHtml;
+        content += chartHtml;
+      } else if (style_raw) {
+        content = `<pre class="jd-price-pre">${summary.replace(/[&<>]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[s]))}</pre>`;
+      } else {
+        // 若三项都未勾选，默认给“表格”
+        content = tableHtml;
+      }
+
+      const panel = `${css}<div class="jd-price-panel"><h3>🧾 ${title}</h3><div class="jd-price-meta">${lower} <span class="jd-price-muted">${tip}</span></div>${content}</div>`;
+      let html = $response.body || "";
+      if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, panel + "</body>");
+      else html = panel + html;
+      $done({ body: html });
+    }).catch(_=> $done($response));
   } catch (e) {
-    cb(String(e && (e.stack || e)));
+    try { $done($response); } catch(_) { done({}); }
   }
+  return;
 }
 
-/* ===== 弹窗 / 页面渲染 / 助手 分支 ===== */
-if (mode === "popup") {
-  var id = extractId(url);
-  if (!id) return done({});
-  var dev = getToken();
-  if (!dev) { notify(NAME+"｜缺少token", "请先打开慢慢买App-我的获取", ""); return done({}); }
-  fetchHistory(id, dev, function (err, j2) {
-    if (err) { notify(NAME+"｜接口异常", "", String(err)); return done({}); }
-    if (!j2 || j2.ok !== 1) { notify("比价结果", "", j2 && j2.msg ? "慢慢买："+j2.msg : "接口错误"); return done({}); }
-    var r = j2.result || {};
-    var title = (r.trendData && r.trendData.title) || ("商品 "+id);
-    var tip = ((r.priceRemark && r.priceRemark.Tip) || "") + "（仅供参考）";
-    var lower = lowestMsg(r);
-    var summary = summaryText(r);
-    notify(title, lower + " " + tip, summary, {"open-url":"https://item.jd.com/"+id+".html","update-pasteboard":summary});
-    done({});
-  });
-} else if (mode === "render") {
-  var id2 = extractId(url);
-  if (!id2) { try{$done($response);}catch(_){done({});} return; }
-  var dev2 = getToken();
-  if (!dev2) { try{$done($response);}catch(_){done({});} return; }
-  fetchHistory(id2, dev2, function (err, j22) {
-    if (err || !j22 || j22.ok !== 1) { try{$done($response);}catch(_){done({});} return; }
-    var r = j22.result || {};
-    var title = (r.trendData && r.trendData.title) || ("商品 "+id2);
-    var tip = ((r.priceRemark && r.priceRemark.Tip) || "") + "（仅供参考）";
-    var lower = lowestMsg(r);
-    var summary = summaryText(r);
-
-    var html = $response.body || "";
-    var panelId = "jd-price-panel-" + Date.now();
-    var css = '<style id="'+panelId+'-css">.jd-price-panel{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,PingFang SC,Helvetica,Arial;line-height:1.35;box-shadow:0 6px 18px rgba(0,0,0,.08);border:1px solid #eee;border-radius:12px;padding:12px 14px;margin:10px 8px;background:#fff}.jd-price-panel h3{font-size:15px;margin:0 0 8px 0}.jd-price-meta{color:#666;font-size:12px;margin-bottom:8px}.jd-price-pre{font-size:12px;background:#fafafa;border:1px dashed #ddd;border-radius:8px;padding:8px;white-space:pre-wrap}.jd-price-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}.jd-price-table th,.jd-price-table td{border:1px solid #eee;padding:6px 8px;text-align:left}.jd-price-chart{width:100%;height:120px;margin-top:6px}.jd-price-muted{color:#999}</style>';
-    var content = "";
-    if (isTrue(arg.style_table)) {
-      content += toTable(r);
-    } else if (isTrue(arg.style_line)) {
-      if (!isTrue(arg.line_only)) content += toTable(r);
-      content += toLineChart(r.priceTrend || []);
-    } else {
-      content += '<pre class="jd-price-pre">'+summary.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</pre>';
-    }
-    var panel = '<div class="jd-price-panel" id="'+panelId+'"><h3>🧾 '+(title||"")+'</h3><div class="jd-price-meta">'+(lower||"")+' <span class="jd-price-muted">'+(tip||"")+'</span></div>'+content+'</div>';
-    html = injectAfterHead(html, css + panel);
-    $done({ body: html });
-  });
-} else if (mode === "assistant") {
-  if (isTrue(arg.mute_jd)) { try{$done($response);}catch(_){done({});} }
-  else {
-    try {
-      var html2 = $response.body || "";
-      var tag = '<div style="position:fixed;right:8px;bottom:8px;background:#000;color:#fff;font-size:11px;padding:6px 8px;border-radius:8px;opacity:.5;z-index:99999">京东助手已启用</div>';
-      html2 = html2.replace(/<\/body>/i, tag + "</body>");
-      $done({ body: html2 });
-    } catch(_) { try{$done($response);}catch(_){done({});} }
-  }
-} else {
-  done({});
-}
+// 其它情况直接放行
+done({});
