@@ -1,7 +1,6 @@
 // 京东比价
 // - 获取 token（慢慢买）/ 弹窗（request）/ 页面渲染（表格/原始/折线）
 // - 兼容 Surge / Loon / Stash / Egern / Quantumult X
-// - 去除所有顶层 return，统一 done/$done 结束
 // - 仅需 MITM: in.m.jd.com, apapia-sqk-weblogic.manmanbuy.com
 
 const APP = "京东比价";
