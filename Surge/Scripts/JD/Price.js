@@ -1,24 +1,22 @@
-/** 
- * 京东比价 · 统一渲染器（秒加载/互斥/去重/缓存优先）
- * Author: ByteValley
- * Mode:
- *   - argument=action=token                 // 仅处理慢慢买 token 获取并持久化
- *   - argument=mode=table|raw|line|popup    // 样式模式
- *   - argument=hideTable=true|false         // 折线模式是否隐藏表格
- *   - argument=cacheHours=24                // 缓存时长（小时）
+/**
+ * 京东比价 · 统一渲染器（秒加载 / 互斥 / 去重 / 缓存优先）
+ * Author: ByteValley & ChatGPT
  *
- * 外部脚本（按需异步加载，若你有自研接口可替换）：
- *   TABLE: https://fastly.jsdelivr.net/gh/githubdulong/Script@master/jd_price.js
- *   RAW  : https://fastly.jsdelivr.net/gh/wf021325/qx@master/js/jd_price.js
- *   LINE : https://fastly.jsdelivr.net/gh/mw418/Loon@main/script/jd_price2.js
- *   POPUP: https://fastly.jsdelivr.net/gh/mw418/Loon@main/script/jd_price.js  // 仅用于需要时
+ * 传参方式（Surge/Loon 的 argument）：
+ *   - action=token                // 仅用于慢慢买 token 获取（挂在 apapia-sqk-weblogic 的请求上）
+ *   - mode=table|raw|line|popup   // 指定样式模式（单一值）
+ *   - 或者使用布尔开关（脚本会自动按优先级挑一个）：
+ *        table=true / raw=true / line=true / popup=true
+ *        优先级默认：table > line > raw > popup
+ *   - hideTable=true|false        // 折线模式是否隐藏表格
+ *   - cacheHours=24               // 本地缓存时长（小时），预留给后续直拉接口时使用
  */
 
 (function () {
   const isResponse = typeof $response !== 'undefined';
   const isRequest = typeof $request !== 'undefined' && typeof $response === 'undefined';
 
-  // --------- 参数解析 ---------
+  // ---------- 参数解析 ----------
   const ARG = (function parseArg(s) {
     const out = {};
     if (!s) return out;
@@ -35,12 +33,34 @@
     ($argument && typeof $argument === 'object') ? Object.entries($argument).map(([k,v])=>`${k}=${v}`).join('&') : ''
   );
 
-  const MODE = (ARG.mode || '').toLowerCase();           // table | raw | line | popup
-  const HIDE_TABLE = String(ARG.hideTable || '').toLowerCase() === 'true';
-  const CACHE_HOURS = Math.max(1, parseInt(ARG.cacheHours || '24', 10));
-  const ACTION = ARG.action || '';
+  // ---------- 布尔开关 → MODE ----------
+  const BOOL = (v) => String(v || '').toLowerCase() === 'true';
 
-  // --------- 常量 & 工具 ---------
+  // 用户布尔开关
+  const FLAG = {
+    table: BOOL(ARG.table),
+    raw  : BOOL(ARG.raw),
+    line : BOOL(ARG.line),
+    popup: BOOL(ARG.popup),
+  };
+
+  // 你想要的优先级（可按需调整）
+  const PICK_BY_FLAG = () => {
+    if (FLAG.table) return 'table';
+    if (FLAG.line)  return 'line';
+    if (FLAG.raw)   return 'raw';
+    if (FLAG.popup) return 'popup';
+    return ''; // 没开任何就留空，后面再兜底
+  };
+
+  // 最终模式：优先 mode=...；否则按布尔开关优先级挑；仍为空则默认 table
+  const MODE = ((ARG.mode || '').toLowerCase() || PICK_BY_FLAG() || 'table');
+
+  const HIDE_TABLE  = String(ARG.hideTable  || '').toLowerCase() === 'true';
+  const CACHE_HOURS = Math.max(1, parseInt(ARG.cacheHours || '24', 10));
+  const ACTION      = ARG.action || '';
+
+  // ---------- 工具 ----------
   const store = {
     get(k){ try { return JSON.parse($persistentStore.read(k) || 'null'); } catch(e){ return null; } },
     set(k,v){ try { $persistentStore.write(JSON.stringify(v), k); } catch(e){} },
@@ -65,29 +85,26 @@
     return '';
   }
 
-  // --------- Token 获取专用 ---------
+  // ---------- Token 获取专用 ----------
   if (ACTION === 'token') {
-    // 这里只做“已命中慢慢买菜单接口”的标记；真实 token 仍由外部脚本获取
+    // 命中慢慢买菜单接口时仅做一个标记，真实 token 仍由第三方脚本完成
     store.set('JD_PRICE_TOKEN_HIT', { t: now(), url: ($request && $request.url) });
     return $done({});
   }
 
-  const url = ($request && $request.url) || '';
+  const url = ($request && $request.url) || ($response && $response.url) || '';
   const sku = extractSku(url);
   const cacheKey = sku ? `JD_PRICE_CACHE_${sku}` : '';
 
-  // --------- 把“秒加载”占位注入到页面（response 场景）---------
+  // ---------- response：向页面注入“秒加载”占位 + 异步加载对应样式脚本 ----------
   if (isResponse) {
-    // 防重复：全局哨兵。即便你误开多个版本，也只会渲染一次。
-    const sentinel = 'window.__JD_PRICE_SENTINEL__';
     let body = $response.body;
-
     if (!body || typeof body !== 'string') {
       return $done($response);
     }
 
+    // 防重复：哨兵 + 容器判断。即使被多条规则命中，也只会渲染一次
     if (body.indexOf('__JD_PRICE_SENTINEL__') !== -1 || body.indexOf('id="jd-price-box"') !== -1) {
-      // 已注入过，直接返回，彻底杜绝“双表格”
       return $done($response);
     }
 
@@ -96,28 +113,28 @@
 (function(){
   if (window.__JD_PRICE_SENTINEL__) return;
   window.__JD_PRICE_SENTINEL__ = true;
-  window.__JD_PRICE_MODE__ = ${JSON.stringify(MODE || 'table')};
+  window.__JD_PRICE_MODE__ = ${JSON.stringify(MODE)};
   window.__JD_PRICE_HIDE_TABLE__ = ${HIDE_TABLE ? 'true' : 'false'};
   window.__JD_PRICE_SKU__ = ${JSON.stringify(sku || '')};
 
-  // 占位：秒显，避免白屏
+  // 秒显占位，避免等待时页面空白
   try{
     var box = document.createElement('div');
     box.id = 'jd-price-box';
-    box.style.cssText = 'margin:12px 12px 0;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;';
+    box.style.cssText = 'margin:12px 12px 0;padding:10px;border:1px solid #eee;border-radius:8px;font-size:14px;background:#fff';
     box.innerHTML = '<div style="opacity:.85">💴 价格趋势 · 正在获取…（不影响页面）</div>';
-    document.addEventListener('DOMContentLoaded', function(){ 
-      var mount = document.querySelector('#app,body') || document.body; 
+    document.addEventListener('DOMContentLoaded', function(){
+      var mount = document.querySelector('#app') || document.body;
       (mount||document.body).insertBefore(box, mount.firstChild);
     });
   }catch(e){}
 
-  // 加载外部脚本（按模式）
+  // 根据模式选择外部脚本（可替换为你自托管地址）
   var urls = {
     table: 'https://fastly.jsdelivr.net/gh/githubdulong/Script@master/jd_price.js',
     raw  : 'https://fastly.jsdelivr.net/gh/wf021325/qx@master/js/jd_price.js',
     line : 'https://fastly.jsdelivr.net/gh/mw418/Loon@main/script/jd_price2.js',
-    popup: 'https://fastly.jsdelivr.net/gh/mw418/Loon@main/script/jd_price.js'
+    popup: 'https://fastly.jsdelivr.net/gh/mw418/Loon@main/script/jd_price.js' // popup 仅作兜底
   };
   var chosen = urls[(window.__JD_PRICE_MODE__||'table')] || urls.table;
 
@@ -128,25 +145,28 @@
     document.head.appendChild(s);
   }
 
+  // 3.5s 超时：不再等待，保证体验；占位保留
   var timeout = setTimeout(function(){
-    // 3.5s 超时：不再等待，以免卡体验；占位继续显示即可
-    try{ var tip = document.querySelector('#jd-price-box'); if(tip){ tip.style.opacity='0.7'; tip.innerHTML='💴 价格趋势 · 暂无最新数据（稍后重试）'; } }catch(e){}
+    try{
+      var tip = document.querySelector('#jd-price-box');
+      if(tip){ tip.style.opacity='0.7'; tip.innerHTML='💴 价格趋势 · 暂无最新数据（稍后再试）'; }
+    }catch(e){}
   }, 3500);
 
   load(chosen, function(ok){
     clearTimeout(timeout);
     if (!ok) {
-      try{ var tip = document.querySelector('#jd-price-box'); if(tip){ tip.innerHTML='💴 价格趋势 · 加载脚本失败'; } }catch(e){}
+      try{ var tip = document.querySelector('#jd-price-box'); if(tip){ tip.innerHTML='💴 价格趋势 · 脚本加载失败'; } }catch(e){}
       return;
     }
-    // 去重策略：若外部脚本自己渲染了一套表格，保留一套即可
+    // 去重：若外部脚本也渲染了 DOM，合并/保留一份
     try{
-      var tables = Array.from(document.querySelectorAll('#jd-price-box, .history_price, .price_trend, .price-box'));
-      if (tables.length > 1) {
-        // 保留第一套，移除其余
-        for (var i=1;i<tables.length;i++){
-          if (tables[i] && tables[i].id === 'jd-price-box') continue;
-          if (tables[i].parentNode) tables[i].parentNode.removeChild(tables[i]);
+      var nodes = Array.from(document.querySelectorAll('#jd-price-box, .history_price, .price_trend, .price-box'));
+      if (nodes.length > 1) {
+        for (var i=1;i<nodes.length;i++){
+          if (!nodes[i]) continue;
+          if (nodes[i].id === 'jd-price-box') continue;
+          if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
         }
       }
     }catch(e){}
@@ -154,7 +174,7 @@
 })();
 </script>`;
 
-    // 简单策略：在 </body> 前注入（若未找到则末尾追加）
+    // 在 </body> 前注入（若没有 </body> 就直接追加）
     if (body.indexOf('</body>') !== -1) {
       body = body.replace('</body>', injectJS + '\n</body>');
     } else {
@@ -164,19 +184,18 @@
     return $done({ body });
   }
 
-  // --------- 弹窗模式（request 不拦渲染，或 response 非 graphext 走摘要弹窗）---------
+  // ---------- request 或 popup 模式：弹窗摘要（不阻塞页面） ----------
   if (isRequest || MODE === 'popup') {
-    // 缓存优先：有缓存就直接弹，保证秒出；并后台刷新（这里预留）
+    // 缓存优先：若已有缓存则秒弹；（直拉接口刷新缓存的逻辑留作后续扩展）
     let cached = cacheKey ? store.get(cacheKey) : null;
     if (cached && cached.t && (now() - cached.t < ttlMs)) {
-      notify('京东比价（缓存）', `SKU: ${sku}`, cached.msg || '已为你显示最近价格摘要');
+      notify('京东比价（缓存）', 'SKU: ' + (sku || '未知'), cached.msg || '已展示最近价格摘要');
     } else {
-      notify('京东比价', `SKU: ${sku || '未知'}`, '正在获取价格数据… 不影响页面加载');
+      notify('京东比价', 'SKU: ' + (sku || '未知'), '正在获取价格数据… 页面不受影响');
     }
-    // 你若有直连接口，可在此用 $httpClient 异步刷新并写回 cacheKey
     return $done({});
   }
 
-  // 默认兜底
+  // 兜底
   return $done({});
 })();
