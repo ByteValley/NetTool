@@ -1,84 +1,53 @@
-// 京东比价分发器（超兼容，无新语法）
-// 只做：按 mode 选择上游脚本 -> 下载 -> eval
-// 上游：
-//  - token / popup： https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js
-//  - render 表格：   https://raw.githubusercontent.com/githubdulong/Script/master/jd_price.js
-//  - render 原始：   https://raw.githubusercontent.com/wf021325/qx/master/js/jd_price.js
-//  - render 折线：   https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js
+// 京东比价 · 分发器
+// 只负责按 mode 下载对应上游脚本 → eval
 
-function notify(t,s,b,ext){try{ if(typeof $task!=="undefined"){$notify(t||"",s||"",b||"",ext||{});}else{$notification.post(t||"",s||"",b||"",ext||{});} }catch(e){}}
+function notify(t,s,b){try{if($notification) $notification.post(t||"",s||"",b||"");}catch(e){}}
 function done(v){try{$done(v||{});}catch(e){}}
 
 function parseArg(a){
   var o={}; if(!a) return o;
-  try{
-    var arr=String(a).split("&");
-    for(var i=0;i<arr.length;i++){
-      var kv=arr[i]; var p=kv.indexOf("=");
-      if(p===-1) continue;
-      var k=decodeURIComponent(kv.slice(0,p));
-      var v=decodeURIComponent(kv.slice(p+1));
-      o[k]=v;
-    }
-  }catch(e){}
+  var arr=String(a).split("&");
+  for(var i=0;i<arr.length;i++){
+    var kv=arr[i].split("=");
+    if(kv.length>=2) o[kv[0]]=kv[1];
+  }
   return o;
 }
-var ARG  = parseArg(typeof $argument==="string"?$argument:"");
+
+var ARG = parseArg($argument);
 var MODE = (ARG.mode||"").toLowerCase();
 
 function httpGet(u, cb){
-  try{
-    if(typeof $task!=="undefined"){
-      $task.fetch({url:u}).then(function(resp){cb(null, resp && resp.body);}, function(err){cb(err||"fetch error", null);});
-    }else{
-      $httpClient.get({url:u}, function(e,r,d){ cb(e||null, d||null); });
-    }
-  }catch(e){ cb(e, null); }
+  if(typeof $task!=="undefined"){
+    $task.fetch({url:u}).then(r=>cb(null,r.body), e=>cb(e,null));
+  }else{
+    $httpClient.get(u,(e,r,d)=>cb(e,d));
+  }
 }
 
-function run(url, overrideArg){
-  // 把上游脚本需要的 $argument 透传（仅折线脚本需要 true/false）
-  var oldArg = (typeof $argument!=="undefined") ? $argument : "";
-  if(typeof overrideArg!=="undefined"){ try{ $argument = overrideArg; }catch(e){} }
-
-  httpGet(url, function(err, code){
-    if(err || !code){ notify("京东比价·分发器","加载上游失败", String(err||"empty")); return done({}); }
-    try{
-      eval(code);
-    }catch(e){
-      notify("京东比价·分发器","上游脚本执行异常", String(e&&e.message?e.message:e));
-      done({});
-    }finally{
-      // 还原 $argument，避免污染
-      try{ $argument = oldArg; }catch(e){}
-    }
+function run(url, argOverride){
+  var oldArg=$argument;
+  if(argOverride!==undefined) $argument=argOverride;
+  httpGet(url,function(err,code){
+    if(err||!code){notify("京东比价分发器","加载失败",String(err||"无响应")); return done({});}
+    try{eval(code);}catch(e){notify("京东比价分发器","执行异常",String(e)); done({});}
+    finally{$argument=oldArg;}
   });
 }
 
-/* 路由 */
+// 路由逻辑
 if(MODE==="token"){
-  // 慢慢买 App 我的页面命中
   run("https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js");
-} else if(MODE==="popup"){
-  // 弹窗极速版（request 钩子）
+}else if(MODE==="popup"){
   run("https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price.js");
-} else if(MODE==="render"){
-  // 页面渲染（response）：三选一
-  var sTable = String(ARG.style_table||"").toLowerCase()==="true";
-  var sRaw   = String(ARG.style_raw||"").toLowerCase()==="true";
-  var sLine  = String(ARG.style_line||"").toLowerCase()==="true";
-  var lineOnly = String(ARG.line_only||"").toLowerCase()==="true";
-
-  if(sLine){
-    // 折线脚本吃 $argument：true=仅折线；false=折线+表格
-    run("https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js", lineOnly?"true":"false");
-  }else if(sRaw){
+}else if(MODE==="render"){
+  if(ARG.style_line==="true"){
+    run("https://raw.githubusercontent.com/mw418/Loon/main/script/jd_price2.js", ARG.line_only==="true"?"true":"false");
+  }else if(ARG.style_raw==="true"){
     run("https://raw.githubusercontent.com/wf021325/qx/master/js/jd_price.js");
   }else{
-    // 默认表格
     run("https://raw.githubusercontent.com/githubdulong/Script/master/jd_price.js");
   }
-} else {
-  // mode 不匹配：直接放行
+}else{
   done({});
 }
