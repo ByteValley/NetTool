@@ -5,7 +5,7 @@
 #!tag=功能净化
 
 [Argument]
-激励视频=input,REJECT-DROP,tag=激励视频, desc=激励视频
+激励视频=switch,REJECT-DROP,DIRECT,tag=激励视频, desc=激励视频
 
 [Rule]
 # 1) 分发/控制面：广告配置与下发
