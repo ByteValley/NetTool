@@ -1,0 +1,13 @@
+#!name=中国电信
+#!desc=抓取 e.dlife.cn 登录地址（loginUrl），写入 BoxJS 键 yy_10000.china_telecom_loginUrl，供组件读取
+#!author=ByteValley
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/ChinaTetlcom.png
+#!tag=功能增强
+#!date=2025-09-27
+
+[Script]
+# —— 登录地址捕获（命中 e.dlife.cn 登录流程）——
+http-request ^https?:\/\/e\.dlife\.cn\/(?:user\/loginMiddle|index\.do|forward\.do)\b script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture_notify.js, timeout=30, tag=电信登录地址
+
+[MITM]
+hostname = e.dlife.cn
