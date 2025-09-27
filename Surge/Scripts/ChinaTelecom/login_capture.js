@@ -2,7 +2,7 @@
  * 名称：电信登录地址抓取（稳定版）
  * 作用：从 e.dlife.cn 的登录跳转中提取 loginUrl，写入 BoxJS 键 yy_10000.china_telecom_loginUrl
  * 适配：Surge / Loon / Egern（type=http-request）
- * 作者：ByteValley & ChatGPT
+ * 作者：ByteValley
  */
 
 (function () {
