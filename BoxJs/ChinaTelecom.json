@@ -1,0 +1,66 @@
+{
+  "id": "sub.china_telecom_scriptable",
+  "name": "中国电信（Scriptable）",
+  "apps": [
+    {
+      "id": "yy_10000",
+      "name": "中国电信（Scriptable）",
+      "author": "ByteValley",
+      "icon": "https://raw.githubusercontent.com/anker1209/icon/main/zgdx-big.png",
+      "repo": "local",
+      "keys": [
+        "yy_10000.china_telecom_loginUrl",
+        "yy_10000.cookie",
+        "yy_10000.filterOrientateFlow",
+        "yy_10000.showUsedFlow",
+        "yy_10000.note"
+      ],
+      "settings": [
+        {
+          "id": "yy_10000.china_telecom_loginUrl",
+          "name": "登录地址（loginUrl）",
+          "val": "",
+          "type": "text",
+          "placeholder": "例如：https://e.dlife.cn/user/loginMiddle.do?...",
+          "desc": "由抓取脚本自动写入；如需手动粘贴，也可在此填入。"
+        },
+        {
+          "id": "yy_10000.cookie",
+          "name": "Cookie（可选手动覆盖）",
+          "val": "",
+          "type": "textarea",
+          "placeholder": "如果网站登录后依然无法读取数据，可以把 Cookie 粘贴到这里作为临时覆盖。",
+          "desc": "通常不必手动填写；主脚本在“网站登录”后会自动保存 Cookie。"
+        },
+        {
+          "id": "yy_10000.filterOrientateFlow",
+          "name": "过滤定向流量",
+          "val": "false",
+          "type": "boolean",
+          "desc": "与脚本的「过滤定向」开关一致。"
+        },
+        {
+          "id": "yy_10000.showUsedFlow",
+          "name": "显示已用流量",
+          "val": "false",
+          "type": "boolean",
+          "desc": "与脚本的「显示已用」开关一致。"
+        },
+        {
+          "id": "yy_10000.note",
+          "name": "备注（可选）",
+          "val": "",
+          "type": "text",
+          "placeholder": "比如：主卡/副卡、地区等",
+          "desc": "纯备注，脚本不读取。"
+        }
+      ],
+      "descs_html": [
+        "⚙️ <b>使用说明</b>",
+        "1）登录地址由抓取脚本自动写到 <code>yy_10000.china_telecom_loginUrl</code>；",
+        "2）在 Scriptable 主脚本里点“网站登录”，成功后会自动保存 Cookie；",
+        "3）如遇接口抽风，可把 Cookie 暂时粘到本页的 Cookie 项来覆盖。"
+      ]
+    }
+  ]
+}
