@@ -1,37 +1,50 @@
 /*
 获取方式：打开 https://e.dlife.cn/index.do 登录
-Surge/QuanX/Loon 抓包脚本：ct_login_capture.js
-用途：捕获登录跳转中携带的真实 loginUrl 并写入持久化 key: china_telecom_loginUrl
+
+Surge:
+[MITM]
+hostname = e.dlife.cn
+
+[Script]
+电信登录地址 = type=http-request,pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle,requires-body=0,script-path=https://your.cdn/ct_login_capture.js,script-update-interval=0
+
+或同时匹配 index.do：
+电信登录地址 = type=http-request,pattern=^https:\/\/e\.dlife\.cn\/(user\/loginMiddle|index\.do),requires-body=0,script-path=https://your.cdn/ct_login_capture.js,script-update-interval=0
 */
 
 const APIKey = "yy_10000";
 const $ = new API(APIKey, true);
 if ($request) capture();
 
+/**
+ * capture() - 提取登录地址并写入持久化 key: china_telecom_loginUrl
+ */
 function capture() {
   try {
-    const raw = $request && $request.url ? $request.url : "";
-    const method = $request && $request.method ? $request.method : "";
-    const headers = $request && $request.headers ? $request.headers : {};
-    $.log(`[capture] method=${method}`);
-    $.log(`[capture] raw=${raw}`);
-    $.log(`[capture] ua=${headers['User-Agent'] || headers['user-agent'] || ''}`);
+    const raw = ($request && $request.url) || "";
+    const method = ($request && $request.method) || "";
+    const headers = ($request && $request.headers) || {};
+    // 日志（Surge / Loon / QX 都会有）
+    $.log(`[CT-capture] method=${method}`);
+    $.log(`[CT-capture] raw=${raw}`);
+    $.log(`[CT-capture] UA=${headers['User-Agent'] || headers['user-agent'] || ''}`);
 
     const urlDec = decodeURIComponent(raw);
 
-    // 1) 优先取 ?loginUrl=xxx
+    // 1) 优先取 ?loginUrl=xxx 参数
     const mLogin = urlDec.match(/[?&]loginUrl=([^&]+)/);
     let loginUrl = mLogin ? decodeURIComponent(mLogin[1]) : urlDec;
 
-    // 2) 去掉 sign 参数（如果存在）
+    // 2) 去掉 &sign=...（若存在）
     loginUrl = loginUrl.replace(/&sign=[^&]*/i, "");
 
-    // 3) 兜底：如果不是以 http 开头，从全文抽取第一个 http 链接
+    // 3) 若不是以 http(s) 开头，从全文抽取第一个 http(s) 链接
     if (!/^https?:\/\//i.test(loginUrl)) {
-      const mHttp = urlDec.match(/https?:\/\/[^\s'"]+/i);
+      const mHttp = urlDec.match(/https?:\/\/[^\s&'"]+/i);
       if (mHttp) loginUrl = mHttp[0];
     }
 
+    // 4) 最终校验
     if (!/^https?:\/\//i.test(loginUrl)) {
       $.notify("中国电信", "登录地址获取失败", "未在请求中找到有效的登录地址");
       $.error({ raw, urlDec });
@@ -48,7 +61,10 @@ function capture() {
   }
 }
 
-/* ========== 通用内核（保持不变） ========== */
+// 兼容旧名字（如果有其它老脚本调用 GetCookie）
+var GetCookie = capture;
+
+/* ========== 通用内核（下列代码保持不变） ========== */
 /* prettier-ignore */
 function ENV(){const isJSBox=typeof require=="function"&&typeof $jsbox!="undefined";return{isQX:typeof $task!=="undefined",isLoon:typeof $loon!=="undefined",isSurge:typeof $httpClient!=="undefined"&&typeof $utils!=="undefined",isBrowser:typeof document!=="undefined",isNode:typeof require=="function"&&!isJSBox,isJSBox,isRequest:typeof $request!=="undefined",isScriptable:typeof importModule!=="undefined",isShadowrocket:"undefined"!==typeof $rocket,isStash:"undefined"!==typeof $environment&&$environment["stash-version"]}}
 /* prettier-ignore */
