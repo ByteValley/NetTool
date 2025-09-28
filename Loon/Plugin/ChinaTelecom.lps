@@ -7,7 +7,7 @@
 
 [Script]
 # —— 登录地址捕获（命中 e.dlife.cn 登录流程）——
-http-request ^https?:\/\/e\.dlife\.cn\/(?:user\/loginMiddle|index\.do|forward\.do)\b script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture_notify.js, timeout=30, tag=电信登录地址
+http-request ^https?:\/\/e\.dlife\.cn\/(?:user\/.*|index\.do|index\.html).* script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_catcher.js, timeout=30, tag=电信登录地址
 
 [MITM]
 hostname = e.dlife.cn
