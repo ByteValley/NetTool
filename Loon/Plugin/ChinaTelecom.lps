@@ -2,7 +2,7 @@
 #!desc=抓取 e.dlife.cn 登录地址（loginUrl），写入 BoxJS 键 yy_10000.china_telecom_loginUrl，供组件读取
 #!author=ByteValley
 #!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/ChinaTetlcom.png
-#!tag=功能增强
+#!tag=数据捕获
 #!date=2025-09-27
 
 [Script]
