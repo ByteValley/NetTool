@@ -1,7 +1,7 @@
 /*
- * 名称：电信登录地址抓取（稳定版）+ 捕获结果弹窗
+ * 名称：电信登录地址抓取 + 捕获结果弹窗
  * 作用：从 e.dlife.cn 的登录跳转中提取 loginUrl，写入 BoxJS 键 yy_10000.china_telecom_loginUrl，并弹窗提示
- * 适配：Surge / Loon / Egern（type=http-request）
+ * 适配：Surge / Loon / Egern / Quantumult X（type=http-request）
  * 作者：ByteValley
  */
 
@@ -16,26 +16,22 @@
     const dec = safeDecode(raw);
     let loginUrl = '';
 
-    // 1) 优先：query 里的 loginUrl=xxx
+    // ——— 优先：query 里的 loginUrl=xxx ———
     const qMatch = dec.match(/[?&]loginUrl=([^&]+)/);
     if (qMatch && qMatch[1]) {
       loginUrl = safeDecode(qMatch[1]);
     }
 
-    // 2) 其次：整串里出现 &sign=，取 &sign= 之前的 http(s) 开头那段
+    // ——— 其次：整串里出现 &sign=，取 &sign= 之前的 http(s) 开头那段 ———
     if (!loginUrl) {
       const signMatch = dec.match(/(https?:\/\/.+?)&sign=/);
-      if (signMatch && signMatch[1]) {
-        loginUrl = signMatch[1];
-      }
+      if (signMatch && signMatch[1]) loginUrl = signMatch[1];
     }
 
-    // 3) 兜底：如果本身就是 http(s) 开头的一串
+    // ——— 兜底：抓第一个 http(s):// 开头的片段 ———
     if (!loginUrl) {
-      const httpOnly = dec.match(/https?:\/\/[^\s]+/);
-      if (httpOnly && httpOnly[0]) {
-        loginUrl = httpOnly[0];
-      }
+      const httpOnly = dec.match(/https?:\/\/[^\s"']+/);
+      if (httpOnly && httpOnly[0]) loginUrl = httpOnly[0];
     }
 
     if (!loginUrl) {
@@ -44,7 +40,8 @@
     }
 
     // 写入 BoxJS 键（组件侧以 @yy_10000.china_telecom_loginUrl 引用）
-    setVal('yy_10000.china_telecom_loginUrl', loginUrl);
+    const BOX_KEY = 'yy_10000.china_telecom_loginUrl';
+    setVal(BOX_KEY, loginUrl);
 
     // 复制到剪贴板（多平台兜底）
     setClipboard(loginUrl);
@@ -61,60 +58,91 @@
     return $done({});
   }
 
-  // —— 工具函数 —— //
+  // ——— 工具函数 ———
   function safeDecode(s) {
-    try { return decodeURIComponent(s); } catch (_) { return s; }
+    try { return decodeURIComponent(s.replace(/\+/g, '%20')); } catch (_) { return s; }
   }
 
+  // 跨平台持久化：Surge/Loon → QX → Egern（两种签名） → localStorage
   function setVal(k, v) {
-    if (typeof $prefs !== 'undefined' && $prefs.setValueForKey) {
-      // Surge / Loon
-      $prefs.setValueForKey(v, k);
-    } else if (typeof $storage !== 'undefined' && $storage.set) {
-      // Egern
-      $storage.set({ key: k, value: v });
-    } else if (typeof localStorage !== 'undefined') {
-      // 兜底（一般用不到）
-      localStorage.setItem(k, v);
-    }
+    // Surge / Loon
+    try {
+      if (typeof $persistentStore !== 'undefined' && $persistentStore.write) {
+        $persistentStore.write(String(v), String(k));
+        return;
+      }
+    } catch (_) {}
+
+    // Quantumult X
+    try {
+      if (typeof $prefs !== 'undefined' && $prefs.setValueForKey) {
+        $prefs.setValueForKey(String(v), String(k));
+        return;
+      }
+    } catch (_) {}
+
+    // Egern：写法一
+    try {
+      if (typeof $storage !== 'undefined' && typeof $storage.set === 'function') {
+        $storage.set({ key: String(k), value: String(v) });
+        return;
+      }
+    } catch (_) {}
+
+    // Egern：写法二（有些版本支持 set(k, v)）
+    try {
+      if (typeof $storage !== 'undefined' && typeof $storage.set === 'function') {
+        $storage.set(String(k), String(v));
+        return;
+      }
+    } catch (_) {}
+
+    // 兜底（通常不会用到）
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.setItem) {
+        localStorage.setItem(String(k), String(v));
+        return;
+      }
+    } catch (_) {}
+
+    // 实在不行，打日志但不抛错
+    console.log('[电信登录地址] 持久化失败：未检测到可用存储 API');
   }
 
   // 复制到剪贴板（兼容多平台）
   function setClipboard(text) {
     try {
-      if (typeof $clipboard !== 'undefined' && $clipboard.set) {
-        // Loon / Egern
-        $clipboard.set(text);
-      } else if (typeof $notification !== 'undefined' && $notification.post) {
-        // Surge 无 $clipboard，但有 apps 可通过通知 actions 再打开（这里仍尝试下）
-        // 有些环境也内置 $clipboard.text
-        if (typeof $clipboard !== 'undefined' && 'text' in $clipboard) $clipboard.text = text;
+      if (typeof $clipboard !== 'undefined') {
+        // QX：$clipboard.text；Loon/Egern：$clipboard.set
+        if (typeof $clipboard.set === 'function') {
+          $clipboard.set(String(text));
+          return;
+        }
+        if ('text' in $clipboard) {
+          $clipboard.text = String(text);
+          return;
+        }
       }
     } catch (_) {}
+    // 不能复制就忽略，不影响主流程
   }
 
-  // 统一的通知封装（带 open-url/url，适配多平台；subtitle/body 都可传）
+  // 统一通知（支持 open-url/url）
   function toast(subtitle, body, openUrl) {
     const title = '电信登录地址';
-    // Surge / Loon (老式)
+    // QX / 旧 Surge/Loon
     if (typeof $notify !== 'undefined') {
-      try {
-        $notify(title, subtitle || '', body || '');
-      } catch (_) {}
+      try { $notify(title, subtitle || '', body || ''); } catch (_) {}
     }
-    // Surge / Loon 新式（带 options）
+    // Surge / Loon 新式
     if (typeof $notification !== 'undefined' && $notification.post) {
       try {
         const opts = {};
-        if (openUrl) {
-          // 尽量兼容
-          opts['open-url'] = openUrl;
-          opts['url'] = openUrl;
-        }
+        if (openUrl) { opts['open-url'] = openUrl; opts['url'] = openUrl; }
         $notification.post(title, subtitle || '', body || '', opts);
       } catch (_) {}
     }
-    // Egern
+    // 控制台兜底
     if (typeof $notify === 'undefined' && typeof $notification === 'undefined' && typeof console !== 'undefined') {
       console.log(`[${title}] ${subtitle || ''} ${body || ''}`);
     }
