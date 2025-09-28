@@ -10,4 +10,4 @@ hostname = %APPEND% e.dlife.cn
 
 [Script]
 # —— 登录地址捕获（命中 e.dlife.cn 登录流程）——
-电信登录地址 = type=http-request, pattern=^https?:\/\/e\.dlife\.cn\/(?:user\/loginMiddle|index\.do|forward\.do)\b, requires-body=0, timeout=30, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture_notify.js
+电信登录地址 = type=http-request, pattern=^https?:\/\/e\.dlife\.cn\/(?:user\/.*|index\.do|index\.html).*, requires-body=0, timeout=30, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_catcher.js
