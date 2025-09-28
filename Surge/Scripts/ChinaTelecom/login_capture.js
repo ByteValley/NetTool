@@ -1,11 +1,7 @@
 /*
 获取方式：打开 https://e.dlife.cn/index.do 登录
-
-Surge:
-[MITM]
-hostname = e.dlife.cn
-[Script]
-电信登录地址 = type=http-request,pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle,requires-body=0,script-path=https://your.cdn/ct_login_capture.js,script-update-interval=0
+Surge/QuanX/Loon 抓包脚本：ct_login_capture.js
+用途：捕获登录跳转中携带的真实 loginUrl 并写入持久化 key: china_telecom_loginUrl
 */
 
 const APIKey = "yy_10000";
@@ -14,20 +10,25 @@ if ($request) capture();
 
 function capture() {
   try {
-    const raw = $request.url || "";
+    const raw = $request && $request.url ? $request.url : "";
+    const method = $request && $request.method ? $request.method : "";
+    const headers = $request && $request.headers ? $request.headers : {};
+    $.log(`[capture] method=${method}`);
+    $.log(`[capture] raw=${raw}`);
+    $.log(`[capture] ua=${headers['User-Agent'] || headers['user-agent'] || ''}`);
+
     const urlDec = decodeURIComponent(raw);
 
     // 1) 优先取 ?loginUrl=xxx
     const mLogin = urlDec.match(/[?&]loginUrl=([^&]+)/);
     let loginUrl = mLogin ? decodeURIComponent(mLogin[1]) : urlDec;
 
-    // 2) 如果有 &sign=xxx，就去掉它（可选）
+    // 2) 去掉 sign 参数（如果存在）
     loginUrl = loginUrl.replace(/&sign=[^&]*/i, "");
 
-    // 3) 基本兜底：确认是 http/https 开头
+    // 3) 兜底：如果不是以 http 开头，从全文抽取第一个 http 链接
     if (!/^https?:\/\//i.test(loginUrl)) {
-      // 尝试从整串里抽第一个 http(s) 链接
-      const mHttp = urlDec.match(/https?:\/\/[^\s&]+/i);
+      const mHttp = urlDec.match(/https?:\/\/[^\s'"]+/i);
       if (mHttp) loginUrl = mHttp[0];
     }
 
@@ -47,7 +48,7 @@ function capture() {
   }
 }
 
-/* ========== 通用内核，保持不变 ========== */
+/* ========== 通用内核（保持不变） ========== */
 /* prettier-ignore */
 function ENV(){const isJSBox=typeof require=="function"&&typeof $jsbox!="undefined";return{isQX:typeof $task!=="undefined",isLoon:typeof $loon!=="undefined",isSurge:typeof $httpClient!=="undefined"&&typeof $utils!=="undefined",isBrowser:typeof document!=="undefined",isNode:typeof require=="function"&&!isJSBox,isJSBox,isRequest:typeof $request!=="undefined",isScriptable:typeof importModule!=="undefined",isShadowrocket:"undefined"!==typeof $rocket,isStash:"undefined"!==typeof $environment&&$environment["stash-version"]}}
 /* prettier-ignore */
