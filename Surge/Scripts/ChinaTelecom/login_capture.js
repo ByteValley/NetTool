@@ -3,10 +3,8 @@
 
 Surge:
 [Script]
-# 推荐：只抓 loginMiddle.do（最干净）
 电信登录地址抓取 = type=http-request, pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle\.do(?:\?.*)?$, requires-body=0, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture.js, script-update-interval=0
 
-# 可选：也抓入口 index.do（有些场景只访问入口页）
 电信入口地址抓取 = type=http-request, pattern=^https:\/\/e\.dlife\.cn\/index\.do(?:\?.*)?$, requires-body=0, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture.js, script-update-interval=0
 
 [MITM]
