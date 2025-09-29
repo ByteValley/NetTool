@@ -1,13 +1,15 @@
 #!name=电信抓取
-#!desc=捕获 e.dlife.cn 的 loginMiddle.do 登录跳转地址，写入 BoxJS 键 yy_10000.china_telecom_loginUrl
+#!desc=捕获 e.dlife.cn 的 loginMiddle.do 跳转并写入 BoxJS 键 yy_10000.china_telecom_loginUrl
 #!author=ByteValley
 #!category=数据捕获
 #!updated=2025-09-28
 
 [Script]
-电信登录地址抓取 = type=http-request, pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle, requires-body=0, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture.js, requires-body=true, max-size=0, script-update-interval=0
+# 只抓 loginMiddle.do（推荐）
+电信登录地址抓取 = type=http-request, pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle\.do(?:\?.*)?$, requires-body=0, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture.js, script-update-interval=43200
 
-index = type=http-request, pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle, requires-body=0, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture.js
+# 可选：也抓 index.do（登录入口）
+电信入口地址抓取 = type=http-request, pattern=^https:\/\/e\.dlife\.cn\/index\.do(?:\?.*)?$, requires-body=0, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/ChinaTelecom/login_capture.js, script-update-interval=43200
 
 [MITM]
 hostname = %APPEND% e.dlife.cn
