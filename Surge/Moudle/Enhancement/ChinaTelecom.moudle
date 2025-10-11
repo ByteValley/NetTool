@@ -1,0 +1,11 @@
+#!name=中国电信
+#!desc=查询套餐内通话、套餐使用情况，获取方式：打开  https://e.dlife.cn/index.do 登录
+#!author=ByteValley
+#!category=功能增强
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/ChinaTetlcom.png
+
+[MITM]
+hostname = e.dlife.cn
+
+[Script]
+电信登录地址 = type=http-request,pattern=^https:\/\/e\.dlife\.cn\/user\/loginMiddle,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/dompling/Script/master/10000/index.js,script-update-interval=0
