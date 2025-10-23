@@ -3,7 +3,8 @@
 #!author=ByteValley
 #!icon=https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/Weibo-00.png
 #!category=功能净化
-#!updated=2025-08-02
+#!updated=2025-10-23
+#!ScriptHub=https://script.hub/file/_start_/https://github.com/fmz200/wool_scripts/raw/main/Surge/module/weibo.module/_end_/weibo.sgmodule.txt?type=surge-module&target=surge-module&del=true&jqEnabled=true
 
 [Rule]
 # 收集用户信息，上传用户日志的请求
