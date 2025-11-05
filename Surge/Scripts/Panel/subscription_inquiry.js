@@ -149,7 +149,7 @@ function fetchInfo(url, resetDay, title) {
   } else {
     const contentAll = panels.map(p => p.content).join("\n\n");
     $done({
-      title: "订阅流量",
+      title: "订阅信息",
       content: contentAll,
       icon: defaultIcon,
       iconColor: defaultColor
