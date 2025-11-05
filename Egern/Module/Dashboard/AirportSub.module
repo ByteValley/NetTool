@@ -1,0 +1,34 @@
+name: 订阅流量查询
+description: 机场订阅信息展示,流量使用及剩余信息&到期日期。
+compat_arguments:
+  Title1: SNPT
+  URL1: 
+  ResetDay1: 30
+  Title2: KTMIEPL
+  URL2: 
+  ResetDay2: 3
+  Title3: KTMCloud
+  URL3: 
+  ResetDay3: 0
+  Title4: CornssCloud
+  URL4: 
+  ResetDay4: 30
+  Title5: AladdinNetwork
+  URL5: 
+  ResetDay5: 12
+compat_arguments_desc: |-
+  1.本模块不需要编码订阅地址可直接使用
+  2.ABCDE代表不同订阅的地址和备注名称以及流量重置日期
+
+  支持导入5个订阅显示
+  支持百分比进度
+  支持订阅套餐重置填写重置日期
+dns: {}
+scriptings:
+- generic:
+    name: 订阅面板
+    script_url: https://github.com/z-jinke/Panel/raw/refs/heads/main/Js/Flowquery.js
+    arguments:
+      _compat.$argument: title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}
+panels:
+- name: 订阅面板
