@@ -1,51 +1,26 @@
 // ===== 工具函数 =====
 function bytesToSize(bytes) {
   if (!bytes || bytes <= 0) return "0 B";
-  const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   const val = bytes / Math.pow(k, i);
-  return `${val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2)} ${sizes[i]}`;
+  return `${val.toFixed(2)} ${sizes[i]}`;
 }
 function toPercent(used, total) {
   if (!total) return "0%";
-  return `${Math.round((used / total) * 100)}%`;
+  return `${((used / total) * 100).toFixed(2)}%`;
 }
 function toReversePercent(used, total) {
   if (!total) return "0%";
-  return `${Math.round(((total - used) / total) * 100)}%`;
+  return `${(((total - used) / total) * 100).toFixed(2)}%`;
 }
-function toMultiply(total, used) { // 实际即“剩余字节”
-  const remain = Math.max((total || 0) - (used || 0), 0);
-  return bytesToSize(remain);
+function formatDate(ts) {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${y}.${m}.${day}`;
 }
-function formatTime(ts) {
-  try {
-    const d = new Date(ts);
-    const Y = d.getFullYear();
-    const M = String(d.getMonth() + 1).padStart(2, "0");
-    const D = String(d.getDate()).padStart(2, "0");
-    const h = String(d.getHours()).padStart(2, "0");
-    const m = String(d.getMinutes()).padStart(2, "0");
-    return `${Y}-${M}-${D} ${h}:${m}`;
-  } catch {
-    return "--";
-  }
-}
-
-// ===== 参数解析（兼容大小写）=====
-const args = {};
-($argument || "").split("&").forEach(p => {
-  const idx = p.indexOf("=");
-  if (idx === -1) return;
-  const key = p.substring(0, idx);
-  const value = p.substring(idx + 1);
-  args[key] = decodeURIComponent(value || "");
-});
-function pickArg(prefLower, prefUpper) {
-  return args[prefLower] ?? args[prefUpper] ?? null;
-}
-
-// ===== 计算重置信息（返回天数整数）=====
 function getResetDaysLeft(resetDay) {
   if (!resetDay) return null;
   const today = new Date();
@@ -53,26 +28,49 @@ function getResetDaysLeft(resetDay) {
   const nowMonth = today.getMonth();
   const nowYear = today.getFullYear();
   let resetDate;
-  if (nowDay < resetDay) {
-    resetDate = new Date(nowYear, nowMonth, resetDay);
-  } else {
-    resetDate = new Date(nowYear, nowMonth + 1, resetDay);
-  }
+  if (nowDay < resetDay) resetDate = new Date(nowYear, nowMonth, resetDay);
+  else resetDate = new Date(nowYear, nowMonth + 1, resetDay);
   const diff = Math.ceil((resetDate - today) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 0;
 }
 
-// ===== 拉取一个订阅并按“这样”的样式拼装 =====
-function fetchInfo(url, resetDay) {
+// ===== 参数解析 =====
+const args = {};
+($argument || "").split("&").forEach(p => {
+  const idx = p.indexOf("=");
+  if (idx === -1) return;
+  const key = p.substring(0, idx);
+  const value = p.substring(idx + 1);
+  args[key] = decodeURIComponent(value);
+});
+function getArg(lower, upper) {
+  return args[lower] ?? args[upper] ?? null;
+}
+
+// ===== 机场图标与颜色映射 =====
+const iconMap = {
+  snpt: { icon: "bandage.fill", color: "#FF9500" },
+  ktmiepl: { icon: "waveform.path.ecg", color: "#FF7F00" },
+  ktmcloud: { icon: "atom", color: "#FF3B30" },
+  cornsscloud: { icon: "waveform", color: "#30D158" },
+  aladdinnetwork: { icon: "network", color: "#007AFF" },
+};
+
+// ===== 拉取机场信息 =====
+function fetchInfo(url, resetDay, title) {
   return new Promise(resolve => {
     $httpClient.get({ url, headers: { "User-Agent": "Quantumult%20X/1.5.2" } }, (err, resp) => {
-      if (err || !resp || resp.status !== 200) {
-        resolve(`订阅请求失败，状态码：${resp ? resp.status : "请求错误"}`);
+      if (err || !resp) {
+        resolve(`机场：${title}\n订阅请求失败，状态码：${resp ? resp.status : "请求错误"}`);
+        return;
+      }
+      if (resp.status !== 200) {
+        resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
         return;
       }
 
-      const data = {};
       const headerKey = Object.keys(resp.headers).find(k => k.toLowerCase() === "subscription-userinfo");
+      const data = {};
       if (headerKey && resp.headers[headerKey]) {
         resp.headers[headerKey].split(";").forEach(p => {
           const [k, v] = p.trim().split("=");
@@ -84,56 +82,77 @@ function fetchInfo(url, resetDay) {
       const download = data.download || 0;
       const total = data.total || 0;
       const used = upload + download;
-
-      // 第一行：已用/剩余（百分比 + 字节）
-      const lines = [];
-      const line1 = `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)} \n剩余：${toReversePercent(used, total)} ➟ ${toMultiply(total, used)}`;
-      lines.push(line1);
-
-      // 第二行：重置天数与到期时间
-      let expire = data.expire;
-      let expireMs = null;
-      if (expire) {
-        // 兼容秒/毫秒
-        expireMs = /^[\d.]+$/.test(String(expire)) ? (Number(expire) < 10_000_000_000 ? Number(expire) * 1000 : Number(expire)) : null;
-      }
+      const remain = Math.max(total - used, 0);
       const resetLeft = getResetDaysLeft(resetDay);
 
-      if ((resetLeft !== null && resetLeft !== undefined) || expireMs) {
-        if (resetLeft !== null && expireMs) {
-          lines.push(`重置：${resetLeft}天 \t|  ${formatTime(expireMs)}`);
-        } else if (resetLeft !== null && !expireMs) {
-          lines.push(`重置：${resetLeft}天`);
-        } else if ((resetLeft === null || resetLeft === undefined) && expireMs) {
-          lines.push(`到期：${formatTime(expireMs)}`);
+      // 到期时间逻辑
+      let expireMs;
+      if (data.expire) {
+        let exp = Number(data.expire);
+        if (/^\d+$/.test(data.expire)) {
+          if (exp < 10_000_000_000) exp *= 1000; // 秒转毫秒
         }
+        expireMs = exp;
+      } else {
+        expireMs = new Date("2099-12-31T00:00:00Z").getTime();
       }
+      const expireStr = formatDate(expireMs);
 
-      resolve(lines.join("\n"));
+      // 构建内容
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      const titleLine = `${title} | ${bytesToSize(total)} | ${timeStr}`;
+      const usedLine = `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)}`;
+      const remainLine = `剩余：${toReversePercent(used, total)} ➟ ${bytesToSize(remain)}`;
+      const resetLine = `重置：${resetLeft !== null ? resetLeft : 0}天 | 到期：${expireStr}`;
+
+      resolve([titleLine, usedLine, remainLine, resetLine].join("\n"));
     });
   });
 }
 
-// ===== 主流程：最多 10 个订阅，兼容大小写参数 =====
+// ===== 主流程 =====
 (async () => {
+  const defaultIcon = "antenna.radiowaves.left.and.right.circle.fill";
+  const defaultColor = "#00E28F";
   const panels = [];
 
   for (let i = 1; i <= 10; i++) {
-    const url = pickArg(`url${i}`, `URL${i}`);
+    const url = getArg(`url${i}`, `URL${i}`);
     if (!url) continue;
 
-    const title = pickArg(`title${i}`, `Title${i}`);
-    const resetRaw = pickArg(`resetDay${i}`, `ResetDay${i}`);
-    const resetDay = resetRaw ? parseInt(resetRaw) : null;
+    const title = getArg(`title${i}`, `Title${i}`) || `机场${i}`;
+    const reset = getArg(`resetDay${i}`, `ResetDay${i}`);
+    const resetDay = reset ? parseInt(reset) : null;
 
-    const content = await fetchInfo(url, Number.isInteger(resetDay) ? resetDay : null);
-    panels.push(title ? `机场：${title}\n${content}` : content);
+    const customIcon = getArg(`icon${i}`, `Icon${i}`);
+    const customColor = getArg(`iconColor${i}`, `IconColor${i}`);
+
+    const key = title.toLowerCase();
+    const autoIcon = iconMap[key]?.icon || defaultIcon;
+    const autoColor = iconMap[key]?.color || defaultColor;
+
+    const icon = customIcon || autoIcon;
+    const color = customColor || autoColor;
+
+    const content = await fetchInfo(url, resetDay, title);
+    panels.push({
+      title,
+      content,
+      icon,
+      iconColor: color
+    });
   }
 
-  $done({
-    title: "订阅流量",
-    content: panels.length ? panels.join("\n\n") : "未配置订阅参数",
-    icon: "antenna.radiowaves.left.and.right.circle.fill",
-    "icon-color": "#00E28F"
-  });
+  if (panels.length === 1) {
+    $done(panels[0]);
+  } else {
+    const contentAll = panels.map(p => p.content).join("\n\n");
+    $done({
+      title: "订阅流量",
+      content: contentAll,
+      icon: defaultIcon,
+      iconColor: defaultColor
+    });
+  }
 })();
