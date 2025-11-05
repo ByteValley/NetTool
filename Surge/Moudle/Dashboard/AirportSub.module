@@ -1,0 +1,22 @@
+#!name=订阅流量面板
+#!desc=机场订阅信息展示,流量使用及剩余信息&到期日期。
+#!author=ByteEden & z-jinke
+#!category=功能看板
+#!icon=https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Icon/Flow.png
+#!arguments=Title1,URL1,ResetDay1,Title2,URL2,ResetDay2,Title3,URL3,ResetDay3,Title4,URL4,ResetDay4,Title5,URL5,ResetDay5
+
+# =========================
+# 模块说明 · 使用指引
+# =========================
+# 1）在模块参数界面中填写以下字段：
+#    - TitleN：面板显示名称（支持中文）
+#    - URLN：订阅链接（需URL编码）
+#    - ResetDayN：重置日（1~31，可选）
+# 2）最多支持五个订阅
+# 3）无需配置 Rewrite 或 MITM
+
+[Panel]
+订阅流量 = script-name=订阅流量查询, update-interval=600
+
+[Script]
+订阅流量查询 = type=generic, timeout=15, script-path=https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Js/Flowquery.js, argument=title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}
