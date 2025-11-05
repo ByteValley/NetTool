@@ -1,6 +1,6 @@
 #!name=订阅流量面板
 #!desc=机场订阅信息展示,流量使用及剩余信息&到期日期。
-#!author=ByteEden & z-jinke
+#!author=ByteValley
 #!category=功能看板
 #!icon=https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Icon/Flow.png
 #!arguments=Title1,URL1,ResetDay1,Title2,URL2,ResetDay2,Title3,URL3,ResetDay3,Title4,URL4,ResetDay4,Title5,URL5,ResetDay5
