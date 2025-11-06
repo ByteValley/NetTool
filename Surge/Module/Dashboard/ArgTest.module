@@ -1,8 +1,0 @@
-#!name=ArgTest
-#!desc=参数面板测试
-#!category=测试
-#!arguments=Foo:bar,Baz:
-#!arguments-desc=用于验证参数面板是否出现（应能看到 Foo 和 Baz 可编辑）
-
-[Rule]
-DOMAIN-SUFFIX,example.com,REJECT
