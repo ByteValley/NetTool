@@ -195,7 +195,7 @@
       const x=resp.headers && (resp.headers["x-originating-url"]||resp.headers["X-Originating-URL"]);
       if (x){
         const seg=String(x).split("/"); if (seg.length>=4){
-          const cc=seg[3].split("-)[0]; if (cc && cc.length===2) return cc.toUpperCase();
+          const cc = seg[3].split('-')[0]; if (cc && cc.length===2) return cc.toUpperCase();
         }
       }
       const m=String(resp.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
