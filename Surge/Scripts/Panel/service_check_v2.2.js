@@ -5,6 +5,8 @@
  * 样式：
  *   - detail：✅ + 旗帜 + 代码 + "| 中文名" + 延迟 + HTTP
  *   - simple：✅ + 旗帜 + 代码 + "| 中文名"
+ *   - text  ：YouTube: 已解锁， 区域: 🇯🇵 JP | 日本 ｜ 自制/完整/受限/不可达
+ *   - arrow ：YouTube: 已解锁  ==>  🇯🇵 JP | 日本 ｜ 自制/完整/受限/不可达
  * 其它：
  *   - 去掉“出口信息”首行
  *   - 末尾追加：蜂窝数据一行；下一行起显示 设备/节点 信息（无额外标题，与上段之间留一空行）
@@ -31,7 +33,8 @@
   const ICON         = getArg("defaultIcon", "globe");
   const ICON_COLOR   = getArg("defaultIconColor", "#1E90FF");
   const LANG         = /^zh-hans$/i.test(getArg("lang", "zh-Hant")) ? "zh-Hans" : "zh-Hant";
-  const STYLE        = /^simple$/i.test(getArg("style", "detail")) ? "simple" : "detail";
+  const STYLE_RAW    = getArg("style", "detail").toLowerCase();
+  const STYLE        = (["detail","simple","text","arrow"].includes(STYLE_RAW) ? STYLE_RAW : "detail");
   const SHOW_LAT     = /^true$/i.test(getArg("showLatency", "true"));
   const SHOW_HTTP    = /^true$/i.test(getArg("showHttp", "true"));
   const TITLE_PARAM  = getArg("title", "");
@@ -45,6 +48,7 @@
       fail: "檢測失敗",
       regionBlocked: "區域受限",
       unlocked: "已解鎖",
+      locked: "未解鎖",
       full: "完整",
       originals: "自製",
       youTube: "YouTube",
@@ -55,6 +59,7 @@
       huluUS: "Hulu(美)",
       huluJP: "Hulu(日)",
       hbo: "Max(HBO)",
+      region: "區域",
       cellular: "蜂窩數據",
       devip: "設備IP",
       ipv6: "IPv6地址",
@@ -69,6 +74,7 @@
       fail: "检测失败",
       regionBlocked: "区域受限",
       unlocked: "已解锁",
+      locked: "未解锁",
       full: "完整",
       originals: "自制",
       youTube: "YouTube",
@@ -79,6 +85,7 @@
       huluUS: "Hulu(美)",
       huluJP: "Hulu(日)",
       hbo: "Max(HBO)",
+      region: "区域",
       cellular: "蜂窝数据",
       devip: "设备IP",
       ipv6: "IPv6地址",
@@ -157,16 +164,29 @@
     return cc;
   }
 
-  // 统一行拼装
-  // tag: “自制/完整/区域受限”等补充标签
-  function joinLine(name, ok, regionCC, cost, status, tag="") {
+  // 样式渲染器
+  function renderLine({name, ok, cc, cost, status, tag}) {
+    const regionChunk = cc ? ccPretty(cc) : "";
+    const tagChunk = tag ? `｜ ${tag}` : "";
+    if (STYLE === "text") {
+      if (ok) return `${name}: ${I18N.unlocked}， ${I18N.region}: ${regionChunk || "—"}${tagChunk}`;
+      // 不可用的 text 风格
+      const bad = tag || I18N.unreachable;
+      return `${name}: ${bad}， ${I18N.region}: ${regionChunk || "—"}`;
+    }
+    if (STYLE === "arrow") {
+      if (ok) return `${name}: ${I18N.unlocked}  ==>  ${regionChunk || "—"}${tagChunk}`;
+      const bad = tag || I18N.unreachable;
+      return `${name}: ${bad}  ==>  ${regionChunk || "—"}`;
+    }
+    // 旧两种
     const parts = [];
     parts.push(`${ok ? "✅" : "⛔️"} ${name}`);
-    if (regionCC) parts.push(ccPretty(regionCC));
+    if (regionChunk) parts.push(regionChunk);
     if (tag) parts.push(tag);
     if (STYLE === "detail") {
-      if (SHOW_LAT && cost != null) parts.push(`${cost}ms`);
-      if (SHOW_HTTP && status > 0)  parts.push(`HTTP ${status}`);
+      if (cost != null) parts.push(`${cost}ms`);
+      if (status > 0)  parts.push(`HTTP ${status}`);
     }
     return parts.join(" ｜ ");
   }
@@ -174,7 +194,7 @@
   // 解析 NF 区域
   function parseNFRegion(resp) {
     try {
-      const x = resp.headers?.["x-originating-url"] || resp.headers?.["X-Originating-URL"];
+      const x = resp.headers?.["x-originating-url"] || resp.headers?.["X-Origining-URL"] || resp.headers?.["X-Originating-URL"];
       if (x) {
         const seg = String(x).split("/");
         if (seg.length >= 4) {
@@ -188,14 +208,12 @@
     return "";
   }
 
-  // 备用：通过 ip-api 查落地信息（给 App/API 用，同时也作为 Disney 等兜底）
+  // 落地 IP 查国家（给 App/API / 兜底）
   async function queryLandingCC() {
     const r = await httpGet("http://ip-api.com/json", {}, true);
     if (r.ok && r.status === 200) {
-      try {
-        const j = JSON.parse(r.data || "{}");
-        return (j.countryCode || "").toUpperCase();
-      } catch(_){ return ""; }
+      try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
+      catch(_){ return ""; }
     }
     return "";
   }
@@ -203,29 +221,28 @@
   // ------------ 各服务检测 ------------
   async function testYouTube() {
     const r = await httpGet("https://www.youtube.com/premium?hl=en", {}, true);
-    if (!r.ok) return `${I18N.youTube}: ${I18N.unreachable}`;
-    let cc = "";
+    if (!r.ok) return renderLine({name:I18N.youTube, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
+    let cc = "US";
     try {
       let m = r.data.match(/"countryCode":"([A-Z]{2})"/);
       if (!m) m = r.data.match(/["']INNERTUBE_CONTEXT_GL["']\s*:\s*["']([A-Z]{2})["']/);
-      if (m) cc = m[1]; else cc = "US";
-    } catch(_){ cc = "US"; }
-    return joinLine(I18N.youTube, true, cc, r.cost, r.status);
+      if (m) cc = m[1];
+    } catch(_){}
+    return renderLine({name:I18N.youTube, ok:true, cc, cost:r.cost, status:r.status, tag:""});
   }
 
   async function testChatGPTWeb() {
     const r = await httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
-    if (!r.ok) return `${I18N.chatgpt}: ${I18N.unreachable}`;
+    if (!r.ok) return renderLine({name:I18N.chatgpt, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
     let cc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch(_){}
-    return joinLine(I18N.chatgpt, true, cc, r.cost, r.status);
+    return renderLine({name:I18N.chatgpt, ok:true, cc, cost:r.cost, status:r.status, tag:""});
   }
 
   async function testChatGPTAppAPI() {
-    // 访问 models 判断可达性；国家用落地 IP 查询补齐
-    const models = await httpGet("https://api.openai.com/v1/models", {}, true);
-    if (!models.ok) return `${I18N.chatgpt_app}: ${I18N.unreachable}`;
-    let cc = await queryLandingCC();
-    return joinLine(I18N.chatgpt_app, true, cc, models.cost, models.status);
+    const r = await httpGet("https://api.openai.com/v1/models", {}, true);
+    if (!r.ok) return renderLine({name:I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
+    const cc = await queryLandingCC();
+    return renderLine({name:I18N.chatgpt_app, ok:true, cc, cost:r.cost, status:r.status, tag:""});
   }
 
   const NF_ORIGINAL = "80018499";
@@ -235,22 +252,22 @@
   async function testNetflix() {
     try {
       const r1 = await nfGet(NF_NONORIG); // 非自制
-      if (!r1.ok) return `${I18N.netflix}: ${I18N.fail}`;
-      if (r1.status === 403) return joinLine(I18N.netflix, false, "", r1.cost, r1.status, I18N.regionBlocked);
+      if (!r1.ok) return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:I18N.fail});
+      if (r1.status === 403) return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:I18N.regionBlocked});
       if (r1.status === 404) {
         const r2 = await nfGet(NF_ORIGINAL);
-        if (!r2.ok) return `${I18N.netflix}: ${I18N.fail}`;
-        if (r2.status === 404) return joinLine(I18N.netflix, false, "", r2.cost, r2.status, I18N.regionBlocked);
+        if (!r2.ok) return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:I18N.fail});
+        if (r2.status === 404) return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:I18N.regionBlocked});
         const cc = parseNFRegion(r2) || "";
-        return joinLine(I18N.netflix, true, cc, r2.cost, r2.status, I18N.originals);
+        return renderLine({name:I18N.netflix, ok:true, cc, cost:r2.cost, status:r2.status, tag:I18N.originals});
       }
       if (r1.status === 200) {
         const cc = parseNFRegion(r1) || "";
-        return joinLine(I18N.netflix, true, cc, r1.cost, r1.status, I18N.full);
+        return renderLine({name:I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:I18N.full});
       }
-      return `${I18N.netflix}: HTTP ${r1.status}`;
+      return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:`HTTP ${r1.status}`});
     } catch(_){
-      return `${I18N.netflix}: ${I18N.fail}`;
+      return renderLine({name:I18N.netflix, ok:false, cc:"", cost:null, status:0, tag:I18N.fail});
     }
   }
 
@@ -288,36 +305,36 @@
     try {
       const h = await Promise.race([home(), timeout(7000,"TO")]);
       const b = await Promise.race([bam(),  timeout(7000,"TO")]).catch(()=>({}));
-      const cc = (b?.cc || h?.cc || (await queryLandingCC()) || "");
       const blocked = (b && b.inLoc === false);
-      return joinLine(I18N.disney, !blocked, blocked ? "" : cc, (b?.cost||h?.cost||0), (b?.status||h?.status||0), blocked ? I18N.regionBlocked : "");
+      const cc = blocked ? "" : (b?.cc || h?.cc || (await queryLandingCC()) || "");
+      return renderLine({name:I18N.disney, ok:!blocked, cc, cost:(b?.cost||h?.cost||0), status:(b?.status||h?.status||0), tag: blocked ? I18N.regionBlocked : ""});
     } catch(e){
-      if (e === "TO") return `${I18N.disney}: ${I18N.timeout}`;
-      return `${I18N.disney}: ${I18N.fail}`;
+      const tag = (e==="TO") ? I18N.timeout : I18N.fail;
+      return renderLine({name:I18N.disney, ok:false, cc:"", cost:null, status:0, tag});
     }
   }
 
   async function testHuluUS() {
     const r = await httpGet("https://www.hulu.com/", {}, true);
-    if (!r.ok) return `${I18N.huluUS}: ${I18N.unreachable}`;
+    if (!r.ok) return renderLine({name:I18N.huluUS, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
     const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
-    return joinLine(I18N.huluUS, !blocked, blocked ? "" : "US", r.cost, r.status, blocked ? I18N.regionBlocked : "");
+    return renderLine({name:I18N.huluUS, ok:!blocked, cc: blocked?"": "US", cost:r.cost, status:r.status, tag: blocked ? I18N.regionBlocked : ""});
   }
 
   async function testHuluJP() {
     const r = await httpGet("https://www.hulu.jp/", { "Accept-Language":"ja" }, true);
-    if (!r.ok) return `${I18N.huluJP}: ${I18N.unreachable}`;
+    if (!r.ok) return renderLine({name:I18N.huluJP, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
     const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
-    return joinLine(I18N.huluJP, !blocked, blocked ? "" : "JP", r.cost, r.status, blocked ? I18N.regionBlocked : "");
+    return renderLine({name:I18N.huluJP, ok:!blocked, cc: blocked?"": "JP", cost:r.cost, status:r.status, tag: blocked ? I18N.regionBlocked : ""});
   }
 
   async function testHBO() {
     const r = await httpGet("https://www.max.com/", {}, true);
-    if (!r.ok) return `${I18N.hbo}: ${I18N.unreachable}`;
+    if (!r.ok) return renderLine({name:I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
     const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
     let cc=""; try { const m = String(r.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch(_){}
     if (!cc) cc = await queryLandingCC();
-    return joinLine(I18N.hbo, !blocked, blocked ? "" : cc, r.cost, r.status, blocked ? I18N.regionBlocked : "");
+    return renderLine({name:I18N.hbo, ok:!blocked, cc: blocked?"": cc, cost:r.cost, status:r.status, tag: blocked ? I18N.regionBlocked : ""});
   }
 
   // ------------ 蜂窝/设备/节点 ------------
@@ -355,11 +372,12 @@
         city    = j.city || "";
       } catch(_){}
     }
-    const loc = cc ? `${flagFromCC(cc)} ${cc} | ${country}${city?` - ${city}`:""}` : "";
+    const flag = cc ? `${flagFromCC(cc)} ${cc}` : "";
+    const loc = cc ? `${flag} | ${country}${city?` - ${city}`:""}` : "";
 
     const out = [];
     if (dev4) out.push(`${I18N.devip}：${dev4}`);
-    out.push(`${I18N.ipv6}：${ipv6Assigned ? (LANG==="zh-Hans"?"已分配":"已分配") : (LANG==="zh-Hans"?"未分配":"未分配")}`);
+    out.push(`${I18N.ipv6}：${LANG==="zh-Hans"?"已分配":"已分配"}${ipv6Assigned?"":"".replace("已","未")}`.replace("已分配", ipv6Assigned? (LANG==="zh-Hans"?"已分配":"已分配") : (LANG==="zh-Hans"?"未分配":"未分配")));
     if (nodeIP) out.push(`${I18N.nodeip}：${nodeIP}`);
     if (isp)   out.push(`${I18N.nodeisp}：${isp}`);
     if (loc)   out.push(`${I18N.nodeloc}：${loc}`);
@@ -381,7 +399,7 @@
       testHBO()
     ]);
 
-    lines.push(yt, cgptW, cgptA, nf, d, hu, hj, hb);
+    lines.push(yt, nf, d, cgptW, cgptA, hu, hj, hb); // 顺序微调：常看流媒在前
 
     const cell = getCellularLine();
     if (cell) lines.push("", cell);
