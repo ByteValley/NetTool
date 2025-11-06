@@ -1,12 +1,8 @@
 /**
- * 服务检测 / 服務檢測
+ * 服务检测 / 服務檢測（含代理策略块）
  * 作者：ByteValley（参考 LucaLin233 / Rabbit-Spec）
  * 支持：Netflix / Disney+ / YouTube Premium / ChatGPT Web+App / Hulu(US/JP) / Max(HBO)
- * Style=pretty（✅+延迟+HTTP+旗帜）/ Style=icon（简洁行+旗帜）
- * 本版要点：
- * - 去掉“出口信息”首行
- * - 顶部头部区：代理策略 + 蜂窝数据（各占一行）；头部区与服务列表之间留一空行
- * - 末尾：设备/节点信息（逐行，无额外标题、无留白）
+ * 新增：在“设备IP”下方追加 代理策略/入口/落地 信息（随 Lang=zh-Hans/zh-Hant 本地化）
  */
 
 (() => {
@@ -27,16 +23,16 @@
   const ICON         = get("defaultIcon", "globe");
   const ICON_COLOR   = get("defaultIconColor", "#1E90FF");
   const LANG         = /^zh-hans$/i.test(get("lang", "zh-Hant")) ? "zh-Hans" : "zh-Hant";
-  const STYLE        = /^(icon)$/i.test(get("style", "pretty")) ? "icon" : "pretty";
+  const STYLE        = /^(icon|simple|text|arrow|concise)$/i.test(get("style", "detail")) ? get("style","detail").toLowerCase() : "detail";
   const SHOW_LAT     = /^true$/i.test(get("showLatency", "true"));
   const SHOW_HTTP    = /^true$/i.test(get("showHttp", "true"));
   const TITLE_PARAM  = get("title", "");
+  const IPAPI_LANG   = LANG === "zh-Hant" ? "zh-TW" : "zh-CN";
 
   // ---------------- i18n ----------------
   const I18N = {
     "zh-Hant": {
       panel: TITLE_PARAM || "服務檢測",
-      policy: "代理策略",
       unreachable: "不可達",
       timeout: "檢測超時",
       fail: "檢測失敗，請刷新面板",
@@ -53,26 +49,29 @@
       huluUS: "Hulu(美)",
       huluJP: "Hulu(日)",
       hbo: "Max(HBO)",
-      regionLabel: "地區",
-      nf_full:    (cc)=>`已完整解鎖， 地區: ${cc}`,
-      nf_origs:   (cc)=>`僅解鎖自製劇， 地區: ${cc}`,
+      regionLabel: "區域",
+      nf_full:    (cc)=>`已完整解鎖， 區域: ${cc}`,
+      nf_origs:   (cc)=>`僅解鎖自製劇， 區域: ${cc}`,
       nf_block:       "該節點不支持解鎖",
-      d_ok:       (cc)=>`已解鎖， 地區: ${cc}`,
-      d_soon:     (cc)=>`即將登陸， 地區: ${cc}`,
-      hulu_ok:    (cc)=>`已解鎖， 地區: ${cc}`,
+      d_ok:       (cc)=>`已解鎖， 區域: ${cc}`,
+      d_soon:     (cc)=>`即將登陸， 區域: ${cc}`,
+      hulu_ok:    (cc)=>`已解鎖， 區域: ${cc}`,
       hulu_blk:       "區域受限 🚫",
-      max_ok:     (cc)=>`已解鎖， 地區: ${cc}`,
+      max_ok:     (cc)=>`已解鎖， 區域: ${cc}`,
       max_blk:        "區域受限 🚫",
       cellular:       "蜂窩數據",
       devip:          "設備IP",
       ipv6:           "IPv6地址",
-      nodeip:         "節點IP",
-      nodeisp:        "節點ISP",
-      nodeloc:        "節點位置"
+      nodeip:         "落地 IP",
+      nodeisp:        "落地 ISP",
+      nodeloc:        "落地位置",
+      policy:         "代理策略",
+      entrance:       "入口",
+      entrance_loc:   "入口位置",
+      entrance_isp:   "入口運營商"
     },
     "zh-Hans": {
       panel: TITLE_PARAM || "服务检测",
-      policy: "代理策略",
       unreachable: "不可达",
       timeout: "检测超时",
       fail: "检测失败，请刷新面板",
@@ -102,9 +101,13 @@
       cellular:       "蜂窝数据",
       devip:          "设备IP",
       ipv6:           "IPv6地址",
-      nodeip:         "节点IP",
-      nodeisp:        "节点ISP",
-      nodeloc:        "节点位置"
+      nodeip:         "落地 IP",
+      nodeisp:        "落地 ISP",
+      nodeloc:        "落地位置",
+      policy:         "代理策略",
+      entrance:       "入口",
+      entrance_loc:   "入口位置",
+      entrance_isp:   "入口运营商"
     }
   }[LANG];
 
@@ -134,6 +137,12 @@
       });
     });
   }
+  function httpAPI(path='/v1/requests/recent', method='GET', body=null) {
+    return new Promise((resolve) => {
+      if (typeof $httpAPI !== 'function') return resolve({});
+      $httpAPI(method, path, body, (r)=>resolve(r||{}));
+    });
+  }
   const joinPretty = (parts, cost, status) => {
     const seg = [];
     if (parts.length) seg.push(parts.join(" ｜ "));
@@ -143,19 +152,25 @@
   };
   const lineIcon = (name, tail) => `${name}: ${tail}`;
 
-  // 区码 -> 国旗
+  // Flag + CC
   function ccFlag(cc) {
     cc = (cc || "").toUpperCase();
     if (!/^[A-Z]{2}$/.test(cc)) return cc || "—";
     const cps = [...cc].map(c => 0x1F1E6 + (c.charCodeAt(0) - 65));
     try { return String.fromCodePoint(...cps) + " " + cc; } catch { return cc; }
   }
+  function getFlagEmoji(countryCode="") {
+    const cc = (countryCode || "").toUpperCase();
+    if (!/^[A-Z]{2}$/.test(cc)) return countryCode || "";
+    const cps = [...cc].map(ch => 127397 + ch.charCodeAt());
+    try { return String.fromCodePoint(...cps); } catch { return countryCode || ""; }
+  }
 
   // ---------------- 服务检测 ----------------
   async function testYouTube() {
     const r = await httpGet("https://www.youtube.com/premium?hl=en", {}, true);
     if (!r.ok) {
-      if (STYLE === "icon") return lineIcon(I18N.youTube, I18N.unreachable);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.youTube, I18N.unreachable);
       return joinPretty([`${noIcon} ${I18N.youTube}`], r.cost, r.status);
     }
     let cc = ""; try {
@@ -164,30 +179,37 @@
       if (m) cc = m[1]; else if (r.data.includes("www.google.cn")) cc = "CN"; else cc = "US";
     } catch (_) {}
     const region = ccFlag(cc || "");
-    if (STYLE === "icon") return lineIcon(I18N.youTube, `${I18N.unlocked}， ${I18N.regionLabel}: ${region || "—"}`);
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.youTube, `${I18N.unlocked}， ${I18N.regionLabel}: ${region || "—"}`);
     return joinPretty([`${okIcon} ${I18N.youTube}`, region], r.cost, r.status);
   }
 
   async function testChatGPTWeb() {
     const r = await httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
     if (!r.ok) {
-      if (STYLE === "icon") return lineIcon(I18N.chatgpt, I18N.unreachable);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.chatgpt, I18N.unreachable);
       return joinPretty([`${noIcon} ${I18N.chatgpt}`], r.cost, r.status);
     }
     let loc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) loc = m[1]; } catch (_) {}
     const region = ccFlag(loc || "");
-    if (STYLE === "icon") return lineIcon(I18N.chatgpt, `${I18N.unlocked}， ${I18N.regionLabel}: ${region || "—"}`);
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.chatgpt, `${I18N.unlocked}， ${I18N.regionLabel}: ${region || "—"}`);
     return joinPretty([`${okIcon} ${I18N.chatgpt}`, region], r.cost, r.status);
   }
 
   async function testChatGPTAppAPI() {
     const r = await httpGet("https://api.openai.com/v1/models", {}, true);
     if (!r.ok) {
-      if (STYLE === "icon") return lineIcon(I18N.chatgpt_app, I18N.unreachable);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.chatgpt_app, I18N.unreachable);
       return joinPretty([`${noIcon} ${I18N.chatgpt_app}`], r.cost, r.status);
     }
-    if (STYLE === "icon") return lineIcon(I18N.chatgpt_app, I18N.unlocked);
-    return joinPretty([`${okIcon} ${I18N.chatgpt_app}`], r.cost, r.status);
+    // 补充地区：取 cf-trace 或 ip-api
+    let cc = ""; 
+    try {
+      const t = await httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
+      const m = (t.data||"").match(/loc=([A-Z]{2})/); if (m) cc = m[1];
+    } catch(_){}
+    const region = cc ? ccFlag(cc) : "";
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.chatgpt_app, `${I18N.unlocked}， ${I18N.regionLabel}: ${region||"—"}`);
+    return joinPretty([`${okIcon} ${I18N.chatgpt_app}`, region], r.cost, r.status);
   }
 
   const NF_ORIGINAL = "80018499";
@@ -226,13 +248,13 @@
         cc = parseNFRegion(r1) || (fallback || ""); txt = I18N.nf_full(ccFlag(cc || "—"));
       } else txt = `HTTP ${r1.status}`;
     } catch (_) { txt = I18N.fail; }
-    if (STYLE === "icon") return lineIcon(I18N.netflix, txt);
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.netflix, txt);
     return `${I18N.netflix}: ${txt}`;
   }
 
   async function testDisney() {
     async function home() {
-      const r = await httpGet("https://www.disneyplus.com/", { "Accept-Language": "en" }, true);
+      const r = await httpGet(`https://www.disneyplus.com/?hl=en`, { "Accept-Language": "en" }, true);
       if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available\s*in\s*your\s*region/i.test(r.data || "")) throw "NA";
       let cc = ""; try {
         const m = r.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || r.data.match(/data-country=["']([A-Z]{2})["']/i);
@@ -267,11 +289,11 @@
       const cc = (b.cc || h.cc || "");
       const region = ccFlag(cc || "—");
       const text = (b.inLoc === false || b.inLoc === 'false') ? I18N.d_soon(region) : I18N.d_ok(region);
-      if (STYLE === "icon") return lineIcon(I18N.disney, text);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.disney, text);
       return `${I18N.disney}: ${text}`;
     } catch (e) {
       const text = e === "NA" ? (I18N.regionBlocked + " 🚫") : e === "TO" ? (I18N.timeout + " 🚦") : I18N.fail;
-      if (STYLE === "icon") return lineIcon(I18N.disney, text);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.disney, text);
       return `${I18N.disney}: ${text}`;
     }
   }
@@ -279,54 +301,76 @@
   async function testHuluUS() {
     const r = await httpGet("https://www.hulu.com/", {}, true);
     if (!r.ok) {
-      if (STYLE === "icon") return lineIcon(I18N.huluUS, I18N.unreachable);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.huluUS, I18N.unreachable);
       return `${I18N.huluUS}: ${I18N.unreachable}`;
     }
     const blk = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
     const txt = blk ? I18N.hulu_blk : I18N.hulu_ok(ccFlag("US"));
-    if (STYLE === "icon") return lineIcon(I18N.huluUS, txt);
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.huluUS, txt);
     return `${I18N.huluUS}: ${txt}`;
   }
 
   async function testHuluJP() {
     const r = await httpGet("https://www.hulu.jp/", { "Accept-Language": "ja" }, true);
     if (!r.ok) {
-      if (STYLE === "icon") return lineIcon(I18N.huluJP, I18N.unreachable);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.huluJP, I18N.unreachable);
       return `${I18N.huluJP}: ${I18N.unreachable}`;
     }
     const blk = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
     const txt = blk ? I18N.hulu_blk : I18N.hulu_ok(ccFlag("JP"));
-    if (STYLE === "icon") return lineIcon(I18N.huluJP, txt);
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.huluJP, txt);
     return `${I18N.huluJP}: ${txt}`;
   }
 
   async function testHBO() {
     const r = await httpGet("https://www.max.com/", {}, true);
     if (!r.ok) {
-      if (STYLE === "icon") return lineIcon(I18N.hbo, I18N.unreachable);
+      if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.hbo, I18N.unreachable);
       return `${I18N.hbo}: ${I18N.unreachable}`;
     }
     const blk = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
     let cc = ""; try { const m = String(r.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch (_) {}
     const txt = blk ? I18N.max_blk : I18N.max_ok(cc ? ccFlag(cc) : "");
-    if (STYLE === "icon") return lineIcon(I18N.hbo, txt);
+    if (/^(simple|text|arrow)$/i.test(STYLE)) return lineIcon(I18N.hbo, txt);
     return `${I18N.hbo}: ${txt}`;
   }
 
-  // ---------------- 代理策略 & 蜂窝 ----------------
-  async function getProxyPolicyLine() {
+  // ---------------- 代理策略块（追加到“设备IP”下方） ----------------
+  async function getPolicyFromRecent() {
+    // 只在 Surge / Stash 可用，其他环境返回空
+    let policy = "";
+    let remote = ""; // 入口 IP（最近请求的远端）
     try {
-      if (typeof $httpAPI !== "function") return "";
-      const recent = await new Promise(res => $httpAPI("GET", "/v1/requests/recent", null, r => res(r || {})));
-      const reqs = Array.isArray(recent?.requests) ? recent.requests.slice(0, 30) : [];
-      // 选一个带策略名的请求
-      const hit = reqs.find(i => i?.policyName) || reqs[0];
-      const name = hit?.policyName;
-      if (!name) return "";
-      return `${I18N.policy} | ${name}`;
-    } catch { return ""; }
+      const rec = await httpAPI('/v1/requests/recent','GET');
+      const list = Array.isArray(rec?.requests) ? rec.requests : [];
+      // 挑最近的 geo 请求作为锚点
+      const hit = list.find(i => /ip-api\.com|ipinfo\.io|ip-score\.com|api-ipv4\.ip\.sb|chatgpt\.com|youtube\.com/i.test(i.URL)) || list[0];
+      if (hit) {
+        policy = hit.policyName || "";
+        if (/\(Proxy\)/.test(hit.remoteAddress||"")) {
+          remote = String(hit.remoteAddress).replace(/\s*\(Proxy\)\s*/,'');
+        }
+      }
+    } catch(_) {}
+    return { policy, remote };
+  }
+  async function geoByIP(ip){
+    if(!ip) return {};
+    const r = await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=${IPAPI_LANG}`, {}, true);
+    if (!r.ok || r.status !== 200) return {};
+    try{
+      const j = JSON.parse(r.data||"{}");
+      return {
+        cc: (j.countryCode||"").toUpperCase(),
+        country: j.country || "",
+        region: j.regionName || "",
+        city: j.city || "",
+        isp: j.isp || ""
+      };
+    }catch{ return {}; }
   }
 
+  // ---------------- 蜂窝 & 设备/节点信息（含代理策略） ----------------
   function getCellularLine() {
     const radioGeneration = {
       'GPRS':'2.5G','CDMA1x':'2.5G','EDGE':'2.75G','WCDMA':'3G','HSDPA':'3.5G',
@@ -343,67 +387,67 @@
     } catch(_) { return ""; }
   }
 
-  // ---------------- 设备/节点信息 ----------------
-  function getFlagEmoji(countryCode="") {
-    const cc = (countryCode || "").toUpperCase();
-    if (!/^[A-Z]{2}$/.test(cc)) return countryCode || "";
-    const cps = [...cc].map(ch => 127397 + ch.charCodeAt());
-    try { return String.fromCodePoint(...cps); } catch { return countryCode || ""; }
-  }
-
   async function getDeviceAndNodeLines() {
     const v4   = $network?.v4 || {};
     const v6   = $network?.v6 || {};
     const dev4 = v4.primaryAddress || "";
     const ipv6Assigned = !!v6.primaryAddress;
 
-    const r = await httpGet("http://ip-api.com/json", {}, true);
-    let nodeIP = "", isp = "", cc = "", country = "", city = "";
+    // 落地：查自身（随语言本地化）
+    const r = await httpGet(`http://ip-api.com/json?lang=${IPAPI_LANG}`, {}, true);
+    let landIP = "", landISP = "", landCC = "", landCountry = "", landCity = "";
     if (r.ok && r.status === 200) {
       try {
         const j = JSON.parse(r.data || "{}");
-        nodeIP  = j.query || "";
-        isp     = j.isp || "";
-        cc      = (j.countryCode || "").toUpperCase();
-        country = j.country || "";
-        city    = j.city || "";
+        landIP  = j.query || "";
+        landISP = j.isp || "";
+        landCC  = (j.countryCode || "").toUpperCase();
+        landCountry = j.country || "";
+        landCity    = j.city || "";
       } catch(_) {}
     }
 
-    const loc = cc ? `${getFlagEmoji(cc)} | ${cc} | ${country}${city?` - ${city}`:""}` : "";
-    const out = [];
+    // 最近请求 -> 策略名 + 入口 IP -> 再查入口地理
+    const { policy, remote } = await getPolicyFromRecent();
+    const entranceGeo = await geoByIP(remote);
 
+    const out = [];
     if (dev4) out.push(`${I18N.devip}：${dev4}`);
-    out.push(`${I18N.ipv6}：${ipv6Assigned ? "已分配" : "未分配"}`);
-    if (nodeIP) out.push(`${I18N.nodeip}：${nodeIP}`);
-    if (isp)    out.push(`${I18N.nodeisp}：${isp}`);
-    if (loc)    out.push(`${I18N.nodeloc}：${loc}`);
+    // 追加 代理策略 块
+    if (policy || remote || landIP) {
+      out.push(`${I18N.policy}：${policy || "-"}`);
+      if (remote) {
+        const loc = entranceGeo.cc ? `${getFlagEmoji(entranceGeo.cc)} | ${entranceGeo.cc} | ${entranceGeo.country}${entranceGeo.city?` - ${entranceGeo.city}`:""}` : "";
+        out.push(`${I18N.entrance}：${remote}`);
+        if (loc) out.push(`${I18N.entrance_loc}：${loc}`);
+        if (entranceGeo.isp) out.push(`${I18N.entrance_isp}：${entranceGeo.isp}`);
+      } else {
+        out.push(`${I18N.entrance}：-`);
+      }
+    }
+
+    out.push(`${I18N.ipv6}：${ipv6Assigned ? (LANG==='zh-Hant'?'已分配':'已分配') : (LANG==='zh-Hant'?'未分配':'未分配')}`);
+    if (landIP) out.push(`${I18N.nodeip}：${landIP}`);
+    if (landISP) out.push(`${I18N.nodeisp}：${landISP}`);
+    const loc = landCC ? `${getFlagEmoji(landCC)} | ${landCC} | ${landCountry}${landCity?` - ${landCity}`:""}` : "";
+    if (loc) out.push(`${I18N.nodeloc}：${loc}`);
 
     return out.join("\n");
   }
 
   // ---------------- 主流程 ----------------
   (async () => {
-    const services = await Promise.all([
+    const lines = [];
+
+    const [yt, cgptW, cgptA, nf, d, hu, hj, hb] = await Promise.all([
       testYouTube(), testChatGPTWeb(), testChatGPTAppAPI(),
       testNetflix(""), testDisney(), testHuluUS(), testHuluJP(), testHBO()
     ]);
+    lines.push(yt, cgptW, cgptA, nf, d, hu, hj, hb);
 
-    const lines = [];
-
-    // 头部区：代理策略 + 蜂窝数据（各占一行），然后空一行
-    const policyLine = await getProxyPolicyLine();
     const cellLine = getCellularLine();
-    const header = [policyLine, cellLine].filter(Boolean).join("\n");
-    if (header) {
-      lines.push(header);
-      lines.push(""); // 与服务列表之间留白一行
-    }
+    if (cellLine) lines.push("", cellLine);
 
-    // 服务列表
-    lines.push(...services);
-
-    // 设备/节点信息（不额外留白）
     const netLines = await getDeviceAndNodeLines();
     if (netLines) lines.push(netLines);
 
