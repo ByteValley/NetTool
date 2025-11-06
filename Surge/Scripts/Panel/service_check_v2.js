@@ -1,19 +1,20 @@
 /**
- * 服务检测（自动识别策略组名 → 标题显示“组名：已选节点”）
+ * 服务检测（标题自动显示“代理策略: {policyName}”）
  * 作者：ByteValley（参考 LucaLin233 / Rabbit-Spec）
  * 支持：Netflix / Disney+ / YouTube Premium / ChatGPT Web + App(API) / Hulu(US/JP) / Max(HBO)
- * 样式：
- *   - icon：✅ + 旗帜 + 代码 + "| 中文名" + （延迟）+ （HTTP）
- *   - text：YouTube: 已解锁 ｜ 🇯🇵 JP | 日本 ｜ 自制/完整/受限/不可达
  */
 
 (() => {
   // ------------ 参数 ------------
-  const args = ($argument || "").split("&").filter(Boolean).reduce((m, kv) => {
-    const i = kv.indexOf("="); if (i === -1) return m;
-    m[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1));
-    return m;
-  }, {});
+  const args = ($argument || "")
+    .split("&")
+    .filter(Boolean)
+    .reduce((m, kv) => {
+      const i = kv.indexOf("="); if (i === -1) return m;
+      const k = decodeURIComponent(kv.slice(0, i));
+      const v = decodeURIComponent(kv.slice(i + 1));
+      m[k] = v; return m;
+    }, {});
   const getArg = (k, d=null) => {
     const v = args[k];
     if (v == null || /^{{{[^}]+}}}$/.test(v) || /^(null|undefined)$/i.test(v)) return d;
@@ -29,30 +30,65 @@
   const SHOW_LAT     = /^true$/i.test(getArg("showLatency", "true"));
   const SHOW_HTTP    = /^true$/i.test(getArg("showHttp", "true"));
   const TITLE_PARAM  = getArg("title", "");
-  const GROUP_PARAM  = getArg("group", ""); // 传了就优先用；不传则自动识别
 
   // ------------ i18n ------------
   const I18N = {
-    "zh-Hant": { panel: TITLE_PARAM || "服務檢測", unreachable:"不可達", timeout:"逾時", fail:"檢測失敗",
-      regionBlocked:"區域受限", unlocked:"已解鎖", locked:"未解鎖", full:"完整", originals:"自製",
-      youTube:"YouTube", chatgpt:"ChatGPT", chatgpt_app:"ChatGPT App(API)", netflix:"Netflix",
-      disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)", region:"區域" },
-    "zh-Hans": { panel: TITLE_PARAM || "服务检测", unreachable:"不可达", timeout:"超时", fail:"检测失败",
-      regionBlocked:"区域受限", unlocked:"已解锁", locked:"未解锁", full:"完整", originals:"自制",
-      youTube:"YouTube", chatgpt:"ChatGPT", chatgpt_app:"ChatGPT App(API)", netflix:"Netflix",
-      disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)", region:"区域" }
+    "zh-Hant": {
+      panel: TITLE_PARAM || "服務檢測",
+      unreachable: "不可達",
+      timeout: "逾時",
+      fail: "檢測失敗",
+      regionBlocked: "區域受限",
+      unlocked: "已解鎖",
+      locked: "未解鎖",
+      full: "完整",
+      originals: "自製",
+      youTube: "YouTube",
+      chatgpt: "ChatGPT",
+      chatgpt_app: "ChatGPT App(API)",
+      netflix: "Netflix",
+      disney: "Disney+",
+      huluUS: "Hulu(美)",
+      huluJP: "Hulu(日)",
+      hbo: "Max(HBO)",
+      region: "區域"
+    },
+    "zh-Hans": {
+      panel: TITLE_PARAM || "服务检测",
+      unreachable: "不可达",
+      timeout: "超时",
+      fail: "检测失败",
+      regionBlocked: "区域受限",
+      unlocked: "已解锁",
+      locked: "未解锁",
+      full: "完整",
+      originals: "自制",
+      youTube: "YouTube",
+      chatgpt: "ChatGPT",
+      chatgpt_app: "ChatGPT App(API)",
+      netflix: "Netflix",
+      disney: "Disney+",
+      huluUS: "Hulu(美)",
+      huluJP: "Hulu(日)",
+      hbo: "Max(HBO)",
+      region: "区域"
+    }
   }[LANG];
 
   // 常见地区中文名
   const CC_NAME = {
-    "zh-Hans": { CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
-      SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚", IN:"印度",
-      AU:"澳大利亚", NZ:"新西兰", CA:"加拿大", GB:"英国", DE:"德国", FR:"法国", NL:"荷兰",
-      ES:"西班牙", IT:"意大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄罗斯" },
-    "zh-Hant": { CN:"中國", TW:"台灣", HK:"中國香港", MO:"中國澳門", JP:"日本", KR:"南韓", US:"美國",
-      SG:"新加坡", MY:"馬來西亞", TH:"泰國", VN:"越南", PH:"菲律賓", ID:"印尼", IN:"印度",
-      AU:"澳洲", NZ:"紐西蘭", CA:"加拿大", GB:"英國", DE:"德國", FR:"法國", NL:"荷蘭",
-      ES:"西班牙", IT:"義大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄羅斯" }
+    "zh-Hans": {
+      CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
+      SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚",
+      IN:"印度", AU:"澳大利亚", NZ:"新西兰", CA:"加拿大", GB:"英国", DE:"德国", FR:"法国",
+      NL:"荷兰", ES:"西班牙", IT:"意大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄罗斯",
+    },
+    "zh-Hant": {
+      CN:"中國", TW:"台灣", HK:"中國香港", MO:"中國澳門", JP:"日本", KR:"南韓", US:"美國",
+      SG:"新加坡", MY:"馬來西亞", TH:"泰國", VN:"越南", PH:"菲律賓", ID:"印尼",
+      IN:"印度", AU:"澳洲", NZ:"紐西蘭", CA:"加拿大", GB:"英國", DE:"德國", FR:"法國",
+      NL:"荷蘭", ES:"西班牙", IT:"義大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄羅斯",
+    }
   }[LANG];
 
   // ------------ 工具 ------------
@@ -63,81 +99,49 @@
   function httpGet(url, headers={}, followRedirect=true) {
     return new Promise((resolve) => {
       const start = now();
-      $httpClient.get({ url, headers: { ...BASE_HEADERS, ...headers }, timeout: TIMEOUT, followRedirect },
+      $httpClient.get(
+        { url, headers: { ...BASE_HEADERS, ...headers }, timeout: TIMEOUT, followRedirect },
         (err, resp, data) => {
           const cost = now() - start;
           if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
           resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
                     headers: resp.headers || {}, data: data || "" });
-        });
+        }
+      );
     });
   }
   function httpPost(url, headers={}, body="") {
     return new Promise((resolve) => {
       const start = now();
-      $httpClient.post({ url, headers: { ...BASE_HEADERS, ...headers }, timeout: TIMEOUT, body },
+      $httpClient.post(
+        { url, headers: { ...BASE_HEADERS, ...headers }, timeout: TIMEOUT, body },
         (err, resp, data) => {
           const cost = now() - start;
           if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
           resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
                     headers: resp.headers || {}, data: data || "" });
-        });
+        }
+      );
     });
   }
 
-  // 读取“组名→已选策略” → 返回如“代理策略：SNTP🇹🇼 TW04”；失败返回 null
-  function getGroupTitle(groupName) {
-    return new Promise((resolve) => {
-      if (typeof $httpAPI !== 'function' || !groupName) return resolve(null);
-      try {
-        $httpAPI("GET", `v1/policy_groups/select?group_name=${encodeURIComponent(groupName)}`, null, (data) => {
-          try {
-            const sel = data?.policy || data?.selected || data?.selectedPolicy;
-            if (sel) return resolve(`${groupName}：${sel}`);
-          } catch(_) {}
-          try {
-            $httpAPI("GET", "v1/policy_groups", null, (d2) => {
-              try {
-                const list = d2?.policy_groups || d2?.groups || d2;
-                const g = Array.isArray(list) ? list.find(x => x?.name === groupName) : null;
-                const sel2 = g?.selected || g?.selectedPolicy || g?.policy;
-                if (sel2) return resolve(`${groupName}：${sel2}`);
-              } catch(_) {}
-              resolve(null);
-            });
-          } catch(_) { resolve(null); }
-        });
-      } catch(_) { resolve(null); }
-    });
+  // —— Surge 本地 API（参考你的 Network Info）——
+  function httpAPI(path='/v1/requests/recent'){
+    return new Promise(res=>{
+      try{ $httpAPI('GET', path, null, res) }catch(_){ res({}) }
+    })
   }
-
-  // 自动识别“主代理组名”
-  function detectGroupName() {
-    return new Promise((resolve) => {
-      if (typeof $httpAPI !== 'function') return resolve("");
-      try {
-        $httpAPI("GET", "v1/policy_groups", null, (d) => {
-          try {
-            const list = d?.policy_groups || d?.groups || [];
-            if (!Array.isArray(list) || !list.length) return resolve("");
-
-            // 打分：命中关键词/图标更高；优先 select/url-test/fallback 类型
-            const keyRe = /(代理|策略|选择|選擇|节点|節點|Proxy|PROXY)/i;
-            const iconRe = /[🚀🔰✈️🛫🛰️🛩️🌐]/;
-            const typeWeight = (t) => /select/i.test(t||"") ? 3 : (/url-test|fallback|ssid/i.test(t||"") ? 2 : 1);
-            const score = (n, t) => (keyRe.test(n)?5:0) + (iconRe.test(n)?1:0) + typeWeight(t);
-
-            const ranked = list
-              .map(g => ({ name: g?.name || "", type: g?.type || "", sc: score(g?.name||"", g?.type||"") }))
-              .filter(x => x.name)
-              .sort((a,b) => b.sc - a.sc);
-
-            const best = ranked[0];
-            return resolve(best && best.sc > 1 ? best.name : "");
-          } catch { resolve(""); }
-        });
-      } catch { resolve(""); }
-    });
+  // 从“最近请求”里取策略名（policyName）
+  async function getRecentPolicyName() {
+    try{
+      const data = await httpAPI('/v1/requests/recent');
+      const reqs = Array.isArray(data?.requests) ? data.requests : [];
+      // 优先挑我们本脚本会访问到的站点
+      const re = /(youtube\.com|netflix\.com|disneyplus\.com|hulu\.com|max\.com|chatgpt\.com|openai\.com)/i;
+      const hit = reqs.find(r => re.test(String(r?.URL||'')) && (r?.policyName || /\(Proxy\)/.test(String(r?.remoteAddress||''))));
+      if (!hit) return '';
+      return String(hit.policyName || '').trim();
+    }catch(_){ return ''; }
   }
 
   // 旗帜 & 区域美化
@@ -162,7 +166,11 @@
     const regionChunk = cc ? ccPretty(cc) : "—";
     const stateChunk  = ok ? I18N.unlocked : (tag || I18N.unreachable);
     const tagChunk    = tag ? ` ｜ ${tag}` : "";
-    if (STYLE === "text") return `${name}: ${stateChunk} ｜ ${regionChunk}${tagChunk}`;
+
+    if (STYLE === "text") {
+      return `${name}: ${stateChunk} ｜ ${regionChunk}${tagChunk}`;
+    }
+
     const parts = [];
     parts.push(`${ok ? "✅" : "⛔️"} ${name}`);
     if (cc) parts.push(regionChunk);
@@ -172,7 +180,34 @@
     return parts.join(" ｜ ");
   }
 
-  // —— 以下为各服务检测（原逻辑保持） ——
+  // 解析 Netflix 区域
+  function parseNFRegion(resp) {
+    try {
+      const x = resp.headers?.["x-originating-url"] || resp.headers?.["X-Origining-URL"] || resp.headers?.["X-Originating-URL"];
+      if (x) {
+        const seg = String(x).split("/");
+        if (seg.length >= 4) {
+          const cc = seg[3].split("-")[0];
+          if (/^[A-Z]{2}$/i.test(cc)) return cc.toUpperCase();
+        }
+      }
+      const m = String(resp.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
+      if (m) return m[1].toUpperCase();
+    } catch(_){}
+    return "";
+  }
+
+  // 落地 IP 国家（兜底）
+  async function queryLandingCC() {
+    const r = await httpGet("http://ip-api.com/json", {}, true);
+    if (r.ok && r.status === 200) {
+      try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
+      catch(_){ return ""; }
+    }
+    return "";
+  }
+
+  // ------------ 各服务检测 ------------
   async function testYouTube() {
     const r = await httpGet("https://www.youtube.com/premium?hl=en", {}, true);
     if (!r.ok) return renderLine({name:I18N.youTube, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
@@ -202,9 +237,10 @@
   const NF_ORIGINAL = "80018499";
   const NF_NONORIG  = "81280792";
   async function nfGet(id){ return await httpGet(`https://www.netflix.com/title/${id}`, {}, true); }
+
   async function testNetflix() {
     try {
-      const r1 = await nfGet(NF_NONORIG);
+      const r1 = await nfGet(NF_NONORIG); // 非自制
       if (!r1.ok) return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:I18N.fail});
       if (r1.status === 403) return renderLine({name:I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:I18N.regionBlocked});
       if (r1.status === 404) {
@@ -254,6 +290,7 @@
       return { inLoc, cc, cost:r.cost, status:r.status };
     }
     function timeout(ms, code){ return new Promise((_,rej)=>setTimeout(()=>rej(code),ms)); }
+
     try {
       const h = await Promise.race([home(), timeout(7000,"TO")]);
       const b = await Promise.race([bam(),  timeout(7000,"TO")]).catch(()=>({}));
@@ -272,12 +309,14 @@
     const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
     return renderLine({name:I18N.huluUS, ok:!blocked, cc: blocked?"": "US", cost:r.cost, status:r.status, tag: blocked ? I18N.regionBlocked : ""});
   }
+
   async function testHuluJP() {
     const r = await httpGet("https://www.hulu.jp/", { "Accept-Language":"ja" }, true);
     if (!r.ok) return renderLine({name:I18N.huluJP, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
     const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
     return renderLine({name:I18N.huluJP, ok:!blocked, cc: blocked?"": "JP", cost:r.cost, status:r.status, tag: blocked ? I18N.regionBlocked : ""});
   }
+
   async function testHBO() {
     const r = await httpGet("https://www.max.com/", {}, true);
     if (!r.ok) return renderLine({name:I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:I18N.unreachable});
@@ -287,31 +326,27 @@
     return renderLine({name:I18N.hbo, ok:!blocked, cc: blocked?"": cc, cost:r.cost, status:r.status, tag: blocked ? I18N.regionBlocked : ""});
   }
 
-  // 落地 IP 国家（兜底）
-  async function queryLandingCC() {
-    const r = await httpGet("http://ip-api.com/json", {}, true);
-    if (r.ok && r.status === 200) {
-      try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
-      catch(_){ return ""; }
-    }
-    return "";
-  }
-
   // ------------ 主流程（并发执行） ------------
   (async () => {
-    // 1) 先确定要用的策略组名
-    const autoName = GROUP_PARAM || await detectGroupName();
-
-    // 2) 并发跑检测 & 取标题
-    const [dynTitle, yt, nf, d, cgptW, cgptA, hu, hj, hb] = await Promise.all([
-      autoName ? getGroupTitle(autoName) : Promise.resolve(null),
-      testYouTube(), testNetflix(), testDisney(), testChatGPTWeb(),
-      testChatGPTAppAPI(), testHuluUS(), testHuluJP(), testHBO()
+    // 并发跑检测
+    const [yt, nf, d, cgptW, cgptA, hu, hj, hb] = await Promise.all([
+      testYouTube(),
+      testNetflix(),
+      testDisney(),
+      testChatGPTWeb(),
+      testChatGPTAppAPI(),
+      testHuluUS(),
+      testHuluJP(),
+      testHBO()
     ]);
+
+    // 检测完后读取“最近请求”的策略名（此时这些请求已被记录）
+    const policyName = await getRecentPolicyName();
+    const panelTitle = policyName ? `代理策略: ${policyName}` : I18N.panel;
 
     const lines = [yt, nf, d, cgptW, cgptA, hu, hj, hb];
     $done({
-      title: dynTitle || I18N.panel, // 成功→“组名：已选节点”，失败→参数 title 或“服务检测/服務檢測”
+      title: panelTitle,
       content: lines.join("\n"),
       icon: ICON,
       "icon-color": ICON_COLOR
