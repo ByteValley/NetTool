@@ -2,6 +2,10 @@
  * 服务检测（标题自动显示“代理策略: {policyName}”）
  * 作者：ByteValley（参考 LucaLin233 / Rabbit-Spec）
  * 支持：Netflix / Disney+ / YouTube Premium / ChatGPT Web + App(API) / Hulu(US/JP) / Max(HBO)
+ * 样式：
+ *   - icon：✅ + 旗帜 + 代码 + "| 中文名" + （延迟）+ （HTTP）
+ *   - text：YouTube: 已解锁 ｜ 🇯🇵 JP | 日本 ｜ 自制/完整/受限/不可达
+ */
  */
 
 (() => {
