@@ -1,0 +1,12 @@
+#!name=服务检测
+#!desc=Netflix / Disney+ / YouTube Premium / ChatGPT Web+App / Hulu(US/JP) / Max(HBO) 解锁与地区检测；含蜂窝网络与设备/节点信息。样式：icon(默认)/text；语言：zh-Hans / zh-Hant
+#!category=功能看板
+#!author=ByteValley
+#!arguments=Update:7200,Timeout:5000,DefaultIcon:globe,DefaultIconColor:#1E90FF,Title:服务检测,Lang:zh-Hant,Style:icon,ShowLatency:true,ShowHttp:true
+#!arguments-desc=参数说明：\nUpdate=面板刷新间隔(秒)，如7200/21600/43200；\nTimeout=单项检测超时(毫秒，默认5000)；\nDefaultIcon/DefaultIconColor=面板图标与颜色；\nTitle=面板标题(留空使用默认)；\nLang=语言(zh-Hans简体/zh-Hant繁体)；\nStyle=显示样式(icon图标｜text文本)；\nShowLatency=是否显示延迟(仅icon生效，true/false)；\nShowHttp=是否显示HTTP状态码(仅icon生效，true/false)。
+
+[Panel]
+服务检测 = script-name=解锁检测, update-interval={{{Update}}}
+
+[Script]
+解锁检测 = type=generic, timeout=25, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/refs/heads/main/Surge/Scripts/Panel/service_check_v2.js, argument=update={{{Update}}}&timeout={{{Timeout}}}&defaultIcon={{{DefaultIcon}}}&defaultIconColor={{{DefaultIconColor}}}&title={{{Title}}}&lang={{{Lang}}}&style={{{Style}}}&showLatency={{{ShowLatency}}}&showHttp={{{ShowHttp}}}
