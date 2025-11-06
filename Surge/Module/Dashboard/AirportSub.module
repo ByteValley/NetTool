@@ -1,12 +1,12 @@
 #!name=订阅面板
-#!desc=机场订阅信息展示，流量使用及剩余信息与到期日期
+#!desc=机场订阅信息展示,流量使用及剩余信息与到期日期
 #!author=ByteValley
 #!category=功能看板
-#!arguments=Update:21600,DefaultIcon:cellularbars,DefaultIconColor:#1E90FF,Title1:订阅1,URL1:https://,ResetDay1:,Title2:订阅2,URL2:https://,ResetDay2:,Title3:订阅3,URL3:https://,ResetDay3:,Title4:订阅4,URL4:https://,ResetDay4:,Title5:订阅5,URL5:https://,ResetDay5:,Title6:订阅6,URL6:https://,ResetDay6:,Title7:订阅7,URL7:https://,ResetDay7:,Title8:订阅8,URL8:https://,ResetDay8:,Title9:订阅9,URL9:https://,ResetDay9:,Title10:订阅10,URL10:https://,ResetDay10:
-#!arguments-desc=模块来源：基于 https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Js/Flowquery.js 改写，由 ByteValley 优化。\n\n模块分类 · 基本参数\n- Update：面板刷新间隔（秒），建议：2 小时=7200，6 小时=21600，12 小时=43200\n- TitleN：面板显示名称（支持中文）\n- URLN：订阅链接（可直接填写无需编码；若含空格/中文/自拼特殊字符建议 URL 编码）\n- ResetDayN：重置日（1~31），或中文提示（如“工单重置”“手动重置”“不限”等）\n- DefaultIcon / DefaultIconColor：面板图标与颜色（可选，SF Symbols / 十六进制色值）\n\n其他说明\n- 最多支持 10 个订阅；无需 Rewrite 或 MITM\n- 未返回到期时间时显示：到期：2099.12.31\n- ResetDay 支持中文文本\n- 同一面板仅一个图标：通过 DefaultIcon / DefaultIconColor 调整\n- Update 为空时，部分版本可能视为 0；建议填写一个值（如 7200）
+#!arguments=Update:21600,DefaultIcon:cellularbars,DefaultIconColor:#1E90FF,Title1:订阅1,URL1:https://,ResetDay1:不限,Title2:订阅2,URL2:https://,ResetDay2:不限,Title3:订阅3,URL3:https://,ResetDay3:不限,Title4:订阅4,URL4:https://,ResetDay4:不限,Title5:订阅5,URL5:https://,ResetDay5:不限,Title6:订阅6,URL6:https://,ResetDay6:不限,Title7:订阅7,URL7:https://,ResetDay7:不限,Title8:订阅8,URL8:https://,ResetDay8:不限,Title9:订阅9,URL9:https://,ResetDay9:不限,Title10:订阅10,URL10:https://,ResetDay10:不限
+#!arguments-desc=Update=刷新间隔(秒);TitleN=名称;URLN=订阅链接;ResetDayN=重置日(1~31或中文提示);DefaultIcon=SF Symbols 名称;DefaultIconColor=十六进制色值
 
 [Panel]
-订阅查询 = script-name=机场订阅查询, update-interval={{{Update}}}
+订阅查询=script-name=机场订阅查询,update-interval={{{Update}}}
 
 [Script]
-机场订阅查询 = type=generic, timeout=15, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscription_inquiry.js, argument=defaultIcon={{{DefaultIcon}}}&defaultIconColor={{{DefaultIconColor}}}&title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}&title6={{{Title6}}}&url6={{{URL6}}}&resetDay6={{{ResetDay6}}}&title7={{{Title7}}}&url7={{{URL7}}}&resetDay7={{{ResetDay7}}}&title8={{{Title8}}}&url8={{{URL8}}}&resetDay8={{{ResetDay8}}}&title9={{{Title9}}}&url9={{{URL9}}}&resetDay9={{{ResetDay9}}}&title10={{{Title10}}}&url10={{{URL10}}}&resetDay10={{{ResetDay10}}}
+机场订阅查询=type=generic,timeout=15,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscription_inquiry.js,argument=defaultIcon={{{DefaultIcon}}}&defaultIconColor={{{DefaultIconColor}}}&title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}&title6={{{Title6}}}&url6={{{URL6}}}&resetDay6={{{ResetDay6}}}&title7={{{Title7}}}&url7={{{URL7}}}&resetDay7={{{ResetDay7}}}&title8={{{Title8}}}&url8={{{URL8}}}&resetDay8={{{ResetDay8}}}&title9={{{Title9}}}&url9={{{URL9}}}&resetDay9={{{ResetDay9}}}&title10={{{Title10}}}&url10={{{URL10}}}&resetDay10={{{ResetDay10}}}
