@@ -1,23 +1,40 @@
-#!name=订阅流量面板
+#!name=订阅面板
 #!desc=机场订阅信息展示,流量使用及剩余信息&到期日期。
 #!author=ByteValley
 #!category=功能看板
-#!icon=https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Icon/Flow.png
-#!arguments=Title1,URL1,ResetDay1,Title2,URL2,ResetDay2,Title3,URL3,ResetDay3,Title4,URL4,ResetDay4,Title5,URL5,ResetDay5
+#!arguments=Update: 21600, Title1: , URL1: , ResetDay1: , Title2: , URL2: , ResetDay2: , Title3: , URL3: , ResetDay3: , Title4: , URL4: , ResetDay4: , Title5: , URL5: , ResetDay5: 
+#!arguments-desc=模块来源：基于 https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Js/Flowquery.js 改写，由 ByteValley 优化。\n\n模块分类 · 基本参数\n- Update：面板刷新间隔（秒），建议：2 小时=7200，6 小时=21600，12 小时=43200\n- TitleN：面板显示名称（支持中文）\n- URLN：订阅链接（可直接填写无需编码；若含空格/中文/自拼特殊字符建议 URL 编码）\n- ResetDayN：重置日（1~31），或中文提示（如“工单重置”“手动重置”“不限”等）\n- DefaultIcon / DefaultIconColor：面板图标与颜色（可选，SF Symbols / 十六进制色值）\n\n其他说明\n- 最多支持 10 个订阅；无需 Rewrite 或 MITM\n- 未返回到期时间时显示：到期：2099.12.31\n- ResetDay 支持中文文本\n- 同一面板仅一个图标：通过 DefaultIcon / DefaultIconColor 调整\n- Update 为空时，部分版本可能视为 0；建议填写一个值（如 7200）
 
 # =========================
 # 模块说明 · 使用指引
 # =========================
-# 1）在模块参数界面中填写以下字段：
-#    - TitleN：面板显示名称（支持中文）
-#    - URLN：订阅链接（需URL编码）
-#    - ResetDayN：重置日（1~31，可选）
-# 2）最多支持五个订阅
-# 3）无需配置 Rewrite 或 MITM
-# 4）https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Js/Flowquery.js
+# 模块来源：
+# 本脚本基于 https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Js/Flowquery.js 改写，
+# 由 ByteValley 定制优化，增强了多订阅支持、中文重置描述、自定义图标颜色、默认到期日期等。
+
+# 模块分类 · 基本参数
+# - Update：**面板刷新间隔（秒）**，建议值：
+#   · 2 小时：7200
+#   · 6 小时：21600
+#   · 12 小时：43200
+# - TitleN：面板显示名称（支持中文）
+# - URLN：订阅链接（可直接填写**无需编码**；若包含空格、中文或你自行拼接的额外 & / ? 等特殊字符，建议 URL 编码）
+# - ResetDayN：重置日（1~31），或中文提示（如“工单重置”“手动重置”“不限”等）
+# - DefaultIcon / DefaultIconColor：面板图标与颜色（可选）
+#   · DefaultIcon：SF Symbols 名称（如 antenna.radiowaves.left.and.right.circle.fill / waveform.path.ecg / atom）
+#   · DefaultIconColor：十六进制颜色值（如 #00E28F）
+#
+# 其他说明
+# - 最多支持 10 个订阅；无需配置 Rewrite 或 MITM
+# - 未返回到期时间时，显示为「到期：2099.12.31」
+# - ResetDay 支持中文文本（如“工单重置/手动重置/不限”）
+# - 同一面板仅显示一个图标：可通过 DefaultIcon / DefaultIconColor 调整
+
+# 脚本地址：
+# https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscription_inquiry.js
 
 [Panel]
-订阅流量 = script-name=订阅流量查询, update-interval=600
+订阅查询 = script-name=机场订阅查询, update-interval={{{Update}}}
 
 [Script]
-订阅流量查询 = type=generic, timeout=15, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscription_inquiry.js, argument=title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}
+机场订阅查询 = type=generic, timeout=15, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscription_inquiry.js, argument=defaultIcon={{{DefaultIcon}}}&defaultIconColor={{{DefaultIconColor}}}&title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}&title6={{{Title6}}}&url6={{{URL6}}}&resetDay6={{{ResetDay6}}}&title7={{{Title7}}}&url7={{{URL7}}}&resetDay7={{{ResetDay7}}}&title8={{{Title8}}}&url8={{{URL8}}}&resetDay8={{{ResetDay8}}}&title9={{{Title9}}}&url9={{{URL9}}}&resetDay9={{{ResetDay9}}}&title10={{{Title10}}}&url10={{{URL10}}}&resetDay10={{{ResetDay10}}}
