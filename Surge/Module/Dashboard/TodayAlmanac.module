@@ -1,8 +1,8 @@
 #!name=今日黄历
 #!desc=四行展示：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次提醒；每日09:00推送今日宜忌/节日播报
+#!category=功能看板
 #!author=ByteValley
 #!version=2025.11.06
-#!category=功能看板
 #!arguments=TITLES_URL:'', BLESS_URL:''
 #!arguments-desc=参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象: 键=节日名, 值=祝词)\n外链JSON示例：\nTITLES_URL: [\"摸鱼使我快乐～\",\"{lunar}\",\"{solar}\",\"下一站：{next}\"]\nBLESS_URL: {\"春节\":\"愿新岁顺遂无虞，家人皆安！\",\"中秋节\":\"人月两团圆，心上皆明朗。\",\"腊八节\":\"粥香暖岁末。\"}\n传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json
 
@@ -14,28 +14,8 @@
 # ========== 脚本 ==========
 [Script]
 # 面板脚本（四行）：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节
-今日黄历·面板 = type=generic, timeout=12, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/today_almanac_v2.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}
+今日黄历·面板 = type=generic, timeout=12, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/today_almanac.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}
 
 # ========== 定时播报 ==========
 # 每日09:00 推送“今日黄历/宜忌/节日”信息（独立脚本，互不影响面板；如无需要可删除此行）
-cron "0 9 * * *" script-path=https://raw.githubusercontent.com/zqzess/rule_for_quantumultX/master/js/Mine/wnCalendar/wnCalendar.js, tag=今日黄历·九点播报#!name=今日黄历
-#!desc=四行展示：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次提醒；每日09:00推送今日宜忌/节日播报
-#!author=ByteValley
-#!version=2025.11.06
-#!category=功能看板
-#!arguments=TITLES_URL:'', BLESS_URL:''
-#!arguments-desc=参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象: 键=节日名, 值=祝词)\n外链JSON示例：\nTITLES_URL: [\"摸鱼使我快乐～\",\"{lunar}\",\"{solar}\",\"下一站：{next}\"]\nBLESS_URL: {\"春节\":\"愿新岁顺遂无虞，家人皆安！\",\"中秋节\":\"人月两团圆，心上皆明朗。\",\"腊八节\":\"粥香暖岁末。\"}\n传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json
-
-# ========== 面板 ==========
-[Panel]
-# 模块分类：功能看板  |  细项：四行节日/节气倒数
-今日黄历 = script-name=今日黄历·面板, update-interval=1800
-
-# ========== 脚本 ==========
-[Script]
-# 面板脚本（四行）：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节
-今日黄历·面板 = type=generic, timeout=12, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/today_almanac_v2.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}
-
-# ========== 定时播报 ==========
-# 每日09:00 推送“今日黄历/宜忌/节日”信息（独立脚本，互不影响面板；如无需要可删除此行）
-cron "0 9 * * *" script-path=https://raw.githubusercontent.com/zqzess/rule_for_quantumultX/master/js/Mine/wnCalendar/wnCalendar.js, tag=今日黄历·九点播报
+今日黄历·播报 = type=cron, cronexp="0 9 * * *", script-path=https://raw.githubusercontent.com/zqzess/rule_for_quantumultX/master/js/Mine/wnCalendar/wnCalendar.js, timeout=12
