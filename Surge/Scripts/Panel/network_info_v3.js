@@ -3,7 +3,7 @@
  * by ByteValley
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜）
  * - 中国境内运营商规范化
- * - 网络类型行（Wi-Fi/蜂窝 + 运营商 + 无线制式）
+ * - 网络类型行（Wi-Fi | SSID / 蜂窝数据 | 5G - NR / 网络 | 未知）
  * - 执行时间后空一行拼接“服务检测”结果
  * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)，全局生效
  * - 脚本接管图标 Icon / IconColor
@@ -30,21 +30,27 @@ const ICON_NAME  = GET('icon', 'globe.asia.australia');
 const ICON_COLOR = GET('icon-color', '#1E90FF');
 
 /* —— 行为参数 —— */
-const IPv6_ON         = GET('IPv6','0') === '1';
-const MASK_IP         = GET('MASK_IP','1') === '1';
-const MASK_POS        = GET('MASK_POS','1') === '1';           // 仅影响直连位置
-const TW_FLAG_MODE    = ['0','1','2'].includes(GET('TW_FLAG_MODE','1')) ? GET('TW_FLAG_MODE','1') : '1';
-const DOMESTIC_IPv4   = GET('DOMESTIC_IPv4','ipip');
-const DOMESTIC_IPv6   = GET('DOMESTIC_IPv6','ddnspod');
-const LANDING_IPv4    = GET('LANDING_IPv4','ipapi');
-const LANDING_IPv6    = GET('LANDING_IPv6','ipsb');
+const IPv6_ON   = GET('IPv6','0') === '1';
+const MASK_IP   = GET('MASK_IP','1') === '1';
+// 直连“位置”脱敏：未显式传入 MASK_POS 时，默认跟随 MASK_IP
+const MASK_POS  = Object.prototype.hasOwnProperty.call(ARG,'MASK_POS')
+  ? (GET('MASK_POS','1') === '1')
+  : (GET('MASK_IP','1') === '1');
+
+// 台湾旗：0=🇨🇳(默认) / 1=🇹🇼 / 2=🇼🇸
+const TW_FLAG_MODE  = ['0','1','2'].includes(GET('TW_FLAG_MODE','0')) ? GET('TW_FLAG_MODE','0') : '0';
+
+const DOMESTIC_IPv4 = GET('DOMESTIC_IPv4','ipip');     // ipip|cip|163|bilibili|126|pingan
+const DOMESTIC_IPv6 = GET('DOMESTIC_IPv6','ddnspod');  // ddnspod|neu6
+const LANDING_IPv4  = GET('LANDING_IPv4','ipapi');     // ipapi|ipwhois|ipsb
+const LANDING_IPv6  = GET('LANDING_IPv6','ipsb');      // ipsb|ident|ipify
 
 /* —— 服务检测参数 —— */
-const SD_STYLE        = (GET('SD_STYLE','icon')||'').toLowerCase()==='text' ? 'text' : 'icon';
-const SD_SHOW_LAT     = /^true$/i.test(GET('SD_SHOW_LAT','true'));
-const SD_SHOW_HTTP    = /^true$/i.test(GET('SD_SHOW_HTTP','true'));
-const SD_LANG         = (/^zh-hant$/i.test(GET('SD_LANG','zh-Hans')) ? 'zh-Hant' : 'zh-Hans');
-const SD_TIMEOUT_MS   = (()=>{
+const SD_STYLE      = (GET('SD_STYLE','icon')||'').toLowerCase()==='text' ? 'text' : 'icon';
+const SD_SHOW_LAT   = /^true$/i.test(GET('SD_SHOW_LAT','true'));
+const SD_SHOW_HTTP  = /^true$/i.test(GET('SD_SHOW_HTTP','true'));
+const SD_LANG       = (/^zh-hant$/i.test(GET('SD_LANG','zh-Hans')) ? 'zh-Hant' : 'zh-Hans');
+const SD_TIMEOUT_MS = (()=>{
   const ms = GET('SD_TIMEOUT_MS','');
   if (ms && /^\d+$/.test(ms)) return parseInt(ms,10);
   const sec = parseInt(GET('Timeout','8'),10);
@@ -71,9 +77,10 @@ const SD_TIMEOUT_MS   = (()=>{
   const title = policyName ? `代理策略: ${policyName}` : `网络信息 𝕏`;
 
   const directLines = [];
-  const netTypeLine = getNetworkTypeLine(); // 网络类型行置顶
-  if (netTypeLine) directLines.push(`网络: ${netTypeLine}`);
+  const nt = netTypeLine();                 // 顶部网络类型行
+  if (nt) directLines.push(nt);
   directLines.push(lineIP('IP', cn.ip, cn6.ip));
+
   // 直连位置：脱敏仅旗帜 or 完整
   const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
   directLines.push(`位置: ${directLoc}`);
@@ -102,9 +109,7 @@ const SD_TIMEOUT_MS   = (()=>{
 
   /* ===== 服务检测（并发） ===== */
   const sdLines = await runServiceChecks();
-  if (sdLines.length) {
-    parts.push('', ...sdLines);       // “执行时间”后空一行
-  }
+  if (sdLines.length) parts.push('', ...sdLines);  // 执行时间后留一空行
 
   const content = parts.join('\n');
   $done({ title, content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
@@ -116,7 +121,7 @@ const SD_TIMEOUT_MS   = (()=>{
 /* ===================== 工具 & 渲染 ===================== */
 function now(){ return new Date().toTimeString().split(' ')[0]; }
 function isIPv4(ip){ return /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/.test(ip||''); }
-function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
+function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
 function isIP(ip){ return isIPv4(ip) || isIPv6(ip); }
 
 function maskIP(ip){
@@ -134,7 +139,7 @@ function splitFlagRaw(s) {
   const m=String(s||'').match(re);
   let flag=m?m[0]:'';
   let text=String(s||'').replace(re,'');
-  // —— TW 替换逻辑（仅当原始是 🇹🇼 时才替换）
+  // 统一处理台湾旗显示方案：0=🇨🇳, 1=🇹🇼, 2=🇼🇸（仅当原始是 🇹🇼 时替换）
   if (flag.includes('🇹🇼')) {
     if (TW_FLAG_MODE==='0') flag='🇨🇳';
     else if (TW_FLAG_MODE==='2') flag='🇼🇸';
@@ -166,7 +171,7 @@ function flagOf(code){
   } catch(_) { return ''; }
 }
 
-/* —— 中国境内运营商规范 —— */
+/* —— 规范中国境内运营商名称 —— */
 function fmtISP(isp, locStr){
   const s0 = String(isp || '').trim();
   if (!s0) return '';
@@ -185,32 +190,26 @@ function fmtISP(isp, locStr){
   return '中国' + s;
 }
 
-/* —— 网络类型（Wi-Fi / 蜂窝） —— */
-function getNetworkTypeLine(){
-  try {
-    const w = $network?.wifi;
-    const c = $network?.['cellular-data'];
-    if (w?.ssid) {
-      return `Wi-Fi（${w.ssid}）`;
+/* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
+function radioToGen(r){
+  const MAP = {
+    GPRS:'2.5G', EDGE:'2.75G', CDMA1x:'2.5G', WCDMA:'3G', HSDPA:'3.5G', HSUPA:'3.75G',
+    CDMAEVDORev0:'3.5G', CDMAEVDORevA:'3.5G', CDMAEVDORevB:'3.75G',
+    eHRPD:'3.9G', LTE:'4G', NRNSA:'5G', NR:'5G'
+  };
+  return MAP[r] || '';
+}
+function netTypeLine(){
+  try{
+    const ssid  = $network?.wifi?.ssid;
+    const radio = $network?.['cellular-data']?.radio;
+    if (ssid) return `Wi-Fi | ${ssid}`;
+    if (radio){
+      const g = radioToGen(radio);
+      return `蜂窝数据 | ${g ? `${g} - ${radio}` : radio}`;
     }
-    if (c) {
-      const radioMap = {
-        'GPRS':'2.5G','CDMA1x':'2.5G','EDGE':'2.75G','WCDMA':'3G','HSDPA':'3.5G',
-        'CDMAEVDORev0':'3.5G','CDMAEVDORevA':'3.5G','CDMAEVDORevB':'3.75G',
-        'HSUPA':'3.75G','eHRPD':'3.9G','LTE':'4G','NRNSA':'5G','NR':'5G'
-      };
-      const carrierNames = {
-        '460-00':'中国移动','460-02':'中国移动','460-04':'中国移动','460-07':'中国移动','460-08':'中国移动',
-        '460-01':'中国联通','460-06':'中国联通','460-09':'中国联通',
-        '460-03':'中国电信','460-05':'中国电信','460-11':'中国电信',
-        '460-15':'中国广电','460-20':'中移铁通'
-      };
-      const carrier = carrierNames[c.carrier] || '';
-      const gen = radioMap[c.radio] || c.radio || '';
-      return ['蜂窝', carrier && `｜${carrier}`, gen && `｜${gen}`].filter(Boolean).join('');
-    }
-  } catch(_) {}
-  return '';
+  }catch(_){}
+  return '网络 | 未知';
 }
 
 /* ===================== HTTP 基础 ===================== */
