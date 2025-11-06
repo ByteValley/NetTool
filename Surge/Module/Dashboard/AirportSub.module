@@ -1,9 +1,9 @@
-#!name=订阅面板
+#!name=订阅信息
 #!desc=机场订阅信息展示,流量使用及剩余信息与到期日期
 #!author=ByteValley
 #!category=功能看板
-#!arguments=Update:21600,DefaultIcon:cellularbars,DefaultIconColor:#1E90FF,Title1:订阅1,URL1:https://,ResetDay1:不限,Title2:订阅2,URL2:https://,ResetDay2:不限,Title3:订阅3,URL3:https://,ResetDay3:不限,Title4:订阅4,URL4:https://,ResetDay4:不限,Title5:订阅5,URL5:https://,ResetDay5:不限,Title6:订阅6,URL6:https://,ResetDay6:不限,Title7:订阅7,URL7:https://,ResetDay7:不限,Title8:订阅8,URL8:https://,ResetDay8:不限,Title9:订阅9,URL9:https://,ResetDay9:不限,Title10:订阅10,URL10:https://,ResetDay10:不限
-#!arguments-desc=Update=刷新间隔(秒);TitleN=名称;URLN=订阅链接;ResetDayN=重置日(1~31或中文提示);DefaultIcon=SF Symbols 名称;DefaultIconColor=十六进制色值
+#!arguments=Update:21600,DefaultIcon:cellularbars,DefaultIconColor:#1E90FF,Title1:机场名称,URL1:订阅链接,ResetDay1:重置日期,Title2:机场名称,URL2:订阅链接,ResetDay2:重置日期,Title3:机场名称,URL3:订阅链接,ResetDay3:重置日期,Title4:机场名称,URL4:订阅链接,ResetDay4:重置日期,Title5:机场名称,URL5:订阅链接,ResetDay5:重置日期,Title6:机场名称,URL6:订阅链接,ResetDay6:重置日期,Title7:机场名称,URL7:订阅链接,ResetDay7:重置日期,Title8:机场名称,URL8:订阅链接,ResetDay8:重置日期,Title9:机场名称,URL9:订阅链接,ResetDay9:重置日期,Title10:机场名称,URL10:订阅链接,ResetDay10:重置日期
+#!arguments-desc=Update=刷新间隔(秒);TitleN=机场名称;URLN=订阅链接;ResetDayN=重置日期(1~31或中文提示);DefaultIcon=SF Symbols 名称;DefaultIconColor=十六进制色值
 
 [Panel]
 订阅查询=script-name=机场订阅查询,update-interval={{{Update}}}
