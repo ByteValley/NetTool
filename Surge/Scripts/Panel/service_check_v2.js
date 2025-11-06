@@ -1,11 +1,12 @@
 /**
- * 服务检测 / 服務檢測（深测 · Surge）
- * 作者：ByteValley（参考 LucaLin233 / Rabbit-Spec）
+ * 服务检测 / 服務檢測
  * 功能：Netflix / Disney+ / YouTube Premium / ChatGPT Web+App / Hulu(US/JP) / HBO Max
- * 样式：Style=pretty（带✅、延迟、HTTP、旗帜）/ Style=icon（简洁行，带旗帜）
+ * 样式：Style=pretty（✅+延迟+HTTP+旗帜）/ Style=icon（简洁行+旗帜）
  * 本版变更：
- * - 移除“出口信息”首行
- * - 结果末尾新增“蜂窝数据”一行（若可获取）
+ * 1) 移除“出口信息”首行
+ * 2) 末尾增加：
+ *    - 蜂窝数据：蜂窝数据 | 运营商 - 代际/制式（可得时显示）
+ *    - 网络信息：设备IP/IPv6/路由器IP/节点IP/节点ISP/节点位置（全部显示）
  */
 
 (() => {
@@ -60,7 +61,14 @@
       hulu_blk:"區域受限 🚫",
       max_ok:(cc)=>`已解鎖， 地區: ${cc}`,
       max_blk:"區域受限 🚫",
-      cellular: "蜂窩數據"
+      cellular: "蜂窩數據",
+      netinfo: "網絡信息",
+      devip:"設備IP",
+      ipv6:"IPv6地址",
+      router:"路由器IP",
+      nodeip:"節點IP",
+      nodeisp:"節點ISP",
+      nodeloc:"節點位置"
     },
     "zh-Hans": {
       panel: TITLE_PARAM || "服务检测",
@@ -90,7 +98,14 @@
       hulu_blk:"区域受限 🚫",
       max_ok:(cc)=>`已解锁， 区域: ${cc}`,
       max_blk:"区域受限 🚫",
-      cellular: "蜂窝数据"
+      cellular: "蜂窝数据",
+      netinfo: "网络信息",
+      devip:"设备IP",
+      ipv6:"IPv6地址",
+      router:"路由器IP",
+      nodeip:"节点IP",
+      nodeisp:"节点ISP",
+      nodeloc:"节点位置"
     }
   }[LANG];
 
@@ -137,7 +152,7 @@
     try { return String.fromCodePoint(...codePoints) + " " + cc; } catch { return cc; }
   }
 
-  // ---------- YouTube Premium ----------
+  // ---------- 服务检测（与你现状一致） ----------
   async function testYouTube(){
     const r=await httpGet("https://www.youtube.com/premium?hl=en",{},true);
     if (!r.ok){
@@ -153,8 +168,6 @@
     if (STYLE==="icon") return lineIcon(I18N.youTube, `${I18N.unlocked}， ${I18N.regionLabel}: ${region||"—"}`);
     return joinPretty([`${okIcon} ${I18N.youTube}`, region], r.cost, r.status);
   }
-
-  // ---------- ChatGPT Web ----------
   async function testChatGPTWeb(){
     const r=await httpGet("https://chatgpt.com/cdn-cgi/trace",{},true);
     if (!r.ok){
@@ -166,8 +179,6 @@
     if (STYLE==="icon") return lineIcon(I18N.chatgpt, `${I18N.unlocked}， ${I18N.regionLabel}: ${region||"—"}`);
     return joinPretty([`${okIcon} ${I18N.chatgpt}`, region], r.cost, r.status);
   }
-
-  // ---------- ChatGPT App(API) ----------
   async function testChatGPTAppAPI(){
     const r=await httpGet("https://api.openai.com/v1/models",{},true);
     if (!r.ok){
@@ -177,8 +188,6 @@
     if (STYLE==="icon") return lineIcon(I18N.chatgpt_app, I18N.unlocked);
     return joinPretty([`${okIcon} ${I18N.chatgpt_app}`], r.cost, r.status);
   }
-
-  // ---------- Netflix ----------
   const NF_ORIGINAL="80018499";
   const NF_NONORIG="81280792";
   function parseNFRegion(resp){
@@ -186,7 +195,7 @@
       const x=resp.headers && (resp.headers["x-originating-url"]||resp.headers["X-Originating-URL"]);
       if (x){
         const seg=String(x).split("/"); if (seg.length>=4){
-          const cc=seg[3].split("-")[0]; if (cc && cc.length===2) return cc.toUpperCase();
+          const cc=seg[3].split("-)[0]; if (cc && cc.length===2) return cc.toUpperCase();
         }
       }
       const m=String(resp.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
@@ -213,8 +222,6 @@
     if (STYLE==="icon") return lineIcon(I18N.netflix, txt);
     return `${I18N.netflix}: ${txt}`;
   }
-
-  // ---------- Disney+（BAM API 优先） ----------
   async function testDisney(){
     async function home(){
       const r=await httpGet("https://www.disneyplus.com/",{"Accept-Language":"en"},true);
@@ -260,8 +267,6 @@
       return `${I18N.disney}: ${text}`;
     }
   }
-
-  // ---------- Hulu(US/JP) ----------
   async function testHuluUS(){
     const r=await httpGet("https://www.hulu.com/",{},true);
     if (!r.ok){
@@ -269,8 +274,8 @@
       return `${I18N.huluUS}: ${I18N.unreachable}`;
     }
     const blk=/not\s+available\s+in\s+your\s+region/i.test(r.data||"");
-    if (STYLE==="icon") return lineIcon(I18N.huluUS, blk? I18N.hulu_blk : I18N.hulu_ok(ccFlag("US")));
-    return `${I18N.huluUS}: ${blk? I18N.hulu_blk : I18N.hulu_ok(ccFlag("US"))}`;
+    if (STYLE==="icon") return lineIcon(I18N.huluUS, blk? "區域受限 🚫" : I18N.hulu_ok(ccFlag("US")));
+    return `${I18N.huluUS}: ${blk? "區域受限 🚫" : I18N.hulu_ok(ccFlag("US"))}`;
   }
   async function testHuluJP(){
     const r=await httpGet("https://www.hulu.jp/",{"Accept-Language":"ja"},true);
@@ -279,11 +284,9 @@
       return `${I18N.huluJP}: ${I18N.unreachable}`;
     }
     const blk=/ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data||"");
-    if (STYLE==="icon") return lineIcon(I18N.huluJP, blk? I18N.hulu_blk : I18N.hulu_ok(ccFlag("JP")));
-    return `${I18N.huluJP}: ${blk? I18N.hulu_blk : I18N.hulu_ok(ccFlag("JP"))}`;
+    if (STYLE==="icon") return lineIcon(I18N.huluJP, blk? "區域受限 🚫" : I18N.hulu_ok(ccFlag("JP")));
+    return `${I18N.huluJP}: ${blk? "區域受限 🚫" : I18N.hulu_ok(ccFlag("JP"))}`;
   }
-
-  // ---------- Max(HBO) ----------
   async function testHBO(){
     const r=await httpGet("https://www.max.com/",{},true);
     if (!r.ok){
@@ -292,12 +295,12 @@
     }
     const blk=/not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data||"");
     let cc=""; try{ const m=String(r.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc=m[1].toUpperCase(); }catch(_){}
-    const text = blk ? I18N.max_blk : I18N.max_ok(cc ? ccFlag(cc) : "");
+    const text = blk ? "區域受限 🚫" : I18N.max_ok(cc ? ccFlag(cc) : "");
     if (STYLE==="icon") return lineIcon(I18N.hbo, text);
     return `${I18N.hbo}: ${text}`;
   }
 
-  // ---------- 蜂窝数据（追加展示用） ----------
+  // ---------- 蜂窝 & 网络信息 ----------
   function loadCarrierNames() {
     return {
       // Taiwan
@@ -309,15 +312,11 @@
       '460-01': '中国联通', '460-06': '中国联通', '460-09': '中国联通',
       '460-00': '中国移动', '460-02': '中国移动', '460-04': '中国移动', '460-07': '中国移动', '460-08': '中国移动',
       '460-15': '中国广电', '460-20': '中移铁通',
-      // Japan
-      '440-00': 'Y!mobile', '440-10': 'docomo', '440-11': 'Rakuten', '440-20': 'SoftBank',
-      '440-50': 'au', '440-51': 'au', '440-52': 'au', '440-53': 'au', '440-54': 'au',
-      // Korea
-      '450-03': 'SKT', '450-05': 'SKT',
-      '450-02': 'KT', '450-04': 'KT', '450-08': 'KT',
-      '450-06': 'LG U+', '450-10': 'LG U+',
-      // US (subset)
-      '310-410': 'AT&T', '310-260': 'T-Mobile', '311-480': 'Verizon'
+      // Japan/Korea(简)
+      '440-10':'docomo', '440-20':'SoftBank', '440-50':'au',
+      '450-03':'SKT','450-02':'KT','450-06':'LG U+',
+      // US(简)
+      '310-410':'AT&T','310-260':'T-Mobile','311-480':'Verizon'
     };
   }
   function getCellularLine() {
@@ -327,36 +326,74 @@
       'eHRPD':'3.9G','LTE':'4G','NRNSA':'5G','NR':'5G'
     };
     try{
-      const carrierMap = loadCarrierNames();
       const cell = $network['cellular-data'];
       if (!cell) return "";
-      const carrierId = cell.carrier; // e.g., 466-11
-      const radio = cell.radio;       // e.g., NRNSA
+      const map = loadCarrierNames();
+      const name = map[cell.carrier] || "";
+      const radio = cell.radio || "";
       const gen = radioGeneration[radio] || radio || "";
-      const name = carrierMap[carrierId] || "";
-      if (radio) {
-        const head = I18N.cellular;
-        return name ? `${head} | ${name} - ${gen}` : `${head} | ${gen}`;
-      }
-    }catch(_){}
-    return "";
+      if (!radio) return "";
+      const head = I18N.cellular;
+      return name ? `${head} | ${name} - ${gen}` : `${head} | ${gen}`;
+    }catch(_){ return ""; }
+  }
+
+  async function getNetworkBlock(){
+    // 设备侧
+    const v4 = $network?.v4 || {};
+    const v6 = $network?.v6 || {};
+    const wifi = $network?.wifi || null;
+
+    const devIPv4 = v4.primaryAddress || "";
+    const devIPv6Assigned = !!v6.primaryAddress;
+    const routerIPv4 = wifi && wifi.ssid ? (v4.primaryRouter || "") : "";
+
+    // 出口节点（公网）
+    const r = await httpGet("http://ip-api.com/json", {}, true);
+    let nodeIP="", isp="", cc="", country="", city="";
+    if (r.ok && r.status<300){
+      try{
+        const j=JSON.parse(r.data||"{}");
+        nodeIP = j.query || "";
+        isp = j.isp || "";
+        cc = (j.countryCode||"").toUpperCase();
+        country = j.country || "";
+        city = j.city || "";
+      }catch(_){}
+    }
+
+    // flag + 码
+    const locFlag = cc ? (ccFlag(cc) + " | " + (country||cc) + (city?` - ${city}`:"")) : "";
+
+    const lines = [];
+    if (devIPv4) lines.push(`${I18N.devip}：${devIPv4}`);
+    lines.push(`${I18N.ipv6}：${devIPv6Assigned ? "已分配" : "未分配"}`);
+    if (routerIPv4) lines.push(`${I18N.router}：${routerIPv4}`);
+    if (nodeIP) lines.push(`${I18N.nodeip}：${nodeIP}`);
+    if (isp) lines.push(`${I18N.nodeisp}：${isp}`);
+    if (locFlag) lines.push(`${I18N.nodeloc}：${locFlag}`);
+
+    return lines.length ? lines.join("\n") : "";
   }
 
   // ---------- 主流程 ----------
   (async () => {
     const lines=[];
-
     const [yt, cgptW, cgptA, nf, d, hu, hj, hb] = await Promise.all([
       testYouTube(), testChatGPTWeb(), testChatGPTAppAPI(),
-      testNetflix(/*fallback not needed now*/""), testDisney(), testHuluUS(), testHuluJP(), testHBO()
+      testNetflix(""), testDisney(), testHuluUS(), testHuluJP(), testHBO()
     ]);
-
     lines.push(yt, cgptW, cgptA, nf, d, hu, hj, hb);
 
-    // 末尾追加蜂窝数据（若有）
     const cell = getCellularLine();
-    if (cell) {
-      lines.push("", cell); // 空行后追加
+    if (cell) lines.push("", cell); // 蜂窝数据
+
+    const netBlock = await getNetworkBlock();
+    if (netBlock) {
+      lines.push("", `${I18N.netinfo} ｜ ${netBlock.split("\n")[0]}`);
+      // 把第一行之外的网络信息继续按行追加
+      const rest = netBlock.split("\n").slice(1);
+      if (rest.length) lines.push(...rest);
     }
 
     $done({
