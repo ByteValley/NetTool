@@ -2,9 +2,36 @@
  * 节日倒数（两行：节气 | 节日）· 可外链标题/祝词库
  * 第1行：最近3个【二十四节气】；第2行：最近3个【节日（阳历/农历）】
  * 正日 06:00 后单次祝词通知（仅节日）
- * 参数：
- *  - TITLES_URL: 标题库外链(JSON数组)，支持 {lunar} {solar} {next}
- *  - BLESS_URL : 祝词库外链(JSON对象，键为节日名，值为文案)
+ *
+ * 参数（Surge 模块 arguments 或脚本 argument 传入）：
+ *  - TITLES_URL: 标题库外链（JSON 数组），支持占位符 {lunar} {solar} {next}
+ *  - BLESS_URL : 祝词库外链（JSON 对象：键=节日名，值=祝词文案）
+ *
+ * 外链 JSON 示例：
+ *  ── TITLES_URL（数组）:
+ *  [
+ *    "摸鱼使我快乐～",
+ *    "{lunar}",
+ *    "{solar}",
+ *    "下一站：{next}"
+ *  ]
+ *
+ *  ── BLESS_URL（对象）:
+ *  {
+ *    "春节": "愿新岁顺遂无虞，家人皆安！",
+ *    "中秋节": "人月两团圆，心上皆明朗。"
+ *  }
+ *
+ * 传参示例：
+ *  argument=TITLES_URL=https://example.com/titles.json&BLESS_URL=https://example.com/bless.json
+ *
+ * 说明：
+ *  - 如未提供外链或拉取失败，自动回退到脚本内置默认标题/祝词；
+ *  - 标题库占位符会在渲染前替换：
+ *      {lunar} -> “农历Title（含干支/生肖）”
+ *      {solar} -> “阳历Title（含星座）”
+ *      {next}  -> “下一个：<最近节日名>”
+ *
  * 作者：ByteValley  |  版本：2025-11-06
  */
 
