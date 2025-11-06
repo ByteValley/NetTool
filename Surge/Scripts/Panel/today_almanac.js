@@ -228,8 +228,8 @@ function titleRandom(daysToNext) {
     16: "今天的目标是先活下去",
     17: "给自己加个鸡腿！",
     18: "只要努力工作，老板的午餐就是我的",
-    19: nowsolar,
-    20: nowlunar
+    19: "今天的任务是：不干活！",
+    20: "用力生活，用力摸鱼"
   };
   if (daysToNext === 0) return `今天是${listA[idxA][0]}，休息一下吧 ~`;
   const r = Math.floor(Math.random() * 20) + 1;
