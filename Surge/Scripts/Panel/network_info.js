@@ -1,6 +1,6 @@
 // 功能：直连/入口/落地 IP 与位置；直连位置可按开关脱敏（仅旗帜 / 完整）；入口/落地完整显示；中国境内 ISP 规范为“中国移动/联通/电信/广电”
 // 图标：脚本接管（支持 $argument 传入 icon / icon-color）；支持台湾旗备用（FLAG_TWFALLBACK=1 用 🇼🇸 代替）
-// 视觉：区块之间留一空行；“执行时间”之前不留空行；在“IP:” 上方新增一行网络类型（Wi-Fi | SSID / 蜂窝数据 | 代际-制式）
+// 视觉：区块之间留一空行；“执行时间”之前不留空行；“IP:” 上方新增一行网络类型（Wi-Fi | SSID / 蜂窝数据 | 代际-制式）
 
 /* ===================== 参数解析 ===================== */
 function parseArgs() {
@@ -19,21 +19,21 @@ const ARG = parseArgs()
 const getArg = (k, d='') => (ARG[k] ?? d)
 
 /* —— 图标（脚本控制卡片系统图标） —— */
-const ICON_NAME  = getArg('icon', 'globe.asia.australia') // 有效 SF Symbols，如：globe / globe.asia.australia / network ...
+const ICON_NAME  = getArg('icon', 'globe.asia.australia') // SF Symbols：globe / globe.asia.australia / network ...
 const ICON_COLOR = getArg('icon-color', '#1E90FF')        // #RRGGBB
 
 /* —— 行为参数 —— */
-const IPv6_ON          = getArg('IPv6', '0') === '1'               // 是否查询 IPv6
-const MASK_IP          = getArg('MASK_IP', '1') === '1'            // IP 是否脱敏（v4 前两段保留；v6 保留前 4 段）
+const IPv6_ON          = getArg('IPv6', '0') === '1'            // 是否查询 IPv6
+const MASK_IP          = getArg('MASK_IP', '1') === '1'         // IP 脱敏（v4 前两段；v6 前 4 段）
 // 直连“位置”是否脱敏：若未显式传入 MASK_POS，则跟随 MASK_IP
 const MASK_POS         = (Object.prototype.hasOwnProperty.call(ARG,'MASK_POS')
                           ? getArg('MASK_POS','1')==='1'
                           : MASK_IP)
-const FLAG_TWFALLBACK  = getArg('FLAG_TWFALLBACK', '0') === '1'    // 台湾旗不可用时用 🇼🇸
-const DOMESTIC_IPv4    = getArg('DOMESTIC_IPv4', 'ipip')           // 直连 v4 源：ipip|cip|163|bilibili|126|pingan
-const DOMESTIC_IPv6    = getArg('DOMESTIC_IPv6', 'ddnspod')        // 直连 v6 源：ddnspod|neu6
-const LANDING_IPv4     = getArg('LANDING_IPv4', 'ipapi')           // 落地 v4 源：ipapi|ipwhois|ipsb
-const LANDING_IPv6     = getArg('LANDING_IPv6', 'ipsb')            // 落地 v6 源：ipsb|ident|ipify
+const FLAG_TWFALLBACK  = getArg('FLAG_TWFALLBACK', '0') === '1' // 台湾旗不可用时用 🇼🇸
+const DOMESTIC_IPv4    = getArg('DOMESTIC_IPv4', 'ipip')        // 直连 v4 源：ipip|cip|163|bilibili|126|pingan
+const DOMESTIC_IPv6    = getArg('DOMESTIC_IPv6', 'ddnspod')     // 直连 v6 源：ddnspod|neu6
+const LANDING_IPv4     = getArg('LANDING_IPv4', 'ipapi')        // 落地 v4 源：ipapi|ipwhois|ipsb
+const LANDING_IPv6     = getArg('LANDING_IPv6', 'ipsb')         // 落地 v6 源：ipsb|ident|ipify
 
 /* ===================== 主流程 ===================== */
 ;(async () => {
@@ -44,7 +44,7 @@ const LANDING_IPv6     = getArg('LANDING_IPv6', 'ipsb')            // 落地 v6 
   // 最近请求：策略名 & 入口 IP
   const { policyName, entranceIP } = await getPolicyAndEntrance().catch(()=>({}))
 
-  // 入口：用两个来源补全（¹ 国内，² 国际）
+  // 入口：两个来源补全（¹ 国内，² 国际）
   const ent = isIP(entranceIP || '') ? await getEntranceBundle(entranceIP).catch(()=>({ ip: entranceIP })) : {}
 
   // 落地
@@ -54,12 +54,10 @@ const LANDING_IPv6     = getArg('LANDING_IPv6', 'ipsb')            // 落地 v6 
   /* ===== 组装输出 ===== */
   const title = policyName ? `代理策略: ${policyName}` : `网络信息 𝕏`
 
-  // —— 直连（位置按 MASK_POS 决定：true=仅旗帜；false=旗帜+中文）
-  const directPos = cn.loc
-    ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc))
-    : '-'
+  // —— 直连（位置按 MASK_POS 控制：true=仅旗帜；false=旗帜+中文）
+  const directPos = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-'
   const directLines = [
-    netTypeLine(),                           // 新增：网络类型行（在“IP:”之上）
+    netTypeLine(),                     // 新增：网络类型行
     lineIP('IP', cn.ip, cn6.ip),
     `位置: ${directPos}`
   ]
@@ -193,25 +191,30 @@ function httpAPI(path='/v1/requests/recent'){
 async function getDirectV4(p){
   try{
     if (p==='cip')      return await d_cip()
-    if (p==='163')      return await d_163()
-    if (p==='bilibili') return await d_bili()
-    if (p==='126')      return await d_126()
-    if (p==='pingan')   return await d_pingan()
-    return await d_ipip()
+    else if (p==='163')      return await d_163()
+    else if (p==='bilibili') return await d_bili()
+    else if (p==='126')      return await d_126()
+    else if (p==='pingan')   return await d_pingan()
+    else return await d_ipip()
   }catch(_){ try{return await d_ipip()}catch(e){} return {} }
 }
-async function d_ipip(){ const r=await httpGet('https://myip.ipip.net/json'); const j=JSON.parse(r.body||'{}'); const c0=j?.data?.location?.[0]; const flag=flagOf(c0==='中国'?'CN':c0); return { ip:j?.data?.ip||'', loc:[flag, j?.data?.location?.[0], j?.data?.location?.[1], j?.data?.location?.[2]].filter(Boolean).join(' ').replace(/\s*中国\s*/,'') , isp:j?.data?.location?.[4]||'' } }
-async function d_cip(){ const r=await httpGet('http://cip.cc/'); const b=String(r.body||''); const ip=(b.match(/IP.*?:\s*(\S+)/)||[])[1]||''; const addr=(b.match(/地址.*?:\s*(.+)/)||[])[1]||''; const isp=(b.match(/运营商.*?:\s*(.+)/)||[])[1]||''; const isCN=/中国/.test(addr); return { ip, loc:[flagOf(isCN?'CN':''), addr.replace(/中国\s*/,'')].filter(Boolean).join(' '), isp:isp.replace(/中国\s*/,'') } }
-async function d_163(){ const r=await httpGet('https://dashi.163.com/fgw/mailsrv-ipdetail/detail'); const d=(JSON.parse(r.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countryCode), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||d.org||'' } }
-async function d_bili(){ const r=await httpGet('https://api.bilibili.com/x/web-interface/zone'); const d=(JSON.parse(r.body||'{}')||{}).data||{}; const flag=flagOf(d.country==='中国'?'CN':d.country); return { ip:d.addr||'', loc:[flag,d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' } }
-async function d_126(){ const r=await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp'); const d=(JSON.parse(r.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countrySymbol), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.operator||'' } }
-async function d_pingan(){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request'); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { ip:d.ip||'', loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' } }
+async function d_ipip(){ const resp=await httpGet('https://myip.ipip.net/json'); const j=JSON.parse(resp.body||'{}'); const c0=j?.data?.location?.[0]; const flag=flagOf(c0==='中国'?'CN':c0); return { ip:j?.data?.ip||'', loc:[flag, j?.data?.location?.[0], j?.data?.location?.[1], j?.data?.location?.[2]].filter(Boolean).join(' ').replace(/\s*中国\s*/,'') , isp:j?.data?.location?.[4]||'' } }
+async function d_cip(){ const resp=await httpGet('http://cip.cc/'); const b=String(resp.body||''); const ip=(b.match(/IP.*?:\s*(\S+)/)||[])[1]||''; const addr=(b.match(/地址.*?:\s*(.+)/)||[])[1]||''; const isp=(b.match(/运营商.*?:\s*(.+)/)||[])[1]||''; const isCN=/中国/.test(addr); return { ip, loc:[flagOf(isCN?'CN':''), addr.replace(/中国\s*/,'')].filter(Boolean).join(' '), isp:isp.replace(/中国\s*/,'') } }
+async function d_163(){ const resp=await httpGet('https://dashi.163.com/fgw/mailsrv-ipdetail/detail'); const d=(JSON.parse(resp.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countryCode), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||d.org||'' } }
+async function d_bili(){ const resp=await httpGet('https://api.bilibili.com/x/web-interface/zone'); const d=(JSON.parse(resp.body||'{}')||{}).data||{}; const flag=flagOf(d.country==='中国'?'CN':d.country); return { ip:d.addr||'', loc:[flag,d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' } }
+async function d_126(){ const resp=await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp'); const d=(JSON.parse(resp.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countrySymbol), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.operator||'' } }
+async function d_pingan(){ const resp=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request'); const d=(JSON.parse(resp.body||'{}')||{}).data||{}; return { ip:d.ip||'', loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' } }
 
-// —— 直连 v6
+// —— 直连 v6（修正为 else 分支与独立变量名，避免重复 const）
 async function getDirectV6(p){
   try{
-    if (p==='neu6'){ const r=await httpGet('https://speed.neu6.edu.cn/getIP.php'); return { ip:String(r.body||'').trim() } }
-    const r=await httpGet('https://ipv6.ddnspod.com'); return { ip:String(r.body||'').trim() }
+    if (p==='neu6') {
+      const resp = await httpGet('https://speed.neu6.edu.cn/getIP.php')
+      return { ip:String(resp.body||'').trim() }
+    } else {
+      const resp = await httpGet('https://ipv6.ddnspod.com')
+      return { ip:String(resp.body||'').trim() }
+    }
   }catch(_){ return {} }
 }
 
@@ -219,20 +222,27 @@ async function getDirectV6(p){
 async function getLandingV4(p){
   try{
     if (p==='ipwhois') return await l_whois()
-    if (p==='ipsb')    return await l_ipsb()
-    return await l_ipapi()
+    else if (p==='ipsb')    return await l_ipsb()
+    else return await l_ipapi()
   }catch(_){ try{return await l_ipapi()}catch(e){} return {} }
 }
-async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' } }
-async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' } }
-async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip');            const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',     loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' } }
+async function l_ipapi(){ const resp=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(resp.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' } }
+async function l_whois(){ const resp=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(resp.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' } }
+async function l_ipsb(){  const resp=await httpGet('https://api-ipv4.ip.sb/geoip');            const j=JSON.parse(resp.body||'{}'); return { ip:j.ip||'',     loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' } }
 
-// —— 落地 v6
+// —— 落地 v6（修正：使用 else if/else，变量名统一用 resp，避免重复声明）
 async function getLandingV6(p){
   try{
-    if (p==='ident'){ const r=await httpGet('https://v6.ident.me'); return { ip:String(r.body||'').trim() }
-    if (p==='ipify'){ const r=await httpGet('https://api6.ipify.org'); return { ip:String(r.body||'').trim() } }
-    const r=await httpGet('https://api-ipv6.ip.sb/ip'); return { ip:String(r.body||'').trim() }
+    if (p==='ident') {
+      const resp = await httpGet('https://v6.ident.me')
+      return { ip:String(resp.body||'').trim() }
+    } else if (p==='ipify') {
+      const resp = await httpGet('https://api6.ipify.org')
+      return { ip:String(resp.body||'').trim() }
+    } else {
+      const resp = await httpGet('https://api-ipv6.ip.sb/ip')
+      return { ip:String(resp.body||'').trim() }
+    }
   }catch(_){ return {} }
 }
 
@@ -254,5 +264,5 @@ async function getEntranceBundle(ip){
   const b = await loc_ipapi(ip).catch(()=>({}))
   return { ip, loc1: a.loc || '', isp1: a.isp || '', loc2: b.loc || '', isp2: b.isp || '' }
 }
-async function loc_pingan(ip){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip='+encodeURIComponent(ip)); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' } }
-async function loc_ipapi(ip){ const r=await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`); const j=JSON.parse(r.body||'{}'); return { loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' } }
+async function loc_pingan(ip){ const resp=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip='+encodeURIComponent(ip)); const d=(JSON.parse(resp.body||'{}')||{}).data||{}; return { loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' } }
+async function loc_ipapi(ip){ const resp=await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`); const j=JSON.parse(resp.body||'{}'); return { loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' } }
