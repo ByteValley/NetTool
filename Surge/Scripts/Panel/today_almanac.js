@@ -56,4 +56,141 @@ function nthWeekdayOfMonth(year, month, weekday, n) {
   const first = new Date(year, month-1, 1);
   const firstW = first.getDay();
   const add = ((weekday - firstW + 7) % 7) + (n-1)*7;
-  r
+  return fmtYMD(year, month, 1 + add);
+}
+function lunarNewYearEveSolar(year) {
+  const days12 = calendar.monthDays(year, 12);
+  const lday = days12 === 29 ? 29 : 30;
+  const obj = calendar.lunar2solar(year, 12, lday);
+  return obj.date;
+}
+function solarTerms(year) {
+  const names = calendar.solarTerm, out = [];
+  for (let i=1;i<=24;i++){
+    const month = i<=2 ? 1 : i<=4 ? 2 : i<=6 ? 3 : i<=8 ? 4 : i<=10 ? 5 : i<=12 ? 6 : i<=14 ? 7 : i<=16 ? 8 : i<=18 ? 9 : i<=20 ? 10 : i<=22 ? 11 : 12;
+    const day = calendar.getTerm(year, i);
+    out.push([names[i-1], fmtYMD(y, month, day)]);
+  }
+  return out;
+}
+function gregorianFest(year) {
+  return [
+    ["元旦", fmtYMD(year,1,1)],
+    ["情人节", fmtYMD(year,2,14)],
+    ["妇女节", fmtYMD(year,3,8)],
+    ["愚人节", fmtYMD(year,4,1)],
+    ["劳动节", fmtYMD(year,5,1)],
+    ["母亲节", nthWeekdayOfMonth(year,5,0,2)],
+    ["儿童节", fmtYMD(year,6,1)],
+    ["父亲节", nthWeekdayOfMonth(year,6,0,3)],
+    ["教师节", fmtYMD(year,9,10)],
+    ["国庆节", fmtYMD(year,10,1)],
+    ["圣诞节", fmtYMD(year,12,25)]
+  ];
+}
+function lunarFest(year) {
+  const base = [
+    ["春节", [1,1]],["元宵节", [1,15]],["龙抬头", [2,2]],
+    ["端午节", [5,5]],["七夕节", [7,7]],["中元节", [7,15]],
+    ["中秋节", [8,15]],["重阳节", [9,9]],["寒衣节", [10,1]],
+    ["下元节", [10,15]],["腊八节", [12,8]],["小年(北)", [12,23]],["小年(南)", [12,24]]
+  ];
+  const out = base.map(([n,[lm,ld]]) => [n, calendar.lunar2solar(year, lm, ld).date]);
+  out.push(["除夕", lunarNewYearEveSolar(year)]);
+  return out;
+}
+function buildTerms(year) {
+  const set = solarTerms(year);
+  set.sort((a,b)=> new Date(a[1]) - new Date(b[1]));
+  return set;
+}
+function buildFest(year) {
+  const set = [...gregorianFest(year), ...lunarFest(year)];
+  const seen = new Set(), out = [];
+  for (const it of set) {
+    const key = it[0] + "@" + it[1];
+    if (!seen.has(key)) { seen.add(key); out.push(it); }
+  }
+  out.sort((a,b)=> new Date(a[1]) - new Date(b[1]));
+  return out;
+}
+
+/* ========== 最近三项 ========== */
+function nextTrip(list) {
+  const arr = list.filter(([_, d]) => dateDiff(todayStr, d) >= 0);
+  if (arr.length === 0) return list.slice(0,3);
+  const take = arr.slice(0,3);
+  if (take.length < 3) take.push(...list.slice(0, 3 - take.length));
+  return take;
+}
+const termsAll = [...buildTerms(y), ...buildTerms(nextY)];
+const festAll  = [...buildFest(y),  ...buildFest(nextY)];
+const T3 = nextTrip(termsAll);
+const F3 = nextTrip(festAll);
+const dT0 = dateDiff(todayStr, T3[0][1]), dT1 = dateDiff(todayStr, T3[1][1]), dT2 = dateDiff(todayStr, T3[2][1]);
+const dF0 = dateDiff(todayStr, F3[0][1]), dF1 = dateDiff(todayStr, F3[1][1]), dF2 = dateDiff(todayStr, F3[2][1]);
+
+/* ========== 载入外部：标题库 / 祝词库 ========== */
+const args = parseArgs();
+const defaultTitles = [
+  "距离放假，还要摸鱼多少天？🥱","坚持住，就快放假啦！💪","上班好累呀，好想放假😮‍💨",
+  "努力，我还能加班24小时！🧐","天呐，还要多久才放假呀？😭","躺平中，等放假(☝ ՞ਊ ՞)☝",
+  "只有摸鱼才是赚老板的钱🙎🤳","一起摸鱼吧✌(՞ټ՞ )✌","摸鱼中，期待下一个假日.ʕʘ‿ʘʔ.",
+  "小乌龟慢慢爬🐢","太难了！😫😩","今日宜摸鱼，忌早起",
+  "{lunar}","{solar}","{next}"
+];
+const defaultBless = {
+  "春节":"春风送暖入屠苏，万象更新福满门。阖家欢乐迎新岁！",
+  "元宵节":"花灯高照月正圆，团团圆圆共此时。",
+  "劳动节":"双手创造幸福路，愿你劳有所获、心有所安。",
+  "端午节":"粽叶飘香龙舟竞，平安康健万事顺。",
+  "中秋节":"海上生明月，天涯共此时。愿人月两团圆。",
+  "国庆节":"山河锦绣盛世华章，祝国泰民安！",
+  "元旦":"辞旧迎新，万象更新；新年胜旧年！",
+  "七夕节":"鹊桥相会意绵绵，愿得一心人，白首不相离。",
+  "重阳节":"草木含秋意，登高望远念亲朋。",
+  "除夕":"爆竹声中一岁除，愿新岁顺遂无虞。",
+  "寒衣节":"添衣一纸，温暖一念。","下元节":"三官赐福，下元祈愿，平安顺心。","腊八节":"腊八粥香入人心，温暖到岁尽。","龙抬头":"龙抬头，万事有抬头。"
+};
+const titlesArr = await fetchJson(args.TITLES_URL, defaultTitles);
+const blessMap  = await fetchJson(args.BLESS_URL , defaultBless);
+
+/* ========== 标题随机（支持占位符） ========== */
+function pickTitle(daysToNext, nextName) {
+  if (daysToNext === 0) return `今天是${nextName}，休息一下吧 ~`;
+  const pool = Array.isArray(titlesArr) && titlesArr.length ? titlesArr : defaultTitles;
+  const r = Math.floor(Math.random() * pool.length);
+  const raw = String(pool[r] || "");
+  return raw
+    .replaceAll("{lunar}", titleLunar)
+    .replaceAll("{solar}", titleSolar)
+    .replaceAll("{next}", nextName ? `下一个：${nextName}` : "");
+}
+
+/* ========== 正日提醒（仅节日，06:00 后每日一次） ========== */
+if (dF0 === 0 && tnow.getHours() >= 6) {
+  const key = "timecardpushed_f";
+  if ($persistentStore.read(key) !== F3[0][1]) {
+    $persistentStore.write(F3[0][1], key);
+    const words = blessMap[F3[0][0]] || "节日快乐！";
+    $notification.post(`🎉今天是 ${F3[0][1]} ${F3[0][0]}`, "", words);
+  }
+}
+
+/* ========== 面板两行输出（第1行节气 / 第2行节日） ========== */
+const lineTerm = (dT0 === 0)
+  ? `今天：${T3[0][0]} | ${T3[1][0]}${dT1}天 | ${T3[2][0]}${dT2}天`
+  : `${T3[0][0]}${dT0}天 | ${T3[1][0]}${dT1}天 | ${T3[2][0]}${dT2}天`;
+
+const lineFest = (dF0 === 0)
+  ? `今天：${F3[0][0]} | ${F3[1][0]}${dF1}天 | ${F3[2][0]}${dF2}天`
+  : `${F3[0][0]}${dF0}天 | ${F3[1][0]}${dF1}天 | ${F3[2][0]}${dF2}天`;
+
+/* ========== 固定橙色日历图标 ========== */
+$done({
+  title: pickTitle(dF0, F3[0][0]),
+  icon: "calendar",          // 橙色日历
+  "icon-color": "#FF9800",   // 亮橙
+  content: `${lineTerm}\n\n${lineFest}`
+});
+})();
