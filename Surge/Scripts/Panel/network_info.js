@@ -185,32 +185,62 @@ function fmtISP(isp, locStr){
   return '中国' + s;
 }
 
-/* —— 网络类型（Wi-Fi / 蜂窝） —— */
+/* —— 网络类型（Wi-Fi / 蜂窝），严格输出：Wi-Fi（SSID） 或 蜂窝｜中国移动｜5G —— */
 function getNetworkTypeLine(){
   try {
     const w = $network?.wifi;
-    const c = $network?.['cellular-data'];
     if (w?.ssid) {
+      // 与既有风格一致：Wi-Fi（SSID）
       return `Wi-Fi（${w.ssid}）`;
     }
-    if (c) {
-      const radioMap = {
-        'GPRS':'2.5G','CDMA1x':'2.5G','EDGE':'2.75G','WCDMA':'3G','HSDPA':'3.5G',
-        'CDMAEVDORev0':'3.5G','CDMAEVDORevA':'3.5G','CDMAEVDORevB':'3.75G',
-        'HSUPA':'3.75G','eHRPD':'3.9G','LTE':'4G','NRNSA':'5G','NR':'5G'
-      };
-      const carrierNames = {
-        '460-00':'中国移动','460-02':'中国移动','460-04':'中国移动','460-07':'中国移动','460-08':'中国移动',
-        '460-01':'中国联通','460-06':'中国联通','460-09':'中国联通',
-        '460-03':'中国电信','460-05':'中国电信','460-11':'中国电信',
-        '460-15':'中国广电','460-20':'中移铁通'
-      };
-      const carrier = carrierNames[c.carrier] || '';
-      const gen = radioMap[c.radio] || c.radio || '';
-      return ['蜂窝', carrier && `｜${carrier}`, gen && `｜${gen}`].filter(Boolean).join('');
+
+    // 兼容多种字段命名
+    const c = $network?.['cellular-data'] || $network?.cellular || $network?.['cellular'];
+    if (!c) return '';
+
+    // 无线制式映射
+    const radioMap = {
+      'GPRS':'2.5G','CDMA1x':'2.5G','EDGE':'2.75G','WCDMA':'3G','HSDPA':'3.5G',
+      'CDMAEVDORev0':'3.5G','CDMAEVDORevA':'3.5G','CDMAEVDORevB':'3.75G',
+      'HSUPA':'3.75G','eHRPD':'3.9G','LTE':'4G','NRNSA':'5G','NR':'5G'
+    };
+
+    // 常见中国 MCC/MNC → 运营商名（兜底表）
+    const carrierMap = {
+      '460-00':'中国移动','460-02':'中国移动','460-04':'中国移动','460-07':'中国移动','460-08':'中国移动',
+      '460-01':'中国联通','460-06':'中国联通','460-09':'中国联通',
+      '460-03':'中国电信','460-05':'中国电信','460-11':'中国电信',
+      '460-15':'中国广电','460-20':'中移铁通'
+    };
+
+    // 统一拿到 MCC-MNC：优先现成 ID → 退化到 mcc/mnc 组合
+    const rawId = String(c.carrier ?? c['carrier'] ?? '').trim();
+    const mcc = String(c.mcc ?? c['mobileCountryCode'] ?? '').trim();
+    const mncRaw = String(c.mnc ?? c['mobileNetworkCode'] ?? '').trim();
+    const mnc = mncRaw ? mncRaw.padStart(2, '0') : '';
+    const id = rawId || ((mcc && mnc) ? `${mcc}-${mnc}` : '');
+
+    // 先用映射表；没有就用系统名（carrierName / carrier-name）
+    let carrier = carrierMap[id] || c.carrierName || c['carrier-name'] || '';
+
+    // 若判断在中国（MCC=460 或映射命中中国表），用既有 fmtISP 规范化为「中国移动/中国联通/中国电信/中国广电」
+    const inCN = id.startsWith('460-') || /移动|联通|电信|广电|China\s*(Mobile|Unicom|Telecom)/i.test(String(carrier));
+    if (inCN) {
+      // fmtISP(原名, 伪造中国位置以触发规范化)
+      carrier = fmtISP(carrier || '中国移动', '🇨🇳 中国');
     }
-  } catch(_) {}
-  return '';
+
+    // 制式
+    const gen = radioMap[c.radio] || c.radio || '';
+
+    // 严格输出：蜂窝｜运营商｜制式（缺项自动省略）
+    const parts = ['蜂窝'];
+    if (carrier) parts.push(`｜${carrier}`);
+    if (gen)     parts.push(`｜${gen}`);
+    return parts.join('');
+  } catch {
+    return '';
+  }
 }
 
 /* ===================== HTTP 基础 ===================== */
