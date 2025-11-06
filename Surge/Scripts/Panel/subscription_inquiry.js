@@ -34,20 +34,36 @@ function getResetDaysLeft(resetDayNum) {
   return diff > 0 ? diff : 0;
 }
 
-// ===== 参数解析 =====
+// ===== 参数解析 & 清洗 =====
 const args = {};
 ($argument || "").split("&").forEach(p => {
   const idx = p.indexOf("=");
   if (idx === -1) return;
   const key = p.substring(0, idx);
   const value = p.substring(idx + 1);
-  args[key] = decodeURIComponent(value);
+  args[key] = decodeURIComponent(value || "");
 });
+
 function getArg(lower, upper) {
   return args[lower] ?? args[upper] ?? null;
 }
+function isPlaceholder(val) {
+  const s = String(val || "").trim();
+  return /^{{{[^}]+}}}$/.test(s);
+}
+function cleanArg(val) {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  const low = s.toLowerCase();
+  if (isPlaceholder(s) || low === "null" || low === "undefined") return null;
+  return s;
+}
 function isPureNumber(s) {
   return typeof s === "number" || (/^\d+$/.test(String(s || "").trim()));
+}
+function isHttpUrl(s) {
+  return /^https?:\/\//i.test(String(s || ""));
 }
 
 // ===== 拉取机场信息（返回文本块） =====
@@ -91,19 +107,16 @@ function fetchInfo(url, resetDayRaw, title) {
       }
       const expireStr = formatDate(expireMs);
 
-      // 重置行：数字 → N天；中文/非数字 → 原文
+      // 重置：数字→N天；中文/非数字→原文；未提供则不显示
       let resetLinePart = "";
-      if (resetDayRaw !== null && resetDayRaw !== undefined && String(resetDayRaw).trim() !== "") {
-        if (isPureNumber(resetDayRaw)) {
-          const left = getResetDaysLeft(parseInt(resetDayRaw, 10));
+      const resetClean = cleanArg(resetDayRaw);
+      if (resetClean) {
+        if (isPureNumber(resetClean)) {
+          const left = getResetDaysLeft(parseInt(resetClean, 10));
           resetLinePart = `重置：${left ?? 0}天`;
         } else {
-          // 直接显示自定义中文，如：工单重置/手动重置/不限
-          resetLinePart = `重置：${String(resetDayRaw).trim()}`;
+          resetLinePart = `重置：${resetClean}`;
         }
-      } else {
-        // 未提供重置信息就不显示“重置：”，只给到期
-        resetLinePart = "";
       }
 
       // 构建内容
@@ -122,19 +135,24 @@ function fetchInfo(url, resetDayRaw, title) {
 
 // ===== 主流程 =====
 (async () => {
-  // 可通过参数改默认图标（同一面板只能有一个图标）
-  const defaultIcon  = getArg("defaultIcon", "DefaultIcon") || "antenna.radiowaves.left.and.right.circle.fill";
-  const defaultColor = getArg("defaultIconColor", "DefaultIconColor") || "#00E28F";
+  // 同一面板使用一个默认图标
+  const defaultIcon  = cleanArg(getArg("defaultIcon", "DefaultIcon")) || "antenna.radiowaves.left.and.right.circle.fill";
+  const defaultColor = cleanArg(getArg("defaultIconColor", "DefaultIconColor")) || "#00E28F";
 
   const blocks = [];
   for (let i = 1; i <= 10; i++) {
-    const url = getArg(`url${i}`, `URL${i}`);
-    if (!url) continue;
-
-    const title = getArg(`title${i}`, `Title${i}`) || `机场${i}`;
-    // resetDay 支持数字（天）或中文提示（工单重置/手动重置/不限）
+    const urlRaw   = getArg(`url${i}`,   `URL${i}`);
+    const titleRaw = getArg(`title${i}`, `Title${i}`);
     const resetRaw = getArg(`resetDay${i}`, `ResetDay${i}`);
-    const block = await fetchInfo(url, resetRaw, title);
+
+    const url   = cleanArg(urlRaw);
+    const title = cleanArg(titleRaw);
+
+    // 未填写 / 占位符 / 非 http(s) URL → 跳过该项
+    if (!url || !isHttpUrl(url)) continue;
+
+    const name = title || `机场${i}`;
+    const block = await fetchInfo(url, resetRaw, name);
     blocks.push(block);
   }
 
