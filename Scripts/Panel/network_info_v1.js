@@ -6,7 +6,7 @@
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
  * - 服务检测并发执行：
- *   · BoxJS：文本 NetworkInfo_SERVICES（JSON 数组/逗号字符串）或方形勾选布尔项（最高优先）
+ *   · BoxJS：方形勾选布尔项（最高优先）NetworkInfo_SERVICES_TEXT，其次文本 NetworkInfo_SERVICES_TEXT（JSON 数组/逗号字符串）
  *   · 模块参数：SERVICES=逗号/JSON 数组（次优先）
  *   · 两者都无 → 检测全部
  * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
@@ -99,14 +99,23 @@ const CFG = {
   SD_ICON_THEME:  readKV(K('SD_ICON_THEME'))  ?? $args.SD_ICON_THEME  ?? 'check',
   SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true),
 
-  // 文本优先（但以 BoxJS 为最高优先）：先 BoxJS 文本，再 BoxJS 勾选，再 arguments 文本
-  SERVICES_BOX_TEXT: (()=>{
-    const box = readKV(K('SERVICES'));
-    return (box != null && String(box).trim() !== '') ? String(box) : '';
+  // BoxJS 勾选（复选框 checkboxes）：NetworkInfo_SERVICES
+  // 注意：这里保留“原始字符串”，用于判断键是否存在（null/undefined 表示根本没这个键）
+  SERVICES_BOX_CHECKED_RAW: (() => {
+    const v = readKV(K('SERVICES'));    // 勾选数组在 BoxJS 里存 JSON 字符串，如：["youtube","netflix"]
+    return (v === undefined || v === null) ? null : String(v);
   })(),
-  SERVICES_ARG_TEXT: (()=>{
-    const arg = $args.SERVICES;
-    return (arg != null && String(arg).trim() !== '') ? String(arg) : '';
+
+  // BoxJS 文本：NetworkInfo_SERVICES_TEXT（JSON 数组或逗号字符串）
+  SERVICES_BOX_TEXT: (() => {
+    const v = readKV(K('SERVICES_TEXT'));
+    return (v != null) ? String(v) : '';
+  })(),
+
+  // 模块参数文本：SERVICES=...
+  SERVICES_ARG_TEXT: (() => {
+    const v = $args.SERVICES;
+    return (v != null) ? String(v) : '';
   })()
 };
 
@@ -438,16 +447,27 @@ const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 function parseServices(raw){
   if (raw == null) return [];
   const s = String(raw).trim();
-  if (!s) return [];
+  if (!s || s === '[]' || s === '{}' || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
+
+  // 优先 JSON 数组
   try {
     const arr = JSON.parse(s);
     if (Array.isArray(arr)) {
-      const out=[]; arr.forEach(x=>{ const k=String(x||'').trim().toLowerCase(); if(k && !out.includes(k)) out.push(k); });
+      const out = [];
+      for (const x of arr) {
+        const k = String(x ?? '').trim().toLowerCase();
+        if (k && !out.includes(k)) out.push(k);
+      }
       return out;
     }
-  } catch(_) {}
-  const out2=[];
-  s.split(',').forEach(x=>{ const k=String(x||'').trim().toLowerCase(); if(k && !out2.includes(k)) out2.push(k); });
+  } catch (_) {}
+
+  // 其次逗号字符串
+  const out2 = [];
+  s.split(',').forEach(x=>{
+    const k = String(x||'').trim().toLowerCase();
+    if (k && !out2.includes(k)) out2.push(k);
+  });
   return out2;
 }
 
@@ -469,16 +489,43 @@ function readCheckedServices(){
 }
 
 // 统一选择逻辑（优先级：BoxJS 文本 > BoxJS 勾选 > arguments 文本 > 全部）
+// 统一选择逻辑（优先级：BoxJS 勾选 > BoxJS 文本 > arguments 文本 > 全部）
 function selectServices(){
-  const boxText = parseServices(CFG.SERVICES_BOX_TEXT);
-  if (boxText.length) return boxText.filter(k => SD_TESTS_MAP[k]);
+  // 1) BoxJS 勾选（checkboxes）
+  const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;    // 是否存在该键
+  const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);  // 解析为数组
 
-  const checked = readCheckedServices();
-  if (checked.length) return checked.filter(k => SD_TESTS_MAP[k]);
+  if (hasCheckboxKey) {
+    if (boxChecked.length > 0) {
+      return boxChecked.filter(k => SD_TESTS_MAP[k]);
+    }
+    // 显式清空（[]/空串/无效）=> 不回退旧布尔历史；转去看 BoxJS 文本
+    const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
+    if (boxTextList.length > 0) {
+      return boxTextList.filter(k => SD_TESTS_MAP[k]);
+    }
+    // 再看 arguments 文本
+    const argList = parseServices(CFG.SERVICES_ARG_TEXT);
+    if (argList.length > 0) {
+      return argList.filter(k => SD_TESTS_MAP[k]);
+    }
+    // 都空 => 默认全开
+    return SD_DEFAULT_ORDER.slice();
+  }
 
-  const argText = parseServices(CFG.SERVICES_ARG_TEXT);
-  if (argText.length) return argText.filter(k => SD_TESTS_MAP[k]);
+  // 2) 没有“勾选键”时：BoxJS 文本
+  const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
+  if (boxTextList.length > 0) {
+    return boxTextList.filter(k => SD_TESTS_MAP[k]);
+  }
 
+  // 3) arguments 文本
+  const argList = parseServices(CFG.SERVICES_ARG_TEXT);
+  if (argList.length > 0) {
+    return argList.filter(k => SD_TESTS_MAP[k]);
+  }
+
+  // 4) 全部
   return SD_DEFAULT_ORDER.slice();
 }
 
