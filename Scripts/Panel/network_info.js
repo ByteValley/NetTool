@@ -1,24 +1,89 @@
 /* =========================================================
- * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX 兼容）
+ * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley (merged & patched by ChatGPT)
- * - 标题显示“网络类型”；第一行显示“代理策略”
+ * Version: 2025-11-08 (t() 工程化 + S2T 兜底)
+ *
+ * 选择优先级（统一）：
+ *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
+ *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
+ *
+ * - 标题显示网络类型；第一行显示代理策略
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
- * - 服务检测并发执行
+ * - 服务检测并发执行，Netflix“完整/自制剧”，其它服务“已解锁/不可达”
  * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 入口/策略获取：预触发落地请求→重试(指数退避)→任意代理请求兜底
- * - 脚本接管图标 Icon / IconColor
- * - 新增：
+ * - 可调：
  *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
  *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
  *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
  *   · ChatGPT App(API) 地区多源回退，优先 CF 头
  * =======================================================*/
 
+/* ===== 语言字典（固定 UI 词收口）===== */
+const SD_STR = {
+  "zh-Hans": {
+    panelTitle: "网络信息 𝕏",
+    wifi: "Wi-Fi",
+    cellular: "蜂窝数据",
+    unknownNet: "网络 | 未知",
+    gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
+    policy: "代理策略",
+    ip: "IP",
+    entrance: "入口",
+    landingIP: "落地 IP",
+    location: "位置",
+    isp: "运营商",
+    runAt: "执行时间",
+    region: "区域",
+    // 状态/检测
+    unlocked: "已解锁",
+    partialUnlocked: "部分解锁",
+    notReachable: "不可达",
+    timeout: "超时",
+    fail: "检测失败",
+    regionBlocked: "区域受限",
+    nfFull: "已完整解锁",
+    nfOriginals: "仅解锁自制剧"
+  },
+  "zh-Hant": {
+    panelTitle: "網路資訊 𝕏",
+    wifi: "Wi-Fi",
+    cellular: "行動數據",
+    unknownNet: "網路 | 未知",
+    gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
+    policy: "代理策略",
+    ip: "IP",
+    entrance: "入口",
+    landingIP: "落地 IP",
+    location: "位置",
+    isp: "運營商",
+    runAt: "執行時間",
+    region: "區域",
+    // 狀態/檢測
+    unlocked: "已解鎖",
+    partialUnlocked: "部分解鎖",
+    notReachable: "不可達",
+    timeout: "逾時",
+    fail: "檢測失敗",
+    regionBlocked: "區域受限",
+    nfFull: "已完整解鎖",
+    nfOriginals: "僅解鎖自製劇"
+  }
+};
+/* t() 取词工具 */
+function t(key, ...args){
+  const lang = (typeof SD_LANG==="string" ? SD_LANG : "zh-Hans");
+  const pack = SD_STR[lang] || SD_STR["zh-Hans"];
+  const val = pack[key];
+  if (typeof val === "function") return val(...args);
+  return (val != null) ? val : key;
+}
+
 /* ===== Compat shim: Surge / Loon / QuanX / BoxJS ===== */
 const readKV = k => {
-  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k); // Surge/Loon
-  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);                // QuanX
+  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k);
+  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);
   try { return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null; } catch (_) { return null; }
 };
 
@@ -39,6 +104,18 @@ const parseArgs = raw => {
   return {};
 };
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
+
+// 兜底从原始 $argument 字符串读取指定参数（仅在对象无值时用）
+function readArgRaw(name){
+  try{
+    if (typeof $argument === 'string') {
+      const re = new RegExp(`(?:^|&)${name}=([^&]*)`);
+      const m = $argument.match(re);
+      if (m) return decodeURIComponent(String(m[1]).replace(/\+/g, '%20'));
+    }
+  }catch(_){}
+  return undefined;
+}
 
 // 辅助转换
 const toBool = (v, d=false) => {
@@ -69,8 +146,9 @@ const CFG = {
   MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
   IPv6:     toBool(readKV(K('IPv6'))     ?? $args.IPv6,     false),
 
-  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? 'ipip',
-  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? 'ddnspod',
+  // 修正 DOMESTIC_* 读取笔误，兼容旧的 DOMIC_* 键
+  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? $args.DOMIC_IPv4 ?? 'ipip',
+  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? $args.DOMIC_IPv6 ?? 'ddnspod',
   LANDING_IPv4:  readKV(K('LANDING_IPv4'))  ?? $args.LANDING_IPv4  ?? 'ipapi',
   LANDING_IPv6:  readKV(K('LANDING_IPv6'))  ?? $args.LANDING_IPv6  ?? 'ipsb',
 
@@ -86,32 +164,54 @@ const CFG = {
 
   SD_TIMEOUT_MS: (() => {
     const raw = readKV(K('SD_TIMEOUT_MS')) ?? $args.SD_TIMEOUT_MS;
-    const fallback = TIMEOUT * 1000;            // 不再自引用 CFG
+    const fallback = TIMEOUT * 1000;
     if (raw === '' || raw === undefined || raw === null) return fallback;
     return toNum(raw, fallback);
   })(),
 
   SD_REGION_MODE: readKV(K('SD_REGION_MODE')) ?? $args.SD_REGION_MODE ?? 'full',
   SD_ICON_THEME:  readKV(K('SD_ICON_THEME'))  ?? $args.SD_ICON_THEME  ?? 'check',
-  SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true)
+  SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true),
+
+  // BoxJS 勾选（JSON 字符串). 若为空串/[]/null => 视为“无此键”，不阻塞回退
+  SERVICES_BOX_CHECKED_RAW: (() => {
+    const v = readKV(K('SERVICES'));    // 例如：["youtube","netflix"]
+    if (v === undefined || v === null) return null;
+    const s = String(v).trim();
+    if (!s || s === '[]' || /^null$/i.test(s)) return null;
+    return s;
+  })(),
+
+  // BoxJS 文本：NetworkInfo_SERVICES_TEXT（JSON 数组或逗号字符串）
+  SERVICES_BOX_TEXT: (() => {
+    const v = readKV(K('SERVICES_TEXT'));
+    const s = (v != null) ? String(v).trim() : '';
+    return s;
+  })(),
+
+  // 模块参数文本：SERVICES=...（支持数组/JSON/逗号）
+  SERVICES_ARG_TEXT: (() => {
+    let v = $args.SERVICES;
+    if (Array.isArray(v)) return JSON.stringify(v);
+    if (v == null || v === '') v = readArgRaw('SERVICES');
+    return (v != null) ? String(v).trim() : '';
+  })()
 };
 
-/* —— 运行时映射（统一用 CFG.*，确保 BoxJS/#!arguments 生效） —— */
-const ICON_NAME   = CFG.Icon;
-const ICON_COLOR  = CFG.IconColor;
+/* —— 运行时映射 —— */
+const ICON_NAME  = CFG.Icon;
+const ICON_COLOR = CFG.IconColor;
 
-const IPv6_ON     = !!CFG.Ipv6 || !!CFG.IPv6; // 兼容大小写
-const MASK_IP     = !!CFG.MASK_IP;
-// 没设 MASK_POS 时，跟随 MASK_IP
-const MASK_POS    = (typeof CFG.MASK_POS === 'boolean') ? CFG.MASK_POS : !!CFG.MASK_IP;
+const IPv6_ON  = !!CFG.IPv6;
+const MASK_IP  = !!CFG.MASK_IP;
+const MASK_POS = (typeof CFG.MASK_POS === 'boolean') ? CFG.MASK_POS : !!CFG.MASK_IP;
 
-// 统一为数字：0/1/2
 const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
 
-const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;   // ipip|cip|163|bilibili|126|pingan
-const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;   // ddnspod|neu6
-const LANDING_IPv4  = CFG.LANDING_IPv4;    // ipapi|ipwhois|ipsb
-const LANDING_IPv6  = CFG.LANDING_IPv6;    // ipsb|ident|ipify
+const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;
+const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;
+const LANDING_IPv4  = CFG.LANDING_IPv4;
+const LANDING_IPv6  = CFG.LANDING_IPv6;
 
 /* —— 服务检测参数 —— */
 const SD_STYLE       = (String(CFG.SD_STYLE).toLowerCase()==='text') ? 'text' : 'icon';
@@ -119,7 +219,6 @@ const SD_SHOW_LAT    = !!CFG.SD_SHOW_LAT;
 const SD_SHOW_HTTP   = !!CFG.SD_SHOW_HTTP;
 const SD_LANG        = (String(CFG.SD_LANG).toLowerCase()==='zh-hant') ? 'zh-Hant' : 'zh-Hans';
 
-// 超时：优先用 CFG.SD_TIMEOUT_MS；否则用 Timeout×1000；给个下限
 const SD_TIMEOUT_MS  = (() => {
   const v = Number(CFG.SD_TIMEOUT_MS);
   const fallback = (Number(CFG.Timeout) || 8) * 1000;
@@ -132,72 +231,65 @@ const SD_ARROW       = !!CFG.SD_ARROW;
 
 /* ===================== 主流程 ===================== */
 ;(async () => {
-  // —— 轻触发一次落地以写日志（不阻塞，短超时）
   const preTouch = touchLandingOnceQuick().catch(()=>{});
 
-  // —— 直连
   const [cn, cn6] = await Promise.all([
     getDirectV4(DOMESTIC_IPv4).catch(()=>({})),
     IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch(()=>({})) : Promise.resolve({})
   ]);
 
-  // —— 最近请求：策略名 & 入口 IP（带重试/兜底）
-  await preTouch; // 尽量等下，帮助 recent 写好
+  await preTouch;
   const { policyName, entranceIP } = await getPolicyAndEntranceRetry(4, 220);
 
-  // —— 入口：国内/国际双源
   const ent = isIP(entranceIP||'') ? await getEntranceBundle(entranceIP).catch(()=>({ ip: entranceIP })) : {};
 
-  // —— 落地
   const [px, px6] = await Promise.all([
     getLandingV4(LANDING_IPv4).catch(()=>({})),
     IPv6_ON ? getLandingV6(LANDING_IPv6).catch(()=>({})) : Promise.resolve({})
   ]);
 
-  /* ===== 组装上半部分（标题=网络类型；第一行=代理策略） ===== */
   const nt = netTypeLine();
-  const title = nt || `网络信息 𝕏`;
+  const title = nt || t('panelTitle');
 
   const directLines = [];
-  directLines.push(`代理策略: ${policyName || '-'}`);   // 第一行
+  directLines.push(`${t('policy')}: ${policyName || '-'}`);
+  directLines.push(lineIP(t('ip'), cn.ip, cn6.ip));
 
-  directLines.push(lineIP('IP', cn.ip, cn6.ip));
-
-  // 直连位置：脱敏仅旗帜 or 完整
   const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
-  directLines.push(`位置: ${directLoc}`);
-  if (cn.isp) directLines.push(`运营商: ${fmtISP(cn.isp, cn.loc)}`);
+  directLines.push(`${t('location')}: ${directLoc}`);
+  if (cn.isp) directLines.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
   const entranceLines = [];
   if (ent && (ent.ip || ent.loc1 || ent.loc2)) {
-    entranceLines.push(lineIP('入口', ent.ip, ''));
-    if (ent.loc1) entranceLines.push(`位置¹: ${flagFirst(ent.loc1)}`);
-    if (ent.isp1) entranceLines.push(`运营商¹: ${fmtISP(ent.isp1, ent.loc1)}`);
-    if (ent.loc2) entranceLines.push(`位置²: ${flagFirst(ent.loc2)}`);
-    if (ent.isp2) entranceLines.push(`运营商²: ${String(ent.isp2).trim()}`); // isp2 保留原始
+    entranceLines.push(lineIP(t('entrance'), ent.ip, ''));
+    if (ent.loc1) entranceLines.push(`${t('location')}¹: ${flagFirst(ent.loc1)}`);
+    if (ent.isp1) entranceLines.push(`${t('isp')}¹: ${fmtISP(ent.isp1, ent.loc1)}`);
+    if (ent.loc2) entranceLines.push(`${t('location')}²: ${flagFirst(ent.loc2)}`);
+    if (ent.isp2) entranceLines.push(`${t('isp')}²: ${String(ent.isp2).trim()}`);
   }
 
   const landingLines = [
-    lineIP('落地 IP', px.ip, px6.ip),
-    px.loc ? `位置: ${flagFirst(px.loc)}` : undefined,
-    px.isp ? `运营商: ${fmtISP(px.isp, px.loc)}` : undefined
+    lineIP(t('landingIP'), px.ip, px6.ip),
+    px.loc ? `${t('location')}: ${flagFirst(px.loc)}` : undefined,
+    px.isp ? `${t('isp')}: ${fmtISP(px.isp, px.loc)}` : undefined
   ].filter(Boolean);
 
   const parts = [];
   parts.push(...directLines);
   if (entranceLines.length) parts.push('', ...entranceLines);
   if (landingLines.length)  parts.push('', ...landingLines);
-  parts.push(`执行时间: ${now()}`);
+  parts.push(`${t('runAt')}: ${now()}`);
 
-  /* ===== 服务检测（并发） ===== */
   const sdLines = await runServiceChecks();
-  if (sdLines.length) parts.push('', ...sdLines);  // 执行时间后留一空行
+  if (sdLines.length) parts.push('', ...sdLines);
 
-  const content = parts.join('\n');
-  $done({ title, content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
+  const content = maybeTify(parts.join('\n'));
+  $done({ title: maybeTify(title), content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
 })().catch(err => {
-  $notification?.post?.('网络信息 𝕏', '脚本错误', String(err));
-  $done({ title: '网络信息 𝕏', content: String(err), icon: ICON_NAME, 'icon-color': ICON_COLOR });
+  $notification?.post?.(t('panelTitle'), '脚本错误', String(err));
+  const errTitle = t('panelTitle');
+  const errBody  = maybeTify(String(err));
+  $done({ title: errTitle, content: errBody, icon: ICON_NAME, 'icon-color': ICON_COLOR });
 });
 
 /* ===================== 工具 & 渲染 ===================== */
@@ -221,7 +313,6 @@ function splitFlagRaw(s) {
   const m=String(s||'').match(re);
   let flag=m?m[0]:'';
   let text=String(s||'').replace(re,'');
-  // 统一处理台湾旗显示方案：0=🇨🇳, 2=🇼🇸（仅当原始是 🇹🇼 时替换）
   if (flag.includes('🇹🇼')) {
     if (TW_FLAG_MODE===0) flag='🇨🇳';
     else if (TW_FLAG_MODE===2) flag='🇼🇸';
@@ -243,7 +334,6 @@ function flagOf(code){
   if (/^中国$|^CN$/i.test(cc)) cc = 'CN';
   if (cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '';
   try {
-    // 对 TW 应用模式
     if (cc.toUpperCase()==='TW') {
       if (TW_FLAG_MODE===0) return '🇨🇳';
       if (TW_FLAG_MODE===2) return '🇼🇸';
@@ -258,7 +348,6 @@ function fmtISP(isp, locStr){
   const raw = String(isp || '').trim();
   if (!raw) return '';
 
-  // 仅大陆（非港澳台）才做归一化
   const txt = String(locStr || '');
   const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
   if (!isMainland) return raw;
@@ -277,8 +366,8 @@ function fmtISP(isp, locStr){
   if (/(cernet|china\s*education)/.test(s) || /教育网/.test(norm))
     return '中国教育网';
 
-  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm; // 已是标准名
-  return raw; // 兜底保留原始
+  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
+  return raw;
 }
 
 /* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
@@ -294,13 +383,13 @@ function netTypeLine(){
   try{
     const ssid  = $network?.wifi?.ssid;
     const radio = $network?.['cellular-data']?.radio;
-    if (ssid) return `Wi-Fi | ${ssid}`;
+    if (ssid) return `${t('wifi')} | ${ssid}`;
     if (radio){
       const g = radioToGen(radio);
-      return `蜂窝数据 | ${g ? `${g} - ${radio}` : radio}`;
+      return `${t('cellular')} | ${t('gen')(g, radio)}`;
     }
   }catch(_){}
-  return '网络 | 未知';
+  return t('unknownNet');
 }
 
 /* ===================== HTTP 基础 ===================== */
@@ -318,12 +407,11 @@ function httpGet(url, headers={}, timeoutMs=null, followRedirect=false){
 function httpAPI(path='/v1/requests/recent'){
   return new Promise(res=>{
     if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, res);
-    else res({}); // 非 Surge 时给空对象，相关功能自动降级
+    else res({});
   });
 }
 
 /* ===================== 数据源：直连/落地/入口 ===================== */
-// —— 直连 v4
 async function getDirectV4(p){
   try{
     if (p==='cip')      return await d_cip();
@@ -341,7 +429,6 @@ async function d_bili(){ const r=await httpGet('https://api.bilibili.com/x/web-i
 async function d_126(){ const r=await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp'); const d=(JSON.parse(r.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countrySymbol), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.operator||'' }; }
 async function d_pingan(){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request'); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { ip:d.ip||'', loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
 
-// —— 直连 v6
 async function getDirectV6(p){
   try{
     if (p==='neu6'){ const r=await httpGet('https://speed.neu6.edu.cn/getIP.php'); return { ip:String(r.body||'').trim() }; }
@@ -349,7 +436,6 @@ async function getDirectV6(p){
   }catch(_){ return {}; }
 }
 
-// —— 落地 v4
 async function getLandingV4(p){
   try{
     if (p==='ipwhois') return await l_whois();
@@ -357,11 +443,10 @@ async function getLandingV4(p){
     return await l_ipapi();
   }catch(_){ try{return await l_ipapi()}catch(e){} return {}; }
 }
-async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' }; }
+async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||'' }; }
 async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' }; }
 async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip');            const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',     loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' }; }
 
-// —— 落地 v6
 async function getLandingV6(p){
   try{
     if (p==='ident'){ const r=await httpGet('https://v6.ident.me'); return { ip:String(r.body||'').trim() }; }
@@ -385,7 +470,6 @@ function extractIP(str){
   return '';
 }
 
-// 轻触发一次落地：短超时+不跟随跳转（快速写日志）
 async function touchLandingOnceQuick(){
   try { await httpGet('http://ip-api.com/json?lang=zh-CN', {}, 700, true); } catch(_) {}
 }
@@ -399,7 +483,6 @@ async function getPolicyAndEntranceOnce(){
   return { policyName: hit.policyName || '', entranceIP: ip || '' };
 }
 
-// 兜底：从“任意代理请求”里拿策略名/入口
 async function getAnyProxyPolicyFromRecent(){
   const data = await httpAPI('/v1/requests/recent');
   const reqs = Array.isArray(data?.requests) ? data.requests : [];
@@ -408,12 +491,11 @@ async function getAnyProxyPolicyFromRecent(){
   return { policyName: hit.policyName, entranceIP: extractIP(hit.remoteAddress) };
 }
 
-// 带重试的综合获取（策略名 + 入口 IP）
 async function getPolicyAndEntranceRetry(times=4, baseDelay=200){
   for (let i=0; i<times; i++){
     const r = await getPolicyAndEntranceOnce().catch(()=>({}));
     if ((r?.entranceIP && isIP(r.entranceIP)) || r?.policyName) return r;
-    if (i === Math.floor(times/2)) await touchLandingOnceQuick();   // 中途再触发一次
+    if (i === Math.floor(times/2)) await touchLandingOnceQuick();
     if (i < times - 1) await sleep(baseDelay * Math.pow(1.6, i));
   }
   const any = await getAnyProxyPolicyFromRecent().catch(()=>({}));
@@ -429,8 +511,117 @@ async function getEntranceBundle(ip){
 async function loc_pingan(ip){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip='+encodeURIComponent(ip)); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
 async function loc_ipapi(ip){ const r=await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`); const j=JSON.parse(r.body||'{}'); return { loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' }; }
 
-/* ===================== 服务检测（并发） ===================== */
-// —— 工具
+/* ===================== 服务清单解析 & 检测 ===================== */
+const SD_TESTS_MAP = {
+  youtube:      () => sd_testYouTube(),
+  netflix:      () => sd_testNetflix(),
+  disney:       () => sd_testDisney(),
+  chatgpt_web:  () => sd_testChatGPTWeb(),
+  chatgpt_app:  () => sd_testChatGPTAppAPI(),
+  hulu_us:      () => sd_testHuluUS(),
+  hulu_jp:      () => sd_testHuluJP(),
+  hbo:          () => sd_testHBO()
+};
+const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
+
+// —— 允许更多分隔符 & 别名归一 —— //
+const SD_ALIAS = {
+  'yt':'youtube',
+  'youtube':'youtube',
+  'youTube':'youtube',
+  'youtube premium':'youtube',
+  '油管':'youtube',
+
+  'nf':'netflix',
+  'netflix':'netflix',
+  '奈飞':'netflix',
+
+  'disney':'disney',
+  'disney+':'disney',
+  '迪士尼':'disney',
+  
+  'chatgpt':'chatgpt_app',
+  'gpt':'chatgpt_app',
+  'openai':'chatgpt_app',
+
+  'chatgpt_web':'chatgpt_web',
+  'chatgpt-web':'chatgpt_web',
+  'chatgptweb':'chatgpt_web',
+  'chatgpt web':'chatgpt_web',
+
+  'hulu':'hulu_us',
+  'huluus':'hulu_us',
+  'hulujp':'hulu_jp',
+
+  'hbo':'hbo',
+  'max':'hbo',
+  '最大':'hbo'
+};
+
+// 解析文本：优先 JSON 数组；否则按多种分隔符切分（含中文逗号）
+function parseServices(raw){
+  if (raw == null) return [];
+  let s = String(raw).trim();
+  if (!s || s === '[]' || s === '{}' || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
+
+  // 1) 先尝试 JSON 数组
+  try {
+    const arr = JSON.parse(s);
+    if (Array.isArray(arr)) return normSvcList(arr);
+  } catch(_) {}
+
+  // 2) 退化为“分隔符”解析：英文/中文逗号、分号、竖线、斜杠、空白、换行
+  const parts = s.split(/[,\uFF0C;\|/ \t\r\n]+/);
+  return normSvcList(parts);
+}
+
+// 把原始列表做：去空白→小写→别名归一→去重→仅保留支持项
+function normSvcList(list){
+  const out = [];
+  for (let x of list){
+    let k = String(x ?? '').trim().toLowerCase();
+    if (!k) continue;
+    k = SD_ALIAS[k] || k;                // 别名归一
+    if (!SD_TESTS_MAP[k]) continue;      // 只接受有实现的键
+    if (!out.includes(k)) out.push(k);   // 按输入顺序去重
+  }
+  return out;
+}
+
+// 统一选择逻辑（优先级：BoxJS 勾选 > BoxJS 文本 > arguments 文本 > 全部）
+function selectServices(){
+  // 1) BoxJS 勾选（checkboxes 数组字符串）
+  const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
+  const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
+
+  if (hasCheckboxKey) {
+    if (boxChecked.length > 0) return boxChecked;
+
+    // 继续看 BoxJS 文本
+    const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
+    if (boxTextList.length > 0) return boxTextList;
+
+    // 再看 arguments 文本
+    const argList = parseServices(CFG.SERVICES_ARG_TEXT);
+    if (argList.length > 0) return argList;
+
+    // 都空 → 默认全开
+    return SD_DEFAULT_ORDER.slice();
+  }
+
+  // 2) 没有“勾选键”时：BoxJS 文本
+  const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
+  if (boxTextList.length > 0) return boxTextList;
+
+  // 3) arguments 文本
+  const argList = parseServices(CFG.SERVICES_ARG_TEXT);
+  if (argList.length > 0) return argList;
+
+  // 4) 全部
+  return SD_DEFAULT_ORDER.slice();
+}
+
+/* —— HTTP 请求工具（服务检测） —— */
 function sd_now(){ return Date.now(); }
 const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const SD_BASE_HEADERS = { "User-Agent": SD_UA, "Accept-Language": "en" };
@@ -464,7 +655,7 @@ function sd_httpPost(url, headers={}, body="") {
   });
 }
 
-// —— 台湾旗模式（服务检测用）
+/* —— 台湾旗模式（服务检测渲染用）—— */
 function sd_flagFromCC(cc){
   cc = (cc||'').toUpperCase();
   if (!/^[A-Z]{2}$/.test(cc)) return '';
@@ -478,7 +669,6 @@ function sd_flagFromCC(cc){
   } catch { return ''; }
 }
 
-// —— 地区名称表
 const SD_CC_NAME = {
   "zh-Hans": { CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
     SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚",
@@ -492,9 +682,9 @@ const SD_CC_NAME = {
 
 function sd_ccPretty(cc){
   cc = (cc||'').toUpperCase();
-  if (!cc) return "—";
   const flag = sd_flagFromCC(cc);
   const name = SD_CC_NAME[cc];
+  if (!cc) return "—";
   if (SD_REGION_MODE==='flag') return flag || "—";
   if (SD_REGION_MODE==='abbr') return (flag||'') + cc;
   if (flag && name) return `${flag} ${cc} | ${name}`;
@@ -513,113 +703,37 @@ function sd_pickIcons(theme){
 const SD_ICONS = sd_pickIcons(SD_ICON_THEME);
 function sd_isPartial(tag){ return /自制|自製|original/i.test(String(tag||'')) || /部分/i.test(String(tag||'')); }
 
-/* —— 统一渲染 —— */
-function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
-  // state 可显式传入，否则根据 ok/tag 推断
-  const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
-  const icon = SD_ICONS[st];
-
-  const regionChunk = cc ? sd_ccPretty(cc) : "";     // 根据模式渲染地区
-  const regionText  = regionChunk || "-";            // 地区缺失时用占位 “-”
-
-  const stateText = (()=>{
-    if (SD_LANG==='zh-Hant'){
-      if (st==='full') return '已解鎖';
-      if (st==='partial') return '部分解鎖';
-      return '不可達';
-    } else {
-      if (st==='full') return '已解锁';
-      if (st==='partial') return '部分解锁';
-      return '不可达';
-    }
-  })();
-
-  if (SD_STYLE === "text") {
-    // text 样式左侧：服务名 + 状态；与地区之间由 SD_ARROW 控制（➟ / ｜）
-    const left  = `${name}: ${stateText}`;
-    const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
-
-    const tail = [
-      tag ? `标注：${tag}` : "",
-      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
-      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-    ].filter(Boolean).join(" ｜ ");
-
-    return tail ? `${head} ｜ ${tail}` : head;
-  }
-
-  // icon 样式：ICON Name (➟/｜) REGION ｜ [tag ｜ latency ｜ HTTP]
-  const head = SD_ARROW
-    ? `${icon} ${name} ➟ ${regionText}`
-    : `${icon} ${name} ｜ ${regionText}`;
-
-  const tail = [
-    tag || "",
-    (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
-    (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-  ].filter(Boolean).join(" ｜ ");
-
-  return tail ? `${head} ｜ ${tail}` : head;
-}
-
-async function sd_queryLandingCC() {
-  const r = await sd_httpGet("http://ip-api.com/json", {}, true);
-  if (r.ok && r.status === 200) {
-    try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
-    catch(_){ return ""; }
-  }
-  return "";
-}
-// 多源回退（更稳）
-async function sd_queryLandingCCMulti(){
-  let cc = await sd_queryLandingCC();
-  if (cc) return cc;
-
-  let r = await sd_httpGet("https://api.ip.sb/geoip", {}, true);
-  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_code) return j.country_code.toUpperCase(); }catch(_){}
-
-  r = await sd_httpGet("https://ipinfo.io/json", {}, true);
-  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country) return j.country.toUpperCase(); }catch(_){}
-
-  r = await sd_httpGet("https://ifconfig.co/json", {"Accept-Language":"en"}, true);
-  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_iso) return j.country_iso.toUpperCase(); }catch(_){}
-
-  return "";
-}
-
-/* —— 各服务 —— */
+/* —— 服务名（仍单独维护，避免误替） —— */
 const SD_I18N = {
   "zh-Hans": {
-    youTube:"YouTube", chatgpt:"ChatGPT", chatgpt_app:"ChatGPT App(API)",
-    netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)",
-    unreachable:"不可达", timeout:"超时", fail:"检测失败", regionBlocked:"区域受限", originals:"自制", full:"完整"
+    youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
+    netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)"
   },
   "zh-Hant": {
-    youTube:"YouTube", chatgpt:"ChatGPT", chatgpt_app:"ChatGPT App(API)",
-    netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)",
-    unreachable:"不可達", timeout:"逾時", fail:"檢測失敗", regionBlocked:"區域受限", originals:"自製", full:"完整"
+    youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
+    netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)"
   }
 }[SD_LANG];
 
+/* —— 各服务 —— */
 function sd_parseNFRegion(resp) {
   try {
-    const x = resp.headers?.["x-originating-url"] || resp.headers?.["X-Origining-URL"] || resp.headers?.["X-Originating-URL"];
-    if (x) {
-      const seg = String(x).split("/");
-      if (seg.length >= 4) {
-        const cc = seg[3].split("-")[0];
-        if (/^[A-Z]{2}$/i.test(cc)) return cc.toUpperCase();
-      }
+    const xo = resp?.headers?.['x-originating-url']
+            || resp?.headers?.['X-Origining-URL']
+            || resp?.headers?.['X-Originating-URL'];
+    if (xo) {
+      const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
+      if (m) return m[1].toUpperCase();
     }
-    const m = String(resp.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
-    if (m) return m[1].toUpperCase();
-  } catch(_){}
+    const m2 = String(resp?.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
+    if (m2) return m2[1].toUpperCase();
+  } catch (_) {}
   return "";
 }
 
 async function sd_testYouTube() {
   const r = await sd_httpGet("https://www.youtube.com/premium?hl=en", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.youTube, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
+  if (!r.ok) return sd_renderLine({name:SD_I18N.youTube, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   let cc = "US";
   try {
     let m = r.data.match(/"countryCode":"([A-Z]{2})"/);
@@ -630,14 +744,13 @@ async function sd_testYouTube() {
 }
 async function sd_testChatGPTWeb() {
   const r = await sd_httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
+  if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   let cc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch(_){}
   return sd_renderLine({name:SD_I18N.chatgpt, ok:true, cc, cost:r.cost, status:r.status, tag:""});
 }
 async function sd_testChatGPTAppAPI() {
   const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
-  // 优先读取 CF 头
+  if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   let cc = "";
   try {
     const h = r.headers || {};
@@ -654,22 +767,22 @@ async function sd_nfGet(id){ return await sd_httpGet(`https://www.netflix.com/ti
 async function sd_testNetflix() {
   try {
     const r1 = await sd_nfGet(SD_NF_NONORIG);
-    if (!r1.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:SD_I18N.fail});
-    if (r1.status === 403) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:SD_I18N.regionBlocked});
+    if (!r1.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:t('fail')});
+    if (r1.status === 403) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:t('regionBlocked')});
     if (r1.status === 404) {
       const r2 = await sd_nfGet(SD_NF_ORIGINAL);
-      if (!r2.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:SD_I18N.fail});
-      if (r2.status === 404) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:SD_I18N.regionBlocked});
+      if (!r2.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:t('fail')});
+      if (r2.status === 404) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:t('regionBlocked')});
       const cc = sd_parseNFRegion(r2) || "";
-      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r2.cost, status:r2.status, tag:SD_I18N.originals, state:'partial'});
+      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r2.cost, status:r2.status, tag:t('nfOriginals'), state:'partial'});
     }
     if (r1.status === 200) {
       const cc = sd_parseNFRegion(r1) || "";
-      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:SD_I18N.full, state:'full'});
+      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:t('nfFull'), state:'full'});
     }
     return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:`HTTP ${r1.status}`});
   } catch(_){
-    return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:null, status:0, tag:SD_I18N.fail});
+    return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:null, status:0, tag:t('fail')});
   }
 }
 
@@ -709,48 +822,183 @@ async function sd_testDisney() {
     const b = await Promise.race([bam(),  timeout(7000,"TO")]).catch(()=>({}));
     const blocked = (b && b.inLoc === false);
     const cc = blocked ? "" : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || "");
-    return sd_renderLine({name:SD_I18N.disney, ok:!blocked, cc, cost:(b?.cost||h?.cost||0), status:(b?.status||h?.status||0), tag: blocked ? SD_I18N.regionBlocked : ""});
+    return sd_renderLine({name:SD_I18N.disney, ok:!blocked, cc, cost:(b?.cost||h?.cost||0), status:(b?.status||h?.status||0), tag: blocked ? t('regionBlocked') : ""});
   } catch(e){
-    const tag = (e==="TO") ? SD_I18N.timeout : SD_I18N.fail;
+    const tag = (e==="TO") ? t('timeout') : t('fail');
     return sd_renderLine({name:SD_I18N.disney, ok:false, cc:"", cost:null, status:0, tag});
   }
 }
 
 async function sd_testHuluUS() {
   const r = await sd_httpGet("https://www.hulu.com/", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.huluUS, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
+  if (!r.ok) return sd_renderLine({name:SD_I18N.huluUS, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
-  return sd_renderLine({name:SD_I18N.huluUS, ok:!blocked, cc: blocked?"": "US", cost:r.cost, status:r.status, tag: blocked ? SD_I18N.regionBlocked : ""});
+  return sd_renderLine({name:SD_I18N.huluUS, ok:!blocked, cc: blocked?"": "US", cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
 }
 async function sd_testHuluJP() {
   const r = await sd_httpGet("https://www.hulu.jp/", { "Accept-Language":"ja" }, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.huluJP, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
+  if (!r.ok) return sd_renderLine({name:SD_I18N.huluJP, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
-  return sd_renderLine({name:SD_I18N.huluJP, ok:!blocked, cc: blocked?"": "JP", cost:r.cost, status:r.status, tag: blocked ? SD_I18N.regionBlocked : ""});
+  return sd_renderLine({name:SD_I18N.huluJP, ok:!blocked, cc: blocked?"": "JP", cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
 }
 async function sd_testHBO() {
   const r = await sd_httpGet("https://www.max.com/", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
+  if (!r.ok) return sd_renderLine({name:SD_I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
   let cc=""; try { const m = String(r.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch(_){}
   if (!cc) cc = await sd_queryLandingCCMulti();
-  return sd_renderLine({name:SD_I18N.hbo, ok:!blocked, cc: blocked?"": cc, cost:r.cost, status:r.status, tag: blocked ? SD_I18N.regionBlocked : ""});
+  return sd_renderLine({name:SD_I18N.hbo, ok:!blocked, cc: blocked?"": cc, cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
 }
 
+// 多源回退（更稳）
+async function sd_queryLandingCC() {
+  const r = await sd_httpGet("http://ip-api.com/json", {}, true);
+  if (r.ok && r.status === 200) {
+    try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
+    catch(_){ return ""; }
+  }
+  return "";
+}
+async function sd_queryLandingCCMulti(){
+  let cc = await sd_queryLandingCC();
+  if (cc) return cc;
+
+  let r = await sd_httpGet("https://api.ip.sb/geoip", {}, true);
+  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_code) return j.country_code.toUpperCase(); }catch(_){}
+
+  r = await sd_httpGet("https://ipinfo.io/json", {}, true);
+  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country) return j.country.toUpperCase(); }catch(_){}
+
+  r = await sd_httpGet("https://ifconfig.co/json", {"Accept-Language":"en"}, true);
+  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_iso) return j.country_iso.toUpperCase(); }catch(_){}
+
+  return "";
+}
+
+/* —— 渲染（仅 Netflix 区分“完整/自制剧”，其它服务统一“已解锁/不可达”）——
+ * text+无箭头：Netflix 用长文案，其它服务用“已解锁/不可达”；句式为“区域: …”
+ * text+箭头：保持“已解锁/部分解锁/不可达”短文案
+ * icon：沿用原逻辑
+ */
+function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
+  // 归一化：full / partial / blocked
+  const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
+
+  const icon = sd_pickIcons(SD_ICON_THEME)[st];
+  const regionChunk = cc ? sd_ccPretty(cc) : "";
+  const regionText  = regionChunk || "-";
+
+  const unlockedShort = t('unlocked');
+  const blockedText   = t('notReachable');
+
+  // Netflix 专用长文案
+  const stateTextLong = (()=>{
+    if (st==='full')    return t('nfFull');
+    if (st==='partial') return t('nfOriginals');
+    return blockedText;
+  })();
+
+  // 其它服务短文案（full/partial → 已解锁）
+  const stateTextShort = (st==='blocked') ? blockedText : unlockedShort;
+
+  const isNetflix = /netflix/i.test(String(name));
+
+  // 关键：text + 无箭头 + Netflix 时隐藏尾部 tag（避免与左侧长文案重复）
+  const showTag = (isNetflix && SD_STYLE === "text" && !SD_ARROW) ? "" : (tag || "");
+
+  // ① text + 无箭头
+  if (SD_STYLE === "text" && !SD_ARROW) {
+    const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
+    const head  = `${left}，${t('region')}: ${regionText}`;
+    const tail = [
+      showTag,
+      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");
+    return tail ? `${head} ｜ ${tail}` : head;
+  }
+
+  // ② text + 箭头：标准短文案
+  const stateTextStd = (()=>{
+    if (st==='full') return t('unlocked');
+    if (st==='partial') return t('partialUnlocked');
+    return t('notReachable');
+  })();
+
+  if (SD_STYLE === "text") {
+    const left  = `${name}: ${stateTextStd}`;
+    const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
+    const tail = [
+      showTag,
+      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");
+    return tail ? `${head} ｜ ${tail}` : head;
+  }
+
+  // ③ icon 样式
+  const head = SD_ARROW
+    ? `${icon} ${name} ➟ ${regionText}`
+    : `${icon} ${name} ｜ ${regionText}`;
+
+  const tail = [
+    showTag,
+    (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+    (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+  ].filter(Boolean).join(" ｜ ");
+
+  return tail ? `${head} ｜ ${tail}` : head;
+}
+
+/* —— 运行队列 —— */
 async function runServiceChecks(){
   try{
-    const [yt, nf, d, cgptW, cgptA, hu, hj, hb] = await Promise.all([
-      sd_testYouTube(),
-      sd_testNetflix(),
-      sd_testDisney(),
-      sd_testChatGPTWeb(),
-      sd_testChatGPTAppAPI(),
-      sd_testHuluUS(),
-      sd_testHuluJP(),
-      sd_testHBO()
-    ]);
-    return [yt, nf, d, cgptW, cgptA, hu, hj, hb];
+    const order = selectServices();
+    if (!order.length) return [];
+    const tasks = order.map(k => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
+    const lines = await Promise.all(tasks);
+    return lines.filter(Boolean);
   }catch(_){
     return [];
   }
+}
+
+/* —— 简→繁（仅在 zh-Hant 开启）：短语优先 + 字符兜底 —— */
+function zhHansToHantOnce(s){
+  if (!s) return s;
+  // 1) 常用短语优先（避免被单字替换拆散）
+  const phraseMap = [
+    // 面板 UI
+    ['网络', '網路'], ['蜂窝数据', '行動數據'], ['代理策略', '代理策略'],
+    ['执行时间', '執行時間'], ['落地 IP', '落地 IP'], ['入口', '入口'],
+    ['位置', '位置'], ['运营商', '運營商'], ['区域', '區域'],
+    ['不可达', '不可達'], ['检测失败', '檢測失敗'], ['超时', '逾時'],
+    ['区域受限', '區域受限'], ['已解锁', '已解鎖'], ['部分解锁', '部分解鎖'],
+    ['已完整解锁', '已完整解鎖'], ['仅解锁自制剧', '僅解鎖自製劇'],
+
+    // 直连位置里常见地名（按需增补）
+    ['中国香港', '中國香港'], ['中国澳门', '中國澳門'],
+
+    // 运营商（fmtISP 的结果如果是简体，这里转为繁体）
+    ['中国移动', '中國移動'], ['中国联通', '中國聯通'], ['中国电信', '中國電信'],
+    ['中国广电', '中國廣電'], ['中国教育网', '中國教育網']
+  ];
+  for (const [hans, hant] of phraseMap) {
+    s = s.replace(new RegExp(hans, 'g'), hant);
+  }
+
+  // 2) 字符兜底（只放面板常见字，避免过度替换）
+  const charMap = {
+    '网':'網', '络':'絡', '运':'運', '营':'營', '达':'達', '检':'檢', '测':'測',
+    '时':'時', '区':'區', '术':'術', '产':'產', '广':'廣', '电':'電', '联':'聯',
+    '动':'動', '数':'數', '汉':'漢', '气':'氣', '历':'曆', '宁':'寧'
+  };
+  s = s.replace(/[\u4E00-\u9FFF]/g, ch => charMap[ch] || ch);
+  return s;
+}
+
+// 最终输出前做一次繁体转换（只在 zh-Hant 时）
+function maybeTify(content){
+  if (SD_LANG === 'zh-Hant') return zhHansToHantOnce(content);
+  return content;
 }
