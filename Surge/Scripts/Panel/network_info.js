@@ -183,23 +183,34 @@ function flagOf(code){
 
 /* —— 规范中国境内运营商名称 —— */
 function fmtISP(isp, locStr){
-  const s0 = String(isp || '').trim();
-  if (!s0) return '';
+  const raw = String(isp || '').trim();
+  if (!raw) return '';
 
+  // 仅大陆（非港澳台）才做归一化
   const txt = String(locStr || '');
   const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
-  if (!isMainland) return s0;
+  if (!isMainland) return raw;
 
-  const s = s0.replace(/^中国\s*/,'').replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').toLowerCase();
+  const norm = raw.replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').trim();
+  const s = norm.toLowerCase();
 
-  if (/(^|[\s-])(cmcc|cmnet|cmi|china mobile( communications)?)/i.test(s)) return '中国移动';
-  if (/(^|[\s-])(chinanet|chinanet backbone|china ?telecom|ctcc|ct)/i.test(s))    return '中国电信';
-  if (/(^|[\s-])(china ?unicom|unicom|cncgroup|china ?netcom)/i.test(s))         return '中国联通';
-  if (/(^|[\s-])(cbn|china broadcasting)/i.test(s))                               return '中国广电';
-  if (/(^|[\s-])(cernet|china education)/i.test(s))                               return '中国教育网';
+  // 映射：英文/缩写/中文别名 → 标准名
+  if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /(^|[\s-])移动\b/.test(norm))
+    return '中国移动';
+  if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /(^|[\s-])电信\b/.test(norm))
+    return '中国电信';
+  if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /(^|[\s-])联通\b/.test(norm))
+    return '中国联通';
+  if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /(^|[\s-])广电\b/.test(norm))
+    return '中国广电';
+  if (/(cernet|china\s*education)/.test(s) || /教育网/.test(norm))
+    return '中国教育网';
 
-  // 兜底：保持“中文前缀中国 + 原文”会怪，就直接返回原文
-  return s0.replace(/^中国\s*/,'');
+  // 已是“中国移动/联通/电信/广电”则保持
+  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
+
+  // 兜底：不要再去掉“中国”前缀，直接保留原始文本
+  return raw;
 }
 
 /* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
