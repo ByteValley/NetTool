@@ -667,19 +667,22 @@ const SD_I18N = {
 /* —— 各服务 —— */
 function sd_parseNFRegion(resp) {
   try {
-    const x = resp.headers?.["x-originating-url"] || resp.headers?.["X-Origining-URL"] || resp.headers?.["X-Originating-URL"];
-    if (x) {
-      const seg = String(x).split("/");
-      if (seg.length >= 4) {
-        const cc = seg[3].split("-)[0]; // 防御式：下面再用正则
-      }
+    // 1) 优先从响应头里的 x-originating-url 提取（Netflix 常见）
+    const xo = resp?.headers?.['x-originating-url']
+            || resp?.headers?.['X-Origining-URL']
+            || resp?.headers?.['X-Originating-URL'];
+    if (xo) {
+      // 形如：https://www.netflix.com/us/title/xxxx 或 /us-en/...
+      const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
+      if (m) return m[1].toUpperCase();
     }
-  } catch(_) {}
-  try {
-    const m = String(resp.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
-    if (m) return m[1].toUpperCase();
-  } catch(_){}
-  // 兜底失败
+
+    // 2) 退化到页面内容里的 "countryCode":"JP" 等
+    const m2 = String(resp?.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
+    if (m2) return m2[1].toUpperCase();
+  } catch (_) {}
+
+  // 3) 兜底
   return "";
 }
 
