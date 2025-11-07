@@ -903,12 +903,15 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
 
   const isNetflix = /netflix/i.test(String(name));
 
+  // 关键：text + 无箭头 + Netflix 时隐藏尾部 tag（避免与左侧长文案重复）
+  const showTag = (isNetflix && SD_STYLE === "text" && !SD_ARROW) ? "" : (tag || "");
+
   // ① text + 无箭头
   if (SD_STYLE === "text" && !SD_ARROW) {
     const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
     const head  = `${left}，${t('region')}: ${regionText}`;
     const tail = [
-      tag || "",
+      showTag,
       (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
       (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
     ].filter(Boolean).join(" ｜ ");
@@ -926,7 +929,7 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     const left  = `${name}: ${stateTextStd}`;
     const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
     const tail = [
-      tag || "",
+      showTag,
       (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
       (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
     ].filter(Boolean).join(" ｜ ");
@@ -939,7 +942,7 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     : `${icon} ${name} ｜ ${regionText}`;
 
   const tail = [
-    tag || "",
+    showTag,
     (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
     (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
   ].filter(Boolean).join(" ｜ ");
