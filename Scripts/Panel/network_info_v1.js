@@ -443,32 +443,44 @@ const SD_TESTS_MAP = {
 };
 const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 
-// 解析文本：优先支持 JSON 数组，其次逗号字符串
+// —— 允许更多分隔符 & 别名归一 —— //
+const SD_ALIAS = {
+  'yt':'youtube', 'you-tube':'youtube', 'youtube':'youtube',
+  'nf':'netflix', 'net-flix':'netflix', 'netflix':'netflix',
+  'disney':'disney', 'disney+':'disney',
+  'chatgpt':'chatgpt_web', 'gpt':'chatgpt_web', 'openai':'chatgpt_app',
+  'hulu':'hulu_us', 'huluus':'hulu_us', 'hulujp':'hulu_jp',
+  'hbo':'hbo', 'max':'hbo'
+};
+
+// 解析文本：优先 JSON 数组；否则按多种分隔符切分
 function parseServices(raw){
   if (raw == null) return [];
-  const s = String(raw).trim();
+  let s = String(raw).trim();
   if (!s || s === '[]' || s === '{}' || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
 
-  // 优先 JSON 数组
+  // 1) 先尝试 JSON 数组
   try {
     const arr = JSON.parse(s);
-    if (Array.isArray(arr)) {
-      const out = [];
-      for (const x of arr) {
-        const k = String(x ?? '').trim().toLowerCase();
-        if (k && !out.includes(k)) out.push(k);
-      }
-      return out;
-    }
-  } catch (_) {}
+    if (Array.isArray(arr)) return normSvcList(arr);
+  } catch(_) {}
 
-  // 其次逗号字符串
-  const out2 = [];
-  s.split(',').forEach(x=>{
-    const k = String(x||'').trim().toLowerCase();
-    if (k && !out2.includes(k)) out2.push(k);
-  });
-  return out2;
+  // 2) 退化为“分隔符”解析：逗号（中/英）、分号、竖线、空白、换行都可
+  const parts = s.split(/[,\uFF0C;\|/\s]+/); // , ；；| / 空格/换行
+  return normSvcList(parts);
+}
+
+// 把原始列表做：去空白→小写→别名归一→去重→仅保留支持项
+function normSvcList(list){
+  const out = [];
+  for (let x of list){
+    let k = String(x ?? '').trim().toLowerCase();
+    if (!k) continue;
+    k = SD_ALIAS[k] || k;                // 别名归一
+    if (!SD_TESTS_MAP[k]) continue;      // 只接受有实现的键
+    if (!out.includes(k)) out.push(k);   // 按输入顺序去重
+  }
+  return out;
 }
 
 // 读取勾选布尔项（BoxJS）
@@ -488,42 +500,33 @@ function readCheckedServices(){
     .map(([k]) => k);
 }
 
-// 统一选择逻辑（优先级：BoxJS 文本 > BoxJS 勾选 > arguments 文本 > 全部）
 // 统一选择逻辑（优先级：BoxJS 勾选 > BoxJS 文本 > arguments 文本 > 全部）
 function selectServices(){
   // 1) BoxJS 勾选（checkboxes）
-  const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;    // 是否存在该键
-  const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);  // 解析为数组
+  const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null; // 是否存在该键
+  const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
   if (hasCheckboxKey) {
-    if (boxChecked.length > 0) {
-      return boxChecked.filter(k => SD_TESTS_MAP[k]);
-    }
-    // 显式清空（[]/空串/无效）=> 不回退旧布尔历史；转去看 BoxJS 文本
+    if (boxChecked.length > 0) return boxChecked;
+    // 勾选键存在但为空 → 继续看 BoxJS 文本
     const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-    if (boxTextList.length > 0) {
-      return boxTextList.filter(k => SD_TESTS_MAP[k]);
-    }
+    if (boxTextList.length > 0) return boxTextList;
+
     // 再看 arguments 文本
     const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-    if (argList.length > 0) {
-      return argList.filter(k => SD_TESTS_MAP[k]);
-    }
-    // 都空 => 默认全开
+    if (argList.length > 0) return argList;
+
+    // 都空 → 默认全开
     return SD_DEFAULT_ORDER.slice();
   }
 
   // 2) 没有“勾选键”时：BoxJS 文本
   const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-  if (boxTextList.length > 0) {
-    return boxTextList.filter(k => SD_TESTS_MAP[k]);
-  }
+  if (boxTextList.length > 0) return boxTextList;
 
   // 3) arguments 文本
   const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-  if (argList.length > 0) {
-    return argList.filter(k => SD_TESTS_MAP[k]);
-  }
+  if (argList.length > 0) return argList;
 
   // 4) 全部
   return SD_DEFAULT_ORDER.slice();
