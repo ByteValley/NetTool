@@ -1,6 +1,6 @@
 /* =========================================================
- * 网络信息 + 服务检测
- * by ByteValley (merged by ChatGPT)
+ * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX 兼容）
+ * by ByteValley (merged & patched by ChatGPT)
  * - 标题显示“网络类型”；第一行显示“代理策略”
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
@@ -15,7 +15,7 @@
  *   · ChatGPT App(API) 地区多源回退，优先 CF 头
  * =======================================================*/
 
-// ===== Compat shim: Surge / Loon / QuanX / BoxJS =====
+/* ===== Compat shim: Surge / Loon / QuanX / BoxJS ===== */
 const readKV = k => {
   if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k); // Surge/Loon
   if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);                // QuanX
@@ -31,7 +31,7 @@ const parseArgs = raw => {
       if (!kv) return acc;
       const [k, v = ''] = kv.split('=');
       const key = decodeURIComponent(k || '');
-      const val = decodeURIComponent(v.replace(/\+/g, '%20'));
+      const val = decodeURIComponent(String(v).replace(/\+/g, '%20'));
       acc[key] = val;
       return acc;
     }, {});
@@ -95,60 +95,40 @@ const CFG = {
   SD_ICON_THEME:  readKV(K('SD_ICON_THEME'))  ?? $args.SD_ICON_THEME  ?? 'check',
   SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true)
 };
-// ===== end compat =====
 
-/* ===================== 参数解析 ===================== */
-function parseArgs() {
-  try {
-    if (typeof $argument === 'string' && $argument) {
-      const map = Object.fromEntries($argument.split('&').map(s => {
-        const [k, ...rest] = s.split('=');
-        return [decodeURIComponent(k), decodeURIComponent(rest.join('='))];
-      }));
-      return map;
-    }
-  } catch (_) {}
-  return {};
-}
-const ARG = parseArgs();
-const GET = (k, d='') => (ARG[k] ?? d);
+/* —— 运行时映射（统一用 CFG.*，确保 BoxJS/#!arguments 生效） —— */
+const ICON_NAME   = CFG.Icon;
+const ICON_COLOR  = CFG.IconColor;
 
-/* —— 图标 —— */
-const ICON_NAME  = GET('icon', 'globe.asia.australia');
-const ICON_COLOR = GET('icon-color', '#1E90FF');
+const IPv6_ON     = !!CFG.Ipv6 || !!CFG.IPv6; // 兼容大小写
+const MASK_IP     = !!CFG.MASK_IP;
+// 没设 MASK_POS 时，跟随 MASK_IP
+const MASK_POS    = (typeof CFG.MASK_POS === 'boolean') ? CFG.MASK_POS : !!CFG.MASK_IP;
 
-/* —— 行为参数 —— */
-const IPv6_ON   = GET('IPv6','0') === '1';
-const MASK_IP   = GET('MASK_IP','1') === '1';
-// 直连“位置”脱敏：未显式传入 MASK_POS 时，默认跟随 MASK_IP
-const MASK_POS  = Object.prototype.hasOwnProperty.call(ARG,'MASK_POS')
-  ? (GET('MASK_POS','1') === '1')
-  : (GET('MASK_IP','1') === '1');
+// 统一为数字：0/1/2
+const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
 
-// 台湾旗：0=🇨🇳(默认) / 1=🇹🇼 / 2=🇼🇸
-const TW_FLAG_MODE  = ['0','1','2'].includes(GET('TW_FLAG_MODE','0')) ? GET('TW_FLAG_MODE','0') : '0';
-
-const DOMESTIC_IPv4 = GET('DOMESTIC_IPv4','ipip');     // ipip|cip|163|bilibili|126|pingan
-const DOMESTIC_IPv6 = GET('DOMESTIC_IPv6','ddnspod');  // ddnspod|neu6
-const LANDING_IPv4  = GET('LANDING_IPv4','ipapi');     // ipapi|ipwhois|ipsb
-const LANDING_IPv6  = GET('LANDING_IPv6','ipsb');      // ipsb|ident|ipify
+const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;   // ipip|cip|163|bilibili|126|pingan
+const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;   // ddnspod|neu6
+const LANDING_IPv4  = CFG.LANDING_IPv4;    // ipapi|ipwhois|ipsb
+const LANDING_IPv6  = CFG.LANDING_IPv6;    // ipsb|ident|ipify
 
 /* —— 服务检测参数 —— */
-const SD_STYLE      = (GET('SD_STYLE','icon')||'').toLowerCase()==='text' ? 'text' : 'icon';
-const SD_SHOW_LAT   = /^true$/i.test(GET('SD_SHOW_LAT','true'));
-const SD_SHOW_HTTP  = /^true$/i.test(GET('SD_SHOW_HTTP','true'));
-const SD_LANG       = (/^zh-hant$/i.test(GET('SD_LANG','zh-Hans')) ? 'zh-Hant' : 'zh-Hans');
-const SD_TIMEOUT_MS = (()=>{
-  const ms = GET('SD_TIMEOUT_MS','');
-  if (ms && /^\d+$/.test(ms)) return parseInt(ms,10);
-  const sec = parseInt(GET('Timeout','8'),10);
-  return isFinite(sec) ? Math.max(2000, sec*1000) : 5000;
+const SD_STYLE       = (String(CFG.SD_STYLE).toLowerCase()==='text') ? 'text' : 'icon';
+const SD_SHOW_LAT    = !!CFG.SD_SHOW_LAT;
+const SD_SHOW_HTTP   = !!CFG.SD_SHOW_HTTP;
+const SD_LANG        = (String(CFG.SD_LANG).toLowerCase()==='zh-hant') ? 'zh-Hant' : 'zh-Hans';
+
+// 超时：优先用 CFG.SD_TIMEOUT_MS；否则用 Timeout×1000；给个下限
+const SD_TIMEOUT_MS  = (() => {
+  const v = Number(CFG.SD_TIMEOUT_MS);
+  const fallback = (Number(CFG.Timeout) || 8) * 1000;
+  return Math.max(2000, Number.isFinite(v) ? v : fallback);
 })();
 
-// —— 新增：图标主题 & 地区显示样式 & 箭头共用开关 —— //
-const SD_ICON_THEME = (()=>{ const v=(GET('SD_ICON_THEME','check')||'').toLowerCase(); return ['lock','circle','check'].includes(v)?v:'check'; })();
-const SD_REGION_MODE = (()=>{ const v=(GET('SD_REGION_MODE','full')||'').toLowerCase(); return ['full','abbr','flag'].includes(v)?v:'full'; })();
-const SD_ARROW = /^true$/i.test(GET('SD_ARROW','true')); // 共用：icon/text 是否使用“➟”
+const SD_REGION_MODE = ['full','abbr','flag'].includes(String(CFG.SD_REGION_MODE)) ? CFG.SD_REGION_MODE : 'full';
+const SD_ICON_THEME  = ['lock','circle','check'].includes(String(CFG.SD_ICON_THEME)) ? CFG.SD_ICON_THEME : 'check';
+const SD_ARROW       = !!CFG.SD_ARROW;
 
 /* ===================== 主流程 ===================== */
 ;(async () => {
@@ -216,7 +196,7 @@ const SD_ARROW = /^true$/i.test(GET('SD_ARROW','true')); // 共用：icon/text �
   const content = parts.join('\n');
   $done({ title, content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
 })().catch(err => {
-  $notification.post('网络信息 𝕏', '脚本错误', String(err));
+  $notification?.post?.('网络信息 𝕏', '脚本错误', String(err));
   $done({ title: '网络信息 𝕏', content: String(err), icon: ICON_NAME, 'icon-color': ICON_COLOR });
 });
 
@@ -241,10 +221,10 @@ function splitFlagRaw(s) {
   const m=String(s||'').match(re);
   let flag=m?m[0]:'';
   let text=String(s||'').replace(re,'');
-  // 统一处理台湾旗显示方案：0=🇨🇳, 1=🇹🇼, 2=🇼🇸（仅当原始是 🇹🇼 时替换）
+  // 统一处理台湾旗显示方案：0=🇨🇳, 2=🇼🇸（仅当原始是 🇹🇼 时替换）
   if (flag.includes('🇹🇼')) {
-    if (TW_FLAG_MODE==='0') flag='🇨🇳';
-    else if (TW_FLAG_MODE==='2') flag='🇼🇸';
+    if (TW_FLAG_MODE===0) flag='🇨🇳';
+    else if (TW_FLAG_MODE===2) flag='🇼🇸';
   }
   return { flag, text };
 }
@@ -263,12 +243,12 @@ function flagOf(code){
   if (/^中国$|^CN$/i.test(cc)) cc = 'CN';
   if (cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '';
   try {
-    const raw = String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt()));
     // 对 TW 应用模式
     if (cc.toUpperCase()==='TW') {
-      if (TW_FLAG_MODE==='0') return '🇨🇳';
-      if (TW_FLAG_MODE==='2') return '🇼🇸';
+      if (TW_FLAG_MODE===0) return '🇨🇳';
+      if (TW_FLAG_MODE===2) return '🇼🇸';
     }
+    const raw = String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt()));
     return raw;
   } catch(_) { return ''; }
 }
@@ -286,7 +266,6 @@ function fmtISP(isp, locStr){
   const norm = raw.replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').trim();
   const s = norm.toLowerCase();
 
-  // 英文/缩写命中 || 中文关键字命中（不再使用 \b）
   if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm))
     return '中国移动';
   if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /电信/.test(norm))
@@ -337,7 +316,10 @@ function httpGet(url, headers={}, timeoutMs=null, followRedirect=false){
   });
 }
 function httpAPI(path='/v1/requests/recent'){
-  return new Promise(res=>{ $httpAPI('GET', path, null, res); });
+  return new Promise(res=>{
+    if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, res);
+    else res({}); // 非 Surge 时给空对象，相关功能自动降级
+  });
 }
 
 /* ===================== 数据源：直连/落地/入口 ===================== */
@@ -487,8 +469,8 @@ function sd_flagFromCC(cc){
   cc = (cc||'').toUpperCase();
   if (!/^[A-Z]{2}$/.test(cc)) return '';
   if (cc==='TW') {
-    if (TW_FLAG_MODE==='0') return '🇨🇳';
-    if (TW_FLAG_MODE==='2') return '🇼🇸';
+    if (TW_FLAG_MODE===0) return '🇨🇳';
+    if (TW_FLAG_MODE===2) return '🇼🇸';
   }
   try {
     const cps = [...cc].map(c => 0x1F1E6 + (c.charCodeAt(0)-65));
