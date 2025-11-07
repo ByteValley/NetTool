@@ -1,6 +1,7 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley (merged & patched by ChatGPT)
+ * Version: 2025-11-08
  *
  * 选择优先级（统一）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
@@ -85,8 +86,9 @@ const CFG = {
   MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
   IPv6:     toBool(readKV(K('IPv6'))     ?? $args.IPv6,     false),
 
-  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMIC_IPv4 ?? 'ipip',
-  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMIC_IPv6 ?? 'ddnspod',
+  // 修正 DOMESTIC_* 读取笔误，兼容旧的 DOMIC_* 键
+  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? $args.DOMIC_IPv4 ?? 'ipip',
+  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? $args.DOMIC_IPv6 ?? 'ddnspod',
   LANDING_IPv4:  readKV(K('LANDING_IPv4'))  ?? $args.LANDING_IPv4  ?? 'ipapi',
   LANDING_IPv6:  readKV(K('LANDING_IPv6'))  ?? $args.LANDING_IPv6  ?? 'ipsb',
 
@@ -231,7 +233,7 @@ const SD_ARROW       = !!CFG.SD_ARROW;
 /* ===================== 工具 & 渲染 ===================== */
 function now(){ return new Date().toTimeString().split(' ')[0]; }
 function isIPv4(ip){ return /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/.test(ip||''); }
-function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,6}:[0-9a-fA-F]{1,4}){1}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
+function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,6}:[0-9a-fA-F]{1,4}){1}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
 function isIP(ip){ return isIPv4(ip) || isIPv6(ip); }
 
 function maskIP(ip){
@@ -463,25 +465,35 @@ const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 // —— 允许更多分隔符 & 别名归一 —— //
 const SD_ALIAS = {
   'yt':'youtube',
-  'YouTube':'youtube',
   'youtube':'youtube',
+  'youTube':'youtube',
+  'youtube premium':'youtube',
+  '油管':'youtube',
+
   'nf':'netflix',
-  'Netflix':'netflix',
   'netflix':'netflix',
+  '奈飞':'netflix',
+
   'disney':'disney',
   'disney+':'disney',
-  // 约定：App 在前（chatgpt_app 显示“ChatGPT”），Web 在后（chatgpt_web 显示“ChatGPT Web”）
+  '迪士尼':'disney',
+  
   'chatgpt':'chatgpt_app',
   'gpt':'chatgpt_app',
   'openai':'chatgpt_app',
+
   'chatgpt_web':'chatgpt_web',
   'chatgpt-web':'chatgpt_web',
   'chatgptweb':'chatgpt_web',
+  'chatgpt web':'chatgpt_web',
+
   'hulu':'hulu_us',
   'huluus':'hulu_us',
   'hulujp':'hulu_jp',
+
   'hbo':'hbo',
-  'max':'hbo'
+  'max':'hbo',
+  '最大':'hbo'
 };
 
 // 解析文本：优先 JSON 数组；否则按多种分隔符切分（含中文逗号）
@@ -672,17 +684,13 @@ function sd_parseNFRegion(resp) {
             || resp?.headers?.['X-Origining-URL']
             || resp?.headers?.['X-Originating-URL'];
     if (xo) {
-      // 形如：https://www.netflix.com/us/title/xxxx 或 /us-en/...
       const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
       if (m) return m[1].toUpperCase();
     }
-
     // 2) 退化到页面内容里的 "countryCode":"JP" 等
     const m2 = String(resp?.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
     if (m2) return m2[1].toUpperCase();
   } catch (_) {}
-
-  // 3) 兜底
   return "";
 }
 
@@ -830,31 +838,8 @@ async function sd_queryLandingCCMulti(){
   return "";
 }
 
-/* —— 渲染（含 text 样式无箭头时“区域:”句式） —— */
 /* —— 渲染（仅 Netflix 区分“完整/自制剧”，其它服务统一“已解锁/不可达”）——
- * 入参:
- *   - name: 服务显示名（如 "Netflix" / "YouTube" / "ChatGPT" / "ChatGPT Web"...）
- *   - ok:   检测是否可达（true/false）
- *   - cc:   两位国家/地区码（如 "JP"）；为空则用 “-”
- *   - cost: 延迟(ms)，可能为 null
- *   - status: HTTP 状态码，可能为 0
- *   - tag:    附加标注（如 Netflix “自制(original)” 等）
- *   - state:  可选的直接状态覆写（'full' | 'partial' | 'blocked'）
- *
- * 规则说明：
- *   1) 统一把状态收敛为 st: full / partial / blocked
- *      - 若提供 state，优先生效；否则根据 ok / tag 推断：
- *        ok=true 且含“自制/original” => partial；ok=true => full；ok=false => blocked
- *   2) text 样式 && 不用箭头时：
- *        - Netflix 使用长文案：
- *            full   -> “已完整解锁”
- *            partial-> “仅解锁自制剧”
- *            blocked-> “不可达”
- *        - 其它服务：full/partial 都显示 “已解锁”，blocked 显示 “不可达”
- *        - 文案格式统一为：`服务名: <状态>，区域: <地区>`
- *   3) text 样式 && 用箭头时：保持原有“已解锁/部分解锁/不可达”的短文案 + 箭头连接
- *   4) icon 样式：维持原先图标+地区的展示
- *   5) 地区文本由 sd_ccPretty(cc) 决定（full/abbr/flag 三种模式），中文地区保持你的既有规则
+ * 入参见注释；text+无箭头时采用“区域:”句式；箭头模式维持原有短文案。
  */
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   // 归一化成三态：full / partial / blocked
@@ -863,7 +848,7 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   // 三态图标（✅/❇️/❎ 或 🔓/🔐/🔒 等主题）
   const icon = sd_pickIcons(SD_ICON_THEME)[st];
 
-  // 地区渲染（可能返回 “🇯🇵 JP | 日本” / “🇯🇵JP” / “🇯🇵”）
+  // 地区渲染
   const regionChunk = cc ? sd_ccPretty(cc) : "";
   const regionText  = regionChunk || "-";
 
@@ -872,9 +857,6 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const blockedText   = (SD_LANG==='zh-Hant') ? '不可達' : '不可达';
 
   // —— 仅 Netflix 使用的“长文案”（text+无箭头场景）——
-  // full   -> “已完整解锁 / 已完整解鎖”
-  // partial-> “仅解锁自制剧 / 僅解鎖自製劇”
-  // blocked-> “不可达 / 不可達”
   const stateTextLong = (()=>{
     const hans = { full:'已完整解锁', partial:'仅解锁自制剧', blocked:blockedText };
     const hant = { full:'已完整解鎖', partial:'僅解鎖自製劇', blocked:blockedText };
@@ -887,22 +869,22 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   // 其它服务的短文案（不区分 full/partial，统一“已解锁”）
   const stateTextShort = (st==='blocked') ? blockedText : unlockedShort;
 
-  // 判定是否 Netflix（多语言下名义相同，保险加正则）
+  // 判定是否 Netflix
   const isNetflix = /netflix/i.test(String(name));
 
   // ① text 样式 + 不使用箭头：Netflix 用长文案；其它服务用短文案
   if (SD_STYLE === "text" && !SD_ARROW) {
     const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
-    const head  = `${left}，区域: ${regionText}`; // 注意中文逗号，符合中文语境
+    const head  = `${left}，区域: ${regionText}`;
     const tail = [
-      tag || "",                                    // 额外标注（如“自制”提示）
+      tag || "",
       (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
       (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-    ].filter(Boolean).join(" ｜ ");                  // 尾部信息以 “｜” 连接
+    ].filter(Boolean).join(" ｜ ");
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  // ② text 样式 + 使用箭头：保持原先“已解锁/部分解锁/不可达”的标准短文案
+  // ② text 样式 + 使用箭头：保持原先“已解锁/部分解锁/不可达”的短文案
   const stateTextStd = (()=>{
     if (SD_LANG==='zh-Hant'){
       if (st==='full') return '已解鎖';
@@ -926,7 +908,7 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  // ③ icon 样式：维持原来的显示（图标 + 名称 + 地区；尾部可选延迟/HTTP/标注）
+  // ③ icon 样式：维持原来的显示
   const head = SD_ARROW
     ? `${icon} ${name} ➟ ${regionText}`
     : `${icon} ${name} ｜ ${regionText}`;
