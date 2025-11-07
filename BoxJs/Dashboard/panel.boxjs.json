@@ -2,80 +2,15 @@
   "id": "ByteValley.Panel",
   "name": "功能看板",
   "author": "ByteValley",
-  "description": "功能看板父级（统一默认）与子级（各面板参数）的合集订阅。",
+  "description": "功能看板下的各子面板参数集合（仅包含：网络信息）。",
   "repo": "https://github.com/ByteValley/NetTool",
   "apps": [
-    {
-      "id": "ByteValley.Panel.Root",
-      "name": "功能看板 · 统一设置",
-      "descs_html": [
-        "作为<b>父层级</b>的通用默认项，未在子级设置时可回落使用。",
-        "建议脚本取值顺序：<code>子级键 → 父级键 → 模块 #!arguments → 代码默认</code>。"
-      ],
-      "keys": [
-        "Dashboard_Icon",
-        "Dashboard_IconColor",
-        "Dashboard_Lang",
-        "Dashboard_Timeout",
-        "Dashboard_TW_FLAG_MODE",
-        "Dashboard_SD_STYLE",
-        "Dashboard_SD_REGION_MODE",
-        "Dashboard_SD_ICON_THEME",
-        "Dashboard_SD_ARROW"
-      ],
-      "settings": [
-        { "id": "Dashboard_Icon",         "name": "通用 SF Symbols 图标名",    "type": "text",    "val": "globe.asia.australia" },
-        { "id": "Dashboard_IconColor",    "name": "通用图标颜色（HEX）",       "type": "text",    "val": "#1E90FF" },
-        {
-          "id": "Dashboard_Lang",         "name": "通用语言",                 "type": "selects", "val": "zh-Hans",
-          "items": [
-            { "key": "zh-Hans", "label": "简体中文" },
-            { "key": "zh-Hant", "label": "繁體中文" },
-            { "key": "en",      "label": "English" }
-          ]
-        },
-        { "id": "Dashboard_Timeout",      "name": "通用脚本超时（秒）",        "type": "number",  "val": 8 },
-        {
-          "id": "Dashboard_TW_FLAG_MODE", "name": "通用台湾旗模式",           "type": "selects", "val": "1",
-          "items": [
-            { "key": "0", "label": "🇨🇳（统一显示）" },
-            { "key": "1", "label": "🇹🇼" },
-            { "key": "2", "label": "🇼🇸（自定义占位）" }
-          ]
-        },
-        {
-          "id": "Dashboard_SD_STYLE",     "name": "服务检测样式（通用）",     "type": "selects", "val": "icon",
-          "items": [
-            { "key": "icon", "label": "图标样式" },
-            { "key": "text", "label": "文字样式" }
-          ]
-        },
-        {
-          "id": "Dashboard_SD_REGION_MODE","name": "地区显示样式（通用）",   "type": "selects", "val": "full",
-          "items": [
-            { "key": "full", "label": "🇯🇵 JP | 日本" },
-            { "key": "abbr", "label": "🇯🇵JP" },
-            { "key": "flag", "label": "仅旗帜" }
-          ]
-        },
-        {
-          "id": "Dashboard_SD_ICON_THEME", "name": "图标主题（三态，通用）",  "type": "selects", "val": "check",
-          "items": [
-            { "key": "check",  "label": "✅ / ❇️ / ❎" },
-            { "key": "lock",   "label": "🔓 / 🔐 / 🔒" },
-            { "key": "circle", "label": "⭕️ / ⛔️ / 🚫" }
-          ]
-        },
-        { "id": "Dashboard_SD_ARROW",     "name": "使用“➟”连接服务名与地区（通用）", "type": "boolean", "val": true }
-      ]
-    },
-
     {
       "id": "ByteValley.Panel.NetworkInfo",
       "name": "网络信息",
       "descs_html": [
-        "直连/入口/落地 IP 与位置；支持台湾旗模式；服务检测合并展示；三态图标与地区样式；icon/text 支持“➟”箭头。",
-        "取值优先级：<code>NetworkInfo_* → Dashboard_* → #!arguments → 代码默认</code>。"
+        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；支持台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
+        "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。"
       ],
       "keys": [
         "NetworkInfo_Update",
@@ -100,15 +35,15 @@
         "NetworkInfo_SD_ARROW"
       ],
       "settings": [
-        { "id": "NetworkInfo_Update",     "name": "刷新间隔（秒）",          "type": "number",  "val": 10, "desc": "默认 10" },
-        { "id": "NetworkInfo_Timeout",    "name": "脚本超时（秒）",          "type": "number",  "val": 8,  "desc": "不填用 Dashboard_Timeout 或 8" },
+        { "id": "NetworkInfo_Update",     "name": "刷新间隔（秒）",            "type": "number",  "val": 10 },
+        { "id": "NetworkInfo_Timeout",    "name": "脚本超时（秒）",            "type": "number",  "val": 8  },
 
-        { "id": "NetworkInfo_MASK_IP",    "name": "IP 脱敏（直连）",        "type": "boolean", "val": true },
-        { "id": "NetworkInfo_MASK_POS",   "name": "直连位置脱敏",            "type": "boolean", "val": true },
-        { "id": "NetworkInfo_IPv6",       "name": "启用 IPv6",              "type": "boolean", "val": false },
+        { "id": "NetworkInfo_MASK_IP",    "name": "IP 脱敏（直连）",          "type": "boolean", "val": true  },
+        { "id": "NetworkInfo_MASK_POS",   "name": "直连位置脱敏",              "type": "boolean", "val": true  },
+        { "id": "NetworkInfo_IPv6",       "name": "启用 IPv6",                "type": "boolean", "val": false },
 
         {
-          "id": "NetworkInfo_DOMESTIC_IPv4", "name": "国内 IPv4 源",       "type": "selects", "val": "ipip",
+          "id": "NetworkInfo_DOMESTIC_IPv4", "name": "国内 IPv4 源",         "type": "selects", "val": "ipip",
           "items": [
             { "key": "ipip",     "label": "ipip.net" },
             { "key": "cip",      "label": "cip.cc" },
@@ -119,7 +54,7 @@
           ]
         },
         {
-          "id": "NetworkInfo_DOMESTIC_IPv6", "name": "国内 IPv6 源",      "type": "selects", "val": "ddnspod",
+          "id": "NetworkInfo_DOMESTIC_IPv6", "name": "国内 IPv6 源",         "type": "selects", "val": "ddnspod",
           "items": [
             { "key": "ddnspod", "label": "DNSPod" },
             { "key": "neu6",    "label": "东北大学 NEU6" }
@@ -127,7 +62,7 @@
         },
 
         {
-          "id": "NetworkInfo_LANDING_IPv4",  "name": "落地 IPv4 源",      "type": "selects", "val": "ipapi",
+          "id": "NetworkInfo_LANDING_IPv4",  "name": "落地 IPv4 源",         "type": "selects", "val": "ipapi",
           "items": [
             { "key": "ipapi",   "label": "ipapi.co" },
             { "key": "ipwhois", "label": "ipwho.is" },
@@ -135,7 +70,7 @@
           ]
         },
         {
-          "id": "NetworkInfo_LANDING_IPv6",  "name": "落地 IPv6 源",      "type": "selects", "val": "ipsb",
+          "id": "NetworkInfo_LANDING_IPv6",  "name": "落地 IPv6 源",         "type": "selects", "val": "ipsb",
           "items": [
             { "key": "ipsb",   "label": "ip.sb" },
             { "key": "ident",  "label": "ident.me" },
@@ -144,39 +79,43 @@
         },
 
         {
-          "id": "NetworkInfo_TW_FLAG_MODE",  "name": "台湾旗模式",          "type": "selects", "val": "1",
-          "items": [
-            { "key": "0", "label": "🇨🇳（统一显示）" },
-            { "key": "1", "label": "🇹🇼" },
-            { "key": "2", "label": "🇼🇸（自定义占位）" }
-          ]
-        },
+  "id": "NetworkInfo_TW_FLAG_MODE",
+  "name": "台湾旗帜模式",
+  "type": "selects",
+  "val": "1",
+  "items": [
+    { "key": "0", "label": "🇨🇳 CN | 中国" },
+    { "key": "1", "label": "🇹🇼 TW | 台湾" },
+    { "key": "2", "label": "🇼🇸 WS | 萨摩亚（占位）" }
+  ],
+  "desc": "影响台湾地区显示时的旗帜样式"
+}
 
-        { "id": "NetworkInfo_Icon",         "name": "面板图标名（SF Symbols）", "type": "text",    "val": "globe.asia.australia" },
+        { "id": "NetworkInfo_Icon",         "name": "面板图标名（SF Symbols）","type": "text",    "val": "globe.asia.australia" },
         { "id": "NetworkInfo_IconColor",    "name": "面板图标颜色（HEX）",      "type": "text",    "val": "#1E90FF" },
 
         {
-          "id": "NetworkInfo_SD_STYLE",      "name": "服务检测样式",        "type": "selects", "val": "icon",
+          "id": "NetworkInfo_SD_STYLE",      "name": "服务检测样式",          "type": "selects", "val": "icon",
           "items": [
             { "key": "icon", "label": "图标样式" },
             { "key": "text", "label": "文字样式" }
           ]
         },
-        { "id": "NetworkInfo_SD_SHOW_LAT",  "name": "显示延迟（Latency）", "type": "boolean", "val": true },
-        { "id": "NetworkInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码",       "type": "boolean", "val": true },
+        { "id": "NetworkInfo_SD_SHOW_LAT",  "name": "显示延迟（Latency）",    "type": "boolean", "val": true  },
+        { "id": "NetworkInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码",          "type": "boolean", "val": true  },
 
         {
-          "id": "NetworkInfo_SD_LANG",       "name": "服务检测语言",        "type": "selects", "val": "zh-Hans",
+          "id": "NetworkInfo_SD_LANG",       "name": "服务检测语言",          "type": "selects", "val": "zh-Hans",
           "items": [
             { "key": "zh-Hans", "label": "简体中文" },
             { "key": "zh-Hant", "label": "繁體中文" }
           ]
         },
 
-        { "id": "NetworkInfo_SD_TIMEOUT_MS","name": "服务检测单项超时（ms）","type": "text",    "val": "1000", "desc": "留空则按 Timeout×1000 或 Dashboard_Timeout×1000" },
+        { "id": "NetworkInfo_SD_TIMEOUT_MS","name": "服务检测单项超时（ms）", "type": "text",    "val": "1000", "desc": "留空则按 Timeout×1000" },
 
         {
-          "id": "NetworkInfo_SD_REGION_MODE","name": "地区显示样式",       "type": "selects", "val": "full",
+          "id": "NetworkInfo_SD_REGION_MODE","name": "地区显示样式",          "type": "selects", "val": "full",
           "items": [
             { "key": "full", "label": "🇯🇵 JP | 日本" },
             { "key": "abbr", "label": "🇯🇵JP" },
@@ -185,7 +124,7 @@
         },
 
         {
-          "id": "NetworkInfo_SD_ICON_THEME", "name": "图标主题（三态）",     "type": "selects", "val": "check",
+          "id": "NetworkInfo_SD_ICON_THEME", "name": "图标主题（三态）",       "type": "selects", "val": "check",
           "items": [
             { "key": "check",  "label": "✅ / ❇️ / ❎" },
             { "key": "lock",   "label": "🔓 / 🔐 / 🔒" },
@@ -193,7 +132,7 @@
           ]
         },
 
-        { "id": "NetworkInfo_SD_ARROW",      "name": "使用“➟”连接服务名与地区", "type": "boolean", "val": true }
+        { "id": "NetworkInfo_SD_ARROW",      "name": "使用“➟”连接服务名与地区","type": "boolean", "val": true }
       ]
     }
   ]
