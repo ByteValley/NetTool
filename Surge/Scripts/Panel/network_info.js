@@ -185,19 +185,21 @@ function flagOf(code){
 function fmtISP(isp, locStr){
   const s0 = String(isp || '').trim();
   if (!s0) return '';
-  const isCN = /^🇨🇳/.test(String(locStr||'')) || /(^|\s)中国/.test(String(locStr||''));
-  if (!isCN) return s0;
 
-  let s = s0.replace(/^中国\s*/,'').replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ');
-  if (/^(移动|CMCC|China Mobile.*)$/i.test(s)) return '中国移动';
-  if (/^(联通|China Unicom.*)$/i.test(s))     return '中国联通';
-  if (/^(电信|China Telecom.*)$/i.test(s))    return '中国电信';
-  if (/^(广电|CBN|China Broadcasting.*)$/i.test(s)) return '中国广电';
+  const txt = String(locStr || '');
+  const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
+  if (!isMainland) return s0;
 
-  if (/^China\s*Mobile.*communications.*$/i.test(s)) return '中国移动';
-  if (/^China\s*Telecom.*$/i.test(s)) return '中国电信';
-  if (/^China\s*Unicom.*$/i.test(s))  return '中国联通';
-  return '中国' + s;
+  const s = s0.replace(/^中国\s*/,'').replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').toLowerCase();
+
+  if (/(^|[\s-])(cmcc|cmnet|cmi|china mobile( communications)?)/i.test(s)) return '中国移动';
+  if (/(^|[\s-])(chinanet|chinanet backbone|china ?telecom|ctcc|ct)/i.test(s))    return '中国电信';
+  if (/(^|[\s-])(china ?unicom|unicom|cncgroup|china ?netcom)/i.test(s))         return '中国联通';
+  if (/(^|[\s-])(cbn|china broadcasting)/i.test(s))                               return '中国广电';
+  if (/(^|[\s-])(cernet|china education)/i.test(s))                               return '中国教育网';
+
+  // 兜底：保持“中文前缀中国 + 原文”会怪，就直接返回原文
+  return s0.replace(/^中国\s*/,'');
 }
 
 /* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
