@@ -1,6 +1,6 @@
 /* =========================================================
  * 网络信息 + 服务检测
- * by ByteValley
+ * by ByteValley (merged by ChatGPT)
  * - 标题显示“网络类型”；第一行显示“代理策略”
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
@@ -8,6 +8,11 @@
  * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 入口/策略获取：预触发落地请求→重试(指数退避)→任意代理请求兜底
  * - 脚本接管图标 Icon / IconColor
+ * - 新增：
+ *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
+ *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
+ *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
+ *   · ChatGPT App(API) 地区多源回退，优先 CF 头
  * =======================================================*/
 
 /* ===================== 参数解析 ===================== */
@@ -58,6 +63,11 @@ const SD_TIMEOUT_MS = (()=>{
   return isFinite(sec) ? Math.max(2000, sec*1000) : 5000;
 })();
 
+// —— 新增：图标主题 & 地区显示样式 & 箭头共用开关 —— //
+const SD_ICON_THEME = (()=>{ const v=(GET('SD_ICON_THEME','check')||'').toLowerCase(); return ['lock','circle','check'].includes(v)?v:'check'; })();
+const SD_REGION_MODE = (()=>{ const v=(GET('SD_REGION_MODE','full')||'').toLowerCase(); return ['full','abbr','flag'].includes(v)?v:'full'; })();
+const SD_ARROW = /^true$/i.test(GET('SD_ARROW','true')); // 共用：icon/text 是否使用“➟”
+
 /* ===================== 主流程 ===================== */
 ;(async () => {
   // —— 轻触发一次落地以写日志（不阻塞，短超时）
@@ -102,7 +112,7 @@ const SD_TIMEOUT_MS = (()=>{
     if (ent.loc1) entranceLines.push(`位置¹: ${flagFirst(ent.loc1)}`);
     if (ent.isp1) entranceLines.push(`运营商¹: ${fmtISP(ent.isp1, ent.loc1)}`);
     if (ent.loc2) entranceLines.push(`位置²: ${flagFirst(ent.loc2)}`);
-    if (ent.isp2) entranceLines.push(`运营商²: ${String(ent.isp2).trim()}`);
+    if (ent.isp2) entranceLines.push(`运营商²: ${String(ent.isp2).trim()}`); // isp2 保留原始
   }
 
   const landingLines = [
@@ -194,23 +204,20 @@ function fmtISP(isp, locStr){
   const norm = raw.replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').trim();
   const s = norm.toLowerCase();
 
-  // 映射：英文/缩写/中文别名 → 标准名
-  if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /(^|[\s-])移动\b/.test(norm))
+  // 英文/缩写命中 || 中文关键字命中（不再使用 \b）
+  if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm))
     return '中国移动';
-  if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /(^|[\s-])电信\b/.test(norm))
+  if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /电信/.test(norm))
     return '中国电信';
-  if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /(^|[\s-])联通\b/.test(norm))
+  if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /联通/.test(norm))
     return '中国联通';
-  if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /(^|[\s-])广电\b/.test(norm))
+  if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /广电/.test(norm))
     return '中国广电';
   if (/(cernet|china\s*education)/.test(s) || /教育网/.test(norm))
     return '中国教育网';
 
-  // 已是“中国移动/联通/电信/广电”则保持
-  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
-
-  // 兜底：不要再去掉“中国”前缀，直接保留原始文本
-  return raw;
+  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm; // 已是标准名
+  return raw; // 兜底保留原始
 }
 
 /* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
@@ -406,6 +413,8 @@ function sd_flagFromCC(cc){
     return String.fromCodePoint(...cps);
   } catch { return ''; }
 }
+
+// —— 地区名称表
 const SD_CC_NAME = {
   "zh-Hans": { CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
     SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚",
@@ -422,32 +431,95 @@ function sd_ccPretty(cc){
   if (!cc) return "—";
   const flag = sd_flagFromCC(cc);
   const name = SD_CC_NAME[cc];
+  if (SD_REGION_MODE==='flag') return flag || "—";
+  if (SD_REGION_MODE==='abbr') return (flag||'') + cc;
   if (flag && name) return `${flag} ${cc} | ${name}`;
   if (flag) return `${flag} ${cc}`;
   return cc;
 }
-function sd_renderLine({name, ok, cc, cost, status, tag}) {
-  const regionChunk = cc ? sd_ccPretty(cc) : "—";
-  const stateChunk  = ok ? (SD_LANG==='zh-Hant'?'已解鎖':'已解锁') : (tag || (SD_LANG==='zh-Hant'?'不可達':'不可达'));
-  const tagChunk    = tag ? ` ｜ ${tag}` : "";
+
+// —— 三态图标主题 —— //
+function sd_pickIcons(theme){
+  switch(theme){
+    case 'lock':   return { full:'🔓', partial:'🔐', blocked:'🔒' };
+    case 'circle': return { full:'⭕️', partial:'⛔️', blocked:'🚫' };
+    default:       return { full:'✅', partial:'❇️', blocked:'❎' };
+  }
+}
+const SD_ICONS = sd_pickIcons(SD_ICON_THEME);
+function sd_isPartial(tag){ return /自制|自製|original/i.test(String(tag||'')) || /部分/i.test(String(tag||'')); }
+
+/* —— 统一渲染 —— */
+function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
+  // state 可显式传入，否则根据 ok/tag 推断
+  const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
+  const icon = SD_ICONS[st];
+
+  const regionChunk = cc ? sd_ccPretty(cc) : "";     // 根据模式渲染地区
+  const regionText  = regionChunk || "-";            // 地区缺失时用占位 “-”
+
+  const stateText = (()=>{
+    if (SD_LANG==='zh-Hant'){
+      if (st==='full') return '已解鎖';
+      if (st==='partial') return '部分解鎖';
+      return '不可達';
+    } else {
+      if (st==='full') return '已解锁';
+      if (st==='partial') return '部分解锁';
+      return '不可达';
+    }
+  })();
 
   if (SD_STYLE === "text") {
-    return `${name}: ${stateChunk} ｜ ${regionChunk}${tagChunk}`;
+    // text 样式左侧：服务名 + 状态；与地区之间由 SD_ARROW 控制（➟ / ｜）
+    const left  = `${name}: ${stateText}`;
+    const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
+
+    const tail = [
+      tag ? `标注：${tag}` : "",
+      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");
+
+    return tail ? `${head} ｜ ${tail}` : head;
   }
-  const parts = [];
-  parts.push(`${ok ? "✅" : "⛔️"} ${name}`);
-  if (cc) parts.push(regionChunk);
-  if (tag) parts.push(tag);
-  if (SD_SHOW_LAT && cost != null) parts.push(`${cost}ms`);
-  if (SD_SHOW_HTTP && status > 0)  parts.push(`HTTP ${status}`);
-  return parts.join(" ｜ ");
+
+  // icon 样式：ICON Name (➟/｜) REGION ｜ [tag ｜ latency ｜ HTTP]
+  const head = SD_ARROW
+    ? `${icon} ${name} ➟ ${regionText}`
+    : `${icon} ${name} ｜ ${regionText}`;
+
+  const tail = [
+    tag || "",
+    (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+    (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+  ].filter(Boolean).join(" ｜ ");
+
+  return tail ? `${head} ｜ ${tail}` : head;
 }
+
 async function sd_queryLandingCC() {
   const r = await sd_httpGet("http://ip-api.com/json", {}, true);
   if (r.ok && r.status === 200) {
     try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
     catch(_){ return ""; }
   }
+  return "";
+}
+// 多源回退（更稳）
+async function sd_queryLandingCCMulti(){
+  let cc = await sd_queryLandingCC();
+  if (cc) return cc;
+
+  let r = await sd_httpGet("https://api.ip.sb/geoip", {}, true);
+  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_code) return j.country_code.toUpperCase(); }catch(_){}
+
+  r = await sd_httpGet("https://ipinfo.io/json", {}, true);
+  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country) return j.country.toUpperCase(); }catch(_){}
+
+  r = await sd_httpGet("https://ifconfig.co/json", {"Accept-Language":"en"}, true);
+  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_iso) return j.country_iso.toUpperCase(); }catch(_){}
+
   return "";
 }
 
@@ -501,7 +573,14 @@ async function sd_testChatGPTWeb() {
 async function sd_testChatGPTAppAPI() {
   const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
-  const cc = await sd_queryLandingCC();
+  // 优先读取 CF 头
+  let cc = "";
+  try {
+    const h = r.headers || {};
+    cc = (h['cf-ipcountry'] || h['CF-IPCountry'] || h['Cf-IpCountry'] || "").toString().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(cc)) cc = "";
+  } catch(_){}
+  if (!cc) cc = await sd_queryLandingCCMulti();
   return sd_renderLine({name:SD_I18N.chatgpt_app, ok:true, cc, cost:r.cost, status:r.status, tag:""});
 }
 
@@ -518,11 +597,11 @@ async function sd_testNetflix() {
       if (!r2.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:SD_I18N.fail});
       if (r2.status === 404) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:SD_I18N.regionBlocked});
       const cc = sd_parseNFRegion(r2) || "";
-      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r2.cost, status:r2.status, tag:SD_I18N.originals});
+      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r2.cost, status:r2.status, tag:SD_I18N.originals, state:'partial'});
     }
     if (r1.status === 200) {
       const cc = sd_parseNFRegion(r1) || "";
-      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:SD_I18N.full});
+      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:SD_I18N.full, state:'full'});
     }
     return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:`HTTP ${r1.status}`});
   } catch(_){
@@ -565,7 +644,7 @@ async function sd_testDisney() {
     const h = await Promise.race([home(), timeout(7000,"TO")]);
     const b = await Promise.race([bam(),  timeout(7000,"TO")]).catch(()=>({}));
     const blocked = (b && b.inLoc === false);
-    const cc = blocked ? "" : (b?.cc || h?.cc || (await sd_queryLandingCC()) || "");
+    const cc = blocked ? "" : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || "");
     return sd_renderLine({name:SD_I18N.disney, ok:!blocked, cc, cost:(b?.cost||h?.cost||0), status:(b?.status||h?.status||0), tag: blocked ? SD_I18N.regionBlocked : ""});
   } catch(e){
     const tag = (e==="TO") ? SD_I18N.timeout : SD_I18N.fail;
@@ -590,7 +669,7 @@ async function sd_testHBO() {
   if (!r.ok) return sd_renderLine({name:SD_I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
   const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
   let cc=""; try { const m = String(r.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch(_){}
-  if (!cc) cc = await sd_queryLandingCC();
+  if (!cc) cc = await sd_queryLandingCCMulti();
   return sd_renderLine({name:SD_I18N.hbo, ok:!blocked, cc: blocked?"": cc, cost:r.cost, status:r.status, tag: blocked ? SD_I18N.regionBlocked : ""});
 }
 
