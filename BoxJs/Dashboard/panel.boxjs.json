@@ -183,7 +183,7 @@
           "name": "服务清单（文本备选）",
           "type": "text",
           "val": "",
-          "desc": "文本或 JSON 数组，分隔符支持英文逗号(,)、中文逗号(，)；大小写不敏感，顺序不限。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。可用键：youtube/netflix/disney/hulu_us/hulu_jp/hbo/chatgpt_app/chatgpt_web。优先级次于多选，高于模块 arguments。"
+          "desc": "文本或 JSON 数组，分隔符支持英文逗号(,)、中文逗号(，)；大小写不敏感，渲染顺序根据输入顺序变动。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。可用键：youtube/netflix/disney/hulu_us/hulu_jp/hbo/chatgpt_app/chatgpt_web。优先级次于多选，高于模块 arguments。"
         }
       ]
     }
