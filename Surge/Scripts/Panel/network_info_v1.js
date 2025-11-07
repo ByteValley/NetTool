@@ -203,20 +203,20 @@ function fmtISP(isp, locStr){
   const norm = raw.replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').trim();
   const s = norm.toLowerCase();
 
-  // 映射：英文/缩写/中文别名 → 标准名
-  if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /(^|[\s-])移动\b/.test(norm))
+  // 英文/缩写命中 || 中文关键字命中（不再使用 \b）
+  if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm))
     return '中国移动';
-  if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /(^|[\s-])电信\b/.test(norm))
+  if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /电信/.test(norm))
     return '中国电信';
-  if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /(^|[\s-])联通\b/.test(norm))
+  if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /联通/.test(norm))
     return '中国联通';
-  if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /(^|[\s-])广电\b/.test(norm))
+  if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /广电/.test(norm))
     return '中国广电';
   if (/(cernet|china\s*education)/.test(s) || /教育网/.test(norm))
     return '中国教育网';
 
-  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
-  return raw;
+  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm; // 已是标准名
+  return raw; // 兜底保留原始
 }
 
 /* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
