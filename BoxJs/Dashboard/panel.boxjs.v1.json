@@ -10,7 +10,7 @@
       "name": "网络信息",
       "descs_html": [
         "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
-        "<b>服务清单策略：</b>若 <code>NetworkInfo_SERVICES</code> 多选有内容，则以多选为准；若为空，再读取 <code>SERVICES</code> 文本（逗号）；二者皆空=检测全部。",
+        "<b>服务清单策略：</b>当 <code>NetworkInfo_SERVICES</code> 多选有内容时，以多选为准；若多选为空，则读取文本 <code>NetworkInfo_SERVICES_TEXT</code> 或模块参数 <code>SERVICES</code>。文本支持 <b>英文逗号 ,</b> 与 <b>中文逗号 ，</b>（亦兼容分号/竖线/斜杠/空格/换行）或 JSON 数组；<b>不区分大小写、顺序不限</b>。可用键：youtube、netflix、disney、hulu_us、hulu_jp、hbo、chatgpt_app（ChatGPT）、chatgpt_web（ChatGPT Web）。",
         "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。"
       ],
       "keys": [
@@ -169,11 +169,11 @@
             { "key": "youtube",     "label": "YouTube" },
             { "key": "netflix",     "label": "Netflix" },
             { "key": "disney",      "label": "Disney+" },
-            { "key": "chatgpt_web", "label": "ChatGPT Web" },
-            { "key": "chatgpt_app", "label": "ChatGPT App(API)" },
             { "key": "hulu_us",     "label": "Hulu(美)" },
             { "key": "hulu_jp",     "label": "Hulu(日)" },
-            { "key": "hbo",         "label": "Max(HBO)" }
+            { "key": "hbo",         "label": "Max(HBO)" },
+            { "key": "chatgpt_app", "label": "ChatGPT" },
+            { "key": "chatgpt_web", "label": "ChatGPT Web" }
           ],
           "desc": "优先级最高。清空=显式为空（不会回退到历史勾选）。"
         },
@@ -182,7 +182,7 @@
           "name": "服务清单（文本备选）",
           "type": "text",
           "val": "",
-          "desc": "JSON 数组或逗号：如 [\"youtube\",\"netflix\"] 或 youtube,netflix。优先级次于复选框，高于 arguments。"
+          "desc": "文本或 JSON 数组，分隔符支持英文逗号(,)、中文逗号(，)、分号、竖线、斜杠、空格与换行；大小写不敏感，顺序不限。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。可用键：youtube/netflix/disney/hulu_us/hulu_jp/hbo/chatgpt_app/chatgpt_web。优先级次于多选，高于模块 arguments。"
         }
       ]
     }
