@@ -2,14 +2,15 @@
   "id": "ByteValley.Panel",
   "name": "功能看板",
   "author": "ByteValley",
-  "description": "功能看板下的各子面板参数集合（仅包含：网络信息）。优先级：BoxJS > 模块 arguments > 默认。",
+  "description": "功能看板下的各子面板参数集合（仅包含：网络信息）。",
   "repo": "https://github.com/ByteValley/NetTool",
   "apps": [
     {
       "id": "ByteValley.Panel.NetworkInfo",
       "name": "网络信息",
       "descs_html": [
-        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；支持台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”；支持自定义服务清单（BoxJS 文本或逐项勾选；模块参数仅文本）。",
+        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
+        "<b>服务清单策略：</b>若 <code>NetworkInfo_SERVICES</code> 多选有内容，则以多选为准；若为空，再读取 <code>SERVICES</code> 文本（逗号）；二者皆空=检测全部。",
         "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。"
       ],
       "keys": [
@@ -34,21 +35,16 @@
         "NetworkInfo_SD_ICON_THEME",
         "NetworkInfo_SD_ARROW",
         "NetworkInfo_SERVICES",
-        "NetworkInfo_SVC_YOUTUBE",
-        "NetworkInfo_SVC_NETFLIX",
-        "NetworkInfo_SVC_DISNEY",
-        "NetworkInfo_SVC_CHATGPT_WEB",
-        "NetworkInfo_SVC_CHATGPT_APP",
-        "NetworkInfo_SVC_HULU_US",
-        "NetworkInfo_SVC_HULU_JP",
-        "NetworkInfo_SVC_HBO"
+        "NetworkInfo_SERVICES_TEXT"
       ],
       "settings": [
         { "id": "NetworkInfo_Update", "name": "刷新间隔（秒）", "type": "number", "val": 10 },
         { "id": "NetworkInfo_Timeout", "name": "脚本超时（秒）", "type": "number", "val": 8 },
+
         { "id": "NetworkInfo_MASK_IP", "name": "IP 脱敏（直连）", "type": "boolean", "val": true },
         { "id": "NetworkInfo_MASK_POS", "name": "直连位置脱敏", "type": "boolean", "val": true },
         { "id": "NetworkInfo_IPv6", "name": "启用 IPv6", "type": "boolean", "val": false },
+
         {
           "id": "NetworkInfo_DOMESTIC_IPv4",
           "name": "国内 IPv4 源",
@@ -95,6 +91,7 @@
             { "key": "ipify", "label": "ipify.org" }
           ]
         },
+
         {
           "id": "NetworkInfo_TW_FLAG_MODE",
           "name": "台湾旗帜模式",
@@ -104,10 +101,13 @@
             { "key": "0", "label": "🇨🇳 CN | 中国" },
             { "key": "1", "label": "🇹🇼 TW | 台湾" },
             { "key": "2", "label": "🇼🇸 WS | 萨摩亚（占位）" }
-          ]
+          ],
+          "desc": "影响台湾地区显示时的旗帜样式"
         },
+
         { "id": "NetworkInfo_Icon", "name": "面板图标名（SF Symbols）", "type": "text", "val": "globe.asia.australia" },
         { "id": "NetworkInfo_IconColor", "name": "面板图标颜色（HEX）", "type": "text", "val": "#1E90FF" },
+
         {
           "id": "NetworkInfo_SD_STYLE",
           "name": "服务检测样式",
@@ -120,6 +120,7 @@
         },
         { "id": "NetworkInfo_SD_SHOW_LAT", "name": "显示延迟（Latency）", "type": "boolean", "val": true },
         { "id": "NetworkInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码", "type": "boolean", "val": true },
+
         {
           "id": "NetworkInfo_SD_LANG",
           "name": "服务检测语言",
@@ -130,7 +131,9 @@
             { "key": "zh-Hant", "label": "繁體中文" }
           ]
         },
-        { "id": "NetworkInfo_SD_TIMEOUT_MS", "name": "服务检测单项超时（ms）", "type": "text", "val": "1000" },
+
+        { "id": "NetworkInfo_SD_TIMEOUT_MS", "name": "服务检测单项超时（ms）", "type": "text", "val": "1000", "desc": "留空则按 Timeout×1000" },
+
         {
           "id": "NetworkInfo_SD_REGION_MODE",
           "name": "地区显示样式",
@@ -142,6 +145,7 @@
             { "key": "flag", "label": "🇯🇵" }
           ]
         },
+
         {
           "id": "NetworkInfo_SD_ICON_THEME",
           "name": "图标主题（三态）",
@@ -153,16 +157,33 @@
             { "key": "circle", "label": "⭕️ / ⛔️ / 🚫" }
           ]
         },
+
         { "id": "NetworkInfo_SD_ARROW", "name": "使用“➟”连接服务名与地区", "type": "boolean", "val": true },
-        { "id": "NetworkInfo_SERVICES", "name": "服务清单（文本：JSON 数组或逗号字符串）", "type": "text", "val": "", "desc": "优先级：BoxJS 文本 > BoxJS 勾选 > 模块参数文本 > 全部" },
-        { "id": "NetworkInfo_SVC_YOUTUBE", "name": "勾选：YouTube", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_NETFLIX", "name": "勾选：Netflix", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_DISNEY", "name": "勾选：Disney+", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_CHATGPT_WEB", "name": "勾选：ChatGPT Web", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_CHATGPT_APP", "name": "勾选：ChatGPT App(API)", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_HULU_US", "name": "勾选：Hulu(美)", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_HULU_JP", "name": "勾选：Hulu(日)", "type": "boolean", "val": false },
-        { "id": "NetworkInfo_SVC_HBO", "name": "勾选：Max(HBO)", "type": "boolean", "val": false }
+
+        {
+          "id": "NetworkInfo_SERVICES",
+          "name": "服务清单（多选）",
+          "type": "checkboxes",
+          "val": [],
+          "items": [
+            { "key": "youtube",      "label": "YouTube" },
+            { "key": "netflix",      "label": "Netflix" },
+            { "key": "disney",       "label": "Disney+" },
+            { "key": "chatgpt_web",  "label": "ChatGPT Web" },
+            { "key": "chatgpt_app",  "label": "ChatGPT App(API)" },
+            { "key": "hulu_us",      "label": "Hulu(美)" },
+            { "key": "hulu_jp",      "label": "Hulu(日)" },
+            { "key": "hbo",          "label": "Max(HBO)" }
+          ],
+          "desc": "若有勾选，则以多选为准。留空则继续看下方文本或使用默认全开。"
+        },
+        {
+          "id": "NetworkInfo_SERVICES_TEXT",
+          "name": "备用文本（逗号）",
+          "type": "text",
+          "val": "",
+          "desc": "当多选为空时才读取。如：youtube,netflix,chatgpt_web"
+        }
       ]
     }
   ]
