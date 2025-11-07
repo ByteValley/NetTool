@@ -231,7 +231,7 @@ const SD_ARROW       = !!CFG.SD_ARROW;
 /* ===================== 工具 & 渲染 ===================== */
 function now(){ return new Date().toTimeString().split(' ')[0]; }
 function isIPv4(ip){ return /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/.test(ip||''); }
-function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,6}:[0-9a-fA-F]{1,4}){1}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
+function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,6}:[0-9a-fA-F]{1,4}){1}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
 function isIP(ip){ return isIPv4(ip) || isIPv6(ip); }
 
 function maskIP(ip){
@@ -379,7 +379,7 @@ async function getLandingV4(p){
     return await l_ipapi();
   }catch(_){ try{return await l_ipapi()}catch(e){} return {}; }
 }
-async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' }; }
+async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||'' }; }
 async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' }; }
 async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip');            const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',     loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' }; }
 
@@ -470,6 +470,7 @@ const SD_ALIAS = {
   'netflix':'netflix',
   'disney':'disney',
   'disney+':'disney',
+  // 约定：App 在前（chatgpt_app 显示“ChatGPT”），Web 在后（chatgpt_web 显示“ChatGPT Web”）
   'chatgpt':'chatgpt_app',
   'gpt':'chatgpt_app',
   'openai':'chatgpt_app',
@@ -483,7 +484,7 @@ const SD_ALIAS = {
   'max':'hbo'
 };
 
-// 解析文本：优先 JSON 数组；否则按多种分隔符切分
+// 解析文本：优先 JSON 数组；否则按多种分隔符切分（含中文逗号）
 function parseServices(raw){
   if (raw == null) return [];
   let s = String(raw).trim();
@@ -495,7 +496,7 @@ function parseServices(raw){
     if (Array.isArray(arr)) return normSvcList(arr);
   } catch(_) {}
 
-  // 2) 退化为“分隔符”解析：逗号（中/英）、分号、竖线、斜杠、空白、换行都可
+  // 2) 退化为“分隔符”解析：英文/中文逗号、分号、竖线、斜杠、空白、换行
   const parts = s.split(/[,\uFF0C;\|/ \t\r\n]+/);
   return normSvcList(parts);
 }
@@ -670,13 +671,15 @@ function sd_parseNFRegion(resp) {
     if (x) {
       const seg = String(x).split("/");
       if (seg.length >= 4) {
-        const cc = seg[3].split("-")[0];
-        if (/^[A-Z]{2}$/i.test(cc)) return cc.toUpperCase();
+        const cc = seg[3].split("-)[0]; // 防御式：下面再用正则
       }
     }
+  } catch(_) {}
+  try {
     const m = String(resp.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
     if (m) return m[1].toUpperCase();
   } catch(_){}
+  // 兜底失败
   return "";
 }
 
@@ -824,7 +827,7 @@ async function sd_queryLandingCCMulti(){
   return "";
 }
 
-/* —— 渲染 —— */
+/* —— 渲染（含 text 样式无箭头时“区域:”句式） —— */
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
   const icon = sd_pickIcons(SD_ICON_THEME)[st];
@@ -832,7 +835,8 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const regionChunk = cc ? sd_ccPretty(cc) : "";
   const regionText  = regionChunk || "-";
 
-  const stateText = (()=>{
+  // 简短状态文案（用于 icon 样式或 text+arrow）
+  const stateTextShort = (()=>{
     if (SD_LANG==='zh-Hant'){
       if (st==='full') return '已解鎖';
       if (st==='partial') return '部分解鎖';
@@ -844,29 +848,41 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     }
   })();
 
-  if (SD_STYLE === "text") {
-    const left  = `${name}: ${stateText}`;
-    const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
+  // text 样式、且不使用箭头时的长文案
+  const stateTextLong = (()=>{
+    const hans = { full:'已完整解锁', partial:'仅解锁自制剧', blocked:'不可达' };
+    const hant = { full:'已完整解鎖', partial:'僅解鎖自製劇', blocked:'不可達' };
+    const dict = (SD_LANG==='zh-Hant') ? hant : hans;
+    if (st==='full') return dict.full;
+    if (st==='partial') return dict.partial;
+    return dict.blocked;
+  })();
 
-    const tail = [
-      tag ? `标注：${tag}` : "",
-      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
-      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-    ].filter(Boolean).join(" ｜ ");
-
-    return tail ? `${head} ｜ ${tail}` : head;
-  }
-
-  const head = SD_ARROW
-    ? `${icon} ${name} ➟ ${regionText}`
-    : `${icon} ${name} ｜ ${regionText}`;
-
+  // 额外尾巴（可选）：延迟 / HTTP / 保留旧 tag
   const tail = [
     tag || "",
     (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
     (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
   ].filter(Boolean).join(" ｜ ");
 
+  // text 样式
+  if (SD_STYLE === "text") {
+    if (SD_ARROW) {
+      // 旧“箭头”风格
+      const left  = `${name}: ${stateTextShort}`;
+      const head  = `${left} ➟ ${regionText}`;
+      return tail ? `${head} ｜ ${tail}` : head;
+    } else {
+      // 新：不用箭头 -> “服务名: 状态，区域: XXX”
+      const head = `${name}: ${stateTextLong}，区域: ${regionText}`;
+      return tail ? `${head} ｜ ${tail}` : head;
+    }
+  }
+
+  // icon 样式保持不变
+  const head = SD_ARROW
+    ? `${icon} ${name} ➟ ${regionText}`
+    : `${icon} ${name} ｜ ${regionText}`;
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
