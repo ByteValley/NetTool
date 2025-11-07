@@ -1,25 +1,28 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley (merged & patched by ChatGPT)
+ * - 优先级（统一）：BoxJS > 模块 #!arguments > 代码默认
  * - 标题显示“网络类型”；第一行显示“代理策略”
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
- * - 服务检测并发执行 + 自定义服务清单（多选/逗号字符串皆可）
+ * - 服务检测并发执行：
+ *   · BoxJS：文本 NetworkInfo_SERVICES（JSON 数组/逗号字符串）或方形勾选布尔项（最高优先）
+ *   · 模块参数：SERVICES=逗号/JSON 数组（次优先）
+ *   · 两者都无 → 检测全部
  * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 入口/策略获取：预触发落地请求→重试(指数退避)→任意代理请求兜底
  * - 脚本接管图标 Icon / IconColor
- * - 新增：
+ * - 可调：
  *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
  *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
  *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
  *   · ChatGPT App(API) 地区多源回退，优先 CF 头
- *   · SERVICES：服务清单（支持 BoxJS 多选数组或逗号字符串）
  * =======================================================*/
 
 /* ===== Compat shim: Surge / Loon / QuanX / BoxJS ===== */
 const readKV = k => {
-  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k); // Surge/Loon
-  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);                // QuanX
+  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k);
+  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);
   try { return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null; } catch (_) { return null; }
 };
 
@@ -87,7 +90,7 @@ const CFG = {
 
   SD_TIMEOUT_MS: (() => {
     const raw = readKV(K('SD_TIMEOUT_MS')) ?? $args.SD_TIMEOUT_MS;
-    const fallback = TIMEOUT * 1000;            // 不再自引用 CFG
+    const fallback = TIMEOUT * 1000;
     if (raw === '' || raw === undefined || raw === null) return fallback;
     return toNum(raw, fallback);
   })(),
@@ -96,26 +99,31 @@ const CFG = {
   SD_ICON_THEME:  readKV(K('SD_ICON_THEME'))  ?? $args.SD_ICON_THEME  ?? 'check',
   SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true),
 
-  // 新增：服务清单（BoxJS 多选数组或逗号字符串）
-  SERVICES:       readKV(K('SERVICES')) ?? $args.SERVICES ?? ""
+  // 文本优先（但以 BoxJS 为最高优先）：先 BoxJS 文本，再 BoxJS 勾选，再 arguments 文本
+  SERVICES_BOX_TEXT: (()=>{
+    const box = readKV(K('SERVICES'));
+    return (box != null && String(box).trim() !== '') ? String(box) : '';
+  })(),
+  SERVICES_ARG_TEXT: (()=>{
+    const arg = $args.SERVICES;
+    return (arg != null && String(arg).trim() !== '') ? String(arg) : '';
+  })()
 };
 
-/* —— 运行时映射（统一用 CFG.*，确保 BoxJS/#!arguments 生效） —— */
-const ICON_NAME   = CFG.Icon;
-const ICON_COLOR  = CFG.IconColor;
+/* —— 运行时映射 —— */
+const ICON_NAME  = CFG.Icon;
+const ICON_COLOR = CFG.IconColor;
 
-const IPv6_ON     = !!CFG.Ipv6 || !!CFG.IPv6; // 兼容大小写
-const MASK_IP     = !!CFG.MASK_IP;
-// 没设 MASK_POS 时，跟随 MASK_IP
-const MASK_POS    = (typeof CFG.MASK_POS === 'boolean') ? CFG.MASK_POS : !!CFG.MASK_IP;
+const IPv6_ON  = !!CFG.IPv6; // 统一大小写
+const MASK_IP  = !!CFG.MASK_IP;
+const MASK_POS = (typeof CFG.MASK_POS === 'boolean') ? CFG.MASK_POS : !!CFG.MASK_IP;
 
-// 统一为数字：0/1/2
 const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
 
-const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;   // ipip|cip|163|bilibili|126|pingan
-const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;   // ddnspod|neu6
-const LANDING_IPv4  = CFG.LANDING_IPv4;    // ipapi|ipwhois|ipsb
-const LANDING_IPv6  = CFG.LANDING_IPv6;    // ipsb|ident|ipify
+const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;
+const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;
+const LANDING_IPv4  = CFG.LANDING_IPv4;
+const LANDING_IPv6  = CFG.LANDING_IPv6;
 
 /* —— 服务检测参数 —— */
 const SD_STYLE       = (String(CFG.SD_STYLE).toLowerCase()==='text') ? 'text' : 'icon';
@@ -123,7 +131,6 @@ const SD_SHOW_LAT    = !!CFG.SD_SHOW_LAT;
 const SD_SHOW_HTTP   = !!CFG.SD_SHOW_HTTP;
 const SD_LANG        = (String(CFG.SD_LANG).toLowerCase()==='zh-hant') ? 'zh-Hant' : 'zh-Hans';
 
-// 超时：优先用 CFG.SD_TIMEOUT_MS；否则用 Timeout×1000；给个下限
 const SD_TIMEOUT_MS  = (() => {
   const v = Number(CFG.SD_TIMEOUT_MS);
   const fallback = (Number(CFG.Timeout) || 8) * 1000;
@@ -136,38 +143,30 @@ const SD_ARROW       = !!CFG.SD_ARROW;
 
 /* ===================== 主流程 ===================== */
 ;(async () => {
-  // —— 轻触发一次落地以写日志（不阻塞，短超时）
   const preTouch = touchLandingOnceQuick().catch(()=>{});
 
-  // —— 直连
   const [cn, cn6] = await Promise.all([
     getDirectV4(DOMESTIC_IPv4).catch(()=>({})),
     IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch(()=>({})) : Promise.resolve({})
   ]);
 
-  // —— 最近请求：策略名 & 入口 IP（带重试/兜底）
-  await preTouch; // 尽量等下，帮助 recent 写好
+  await preTouch;
   const { policyName, entranceIP } = await getPolicyAndEntranceRetry(4, 220);
 
-  // —— 入口：国内/国际双源
   const ent = isIP(entranceIP||'') ? await getEntranceBundle(entranceIP).catch(()=>({ ip: entranceIP })) : {};
 
-  // —— 落地
   const [px, px6] = await Promise.all([
     getLandingV4(LANDING_IPv4).catch(()=>({})),
     IPv6_ON ? getLandingV6(LANDING_IPv6).catch(()=>({})) : Promise.resolve({})
   ]);
 
-  /* ===== 组装上半部分（标题=网络类型；第一行=代理策略） ===== */
   const nt = netTypeLine();
   const title = nt || `网络信息 𝕏`;
 
   const directLines = [];
-  directLines.push(`代理策略: ${policyName || '-'}`);   // 第一行
-
+  directLines.push(`代理策略: ${policyName || '-'}`);
   directLines.push(lineIP('IP', cn.ip, cn6.ip));
 
-  // 直连位置：脱敏仅旗帜 or 完整
   const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
   directLines.push(`位置: ${directLoc}`);
   if (cn.isp) directLines.push(`运营商: ${fmtISP(cn.isp, cn.loc)}`);
@@ -178,7 +177,7 @@ const SD_ARROW       = !!CFG.SD_ARROW;
     if (ent.loc1) entranceLines.push(`位置¹: ${flagFirst(ent.loc1)}`);
     if (ent.isp1) entranceLines.push(`运营商¹: ${fmtISP(ent.isp1, ent.loc1)}`);
     if (ent.loc2) entranceLines.push(`位置²: ${flagFirst(ent.loc2)}`);
-    if (ent.isp2) entranceLines.push(`运营商²: ${String(ent.isp2).trim()}`); // isp2 保留原始
+    if (ent.isp2) entranceLines.push(`运营商²: ${String(ent.isp2).trim()}`);
   }
 
   const landingLines = [
@@ -193,9 +192,8 @@ const SD_ARROW       = !!CFG.SD_ARROW;
   if (landingLines.length)  parts.push('', ...landingLines);
   parts.push(`执行时间: ${now()}`);
 
-  /* ===== 服务清单 & 并发检测 ===== */
   const sdLines = await runServiceChecks();
-  if (sdLines.length) parts.push('', ...sdLines);  // 执行时间后留一空行
+  if (sdLines.length) parts.push('', ...sdLines);
 
   const content = parts.join('\n');
   $done({ title, content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
@@ -225,7 +223,6 @@ function splitFlagRaw(s) {
   const m=String(s||'').match(re);
   let flag=m?m[0]:'';
   let text=String(s||'').replace(re,'');
-  // 统一处理台湾旗显示方案：0=🇨🇳, 2=🇼🇸（仅当原始是 🇹🇼 时替换）
   if (flag.includes('🇹🇼')) {
     if (TW_FLAG_MODE===0) flag='🇨🇳';
     else if (TW_FLAG_MODE===2) flag='🇼🇸';
@@ -247,7 +244,6 @@ function flagOf(code){
   if (/^中国$|^CN$/i.test(cc)) cc = 'CN';
   if (cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '';
   try {
-    // 对 TW 应用模式
     if (cc.toUpperCase()==='TW') {
       if (TW_FLAG_MODE===0) return '🇨🇳';
       if (TW_FLAG_MODE===2) return '🇼🇸';
@@ -262,7 +258,6 @@ function fmtISP(isp, locStr){
   const raw = String(isp || '').trim();
   if (!raw) return '';
 
-  // 仅大陆（非港澳台）才做归一化
   const txt = String(locStr || '');
   const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
   if (!isMainland) return raw;
@@ -281,8 +276,8 @@ function fmtISP(isp, locStr){
   if (/(cernet|china\s*education)/.test(s) || /教育网/.test(norm))
     return '中国教育网';
 
-  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm; // 已是标准名
-  return raw; // 兜底保留原始
+  if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
+  return raw;
 }
 
 /* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
@@ -322,12 +317,11 @@ function httpGet(url, headers={}, timeoutMs=null, followRedirect=false){
 function httpAPI(path='/v1/requests/recent'){
   return new Promise(res=>{
     if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, res);
-    else res({}); // 非 Surge 时给空对象，相关功能自动降级
+    else res({});
   });
 }
 
 /* ===================== 数据源：直连/落地/入口 ===================== */
-// —— 直连 v4
 async function getDirectV4(p){
   try{
     if (p==='cip')      return await d_cip();
@@ -345,7 +339,6 @@ async function d_bili(){ const r=await httpGet('https://api.bilibili.com/x/web-i
 async function d_126(){ const r=await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp'); const d=(JSON.parse(r.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countrySymbol), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.operator||'' }; }
 async function d_pingan(){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request'); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { ip:d.ip||'', loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
 
-// —— 直连 v6
 async function getDirectV6(p){
   try{
     if (p==='neu6'){ const r=await httpGet('https://speed.neu6.edu.cn/getIP.php'); return { ip:String(r.body||'').trim() }; }
@@ -353,7 +346,6 @@ async function getDirectV6(p){
   }catch(_){ return {}; }
 }
 
-// —— 落地 v4
 async function getLandingV4(p){
   try{
     if (p==='ipwhois') return await l_whois();
@@ -365,7 +357,6 @@ async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-
 async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' }; }
 async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip');            const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',     loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' }; }
 
-// —— 落地 v6
 async function getLandingV6(p){
   try{
     if (p==='ident'){ const r=await httpGet('https://v6.ident.me'); return { ip:String(r.body||'').trim() }; }
@@ -389,7 +380,6 @@ function extractIP(str){
   return '';
 }
 
-// 轻触发一次落地：短超时+不跟随跳转（快速写日志）
 async function touchLandingOnceQuick(){
   try { await httpGet('http://ip-api.com/json?lang=zh-CN', {}, 700, true); } catch(_) {}
 }
@@ -403,7 +393,6 @@ async function getPolicyAndEntranceOnce(){
   return { policyName: hit.policyName || '', entranceIP: ip || '' };
 }
 
-// 兜底：从“任意代理请求”里拿策略名/入口
 async function getAnyProxyPolicyFromRecent(){
   const data = await httpAPI('/v1/requests/recent');
   const reqs = Array.isArray(data?.requests) ? data.requests : [];
@@ -412,12 +401,11 @@ async function getAnyProxyPolicyFromRecent(){
   return { policyName: hit.policyName, entranceIP: extractIP(hit.remoteAddress) };
 }
 
-// 带重试的综合获取（策略名 + 入口 IP）
 async function getPolicyAndEntranceRetry(times=4, baseDelay=200){
   for (let i=0; i<times; i++){
     const r = await getPolicyAndEntranceOnce().catch(()=>({}));
     if ((r?.entranceIP && isIP(r.entranceIP)) || r?.policyName) return r;
-    if (i === Math.floor(times/2)) await touchLandingOnceQuick();   // 中途再触发一次
+    if (i === Math.floor(times/2)) await touchLandingOnceQuick();
     if (i < times - 1) await sleep(baseDelay * Math.pow(1.6, i));
   }
   const any = await getAnyProxyPolicyFromRecent().catch(()=>({}));
@@ -433,34 +421,68 @@ async function getEntranceBundle(ip){
 async function loc_pingan(ip){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip='+encodeURIComponent(ip)); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
 async function loc_ipapi(ip){ const r=await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`); const j=JSON.parse(r.body||'{}'); return { loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' }; }
 
-/* ===================== 服务清单解析 & 各服务测试 ===================== */
-// —— 多选/字符串兼容 —— //
-const SD_DEFAULT_ORDER = ['youtube','netflix','disney','chatgpt_web','chatgpt_app','hulu_us','hulu_jp','hbo'];
+/* ===================== 服务清单解析 & 检测 ===================== */
+const SD_TESTS_MAP = {
+  youtube:      () => sd_testYouTube(),
+  netflix:      () => sd_testNetflix(),
+  disney:       () => sd_testDisney(),
+  chatgpt_web:  () => sd_testChatGPTWeb(),
+  chatgpt_app:  () => sd_testChatGPTAppAPI(),
+  hulu_us:      () => sd_testHuluUS(),
+  hulu_jp:      () => sd_testHuluJP(),
+  hbo:          () => sd_testHBO()
+};
+const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 
+// 解析文本：优先支持 JSON 数组，其次逗号字符串
 function parseServices(raw){
-  if (raw == null || raw === "") return []; // 留空=全开（由 runServiceChecks 兜底）
-  // 尝试 JSON 数组
+  if (raw == null) return [];
+  const s = String(raw).trim();
+  if (!s) return [];
   try {
-    const arr = JSON.parse(raw);
+    const arr = JSON.parse(s);
     if (Array.isArray(arr)) {
-      const out = [];
-      for (let i=0;i<arr.length;i++){
-        const s = String(arr[i] ?? '').trim().toLowerCase();
-        if (s && !out.includes(s)) out.push(s);
-      }
-      if (out.length) return out;
+      const out=[]; arr.forEach(x=>{ const k=String(x||'').trim().toLowerCase(); if(k && !out.includes(k)) out.push(k); });
+      return out;
     }
   } catch(_) {}
-  // 逗号字符串
-  const out2 = [];
-  String(raw).split(',').forEach(x=>{
-    const s = String(x||'').trim().toLowerCase();
-    if (s && !out2.includes(s)) out2.push(s);
-  });
+  const out2=[];
+  s.split(',').forEach(x=>{ const k=String(x||'').trim().toLowerCase(); if(k && !out2.includes(k)) out2.push(k); });
   return out2;
 }
 
-// —— 工具
+// 读取勾选布尔项（BoxJS）
+function readCheckedServices(){
+  const map = {
+    youtube:      K('SVC_YOUTUBE'),
+    netflix:      K('SVC_NETFLIX'),
+    disney:       K('SVC_DISNEY'),
+    chatgpt_web:  K('SVC_CHATGPT_WEB'),
+    chatgpt_app:  K('SVC_CHATGPT_APP'),
+    hulu_us:      K('SVC_HULU_US'),
+    hulu_jp:      K('SVC_HULU_JP'),
+    hbo:          K('SVC_HBO')
+  };
+  return Object.entries(map)
+    .filter(([, key]) => toBool(readKV(key), false))
+    .map(([k]) => k);
+}
+
+// 统一选择逻辑（优先级：BoxJS 文本 > BoxJS 勾选 > arguments 文本 > 全部）
+function selectServices(){
+  const boxText = parseServices(CFG.SERVICES_BOX_TEXT);
+  if (boxText.length) return boxText.filter(k => SD_TESTS_MAP[k]);
+
+  const checked = readCheckedServices();
+  if (checked.length) return checked.filter(k => SD_TESTS_MAP[k]);
+
+  const argText = parseServices(CFG.SERVICES_ARG_TEXT);
+  if (argText.length) return argText.filter(k => SD_TESTS_MAP[k]);
+
+  return SD_DEFAULT_ORDER.slice();
+}
+
+/* —— 请求工具（服务检测） —— */
 function sd_now(){ return Date.now(); }
 const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const SD_BASE_HEADERS = { "User-Agent": SD_UA, "Accept-Language": "en" };
@@ -494,7 +516,7 @@ function sd_httpPost(url, headers={}, body="") {
   });
 }
 
-// —— 台湾旗模式（服务检测用）
+// —— 台湾旗模式（服务检测渲染用）——
 function sd_flagFromCC(cc){
   cc = (cc||'').toUpperCase();
   if (!/^[A-Z]{2}$/.test(cc)) return '';
@@ -508,7 +530,6 @@ function sd_flagFromCC(cc){
   } catch { return ''; }
 }
 
-// —— 地区名称表
 const SD_CC_NAME = {
   "zh-Hans": { CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
     SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚",
@@ -522,9 +543,9 @@ const SD_CC_NAME = {
 
 function sd_ccPretty(cc){
   cc = (cc||'').toUpperCase();
-  if (!cc) return "—";
   const flag = sd_flagFromCC(cc);
   const name = SD_CC_NAME[cc];
+  if (!cc) return "—";
   if (SD_REGION_MODE==='flag') return flag || "—";
   if (SD_REGION_MODE==='abbr') return (flag||'') + cc;
   if (flag && name) return `${flag} ${cc} | ${name}`;
@@ -594,7 +615,6 @@ async function sd_testChatGPTWeb() {
 async function sd_testChatGPTAppAPI() {
   const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:SD_I18N.unreachable});
-  // 优先读取 CF 头
   let cc = "";
   try {
     const h = r.headers || {};
@@ -722,7 +742,7 @@ async function sd_queryLandingCCMulti(){
 /* —— 渲染 —— */
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
-  const icon = SD_ICONS[st];
+  const icon = sd_pickIcons(SD_ICON_THEME)[st];
 
   const regionChunk = cc ? sd_ccPretty(cc) : "";
   const regionText  = regionChunk || "-";
@@ -765,24 +785,12 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
-/* —— 运行队列（按服务清单顺序并发） —— */
-const SD_TESTS_MAP = {
-  youtube:      () => sd_testYouTube(),
-  netflix:      () => sd_testNetflix(),
-  disney:       () => sd_testDisney(),
-  chatgpt_web:  () => sd_testChatGPTWeb(),
-  chatgpt_app:  () => sd_testChatGPTAppAPI(),
-  hulu_us:      () => sd_testHuluUS(),
-  hulu_jp:      () => sd_testHuluJP(),
-  hbo:          () => sd_testHBO()
-};
-
+/* —— 运行队列 —— */
 async function runServiceChecks(){
   try{
-    const sel = parseServices(CFG.SERVICES);
-    const order = (sel.length ? sel : SD_DEFAULT_ORDER).filter(k => SD_TESTS_MAP[k]);
+    const order = selectServices();
     if (!order.length) return [];
-    const tasks = order.map(k => SD_TESTS_MAP[k]());
+    const tasks = order.map(k => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
     const lines = await Promise.all(tasks);
     return lines.filter(Boolean);
   }catch(_){
