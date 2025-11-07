@@ -1,9 +1,10 @@
 /**
- * 节日倒数（3行：法定 | 节气 | 民俗）· 可外链标题/祝词库
+ * 节日倒数（4行：法定 | 节气 | 民俗 | 国际）· 可外链标题/祝词库
  * 第1行：最近3个【法定节假日】：元旦/春节/清明/劳动/端午/中秋/国庆
  * 第2行：最近3个【二十四节气】
- * 第3行：最近3个【传统民俗（非法定）】：元宵/龙抬头/七夕/中元/重阳/寒衣/下元/腊八/小年(南/北)/除夕等
- * 正日 06:00 后单次祝词通知（仅“节日类”，即法定+民俗；不对节气）
+ * 第3行：最近3个【传统民俗（非法定）】：除夕/元宵/龙抬头/七夕/中元/重阳/寒衣/下元/腊八/小年(南/北)…
+ * 第4行：最近3个【国际/洋节】：情人节/母亲节/父亲节/万圣节/平安夜/圣诞节/感恩节(美) 等
+ * 正日 06:00 后单次祝词通知（仅“节日类”，即法定+民俗；不对节气与国际）
  *
  * 参数（通过模块 argument 传入）：
  *  - TITLES_URL: 标题库外链(JSON数组)，支持占位符 {lunar} {solar} {next}
@@ -64,7 +65,6 @@ const titleSolar = `${lunarNow.cMonth}月${lunarNow.cDay}日（${lunarNow.astro}
 const titleLunar = `${lunarNow.IMonthCn}${lunarNow.IDayCn} • ${lunarNow.gzYear}年${lunarNow.gzMonth}${lunarNow.gzDay} • ${lunarNow.Animal}年`;
 
 /* ========== 生成集合 ========== */
-// 清明（法定）是“节气第7项”，这里在“法定集”计算；节气行仍保留“清明”作为节气名，但不参与提醒
 function nthWeekdayOfMonth(year, month, weekday, n) {
   const first = new Date(year, month-1, 1);
   const firstW = first.getDay();
@@ -74,7 +74,7 @@ function nthWeekdayOfMonth(year, month, weekday, n) {
 function lunarNewYearEveSolar(year) {
   const days12 = calendar.monthDays(year, 12);
   const lday = days12 === 29 ? 29 : 30;
-  return calendar.lunar2solar(year, 12, lday).date; // 除夕（民俗）
+  return calendar.lunar2solar(year, 12, lday).date;
 }
 function solarTerms(year) {
   const names = calendar.solarTerm, out = [];
@@ -86,21 +86,19 @@ function solarTerms(year) {
   out.sort((a,b)=> new Date(a[1]) - new Date(b[1]));
   return out;
 }
-
-// 法定节假日（按大陆常见口径）
+// 法定（大陆常用七大）
 function legalFest(year) {
   return [
     ["元旦", fmtYMD(year,1,1)],
     ["春节", calendar.lunar2solar(year, 1, 1).date],
-    ["清明节", fmtYMD(year,4, calendar.getTerm(year, 7))], // 节气-清明
+    ["清明节", fmtYMD(year,4, calendar.getTerm(year, 7))],
     ["劳动节", fmtYMD(year,5,1)],
     ["端午节", calendar.lunar2solar(year, 5, 5).date],
     ["中秋节", calendar.lunar2solar(year, 8, 15).date],
     ["国庆节", fmtYMD(year,10,1)]
   ].sort((a,b)=> new Date(a[1]) - new Date(b[1]));
 }
-
-// 民俗节日（非法定）：排除 春节/端午/中秋/清明
+// 民俗（非法定）
 function folkFest(year) {
   const base = [
     ["除夕",    lunarNewYearEveSolar(year)],
@@ -117,6 +115,18 @@ function folkFest(year) {
   ];
   return base.sort((a,b)=> new Date(a[1]) - new Date(b[1]));
 }
+// 国际/洋节（公历，排除“法定七大”；母/父亲节用周序）
+function intlFest(year) {
+  return [
+    ["情人节", fmtYMD(year,2,14)],
+    ["母亲节", nthWeekdayOfMonth(year,5,0,2)],   // 5月第2个周日
+    ["父亲节", nthWeekdayOfMonth(year,6,0,3)],   // 6月第3个周日
+    ["万圣节", fmtYMD(year,10,31)],
+    ["平安夜", fmtYMD(year,12,24)],
+    ["圣诞节", fmtYMD(year,12,25)],
+    ["感恩节(美)", nthWeekdayOfMonth(year,11,4,4)] // 11月第4个周四
+  ].sort((a,b)=> new Date(a[1]) - new Date(b[1]));
+}
 
 /* ========== 合并两年并取最近三项 ========== */
 function nextTrip(list) {
@@ -126,18 +136,20 @@ function nextTrip(list) {
   if (take.length < 3) take.push(...list.slice(0, 3 - take.length));
   return take;
 }
-
 const TERMS = [...solarTerms(y), ...solarTerms(nextY)];
 const LEGAL = [...legalFest(y), ...legalFest(nextY)];
 const FOLK  = [...folkFest(y) , ...folkFest(nextY)];
+const INTL  = [...intlFest(y) , ...intlFest(nextY)];
 
 const T3 = nextTrip(TERMS);
 const L3 = nextTrip(LEGAL);
 const F3 = nextTrip(FOLK);
+const I3 = nextTrip(INTL);
 
 const dT0 = dateDiff(todayStr, T3[0][1]), dT1 = dateDiff(todayStr, T3[1][1]), dT2 = dateDiff(todayStr, T3[2][1]);
 const dL0 = dateDiff(todayStr, L3[0][1]), dL1 = dateDiff(todayStr, L3[1][1]), dL2 = dateDiff(todayStr, L3[2][1]);
 const dF0 = dateDiff(todayStr, F3[0][1]), dF1 = dateDiff(todayStr, F3[1][1]), dF2 = dateDiff(todayStr, F3[2][1]);
+const dI0 = dateDiff(todayStr, I3[0][1]), dI1 = dateDiff(todayStr, I3[1][1]), dI2 = dateDiff(todayStr, I3[2][1]);
 
 /* ========== 外链标题/祝词库 ========== */
 const args = parseArgs();
@@ -166,7 +178,6 @@ const defaultBless = {
   "小年(北)":"尘旧一扫，迎新纳福。","小年(南)":"净灶迎福，诸事顺遂。",
   "除夕":"爆竹一声除旧岁，欢喜团圆迎新春。"
 };
-
 const titlesArr = await fetchJson(args.TITLES_URL, defaultTitles);
 const blessMap  = await fetchJson(args.BLESS_URL , defaultBless);
 
@@ -182,7 +193,7 @@ function pickTitle(nextName, daysToNext) {
     .replaceAll("{next}", nextName ? `下一个：${nextName}` : "");
 }
 
-/* ========== 正日提醒（仅节日：法定+民俗；06:00 后每日一次） ========== */
+/* ========== 正日提醒（仅法定+民俗；06:00 后每日一次） ========== */
 function notifyIfToday(name, date) {
   if (dateDiff(todayStr, date) === 0 && tnow.getHours() >= 6) {
     const key = "timecardpushed_"+date;
@@ -196,26 +207,27 @@ function notifyIfToday(name, date) {
 notifyIfToday(L3[0][0], L3[0][1]);
 notifyIfToday(F3[0][0], F3[0][1]);
 
-/* ========== 三行面板输出：法定 | 节气 | 民俗 ========== */
-function render3(label0, a0, a1, a2, d0, d1, d2) {
+/* ========== 四行面板输出：法定 | 节气 | 民俗 | 国际 ========== */
+function render3(a0, a1, a2, d0, d1, d2) {
   return (d0 === 0)
     ? `今天：${a0[0]} | ${a1[0]}${d1}天 | ${a2[0]}${d2}天`
     : `${a0[0]}${d0}天 | ${a1[0]}${d1}天 | ${a2[0]}${d2}天`;
 }
+const lineLegal = render3(L3[0], L3[1], L3[2], dL0, dL1, dL2);
+const lineTerm  = render3(T3[0], T3[1], T3[2], dT0, dT1, dT2);
+const lineFolk  = render3(F3[0], F3[1], F3[2], dF0, dF1, dF2);
+const lineIntl  = render3(I3[0], I3[1], I3[2], dI0, dI1, dI2);
 
-const lineLegal = render3("法定", L3[0], L3[1], L3[2], dL0, dL1, dL2);
-const lineTerm  = render3("节气", T3[0], T3[1], T3[2], dT0, dT1, dT2);
-const lineFolk  = render3("民俗", F3[0], F3[1], F3[2], dF0, dF1, dF2);
-
-// 标题依据“最近的节日”（法定与民俗中更近者）
-const nearestFest = (dL0 <= dF0) ? L3[0] : F3[0];
-const nearestDays = Math.min(dL0, dF0);
+// 标题依据“最近的节日”（法定/民俗/国际 三类中最近者；不考虑节气）
+let nearest = [L3[0], dL0];
+if (dF0 < nearest[1]) nearest = [F3[0], dF0];
+if (dI0 < nearest[1]) nearest = [I3[0], dI0];
 
 /* 固定橙色日历图标 */
 $done({
-  title: pickTitle(nearestFest[0], nearestDays),
+  title: pickTitle(nearest[0][0], nearest[1]),
   icon: "calendar",
   "icon-color": "#FF9800",
-  content: `${lineLegal}\n\n${lineTerm}\n\n${lineFolk}`
+  content: `${lineLegal}\n\n${lineTerm}\n\n${lineFolk}\n\n${lineIntl}`
 });
 })();
