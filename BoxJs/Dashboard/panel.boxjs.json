@@ -1,6 +1,6 @@
 {
   "id": "ByteValley.boxjs",
-  "name": "ByteValley Apps",
+  "name": "功能看板",
   "author": "ByteValley",
   "apps": [
     {
@@ -146,7 +146,7 @@
           "items": [
             { "key": "full", "label": "🇯🇵 JP | 日本" },
             { "key": "abbr", "label": "🇯🇵JP" },
-            { "key": "flag", "label": "仅旗帜" }
+            { "key": "flag", "label": "🇯🇵" }
           ]
         },
 
