@@ -35,104 +35,173 @@
         "NetworkInfo_SD_ARROW"
       ],
       "settings": [
-        { "id": "NetworkInfo_Update",     "name": "刷新间隔（秒）",            "type": "number",  "val": 10 },
-        { "id": "NetworkInfo_Timeout",    "name": "脚本超时（秒）",            "type": "number",  "val": 8  },
-
-        { "id": "NetworkInfo_MASK_IP",    "name": "IP 脱敏（直连）",          "type": "boolean", "val": true  },
-        { "id": "NetworkInfo_MASK_POS",   "name": "直连位置脱敏",              "type": "boolean", "val": true  },
-        { "id": "NetworkInfo_IPv6",       "name": "启用 IPv6",                "type": "boolean", "val": false },
-
         {
-          "id": "NetworkInfo_DOMESTIC_IPv4", "name": "国内 IPv4 源",         "type": "selects", "val": "ipip",
+          "id": "NetworkInfo_Update",
+          "name": "刷新间隔（秒）",
+          "type": "number",
+          "val": 10
+        },
+        {
+          "id": "NetworkInfo_Timeout",
+          "name": "脚本超时（秒）",
+          "type": "number",
+          "val": 8
+        },
+        {
+          "id": "NetworkInfo_MASK_IP",
+          "name": "IP 脱敏（直连）",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "NetworkInfo_MASK_POS",
+          "name": "直连位置脱敏",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "NetworkInfo_IPv6",
+          "name": "启用 IPv6",
+          "type": "boolean",
+          "val": false
+        },
+        {
+          "id": "NetworkInfo_DOMESTIC_IPv4",
+          "name": "国内 IPv4 源",
+          "type": "selects",
+          "val": "ipip",
           "items": [
-            { "key": "ipip",     "label": "ipip.net" },
-            { "key": "cip",      "label": "cip.cc" },
-            { "key": "163",      "label": "网易 163" },
+            { "key": "ipip", "label": "ipip.net" },
+            { "key": "cip", "label": "cip.cc" },
+            { "key": "163", "label": "网易 163" },
             { "key": "bilibili", "label": "bilibili" },
-            { "key": "126",      "label": "网易 126" },
-            { "key": "pingan",   "label": "平安 pingan" }
+            { "key": "126", "label": "网易 126" },
+            { "key": "pingan", "label": "平安 pingan" }
           ]
         },
         {
-          "id": "NetworkInfo_DOMESTIC_IPv6", "name": "国内 IPv6 源",         "type": "selects", "val": "ddnspod",
+          "id": "NetworkInfo_DOMESTIC_IPv6",
+          "name": "国内 IPv6 源",
+          "type": "selects",
+          "val": "ddnspod",
           "items": [
             { "key": "ddnspod", "label": "DNSPod" },
-            { "key": "neu6",    "label": "东北大学 NEU6" }
+            { "key": "neu6", "label": "东北大学 NEU6" }
           ]
         },
-
         {
-          "id": "NetworkInfo_LANDING_IPv4",  "name": "落地 IPv4 源",         "type": "selects", "val": "ipapi",
+          "id": "NetworkInfo_LANDING_IPv4",
+          "name": "落地 IPv4 源",
+          "type": "selects",
+          "val": "ipapi",
           "items": [
-            { "key": "ipapi",   "label": "ipapi.co" },
+            { "key": "ipapi", "label": "ipapi.co" },
             { "key": "ipwhois", "label": "ipwho.is" },
-            { "key": "ipsb",    "label": "ip.sb" }
+            { "key": "ipsb", "label": "ip.sb" }
           ]
         },
         {
-          "id": "NetworkInfo_LANDING_IPv6",  "name": "落地 IPv6 源",         "type": "selects", "val": "ipsb",
+          "id": "NetworkInfo_LANDING_IPv6",
+          "name": "落地 IPv6 源",
+          "type": "selects",
+          "val": "ipsb",
           "items": [
-            { "key": "ipsb",   "label": "ip.sb" },
-            { "key": "ident",  "label": "ident.me" },
-            { "key": "ipify",  "label": "ipify.org" }
+            { "key": "ipsb", "label": "ip.sb" },
+            { "key": "ident", "label": "ident.me" },
+            { "key": "ipify", "label": "ipify.org" }
           ]
         },
-
         {
-  "id": "NetworkInfo_TW_FLAG_MODE",
-  "name": "台湾旗帜模式",
-  "type": "selects",
-  "val": "1",
-  "items": [
-    { "key": "0", "label": "🇨🇳 CN | 中国" },
-    { "key": "1", "label": "🇹🇼 TW | 台湾" },
-    { "key": "2", "label": "🇼🇸 WS | 萨摩亚（占位）" }
-  ],
-  "desc": "影响台湾地区显示时的旗帜样式"
-}
-
-        { "id": "NetworkInfo_Icon",         "name": "面板图标名（SF Symbols）","type": "text",    "val": "globe.asia.australia" },
-        { "id": "NetworkInfo_IconColor",    "name": "面板图标颜色（HEX）",      "type": "text",    "val": "#1E90FF" },
-
+          "id": "NetworkInfo_TW_FLAG_MODE",
+          "name": "台湾旗帜模式",
+          "type": "selects",
+          "val": "1",
+          "items": [
+            { "key": "0", "label": "🇨🇳 CN | 中国" },
+            { "key": "1", "label": "🇹🇼 TW | 台湾" },
+            { "key": "2", "label": "🇼🇸 WS | 萨摩亚（占位）" }
+          ],
+          "desc": "影响台湾地区显示时的旗帜样式"
+        },
         {
-          "id": "NetworkInfo_SD_STYLE",      "name": "服务检测样式",          "type": "selects", "val": "icon",
+          "id": "NetworkInfo_Icon",
+          "name": "面板图标名（SF Symbols）",
+          "type": "text",
+          "val": "globe.asia.australia"
+        },
+        {
+          "id": "NetworkInfo_IconColor",
+          "name": "面板图标颜色（HEX）",
+          "type": "text",
+          "val": "#1E90FF"
+        },
+        {
+          "id": "NetworkInfo_SD_STYLE",
+          "name": "服务检测样式",
+          "type": "selects",
+          "val": "icon",
           "items": [
             { "key": "icon", "label": "图标样式" },
             { "key": "text", "label": "文字样式" }
           ]
         },
-        { "id": "NetworkInfo_SD_SHOW_LAT",  "name": "显示延迟（Latency）",    "type": "boolean", "val": true  },
-        { "id": "NetworkInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码",          "type": "boolean", "val": true  },
-
         {
-          "id": "NetworkInfo_SD_LANG",       "name": "服务检测语言",          "type": "selects", "val": "zh-Hans",
+          "id": "NetworkInfo_SD_SHOW_LAT",
+          "name": "显示延迟（Latency）",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "NetworkInfo_SD_SHOW_HTTP",
+          "name": "显示 HTTP 码",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "NetworkInfo_SD_LANG",
+          "name": "服务检测语言",
+          "type": "selects",
+          "val": "zh-Hans",
           "items": [
             { "key": "zh-Hans", "label": "简体中文" },
             { "key": "zh-Hant", "label": "繁體中文" }
           ]
         },
-
-        { "id": "NetworkInfo_SD_TIMEOUT_MS","name": "服务检测单项超时（ms）", "type": "text",    "val": "1000", "desc": "留空则按 Timeout×1000" },
-
         {
-          "id": "NetworkInfo_SD_REGION_MODE","name": "地区显示样式",          "type": "selects", "val": "full",
+          "id": "NetworkInfo_SD_TIMEOUT_MS",
+          "name": "服务检测单项超时（ms）",
+          "type": "text",
+          "val": "1000",
+          "desc": "留空则按 Timeout×1000"
+        },
+        {
+          "id": "NetworkInfo_SD_REGION_MODE",
+          "name": "地区显示样式",
+          "type": "selects",
+          "val": "full",
           "items": [
             { "key": "full", "label": "🇯🇵 JP | 日本" },
             { "key": "abbr", "label": "🇯🇵JP" },
             { "key": "flag", "label": "仅旗帜" }
           ]
         },
-
         {
-          "id": "NetworkInfo_SD_ICON_THEME", "name": "图标主题（三态）",       "type": "selects", "val": "check",
+          "id": "NetworkInfo_SD_ICON_THEME",
+          "name": "图标主题（三态）",
+          "type": "selects",
+          "val": "check",
           "items": [
-            { "key": "check",  "label": "✅ / ❇️ / ❎" },
-            { "key": "lock",   "label": "🔓 / 🔐 / 🔒" },
+            { "key": "check", "label": "✅ / ❇️ / ❎" },
+            { "key": "lock", "label": "🔓 / 🔐 / 🔒" },
             { "key": "circle", "label": "⭕️ / ⛔️ / 🚫" }
           ]
         },
-
-        { "id": "NetworkInfo_SD_ARROW",      "name": "使用“➟”连接服务名与地区","type": "boolean", "val": true }
+        {
+          "id": "NetworkInfo_SD_ARROW",
+          "name": "使用“➟”连接服务名与地区",
+          "type": "boolean",
+          "val": true
+        }
       ]
     }
   ]
