@@ -1,0 +1,222 @@
+{
+  "id": "ByteValley.boxjs",
+  "name": "ByteValley Apps",
+  "author": "ByteValley",
+  "apps": [
+    {
+      "id": "bytevalley.common",
+      "name": "【公共】默认参数",
+      "author": "ByteValley",
+      "repo": "https://github.com/ByteValley/NetTool",
+      "descs_html": [
+        "为所有 ByteValley 模块提供<b>共享默认值</b>。",
+        "脚本取值顺序：模块键 → 公共键 → 模块参数 <code>#!arguments</code> → 代码默认。"
+      ],
+      "keys": [
+        "BV_Common_Icon",
+        "BV_Common_IconColor",
+        "BV_Common_TW_FLAG_MODE",
+        "BV_Common_Lang",
+        "BV_Common_Timeout"
+      ],
+      "settings": [
+        { "id": "BV_Common_Icon",      "name": "通用 SF Symbols 图标名", "type": "text",    "val": "globe.asia.australia" },
+        { "id": "BV_Common_IconColor", "name": "通用图标颜色（HEX）",     "type": "text",    "val": "#1E90FF" },
+        { "id": "BV_Common_TW_FLAG_MODE", "name": "通用台湾旗模式", "type": "select", "val": "1",
+          "items": [
+            { "key": "0", "label": "🇨🇳（统一显示）" },
+            { "key": "1", "label": "🇹🇼" },
+            { "key": "2", "label": "🇼🇸（自定义占位）" }
+          ]
+        },
+        { "id": "BV_Common_Lang", "name": "通用语言", "type": "select", "val": "zh-Hans",
+          "items": [
+            { "key": "zh-Hans", "label": "简体中文" },
+            { "key": "zh-Hant", "label": "繁體中文" },
+            { "key": "en",      "label": "English" }
+          ]
+        },
+        { "id": "BV_Common_Timeout", "name": "通用脚本超时（秒）", "type": "number", "val": 8 }
+      ]
+    },
+
+    {
+      "id": "bytevalley.panel.netinfo",
+      "name": "功能看板 · 网络信息",
+      "author": "ByteValley",
+      "repo": "https://github.com/ByteValley/NetTool",
+      "descs_html": [
+        "管理 <b>网络信息</b> 面板的全部参数。",
+        "优先级：模块键 <code>NetInfo_*</code> → 公共键 <code>BV_Common_*</code> → 模块参数 → 代码默认。"
+      ],
+      "keys": [
+        "NetInfo_Update",
+        "NetInfo_Timeout",
+        "NetInfo_MASK_IP",
+        "NetInfo_MASK_POS",
+        "NetInfo_IPv6",
+        "NetInfo_DOMESTIC_IPv4",
+        "NetInfo_DOMESTIC_IPv6",
+        "NetInfo_LANDING_IPv4",
+        "NetInfo_LANDING_IPv6",
+        "NetInfo_TW_FLAG_MODE",
+        "NetInfo_Icon",
+        "NetInfo_IconColor",
+        "NetInfo_SD_STYLE",
+        "NetInfo_SD_SHOW_LAT",
+        "NetInfo_SD_SHOW_HTTP",
+        "NetInfo_SD_LANG",
+        "NetInfo_SD_TIMEOUT_MS",
+        "NetInfo_SD_REGION_MODE",
+        "NetInfo_SD_ICON_THEME",
+        "NetInfo_SD_ARROW"
+      ],
+      "settings": [
+        { "id": "NetInfo_Update",    "name": "刷新间隔（秒）", "type": "number", "val": 10 },
+        { "id": "NetInfo_Timeout",   "name": "脚本超时（秒）", "type": "number", "val": 8 },
+
+        { "id": "NetInfo_MASK_IP",   "name": "IP 脱敏（直连）", "type": "boolean", "val": true },
+        { "id": "NetInfo_MASK_POS",  "name": "直连位置脱敏",     "type": "boolean", "val": true },
+        { "id": "NetInfo_IPv6",      "name": "启用 IPv6",       "type": "boolean", "val": false },
+
+        { "id": "NetInfo_DOMESTIC_IPv4", "name": "国内 IPv4 源", "type": "select", "val": "ipip",
+          "items": [
+            { "key": "ipip",     "label": "ipip.net" },
+            { "key": "cip",      "label": "cip.cc" },
+            { "key": "163",      "label": "网易 163" },
+            { "key": "bilibili", "label": "bilibili" },
+            { "key": "126",      "label": "网易 126" },
+            { "key": "pingan",   "label": "平安 pingan" }
+          ]
+        },
+        { "id": "NetInfo_DOMESTIC_IPv6", "name": "国内 IPv6 源", "type": "select", "val": "ddnspod",
+          "items": [
+            { "key": "ddnspod", "label": "DNSPod" },
+            { "key": "neu6",    "label": "东北大学 NEU6" }
+          ]
+        },
+
+        { "id": "NetInfo_LANDING_IPv4", "name": "落地 IPv4 源", "type": "select", "val": "ipapi",
+          "items": [
+            { "key": "ipapi",   "label": "ipapi.co" },
+            { "key": "ipwhois", "label": "ipwho.is" },
+            { "key": "ipsb",    "label": "ip.sb" }
+          ]
+        },
+        { "id": "NetInfo_LANDING_IPv6", "name": "落地 IPv6 源", "type": "select", "val": "ipsb",
+          "items": [
+            { "key": "ipsb",   "label": "ip.sb" },
+            { "key": "ident",  "label": "ident.me" },
+            { "key": "ipify",  "label": "ipify.org" }
+          ]
+        },
+
+        { "id": "NetInfo_TW_FLAG_MODE", "name": "台湾旗模式", "type": "select", "val": "1",
+          "items": [
+            { "key": "0", "label": "🇨🇳（统一显示）" },
+            { "key": "1", "label": "🇹🇼" },
+            { "key": "2", "label": "🇼🇸（自定义占位）" }
+          ]
+        },
+
+        { "id": "NetInfo_Icon",      "name": "面板图标名（SF Symbols）", "type": "text", "val": "globe.asia.australia" },
+        { "id": "NetInfo_IconColor", "name": "面板图标颜色（HEX）",      "type": "text", "val": "#1E90FF" },
+
+        { "id": "NetInfo_SD_STYLE",  "name": "服务检测样式", "type": "radios", "val": "icon",
+          "items": [
+            { "key": "icon", "label": "图标样式" },
+            { "key": "text", "label": "文字样式" }
+          ]
+        },
+        { "id": "NetInfo_SD_SHOW_LAT",  "name": "显示延迟（Latency）", "type": "boolean", "val": true },
+        { "id": "NetInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码",       "type": "boolean", "val": true },
+
+        { "id": "NetInfo_SD_LANG", "name": "服务检测语言", "type": "select", "val": "zh-Hans",
+          "items": [
+            { "key": "zh-Hans", "label": "简体中文" },
+            { "key": "zh-Hant", "label": "繁體中文" }
+          ]
+        },
+
+        { "id": "NetInfo_SD_TIMEOUT_MS", "name": "服务检测单项超时（ms）", "type": "text", "val": "1000",
+          "desc": "留空则按 Timeout×1000 或 BV_Common_Timeout×1000"
+        },
+
+        { "id": "NetInfo_SD_REGION_MODE", "name": "地区显示样式", "type": "radios", "val": "full",
+          "items": [
+            { "key": "full", "label": "🇯🇵 JP | 日本" },
+            { "key": "abbr", "label": "🇯🇵JP" },
+            { "key": "flag", "label": "仅旗帜" }
+          ]
+        },
+
+        { "id": "NetInfo_SD_ICON_THEME", "name": "图标主题（三态）", "type": "select", "val": "check",
+          "items": [
+            { "key": "check",  "label": "✅ / ❇️ / ❎" },
+            { "key": "lock",   "label": "🔓 / 🔐 / 🔒" },
+            { "key": "circle", "label": "⭕️ / ⛔️ / 🚫" }
+          ]
+        },
+
+        { "id": "NetInfo_SD_ARROW", "name": "使用“➟”连接服务名与地区", "type": "boolean", "val": true }
+      ]
+    },
+
+    {
+      "id": "bytevalley.panel.calendar",
+      "name": "功能看板 · 今日黄历",
+      "author": "ByteValley",
+      "repo": "https://github.com/ByteValley/NetTool",
+      "descs_html": [
+        "管理 <b>今日黄历</b> 面板参数（标题库/祝词库等）。"
+      ],
+      "keys": [
+        "Cal_TITLES_URL",
+        "Cal_BLESS_URL",
+        "Cal_LANG",
+        "Cal_HINT_9AM",
+        "Cal_NOTIFY_ON_FEST"
+      ],
+      "settings": [
+        { "id": "Cal_TITLES_URL", "name": "标题库外链（JSON 数组）", "type": "text", "val": "" },
+        { "id": "Cal_BLESS_URL",  "name": "祝词库外链（JSON 数组）", "type": "text", "val": "" },
+        { "id": "Cal_LANG",       "name": "语言", "type": "select", "val": "zh-Hans",
+          "items": [
+            { "key": "zh-Hans", "label": "简体中文" },
+            { "key": "zh-Hant", "label": "繁體中文" }
+          ]
+        },
+        { "id": "Cal_HINT_9AM",      "name": "每天 9 点提示今日宜忌", "type": "boolean", "val": true },
+        { "id": "Cal_NOTIFY_ON_FEST","name": "法定/民俗正日 06:00 单次提醒", "type": "boolean", "val": true }
+      ]
+    },
+
+    {
+      "id": "bytevalley.block.bytedance",
+      "name": "去广告 · 字节系",
+      "author": "ByteValley",
+      "repo": "https://github.com/ByteValley/NetTool",
+      "descs_html": [
+        "管理字节系去广告模块的可选项（IPv6/安全模式/日志级别等）。"
+      ],
+      "keys": [
+        "AB_Byte_ENABLE_IPV6",
+        "AB_Byte_SAFE_MODE",
+        "AB_Byte_LOG_LEVEL"
+      ],
+      "settings": [
+        { "id": "AB_Byte_ENABLE_IPV6", "name": "启用 IPv6 规则", "type": "boolean", "val": true },
+        { "id": "AB_Byte_SAFE_MODE",   "name": "安全模式（降误杀）", "type": "boolean", "val": true },
+        { "id": "AB_Byte_LOG_LEVEL",   "name": "日志级别", "type": "radios", "val": "info",
+          "items": [
+            { "key": "silent", "label": "silent" },
+            { "key": "error",  "label": "error" },
+            { "key": "warn",   "label": "warn"  },
+            { "key": "info",   "label": "info"  },
+            { "key": "debug",  "label": "debug" }
+          ]
+        }
+      ]
+    }
+  ]
+}
