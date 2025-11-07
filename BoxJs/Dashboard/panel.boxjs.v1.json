@@ -162,27 +162,27 @@
 
         {
           "id": "NetworkInfo_SERVICES",
-          "name": "服务清单（多选）",
+          "name": "服务清单（复选框多选）",
           "type": "checkboxes",
           "val": [],
           "items": [
-            { "key": "youtube",      "label": "YouTube" },
-            { "key": "netflix",      "label": "Netflix" },
-            { "key": "disney",       "label": "Disney+" },
-            { "key": "chatgpt_web",  "label": "ChatGPT Web" },
-            { "key": "chatgpt_app",  "label": "ChatGPT App(API)" },
-            { "key": "hulu_us",      "label": "Hulu(美)" },
-            { "key": "hulu_jp",      "label": "Hulu(日)" },
-            { "key": "hbo",          "label": "Max(HBO)" }
+            { "key": "youtube",     "label": "YouTube" },
+            { "key": "netflix",     "label": "Netflix" },
+            { "key": "disney",      "label": "Disney+" },
+            { "key": "chatgpt_web", "label": "ChatGPT Web" },
+            { "key": "chatgpt_app", "label": "ChatGPT App(API)" },
+            { "key": "hulu_us",     "label": "Hulu(美)" },
+            { "key": "hulu_jp",     "label": "Hulu(日)" },
+            { "key": "hbo",         "label": "Max(HBO)" }
           ],
-          "desc": "若有勾选，则以多选为准。留空则继续看下方文本或使用默认全开。"
+          "desc": "优先级最高。清空=显式为空（不会回退到历史勾选）。"
         },
         {
           "id": "NetworkInfo_SERVICES_TEXT",
-          "name": "备用文本（逗号）",
+          "name": "服务清单（文本备选）",
           "type": "text",
           "val": "",
-          "desc": "当多选为空时才读取。如：youtube,netflix,chatgpt_web"
+          "desc": "JSON 数组或逗号：如 [\"youtube\",\"netflix\"] 或 youtube,netflix。优先级次于复选框，高于 arguments。"
         }
       ]
     }
