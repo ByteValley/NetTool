@@ -102,7 +102,7 @@ const SD_TIMEOUT_MS = (()=>{
     if (ent.loc1) entranceLines.push(`位置¹: ${flagFirst(ent.loc1)}`);
     if (ent.isp1) entranceLines.push(`运营商¹: ${fmtISP(ent.isp1, ent.loc1)}`);
     if (ent.loc2) entranceLines.push(`位置²: ${flagFirst(ent.loc2)}`);
-    if (ent.isp2) entranceLines.push(`运营商²: ${fmtISP(ent.isp2, ent.loc2)}`);
+    if (ent.isp2) entranceLines.push(`运营商²: ${String(ent.isp2).trim()}`);
   }
 
   const landingLines = [
