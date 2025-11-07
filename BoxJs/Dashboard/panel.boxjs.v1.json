@@ -33,9 +33,8 @@
         "NetworkInfo_SD_REGION_MODE",
         "NetworkInfo_SD_ICON_THEME",
         "NetworkInfo_SD_ARROW",
-
-        "NetworkInfo_SERVICES",          // 兼容：逗号字符串
-        "NetworkInfo_SVC_YOUTUBE",       // 复选框：逐项勾选
+        "NetworkInfo_SERVICES",
+        "NetworkInfo_SVC_YOUTUBE",
         "NetworkInfo_SVC_NETFLIX",
         "NetworkInfo_SVC_DISNEY",
         "NetworkInfo_SVC_CHATGPT_WEB",
