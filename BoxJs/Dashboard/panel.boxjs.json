@@ -182,7 +182,7 @@
           "items": [
             { "key": "full", "label": "🇯🇵 JP | 日本" },
             { "key": "abbr", "label": "🇯🇵JP" },
-            { "key": "flag", "label": "仅旗帜" }
+            { "key": "flag", "label": "🇯🇵" }
           ]
         },
         {
