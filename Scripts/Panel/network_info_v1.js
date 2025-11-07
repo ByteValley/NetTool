@@ -1,17 +1,17 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley (merged & patched by ChatGPT)
- * - 优先级（统一）：BoxJS > 模块 #!arguments > 代码默认
+ *
+ * 选择优先级（统一）：
+ *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
+ *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
+ *
  * - 标题显示“网络类型”；第一行显示“代理策略”
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
- * - 服务检测并发执行：
- *   · BoxJS：方形勾选布尔项（最高优先）NetworkInfo_SERVICES_TEXT，其次文本 NetworkInfo_SERVICES_TEXT（JSON 数组/逗号字符串）
- *   · 模块参数：SERVICES=逗号/JSON 数组（次优先）
- *   · 两者都无 → 检测全部
+ * - 服务检测并发执行
  * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 入口/策略获取：预触发落地请求→重试(指数退避)→任意代理请求兜底
- * - 脚本接管图标 Icon / IconColor
  * - 可调：
  *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
  *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
@@ -44,6 +44,18 @@ const parseArgs = raw => {
 };
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
 
+// 兜底从原始 $argument 字符串读取指定参数（仅在对象无值时用）
+function readArgRaw(name){
+  try{
+    if (typeof $argument === 'string') {
+      const re = new RegExp(`(?:^|&)${name}=([^&]*)`);
+      const m = $argument.match(re);
+      if (m) return decodeURIComponent(String(m[1]).replace(/\+/g, '%20'));
+    }
+  }catch(_){}
+  return undefined;
+}
+
 // 辅助转换
 const toBool = (v, d=false) => {
   if (v === undefined || v === null || v === '') return d;
@@ -73,8 +85,8 @@ const CFG = {
   MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
   IPv6:     toBool(readKV(K('IPv6'))     ?? $args.IPv6,     false),
 
-  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? 'ipip',
-  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? 'ddnspod',
+  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMIC_IPv4 ?? 'ipip',
+  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMIC_IPv6 ?? 'ddnspod',
   LANDING_IPv4:  readKV(K('LANDING_IPv4'))  ?? $args.LANDING_IPv4  ?? 'ipapi',
   LANDING_IPv6:  readKV(K('LANDING_IPv6'))  ?? $args.LANDING_IPv6  ?? 'ipsb',
 
@@ -99,23 +111,28 @@ const CFG = {
   SD_ICON_THEME:  readKV(K('SD_ICON_THEME'))  ?? $args.SD_ICON_THEME  ?? 'check',
   SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true),
 
-  // BoxJS 勾选（复选框 checkboxes）：NetworkInfo_SERVICES
-  // 注意：这里保留“原始字符串”，用于判断键是否存在（null/undefined 表示根本没这个键）
+  // BoxJS 勾选（JSON 字符串). 若为空串/[]/null => 视为“无此键”，不阻塞回退
   SERVICES_BOX_CHECKED_RAW: (() => {
-    const v = readKV(K('SERVICES'));    // 勾选数组在 BoxJS 里存 JSON 字符串，如：["youtube","netflix"]
-    return (v === undefined || v === null) ? null : String(v);
+    const v = readKV(K('SERVICES'));    // 例如：["youtube","netflix"]
+    if (v === undefined || v === null) return null;
+    const s = String(v).trim();
+    if (!s || s === '[]' || /^null$/i.test(s)) return null; // 关键：当作不存在
+    return s; // 保留原始字符串（交给 parseServices 处理）
   })(),
 
   // BoxJS 文本：NetworkInfo_SERVICES_TEXT（JSON 数组或逗号字符串）
   SERVICES_BOX_TEXT: (() => {
     const v = readKV(K('SERVICES_TEXT'));
-    return (v != null) ? String(v) : '';
+    const s = (v != null) ? String(v).trim() : '';
+    return s;
   })(),
 
-  // 模块参数文本：SERVICES=...
+  // 模块参数文本：SERVICES=...（支持数组/JSON/逗号）
   SERVICES_ARG_TEXT: (() => {
-    const v = $args.SERVICES;
-    return (v != null) ? String(v) : '';
+    let v = $args.SERVICES;
+    if (Array.isArray(v)) return JSON.stringify(v); // 直接数组，序列化为 JSON
+    if (v == null || v === '') v = readArgRaw('SERVICES'); // 兜底从原始字符串拿
+    return (v != null) ? String(v).trim() : '';
   })()
 };
 
@@ -445,12 +462,25 @@ const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 
 // —— 允许更多分隔符 & 别名归一 —— //
 const SD_ALIAS = {
-  'yt':'youtube', 'you-tube':'youtube', 'youtube':'youtube',
-  'nf':'netflix', 'net-flix':'netflix', 'netflix':'netflix',
-  'disney':'disney', 'disney+':'disney',
-  'chatgpt':'chatgpt_web', 'gpt':'chatgpt_web', 'openai':'chatgpt_app',
-  'hulu':'hulu_us', 'huluus':'hulu_us', 'hulujp':'hulu_jp',
-  'hbo':'hbo', 'max':'hbo'
+  'yt':'youtube',
+  'YouTube':'youtube',
+  'youtube':'youtube',
+  'nf':'netflix',
+  'Netflix':'netflix',
+  'netflix':'netflix',
+  'disney':'disney',
+  'disney+':'disney',
+  'chatgpt':'chatgpt_app',
+  'gpt':'chatgpt_app',
+  'openai':'chatgpt_app',
+  'chatgpt_web':'chatgpt_web',
+  'chatgpt-web':'chatgpt_web',
+  'chatgptweb':'chatgpt_web',
+  'hulu':'hulu_us',
+  'huluus':'hulu_us',
+  'hulujp':'hulu_jp',
+  'hbo':'hbo',
+  'max':'hbo'
 };
 
 // 解析文本：优先 JSON 数组；否则按多种分隔符切分
@@ -465,8 +495,8 @@ function parseServices(raw){
     if (Array.isArray(arr)) return normSvcList(arr);
   } catch(_) {}
 
-  // 2) 退化为“分隔符”解析：逗号（中/英）、分号、竖线、空白、换行都可
-  const parts = s.split(/[,\uFF0C;\|/\s]+/); // , ；；| / 空格/换行
+  // 2) 退化为“分隔符”解析：逗号（中/英）、分号、竖线、斜杠、空白、换行都可
+  const parts = s.split(/[,\uFF0C;\|/ \t\r\n]+/);
   return normSvcList(parts);
 }
 
@@ -483,7 +513,7 @@ function normSvcList(list){
   return out;
 }
 
-// 读取勾选布尔项（BoxJS）
+// 读取勾选布尔项（BoxJS）——保留以备扩展，如需兼容单独 bool 键
 function readCheckedServices(){
   const map = {
     youtube:      K('SVC_YOUTUBE'),
@@ -502,13 +532,18 @@ function readCheckedServices(){
 
 // 统一选择逻辑（优先级：BoxJS 勾选 > BoxJS 文本 > arguments 文本 > 全部）
 function selectServices(){
-  // 1) BoxJS 勾选（checkboxes）
-  const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null; // 是否存在该键
+  // 1) BoxJS 勾选（checkboxes 数组字符串）
+  const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null; // A 段已确保空值= null
   const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
   if (hasCheckboxKey) {
     if (boxChecked.length > 0) return boxChecked;
-    // 勾选键存在但为空 → 继续看 BoxJS 文本
+
+    // 若需要兼容“旧的单个布尔勾选项”，可解注释：
+    // const legacy = readCheckedServices();
+    // if (legacy.length > 0) return legacy;
+
+    // 继续看 BoxJS 文本
     const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
     if (boxTextList.length > 0) return boxTextList;
 
@@ -617,12 +652,12 @@ function sd_isPartial(tag){ return /自制|自製|original/i.test(String(tag||''
 /* —— I18N —— */
 const SD_I18N = {
   "zh-Hans": {
-    youTube:"YouTube", chatgpt:"ChatGPT", chatgpt_app:"ChatGPT App(API)",
+    youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
     netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)",
     unreachable:"不可达", timeout:"超时", fail:"检测失败", regionBlocked:"区域受限", originals:"自制", full:"完整"
   },
   "zh-Hant": {
-    youTube:"YouTube", chatgpt:"ChatGPT", chatgpt_app:"ChatGPT App(API)",
+    youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
     netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)",
     unreachable:"不可達", timeout:"逾時", fail:"檢測失敗", regionBlocked:"區域受限", originals:"自製", full:"完整"
   }
