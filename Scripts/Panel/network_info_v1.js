@@ -831,15 +831,79 @@ async function sd_queryLandingCCMulti(){
 }
 
 /* —— 渲染（含 text 样式无箭头时“区域:”句式） —— */
+/* —— 渲染（仅 Netflix 区分“完整/自制剧”，其它服务统一“已解锁/不可达”）——
+ * 入参:
+ *   - name: 服务显示名（如 "Netflix" / "YouTube" / "ChatGPT" / "ChatGPT Web"...）
+ *   - ok:   检测是否可达（true/false）
+ *   - cc:   两位国家/地区码（如 "JP"）；为空则用 “-”
+ *   - cost: 延迟(ms)，可能为 null
+ *   - status: HTTP 状态码，可能为 0
+ *   - tag:    附加标注（如 Netflix “自制(original)” 等）
+ *   - state:  可选的直接状态覆写（'full' | 'partial' | 'blocked'）
+ *
+ * 规则说明：
+ *   1) 统一把状态收敛为 st: full / partial / blocked
+ *      - 若提供 state，优先生效；否则根据 ok / tag 推断：
+ *        ok=true 且含“自制/original” => partial；ok=true => full；ok=false => blocked
+ *   2) text 样式 && 不用箭头时：
+ *        - Netflix 使用长文案：
+ *            full   -> “已完整解锁”
+ *            partial-> “仅解锁自制剧”
+ *            blocked-> “不可达”
+ *        - 其它服务：full/partial 都显示 “已解锁”，blocked 显示 “不可达”
+ *        - 文案格式统一为：`服务名: <状态>，区域: <地区>`
+ *   3) text 样式 && 用箭头时：保持原有“已解锁/部分解锁/不可达”的短文案 + 箭头连接
+ *   4) icon 样式：维持原先图标+地区的展示
+ *   5) 地区文本由 sd_ccPretty(cc) 决定（full/abbr/flag 三种模式），中文地区保持你的既有规则
+ */
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
+  // 归一化成三态：full / partial / blocked
   const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
+
+  // 三态图标（✅/❇️/❎ 或 🔓/🔐/🔒 等主题）
   const icon = sd_pickIcons(SD_ICON_THEME)[st];
 
+  // 地区渲染（可能返回 “🇯🇵 JP | 日本” / “🇯🇵JP” / “🇯🇵”）
   const regionChunk = cc ? sd_ccPretty(cc) : "";
   const regionText  = regionChunk || "-";
 
-  // 简短状态文案（用于 icon 样式或 text+arrow）
-  const stateTextShort = (()=>{
+  // 多语言短文案：统一给“其它服务”用（full/partial 都视为“已解锁”，blocked 为“不可达”）
+  const unlockedShort = (SD_LANG==='zh-Hant') ? '已解鎖' : '已解锁';
+  const blockedText   = (SD_LANG==='zh-Hant') ? '不可達' : '不可达';
+
+  // —— 仅 Netflix 使用的“长文案”（text+无箭头场景）——
+  // full   -> “已完整解锁 / 已完整解鎖”
+  // partial-> “仅解锁自制剧 / 僅解鎖自製劇”
+  // blocked-> “不可达 / 不可達”
+  const stateTextLong = (()=>{
+    const hans = { full:'已完整解锁', partial:'仅解锁自制剧', blocked:blockedText };
+    const hant = { full:'已完整解鎖', partial:'僅解鎖自製劇', blocked:blockedText };
+    const dict = (SD_LANG==='zh-Hant') ? hant : hans;
+    if (st==='full')    return dict.full;
+    if (st==='partial') return dict.partial;
+    return dict.blocked;
+  })();
+
+  // 其它服务的短文案（不区分 full/partial，统一“已解锁”）
+  const stateTextShort = (st==='blocked') ? blockedText : unlockedShort;
+
+  // 判定是否 Netflix（多语言下名义相同，保险加正则）
+  const isNetflix = /netflix/i.test(String(name));
+
+  // ① text 样式 + 不使用箭头：Netflix 用长文案；其它服务用短文案
+  if (SD_STYLE === "text" && !SD_ARROW) {
+    const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
+    const head  = `${left}，区域: ${regionText}`; // 注意中文逗号，符合中文语境
+    const tail = [
+      tag || "",                                    // 额外标注（如“自制”提示）
+      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");                  // 尾部信息以 “｜” 连接
+    return tail ? `${head} ｜ ${tail}` : head;
+  }
+
+  // ② text 样式 + 使用箭头：保持原先“已解锁/部分解锁/不可达”的标准短文案
+  const stateTextStd = (()=>{
     if (SD_LANG==='zh-Hant'){
       if (st==='full') return '已解鎖';
       if (st==='partial') return '部分解鎖';
@@ -851,41 +915,28 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     }
   })();
 
-  // text 样式、且不使用箭头时的长文案
-  const stateTextLong = (()=>{
-    const hans = { full:'已完整解锁', partial:'仅解锁自制剧', blocked:'不可达' };
-    const hant = { full:'已完整解鎖', partial:'僅解鎖自製劇', blocked:'不可達' };
-    const dict = (SD_LANG==='zh-Hant') ? hant : hans;
-    if (st==='full') return dict.full;
-    if (st==='partial') return dict.partial;
-    return dict.blocked;
-  })();
+  if (SD_STYLE === "text") {
+    const left  = `${name}: ${stateTextStd}`;
+    const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
+    const tail = [
+      tag || "",
+      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
+      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");
+    return tail ? `${head} ｜ ${tail}` : head;
+  }
 
-  // 额外尾巴（可选）：延迟 / HTTP / 保留旧 tag
+  // ③ icon 样式：维持原来的显示（图标 + 名称 + 地区；尾部可选延迟/HTTP/标注）
+  const head = SD_ARROW
+    ? `${icon} ${name} ➟ ${regionText}`
+    : `${icon} ${name} ｜ ${regionText}`;
+
   const tail = [
     tag || "",
     (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
     (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
   ].filter(Boolean).join(" ｜ ");
 
-  // text 样式
-  if (SD_STYLE === "text") {
-    if (SD_ARROW) {
-      // 旧“箭头”风格
-      const left  = `${name}: ${stateTextShort}`;
-      const head  = `${left} ➟ ${regionText}`;
-      return tail ? `${head} ｜ ${tail}` : head;
-    } else {
-      // 新：不用箭头 -> “服务名: 状态，区域: XXX”
-      const head = `${name}: ${stateTextLong}，区域: ${regionText}`;
-      return tail ? `${head} ｜ ${tail}` : head;
-    }
-  }
-
-  // icon 样式保持不变
-  const head = SD_ARROW
-    ? `${icon} ${name} ➟ ${regionText}`
-    : `${icon} ${name} ｜ ${regionText}`;
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
