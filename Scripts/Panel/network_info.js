@@ -122,8 +122,7 @@ const parseArgs = (raw) => {
       if (!kv) return acc;
       const [k, v = ''] = kv.split('=');
       const key = decodeURIComponent(k || '');
-      const val = decodeURIComponent(String(v).replace(/\+/g, '%20'));
-      acc[key] = val;
+      acc[key] = decodeURIComponent(String(v).replace(/\+/g, '%20'));
       return acc;
     }, {});
   }
@@ -768,7 +767,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function extractIP(str) {
   const s = String(str || '').replace(/\(Proxy\)/i, '').trim();
-  let m = s.match(/\[([0-9a-fA-F:]+)\]/);
+  let m = s.match(/\[([0-9a-fA-F:]+)]/);
   if (m && isIPv6(m[1])) return m[1];
   m = s.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
   if (m && isIPv4(m[1])) return m[1];
@@ -974,7 +973,7 @@ function parseServices(raw) {
     const arr = JSON.parse(s);
     if (Array.isArray(arr)) return normSvcList(arr);
   } catch (_) {}
-  const parts = s.split(/[\,\uFF0C;|\/ \t\r\n]+/);
+  const parts = s.split(/[,\uFF0C;|\/ \t\r\n]+/);
   return normSvcList(parts);
 }
 function normSvcList(list) {
@@ -989,23 +988,32 @@ function normSvcList(list) {
   return out;
 }
 function selectServices() {
+  // 是否存在 BoxJS 多选键（存在即使为空数组也视为“显式提供过”）
   const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
-  const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
-  if (hasCheckboxKey) {
-    if (boxChecked.length) return (log('info','Services: BoxJS checkbox', boxChecked), boxChecked);
-    const fromText = parseServices(CFG.SERVICES_BOX_TEXT);
-    if (fromText.length)  return (log('info','Services: BoxJS text', fromText), fromText);
-    const fromArg  = parseServices(CFG.SERVICES_ARG_TEXT);
-    if (fromArg.length)   return (log('info','Services: arguments', fromArg), fromArg);
-    log('info','Services: default(all)');
-    return SD_DEFAULT_ORDER.slice();
+  // 组装候选源，按优先级从高到低
+  const candidates = hasCheckboxKey
+      ? [
+        ["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW],
+        ["BoxJS text",     CFG.SERVICES_BOX_TEXT],
+        ["arguments",      CFG.SERVICES_ARG_TEXT]
+      ]
+      : [
+        ["BoxJS text",     CFG.SERVICES_BOX_TEXT],
+        ["arguments",      CFG.SERVICES_ARG_TEXT]
+      ];
+
+  // 逐源解析，命中即返回
+  for (const [label, raw] of candidates) {
+    const list = parseServices(raw);
+    if (list.length > 0) {
+      log("info", `Services: ${label}`, list);
+      return list;
+    }
   }
-  const fromText = parseServices(CFG.SERVICES_BOX_TEXT);
-  if (fromText.length)  return (log('info','Services: BoxJS text', fromText), fromText);
-  const fromArg  = parseServices(CFG.SERVICES_ARG_TEXT);
-  if (fromArg.length)   return (log('info','Services: arguments', fromArg), fromArg);
-  log('info','Services: default(all)');
+
+  // 全部为空时，回退到默认（保持拷贝，避免外部修改原数组）
+  log("info", "Services: default(all)");
   return SD_DEFAULT_ORDER.slice();
 }
 
