@@ -962,8 +962,8 @@ const SD_ALIAS = {
   'disney': 'disney', 'disney+': 'disney', '迪士尼': 'disney',
   'chatgpt': 'chatgpt_app', gpt: 'chatgpt_app', openai: 'chatgpt_app',
   'chatgpt_web': 'chatgpt_web', 'chatgpt-web': 'chatgpt_web', 'chatgpt web': 'chatgpt_web',
-  hulu: 'hulu_us', huluus: 'hulu_us', hulujp: 'hulu_jp',
-  hbo: 'hbo', max: 'hbo', '最大': 'hbo'
+  hulu: 'hulu_us', '葫芦': 'hulu_us', huluus: 'hulu_us', hulujp: 'hulu_jp',
+  hbo: 'hbo', max: 'hbo'
 };
 
 function parseServices(raw) {
