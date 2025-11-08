@@ -111,12 +111,12 @@
           "id": "NetworkInfo_IconPreset",
           "name": "脚本图标（预设）",
           "type": "selects",
-          "val": "antenna",
+          "val": "globe",
           "items": [
-            { "key": "antenna", "label": "📡 antenna.radiowaves.left.and.right" },
             { "key": "wifi",    "label": "📶 wifi.router" },
             { "key": "globe",   "label": "🌐 globe.asia.australia" },
             { "key": "dots",    "label": "📡 dot.radiowaves.left.and.right" },
+            { "key": "antenna", "label": "📡 antenna.radiowaves.left.and.right" },
             { "key": "point",   "label": "🔺 point.3.connected.trianglepath.dotted" },
             { "key": "custom",  "label": "✏️ 自定义（下方填写）" }
           ],
