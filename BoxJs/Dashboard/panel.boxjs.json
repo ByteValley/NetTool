@@ -44,10 +44,10 @@
         "• 可用键与常见别名：<br/>" +
         "　- YouTube：<code>youtube</code>/<code>yt</code>/<code>youTube</code>/<code>youtube premium</code>/<code>油管</code><br/>" +
         "　- Netflix：<code>netflix</code>/<code>nf</code>/<code>奈飞</code><br/>" +
-        "　- Disney+：<code>disney</code>/<code>disney+</code><br/>" +
-        "　- Hulu(美)：<code>hulu</code>/<code>hulu_us</code>/<code>huluus</code><br/>" +
+        "　- Disney+：<code>disney</code>/<code>disney+</code><br/>" +,
+        "　- Hulu(美)：<code>hulu</code>/<code>葫芦</code>/<code>hulu_us</code>/<code>huluus</code><br/>", +
         "　- Hulu(日)：<code>hulujp</code>/<code>hulu_jp</code><br/>" +
-        "　- Max(HBO)：<code>hbo</code>/<code>max</code>/<code>最大</code><br/>" +
+        "　- Max(HBO)：<code>hbo</code>/<code>max</code><br/>" +
         "　- ChatGPT：<code>chatgpt_app</code>/<code>chatgpt</code>/<code>gpt</code>/<code>openai</code><br/>" +
         "　- ChatGPT Web：<code>chatgpt_web</code>/<code>chatgpt web</code>/<code>chatgpt-web</code>/<code>chatgptweb</code><br/>" +
         "• 选择优先级：<b>多选(NetworkInfo_SERVICES)</b> → <b>文本(NetworkInfo_SERVICES_TEXT)</b> → <b>模块 arguments(SERVICES)</b> → 默认（全部）",
