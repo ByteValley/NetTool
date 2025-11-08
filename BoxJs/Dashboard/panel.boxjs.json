@@ -1,4 +1,3 @@
-
 {
   "id": "ByteValley.Panel",
   "name": "功能看板",
@@ -9,6 +8,7 @@
     {
       "id": "ByteValley.Panel.NetworkInfo",
       "name": "网络信息",
+      "icon": "https://cdn.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
       "descs_html": [
         "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
         "<b>服务清单策略：</b>当 <code>NetworkInfo_SERVICES</code> 多选有内容时，以多选为准；若多选为空，则读取文本 <code>NetworkInfo_SERVICES_TEXT</code> 或模块参数 <code>SERVICES</code>。文本支持 <b>英文逗号 ,</b> 与 <b>中文逗号 ，</b>（亦兼容分号/竖线/斜杠/空格/换行）或 JSON 数组；<b>不区分大小写、顺序不限</b>。可用键：youtube、netflix、disney、hulu_us、hulu_jp、hbo、chatgpt_app（ChatGPT）、chatgpt_web（ChatGPT Web）。",
@@ -25,6 +25,7 @@
         "NetworkInfo_LANDING_IPv4",
         "NetworkInfo_LANDING_IPv6",
         "NetworkInfo_TW_FLAG_MODE",
+        "NetworkInfo_IconPreset",
         "NetworkInfo_Icon",
         "NetworkInfo_IconColor",
         "NetworkInfo_SD_STYLE",
@@ -39,8 +40,8 @@
         "NetworkInfo_SERVICES_TEXT"
       ],
       "settings": [
-        { "id": "NetworkInfo_Update", "name": "刷新间隔（秒）", "type": "number", "val": 10 },
-        { "id": "NetworkInfo_Timeout", "name": "脚本超时（秒）", "type": "number", "val": 8 },
+        { "id": "NetworkInfo_Update", "name": "刷新间隔（秒）", "type": "number", "val": 10, "min": 3 },
+        { "id": "NetworkInfo_Timeout", "name": "脚本超时（秒）", "type": "number", "val": 8, "min": 3 },
 
         { "id": "NetworkInfo_MASK_IP", "name": "IP 脱敏（直连）", "type": "boolean", "val": true },
         { "id": "NetworkInfo_MASK_POS", "name": "直连位置脱敏", "type": "boolean", "val": true },
@@ -106,7 +107,22 @@
           "desc": "影响台湾地区显示时的旗帜样式"
         },
 
-        { "id": "NetworkInfo_Icon", "name": "面板图标名（SF Symbols）", "type": "text", "val": "globe.asia.australia" },
+        {
+          "id": "NetworkInfo_IconPreset",
+          "name": "脚本图标（预设）",
+          "type": "selects",
+          "val": "antenna",
+          "items": [
+            { "key": "antenna", "label": "📡 antenna.radiowaves.left.and.right" },
+            { "key": "wifi",    "label": "📶 wifi.router" },
+            { "key": "globe",   "label": "🌐 globe.asia.australia" },
+            { "key": "dots",    "label": "📡 dot.radiowaves.left.and.right" },
+            { "key": "point",   "label": "🔺 point.3.connected.trianglepath.dotted" },
+            { "key": "custom",  "label": "✏️ 自定义（下方填写）" }
+          ],
+          "desc": "若选择“自定义”，将使用下方的图标名"
+        },
+        { "id": "NetworkInfo_Icon", "name": "脚本图标名（SF Symbols）", "type": "text", "val": "", "placeholder": "留空=使用上面的预设" },
         { "id": "NetworkInfo_IconColor", "name": "面板图标颜色（HEX）", "type": "text", "val": "#1E90FF" },
 
         {
@@ -183,7 +199,7 @@
           "name": "服务清单（文本备选）",
           "type": "text",
           "val": "",
-          "desc": "文本或 JSON 数组，分隔符支持英文逗号(,)、中文逗号(，)；大小写不敏感，渲染顺序根据输入顺序变动。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。可用键：youtube/netflix/disney/hulu_us/hulu_jp/hbo/chatgpt_app/chatgpt_web。优先级次于多选，高于模块 arguments。"
+          "desc": "文本或 JSON 数组，分隔符支持英文/中文逗号；可用键：youtube/netflix/disney/hulu_us/hulu_jp/hbo/chatgpt_app/chatgpt_web。优先级次于多选，高于模块 arguments。"
         }
       ]
     }
