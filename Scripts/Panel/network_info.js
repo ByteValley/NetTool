@@ -518,14 +518,112 @@ async function getPolicyAndEntranceRetry(times=4, baseDelay=200){
   return any || {};
 }
 
-/* —— 入口位置（国内/国际） —— */
-async function getEntranceBundle(ip){
-  const a = await loc_pingan(ip).catch(()=>({}));
-  const b = await loc_ipapi(ip).catch(()=>({}));
-  return { ip, loc1: a.loc || '', isp1: a.isp || '', loc2: b.loc || '', isp2: b.isp || '' };
+/* —— 入口位置（国内/国际）超时+回退+缓存 —— */
+// 显式超时：优先取服务检测超时；否则按 Timeout*1000，至少 2500ms
+const ENT_REQ_TO = Math.max(2500, (Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000));
+
+// 简易缓存：同一个入口 IP 60 秒内复用结果，降低被限流概率
+let ENT_CACHE = { ip: "", t: 0, data: null };
+
+async function withRetry(fn, retry = 1, delay = 260) {
+  try { return await fn(); } catch (_) {}
+  for (let i = 0; i < retry; i++) {
+    await sleep(delay * (i + 1));
+    try { return await fn(); } catch (_) {}
+  }
+  throw "retry-fail";
 }
-async function loc_pingan(ip){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip='+encodeURIComponent(ip)); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
-async function loc_ipapi(ip){ const r=await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`); const j=JSON.parse(r.body||'{}'); return { loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||j.as||'' }; }
+
+// ---- 数据源 A：平安（国内） ----
+async function loc_pingan(ip) {
+  const r = await httpGet(
+      'https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=' + encodeURIComponent(ip),
+      {},
+      ENT_REQ_TO
+  );
+  const d = (JSON.parse(r.body || '{}') || {}).data || {};
+  if (!d || (!d.countryIsoCode && !d.country)) throw "pingan-empty";
+  return {
+    loc: [flagOf(d.countryIsoCode), d.country, d.region, d.city]
+        .filter(Boolean).join(' ').replace(/\s*中国\s*/, ''),
+    isp: d.isp || ''
+  };
+}
+
+// ---- 数据源 B1：ip-api（国际） ----
+async function loc_ipapi(ip) {
+  const r = await httpGet(
+      `http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`,
+      {},
+      ENT_REQ_TO
+  );
+  const j = JSON.parse(r.body || '{}');
+  if (j.status && j.status !== "success") throw "ipapi-fail";
+  return {
+    loc: [flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ''), j.regionName?.split(/\s+or\s+/)[0], j.city]
+        .filter(Boolean).join(' '),
+    isp: j.isp || j.org || j.as || ''
+  };
+}
+
+// ---- 数据源 B2：ipwhois（回退1） ----
+async function loc_ipwhois(ip) {
+  const r = await httpGet(
+      `https://ipwhois.app/json/${encodeURIComponent(ip)}?lang=zh-CN`,
+      {},
+      ENT_REQ_TO
+  );
+  const j = JSON.parse(r.body || '{}');
+  if (j.success === false || (!j.country && !j.country_code)) throw "ipwhois-fail";
+  return {
+    loc: [flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city]
+        .filter(Boolean).join(' '),
+    isp: (j.connection && j.connection.isp) || j.org || ''
+  };
+}
+
+// ---- 数据源 B3：ip.sb（回退2） ----
+async function loc_ipsb(ip) {
+  const r = await httpGet(
+      `https://api.ip.sb/geoip/${encodeURIComponent(ip)}`,
+      {},
+      ENT_REQ_TO
+  );
+  const j = JSON.parse(r.body || '{}');
+  if (!j || (!j.country && !j.country_code)) throw "ipsb-fail";
+  return {
+    loc: [flagOf(j.country_code), j.country, j.region, j.city]
+        .filter(Boolean).join(' ').replace(/\s*中国\s*/, ''),
+    isp: j.isp || j.organization || ''
+  };
+}
+
+// ---- B 链式回退：ip-api → ipwhois → ip.sb ----
+async function loc_chain(ip) {
+  try { return await withRetry(() => loc_ipapi(ip),   1); } catch (_) {}
+  try { return await withRetry(() => loc_ipwhois(ip), 1); } catch (_) {}
+  return        await withRetry(() => loc_ipsb(ip),   0);
+}
+
+// ---- 对外：并发拿 A/B，两路齐备；含 60s 缓存 ----
+async function getEntranceBundle(ip) {
+  if (ENT_CACHE.ip === ip && (Date.now() - ENT_CACHE.t) < 60000 && ENT_CACHE.data) {
+    return ENT_CACHE.data;
+  }
+  const [a, b] = await Promise.allSettled([
+    withRetry(() => loc_pingan(ip), 1),
+    withRetry(() => loc_chain(ip),  1)
+  ]);
+  const res = {
+    ip,
+    loc1: a.status === 'fulfilled' ? (a.value.loc || '') : '',
+    isp1: a.status === 'fulfilled' ? (a.value.isp || '') : '',
+    loc2: b.status === 'fulfilled' ? (b.value.loc || '') : '',
+    isp2: b.status === 'fulfilled' ? (b.value.isp || '') : ''
+  };
+  ENT_CACHE = { ip, t: Date.now(), data: res };
+  return res;
+}
 
 /* ===================== 服务清单解析 & 检测 ===================== */
 const SD_TESTS_MAP = {
