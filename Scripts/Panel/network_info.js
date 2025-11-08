@@ -1,14 +1,14 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley
- * Version: 2025-11-08R5
+ * Version: 2025-11-08R6
  *
  * 选择优先级（统一，BoxJS 最高）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
  *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
  *
  * - 标题显示网络类型；顶部显示 执行时间 → 代理策略（紧邻）
- * - 分组子标题：本地 / 入口 / 落地 / 服务检测（留白由 SUBTITLE_BLANK 控制）
+ * - 分组子标题：本地 / 入口 / 落地 / 服务检测（留白由 ST_GAP_LINES 控制）
  * - IPv4/IPv6 分行显示（仅渲染存在的那个；IP 可按 MASK_IP 脱敏）
  * - 直连/入口/落地 位置展示支持台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 中国境内运营商规范化
@@ -266,7 +266,12 @@ const CFG = {
         if (Array.isArray(v)) return JSON.stringify(v);
         if (v == null || v === '') v = readArgRaw('SERVICES');
         return v != null ? String(v).trim() : '';
-    })()
+    })(),
+
+    /* ===== 新增：分组子标题样式 ===== */
+    ST_SUBTITLE_STYLE: (readKV(K('ST_SUBTITLE_STYLE')) ?? $args.ST_SUBTITLE_STYLE ?? 'line').toString().trim(),
+    ST_SUBTITLE_MINIMAL: toBool(readKV(K('ST_SUBTITLE_MINIMAL')) ?? $args.ST_SUBTITLE_MINIMAL, false),
+    ST_GAP_LINES: Math.max(0, Math.min(2, toNum(readKV(K('ST_GAP_LINES')) ?? $args.ST_GAP_LINES, 1)))
 };
 
 // ====================== 图标 & 开关映射 ======================
@@ -321,29 +326,36 @@ const SD_ICONS = (() => {
     }
 })();
 
-// ====================== 子标题样式 & 留白（新增） ======================
-const SUBTITLE_STYLE = (readKV(K('SUBTITLE_STYLE')) ?? $args.SUBTITLE_STYLE ?? 'dash')
-    .toString().trim().toLowerCase();
-const SUBTITLE_BLANK = Math.max(0, toNum(readKV(K('SUBTITLE_BLANK')) ?? $args.SUBTITLE_BLANK, 1));
+// ====================== 子标题样式（全新命名，无旧别名） ======================
+const SUBTITLE_STYLES = Object.freeze({
+    // 装饰类：留空格，提升可读性
+    line: (s) => `—— ${s} ——`,    // 连线：左右各留一格
+    pipe: (s) => `║ ${s} ║`,      // 竖线框：左右各留一格
+    bullet: (s) => `· ${s} ·`,      // 居中圆点：左右各留一格
 
-const SUBTITLE_STYLES = {
-    dash: (s) => `—— ${s} ——`,
-    bracket: (s) => `【 ${s} 】`,
-    corner: (s) => `《 ${s} 》`,
-    pipe: (s) => `║ ${s} ║`,
-    dot: (s) => `· ${s} ·`,
+    // 括号/引号类：不留空格，更符合中文标点习惯
+    cnBracket: (s) => `【${s}】`,    // 中文方头括
+    cnQuote: (s) => `「${s}」`,    // 中文引号
+    square: (s) => `[${s}]`,      // 方括号
+    curly: (s) => `{${s}}`,      // 花括号
+    angle: (s) => `《${s}》`,    // 书名号
+
+    // 纯文本
     plain: (s) => `${s}`
-};
+});
 
-function subTitle(text) {
-    const render = SUBTITLE_STYLES[SUBTITLE_STYLE] || SUBTITLE_STYLES.dash;
-    return render(String(text || '').trim());
+
+function makeSubTitleRenderer(styleKey, minimal = false) {
+    const fn = SUBTITLE_STYLES[styleKey] || SUBTITLE_STYLES.line;
+    if (minimal) return (s) => String(s);
+    return (s) => fn(String(s));
 }
 
-/** 统一入口：先加留白，再加子标题 */
-function pushSection(arr, title) {
-    for (let i = 0; i < SUBTITLE_BLANK; i++) arr.push('');
-    arr.push(subTitle(title));
+/** 统一推入分组标题：自动插入留白 + 应用样式/纯净模式 */
+function pushGroupTitle(parts, title) {
+    for (let i = 0; i < CFG.ST_GAP_LINES; i++) parts.push('');
+    const render = makeSubTitleRenderer(CFG.ST_SUBTITLE_STYLE, CFG.ST_SUBTITLE_MINIMAL);
+    parts.push(render(title));
 }
 
 // ====================== 启动日志 ======================
@@ -355,8 +367,9 @@ log('info', 'Start', JSON.stringify({
     SD_STYLE,
     SD_REGION_MODE,
     TW_FLAG_MODE,
-    SUBTITLE_STYLE,
-    SUBTITLE_BLANK
+    ST_SUBTITLE_STYLE: CFG.ST_SUBTITLE_STYLE,
+    ST_SUBTITLE_MINIMAL: CFG.ST_SUBTITLE_MINIMAL,
+    ST_GAP_LINES: CFG.ST_GAP_LINES
 }));
 
 // ====================== 主流程（IIFE） ======================
@@ -430,7 +443,7 @@ log('info', 'Start', JSON.stringify({
     parts.push(`${t('policy')}: ${policyName || '-'}`);
 
     // 本地
-    pushSection(parts, '本地');
+    pushGroupTitle(parts, '本地');
     const directIPv4 = ipLine('IPv4', cn.ip);
     const directIPv6 = ipLine('IPv6', cn6.ip);
     if (directIPv4) parts.push(directIPv4);
@@ -442,7 +455,7 @@ log('info', 'Start', JSON.stringify({
     // 入口
     if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2))
         || (ent6 && ent6.ip)) {
-        pushSection(parts, '入口');
+        pushGroupTitle(parts, '入口');
         const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
         const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
         if (entIPv4) parts.push(entIPv4);
@@ -455,7 +468,7 @@ log('info', 'Start', JSON.stringify({
 
     // 落地
     if (px.ip || px6.ip || px.loc || px.isp) {
-        pushSection(parts, '落地');
+        pushGroupTitle(parts, '落地');
         const landIPv4 = ipLine('IPv4', px.ip);
         const landIPv6 = ipLine('IPv6', px6.ip);
         if (landIPv4) parts.push(landIPv4);
@@ -467,13 +480,13 @@ log('info', 'Start', JSON.stringify({
     // 服务检测
     const sdLines = await runServiceChecks();
     if (sdLines.length) {
-        pushSection(parts, '服务检测');
+        pushGroupTitle(parts, '服务检测');
         parts.push(...sdLines);
     }
 
     // 调试尾巴（可选）
     if (LOG_TO_PANEL && DEBUG_LINES.length) {
-        pushSection(parts, t('debug'));
+        pushGroupTitle(parts, t('debug'));
         const tail = DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES).join('\n');
         parts.push(tail);
     }
