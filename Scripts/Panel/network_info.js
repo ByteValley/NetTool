@@ -1,25 +1,25 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley (merged & patched by ChatGPT)
- * Version: 2025-11-08 (t() 工程化 + S2T 兜底 + 子标题/分组)
+ * Version: 2025-11-08R2
  *
- * 选择优先级（统一）：
+ * 选择优先级（统一，BoxJS 最高）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
  *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
  *
  * - 标题显示网络类型；顶部显示 执行时间 → 代理策略（紧邻）
- * - 分组子标题：本地 / 入口 / 落地 / 服务检测（本地前留一行空白）
- * - IPv4/IPv6 分行显示（仅渲染存在的那个）
- * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
+ * - 分组子标题：本地 / 入口 / 落地 / 服务检测（“本地”前保留一行空白）
+ * - IPv4/IPv6 分行显示（仅渲染存在的那个；IP 可按 MASK_IP 脱敏）
+ * - 直连/入口/落地 位置展示支持台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 中国境内运营商规范化
- * - 服务检测并发执行，Netflix“完整/自制剧”，其它服务“已解锁/不可达”
- * - 台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
- * - 入口/策略获取：预触发落地请求(v4/v6)→同时抓入口IPv4+IPv6→任意代理请求兜底
+ * - 服务检测并发执行；Netflix区分“完整/自制剧”，其它统一“已解锁/不可达”
+ * - 入口/策略获取：预触发落地(v4/v6) → 扫描最近请求抓入口IPv4+IPv6 → 任意代理请求兜底
+ * - 入口定位缓存 TTL 跟 Update 联动：TTL = max(30, min(Update, 3600)) 秒
  * - 可调：
  *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
  *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
  *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
- *   · ChatGPT App(API) 地区多源回退，优先 CF 头
+ *   · ChatGPT App(API) 地区多源回退，优先 Cloudflare 头
  * =======================================================*/
 
 /* ===== 语言字典（固定 UI 词收口）===== */
@@ -38,7 +38,6 @@ const SD_STR = {
     isp: "运营商",
     runAt: "执行时间",
     region: "区域",
-    // 状态/检测
     unlocked: "已解锁",
     partialUnlocked: "部分解锁",
     notReachable: "不可达",
@@ -62,7 +61,6 @@ const SD_STR = {
     isp: "運營商",
     runAt: "執行時間",
     region: "區域",
-    // 狀態/檢測
     unlocked: "已解鎖",
     partialUnlocked: "部分解鎖",
     notReachable: "不可達",
@@ -148,7 +146,6 @@ const CFG = {
   MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
   IPv6:     toBool(readKV(K('IPv6'))     ?? $args.IPv6,     false),
 
-  // 修正 DOMESTIC_* 读取笔误，兼容旧的 DOMIC_* 键
   DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? $args.DOMIC_IPv4 ?? 'ipip',
   DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? $args.DOMIC_IPv6 ?? 'ddnspod',
   LANDING_IPv4:  readKV(K('LANDING_IPv4'))  ?? $args.LANDING_IPv4  ?? 'ipapi',
@@ -158,8 +155,8 @@ const CFG = {
 
   // 图标预设 / 自定义
   IconPreset: readKV(K('IconPreset')) ?? $args.IconPreset ?? 'globe.asia.australia',
-  Icon:      readKV(K('Icon'))      ?? $args.Icon      ?? '',
-  IconColor: readKV(K('IconColor')) ?? $args.IconColor ?? '#1E90FF',
+  Icon:       readKV(K('Icon'))       ?? $args.Icon       ?? '',
+  IconColor:  readKV(K('IconColor'))  ?? $args.IconColor  ?? '#1E90FF',
 
   SD_STYLE:     readKV(K('SD_STYLE'))     ?? $args.SD_STYLE     ?? 'icon',
   SD_SHOW_LAT:  toBool(readKV(K('SD_SHOW_LAT'))  ?? $args.SD_SHOW_LAT,  true),
@@ -179,7 +176,7 @@ const CFG = {
 
   // BoxJS 勾选（JSON 字符串). 若为空串/[]/null => 视为“无此键”，不阻塞回退
   SERVICES_BOX_CHECKED_RAW: (() => {
-    const v = readKV(K('SERVICES'));    // 例如：["youtube","netflix"]
+    const v = readKV(K('SERVICES')); // 例如：["youtube","netflix"]
     if (v === undefined || v === null) return null;
     const s = String(v).trim();
     if (!s || s === '[]' || /^null$/i.test(s)) return null;
@@ -207,7 +204,7 @@ const ICON_PRESET = CFG.IconPreset;
 const ICON_PRESET_MAP = {
   wifi:    'wifi.router',
   globe:   'globe.asia.australia',
-  dots:    'dot.radiowaves.left.and.right',
+  dots:    'dot.radiowaves.left.and-right',
   antenna: 'antenna.radiowaves.left.and.right',
   point:   'point.3.connected.trianglepath.dotted'
 };
@@ -268,7 +265,7 @@ const SD_ARROW       = !!CFG.SD_ARROW;
   const nt = netTypeLine();
   const title = nt || t('panelTitle');
 
-  /* ====== 分组渲染（带子标题 + IPv4/IPv6 分行）====== */
+  /* ====== 分组渲染 ====== */
   const parts = [];
 
   // 顶部：执行时间 & 代理策略（不留白）
@@ -381,7 +378,6 @@ function flagOf(code){
 function fmtISP(isp, locStr){
   const raw = String(isp || '').trim();
   if (!raw) return '';
-
   const txt = String(locStr || '');
   const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
   if (!isMainland) return raw;
@@ -479,7 +475,7 @@ async function getLandingV4(p){
 }
 async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||'' }; }
 async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' }; }
-async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip');            const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',     loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' }; }
+async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'', loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' }; }
 
 async function getLandingV6(p){
   try{
@@ -510,31 +506,7 @@ async function touchLandingOnceQuick(){
   try { await httpGet('https://api-ipv6.ip.sb/ip', {}, 700, true); } catch(_) {}
 }
 
-async function getPolicyAndEntranceOnce(){
-  const data = await httpAPI('/v1/requests/recent');
-  const reqs = Array.isArray(data?.requests) ? data.requests : [];
-  const hit  = reqs.slice(0, 120).find(i => ENT_SOURCES_RE.test(i.URL || ''));
-  if (!hit) return {};
-  const ip = extractIP(hit.remoteAddress || '');
-  return { policyName: hit.policyName || '', entranceIP: ip || '' };
-}
-
-async function getAnyProxyPolicyFromRecent(){
-  const data = await httpAPI('/v1/requests/recent');
-  const reqs = Array.isArray(data?.requests) ? data.requests : [];
-  const hit  = reqs.find(i => /\(Proxy\)/.test(i.remoteAddress||'') && i.policyName);
-  if (!hit) return {};
-  return { policyName: hit.policyName, entranceIP: extractIP(hit.remoteAddress) };
-}
-
-async function getPolicyAndEntranceRetry(times=4, baseDelay=200){
-  for (let i=0; i<i; i++){} // 占位（保留旧接口以兼容外部引用，不再使用）
-  const any = await getAnyProxyPolicyFromRecent().catch(()=>({}));
-  return any || {};
-}
-
-// 新：同时抓入口 IPv4 + IPv6（优先从最近请求命中 IP 数据源）
-function isV6Remote(addr){ return /\:/.test(String(addr||'')); }
+// 同时抓入口 IPv4 + IPv6（优先从最近请求命中 IP 数据源）
 async function getPolicyAndEntranceBoth(){
   const data = await httpAPI('/v1/requests/recent');
   const reqs = Array.isArray(data?.requests) ? data.requests : [];
@@ -549,9 +521,15 @@ async function getPolicyAndEntranceBoth(){
     else if (isIPv4(ip)) { if (!ip4) ip4 = ip; }
     if (policy && ip4 && ip6) break;
   }
-  // 兜底：任意代理请求
+  // 兜底：任意代理请求（不要求来源匹配）
   if (!policy && !ip4 && !ip6){
-    const any = await getAnyProxyPolicyFromRecent().catch(()=>({}));
+    const any = await (async ()=>{
+      const d = await httpAPI('/v1/requests/recent');
+      const rs = Array.isArray(d?.requests) ? d.requests : [];
+      const hit  = rs.find(i => /\(Proxy\)/.test(i.remoteAddress||'') && i.policyName);
+      if (!hit) return {};
+      return { policyName: hit.policyName, entranceIP: extractIP(hit.remoteAddress) };
+    })().catch(()=>({}));
     policy = any.policyName || '';
     if (any.entranceIP) (isIPv6(any.entranceIP) ? (ip6=any.entranceIP) : (ip4=any.entranceIP));
   }
@@ -560,8 +538,9 @@ async function getPolicyAndEntranceBoth(){
 
 /* —— 入口位置（国内/国际）超时+回退+缓存 —— */
 const ENT_REQ_TO = Math.max(2500, (Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000));
+// 入口信息缓存时长（秒）：跟随 Update，但最多 3600 秒；下限 30 秒兜底
+const ENT_TTL_SEC = Math.max(30, Math.min(Number(CFG.Update) || 10, 3600));
 
-// 简易缓存：同一个入口 IP 60 秒内复用结果
 let ENT_CACHE = { ip: "", t: 0, data: null };
 
 async function withRetry(fn, retry = 1, delay = 260) {
@@ -644,9 +623,9 @@ async function loc_chain(ip) {
   return        await withRetry(() => loc_ipsb(ip),   0);
 }
 
-// 对外：并发拿 A/B；含 60s 缓存
+// 对外：并发拿 A/B；含动态 TTL 缓存
 async function getEntranceBundle(ip) {
-  if (ENT_CACHE.ip === ip && (Date.now() - ENT_CACHE.t) < 60000 && ENT_CACHE.data) {
+  if (ENT_CACHE.ip === ip && (Date.now() - ENT_CACHE.t) < ENT_TTL_SEC * 1000 && ENT_CACHE.data) {
     return ENT_CACHE.data;
   }
   const [a, b] = await Promise.allSettled([
@@ -677,41 +656,17 @@ const SD_TESTS_MAP = {
 };
 const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 
-// —— 允许更多分隔符 & 别名归一 —— //
+// 允许更多分隔符 & 别名归一
 const SD_ALIAS = {
-  'yt':'youtube',
-  'youtube':'youtube',
-  'youTube':'youtube',
-  'youtube premium':'youtube',
-  '油管':'youtube',
-
-  'nf':'netflix',
-  'netflix':'netflix',
-  '奈飞':'netflix',
-
-  'disney':'disney',
-  'disney+':'disney',
-  '迪士尼':'disney',
-
-  'chatgpt':'chatgpt_app',
-  'gpt':'chatgpt_app',
-  'openai':'chatgpt_app',
-
-  'chatgpt_web':'chatgpt_web',
-  'chatgpt-web':'chatgpt_web',
-  'chatgptweb':'chatgpt_web',
-  'chatgpt web':'chatgpt_web',
-
-  'hulu':'hulu_us',
-  'huluus':'hulu_us',
-  'hulujp':'hulu_jp',
-
-  'hbo':'hbo',
-  'max':'hbo',
-  '最大':'hbo'
+  yt:'youtube', 'youtube':'youtube', 'youtube premium':'youtube', '油管':'youtube',
+  nf:'netflix', 'netflix':'netflix', '奈飞':'netflix',
+  'disney':'disney', 'disney+':'disney', '迪士尼':'disney',
+  'chatgpt':'chatgpt_app', gpt:'chatgpt_app', openai:'chatgpt_app',
+  'chatgpt_web':'chatgpt_web', 'chatgpt-web':'chatgpt_web', 'chatgpt web':'chatgpt_web',
+  hulu:'hulu_us', huluus:'hulu_us', hulujp:'hulu_jp',
+  hbo:'hbo', max:'hbo', '最大':'hbo'
 };
 
-// 解析文本
 function parseServices(raw){
   if (raw == null) return [];
   let s = String(raw).trim();
@@ -719,12 +674,11 @@ function parseServices(raw){
   try {
     const arr = JSON.parse(s);
     if (Array.isArray(arr)) return normSvcList(arr);
-  } catch(_) {}
-  const parts = s.split(/[,\uFF0C;|/ \t\r\n]+/);  // 去掉多余转义
+  } catch(_){}
+  const parts = s.split(/[,\uFF0C;|/ \t\r\n]+/);
   return normSvcList(parts);
 }
 
-// 归一 & 过滤
 function normSvcList(list){
   const out = [];
   for (let x of list){
@@ -737,29 +691,23 @@ function normSvcList(list){
   return out;
 }
 
-// 选择逻辑
 function selectServices(){
   const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
   const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
   if (hasCheckboxKey) {
     if (boxChecked.length > 0) return boxChecked;
-
     const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
     if (boxTextList.length > 0) return boxTextList;
-
     const argList = parseServices(CFG.SERVICES_ARG_TEXT);
     if (argList.length > 0) return argList;
-
     return SD_DEFAULT_ORDER.slice();
   }
 
   const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
   if (boxTextList.length > 0) return boxTextList;
-
   const argList = parseServices(CFG.SERVICES_ARG_TEXT);
   if (argList.length > 0) return argList;
-
   return SD_DEFAULT_ORDER.slice();
 }
 
@@ -1066,10 +1014,7 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  const head = SD_ARROW
-      ? `${icon} ${name} ➟ ${regionText}`
-      : `${icon} ${name} ｜ ${regionText}`;
-
+  const head = SD_ARROW ? `${icon} ${name} ➟ ${regionText}` : `${icon} ${name} ｜ ${regionText}`;
   const tail = [
     showTag,
     (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
@@ -1107,17 +1052,10 @@ function zhHansToHantOnce(s){
     ['中国广电', '中國廣電'], ['中国教育网', '中國教育網']
   ];
   for (const [hans, hant] of phraseMap) s = s.replace(new RegExp(hans, 'g'), hant);
-
-  const charMap = {
-    '网':'網', '络':'絡', '运':'運', '营':'營', '达':'達', '检':'檢', '测':'測',
-    '时':'時', '区':'區', '术':'術', '产':'產', '广':'廣', '电':'電', '联':'聯',
-    '动':'動', '数':'數', '汉':'漢', '气':'氣', '历':'曆', '宁':'寧'
-  };
+  const charMap = { '网':'網', '络':'絡', '运':'運', '营':'營', '达':'達', '检':'檢', '测':'測', '时':'時', '区':'區', '术':'術', '产':'產', '广':'廣', '电':'電', '联':'聯', '动':'動', '数':'數', '汉':'漢', '气':'氣', '历':'曆', '宁':'寧' };
   s = s.replace(/[\u4E00-\u9FFF]/g, ch => charMap[ch] || ch);
   return s;
 }
-
-// 最终输出前做一次繁体转换（只在 zh-Hant 时）
 function maybeTify(content){
   if (SD_LANG === 'zh-Hant') return zhHansToHantOnce(content);
   return content;
