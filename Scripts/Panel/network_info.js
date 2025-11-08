@@ -1,7 +1,7 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley
- * Version: 2025-11-08R5  // + SUBTITLE_STYLE / SUBTITLE_BLANK
+ * Version: 2025-11-08R5
  *
  * 选择优先级（统一，BoxJS 最高）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
