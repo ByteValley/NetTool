@@ -1,6 +1,6 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
- * by ByteValley
+ * by ByteValley (merged & patched by ChatGPT)
  * Version: 2025-11-08 (t() 工程化 + S2T 兜底)
  *
  * 选择优先级（统一）：
@@ -154,9 +154,13 @@ const CFG = {
 
   TW_FLAG_MODE:  toNum(readKV(K('TW_FLAG_MODE')) ?? $args.TW_FLAG_MODE ?? 1, 1),
 
-  Icon:      readKV(K('Icon'))      ?? $args.Icon      ?? 'globe.asia.australia',
+  // ✅ 新增：图标预设；支持 BoxJS/#!arguments 覆盖
+  IconPreset: readKV(K('IconPreset')) ?? $args.IconPreset ?? 'globe.asia.australia',
+  // ✅ 修改：Icon 默认给空串，让预设能生效（有值仍优先）
+  Icon:      readKV(K('Icon'))      ?? $args.Icon      ?? '',
+  // 保留颜色（仍可 BoxJS/#!arguments 覆盖）
   IconColor: readKV(K('IconColor')) ?? $args.IconColor ?? '#1E90FF',
-
+  
   SD_STYLE:     readKV(K('SD_STYLE'))     ?? $args.SD_STYLE     ?? 'icon',
   SD_SHOW_LAT:  toBool(readKV(K('SD_SHOW_LAT'))  ?? $args.SD_SHOW_LAT,  true),
   SD_SHOW_HTTP: toBool(readKV(K('SD_SHOW_HTTP')) ?? $args.SD_SHOW_HTTP, true),
@@ -198,8 +202,20 @@ const CFG = {
   })()
 };
 
-/* —— 运行时映射 —— */
-const ICON_NAME  = CFG.Icon;
+// —— 运行时映射（图标支持预设 + 自定义）——
+const ICON_PRESET = CFG.IconPreset;  // ← 直接用 CFG
+const ICON_PRESET_MAP = {
+  wifi:    'wifi.router',
+  globe:   'globe.asia.australia',
+  dots:    'dot.radiowaves.left.and.right',
+  antenna: 'antenna.radiowaves.left.and.right',
+  point:   'point.3.connected.trianglepath.dotted'
+};
+
+// 有自定义 Icon 就用自定义；否则用预设；最后兜底到 globe
+const ICON_NAME  = (CFG.Icon || '').trim()
+                || ICON_PRESET_MAP[ICON_PRESET]
+                || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
 const IPv6_ON  = !!CFG.IPv6;
