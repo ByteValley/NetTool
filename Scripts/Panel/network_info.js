@@ -1,6 +1,6 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
- * by ByteValley (merged & patched by ChatGPT)
+ * by ByteValley
  * Version: 2025-11-08R2
  *
  * 选择优先级（统一，BoxJS 最高）：
