@@ -2,18 +2,17 @@
   "id": "ByteValley.Panel",
   "name": "功能看板",
   "author": "ByteValley",
-  "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
-  "description": "功能看板下的各子面板参数集合（仅包含：网络信息）。",
+  "description": "功能看板下的各子面板参数集合（当前包含：网络信息）。",
   "repo": "https://github.com/ByteValley/NetTool",
   "apps": [
     {
       "id": "ByteValley.Panel.NetworkInfo",
       "name": "网络信息",
-      "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
-      "icon_alt": [
-        "https://cdn.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
-        "https://raw.githubusercontent.com/Orz-3/mini/master/Color/Network.png",
-        "https://raw.gitmirror.com/Orz-3/mini/master/Color/Network.png"
+      "descs_html": [
+        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
+        "<b>服务清单策略：</b>当 <code>NetworkInfo_SERVICES</code> 多选有内容时，以多选为准；若多选为空，则读取文本 <code>NetworkInfo_SERVICES_TEXT</code> 或模块参数 <code>SERVICES</code>。文本支持 <b>英文逗号 ,</b> 与 <b>中文逗号 ，</b>（亦兼容分号/竖线/斜杠/空格/换行）或 JSON 数组；<b>不区分大小写</b>、顺序不限。",
+        "<b>可用键与常见别名：</b><br/>YouTube：<code>youtube</code>/<code>yt</code>/<code>youTube</code>/<code>youtube premium</code>/<code>油管</code><br/>Netflix：<code>netflix</code>/<code>nf</code>/<code>奈飞</code><br/>Disney+：<code>disney</code>/<code>disney+</code>/<code>迪士尼</code><br/>Hulu(美)：<code>hulu</code>/<code>hulu_us</code>/<code>huluus</code><br/>Hulu(日)：<code>hulujp</code>/<code>hulu_jp</code><br/>Max(HBO)：<code>hbo</code>/<code>max</code>/<code>最大</code><br/>ChatGPT：<code>chatgpt_app</code>/<code>chatgpt</code>/<code>gpt</code>/<code>openai</code><br/>ChatGPT Web：<code>chatgpt_web</code>/<code>chatgpt web</code>/<code>chatgpt-web</code>/<code>chatgptweb</code>",
+        "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。"
       ],
       "keys": [
         "NetworkInfo_Update",
@@ -26,7 +25,6 @@
         "NetworkInfo_LANDING_IPv4",
         "NetworkInfo_LANDING_IPv6",
         "NetworkInfo_TW_FLAG_MODE",
-        "NetworkInfo_IconPreset",
         "NetworkInfo_Icon",
         "NetworkInfo_IconColor",
         "NetworkInfo_SD_STYLE",
@@ -41,12 +39,12 @@
         "NetworkInfo_SERVICES_TEXT"
       ],
       "settings": [
-        { "id": "NetworkInfo_Update", "name": "刷新间隔（秒）", "type": "number", "val": 10, "min": 3 },
-        { "id": "NetworkInfo_Timeout", "name": "脚本超时（秒）", "type": "number", "val": 8, "min": 3 },
+        { "id": "NetworkInfo_Update", "name": "刷新间隔（秒）", "type": "number", "val": 10 },
+        { "id": "NetworkInfo_Timeout", "name": "脚本超时（秒）", "type": "number", "val": 8 },
 
-        { "id": "NetworkInfo_MASK_IP", "name": "IP 脱敏（直连）", "type": "boolean", "val": true },
-        { "id": "NetworkInfo_MASK_POS", "name": "直连位置脱敏", "type": "boolean", "val": true },
-        { "id": "NetworkInfo_IPv6", "name": "启用 IPv6", "type": "boolean", "val": false },
+        { "id": "NetworkInfo_MASK_IP",  "name": "IP 脱敏（直连）", "type": "boolean", "val": true },
+        { "id": "NetworkInfo_MASK_POS", "name": "直连位置脱敏",     "type": "boolean", "val": true },
+        { "id": "NetworkInfo_IPv6",     "name": "启用 IPv6",       "type": "boolean", "val": false },
 
         {
           "id": "NetworkInfo_DOMESTIC_IPv4",
@@ -54,12 +52,12 @@
           "type": "selects",
           "val": "ipip",
           "items": [
-            { "key": "ipip", "label": "ipip.net" },
-            { "key": "cip", "label": "cip.cc" },
-            { "key": "163", "label": "网易 163" },
+            { "key": "ipip",     "label": "ipip.net" },
+            { "key": "cip",      "label": "cip.cc" },
+            { "key": "163",      "label": "网易 163" },
             { "key": "bilibili", "label": "bilibili" },
-            { "key": "126", "label": "网易 126" },
-            { "key": "pingan", "label": "平安 pingan" }
+            { "key": "126",      "label": "网易 126" },
+            { "key": "pingan",   "label": "平安 pingan" }
           ]
         },
         {
@@ -69,7 +67,7 @@
           "val": "ddnspod",
           "items": [
             { "key": "ddnspod", "label": "DNSPod" },
-            { "key": "neu6", "label": "东北大学 NEU6" }
+            { "key": "neu6",    "label": "东北大学 NEU6" }
           ]
         },
         {
@@ -78,9 +76,9 @@
           "type": "selects",
           "val": "ipapi",
           "items": [
-            { "key": "ipapi", "label": "ipapi.co" },
-            { "key": "ipwhois", "label": "ipwho.is" },
-            { "key": "ipsb", "label": "ip.sb" }
+            { "key": "ipapi",  "label": "ipapi.co" },
+            { "key": "ipwhois","label": "ipwho.is" },
+            { "key": "ipsb",   "label": "ip.sb" }
           ]
         },
         {
@@ -89,7 +87,7 @@
           "type": "selects",
           "val": "ipsb",
           "items": [
-            { "key": "ipsb", "label": "ip.sb" },
+            { "key": "ipsb",  "label": "ip.sb" },
             { "key": "ident", "label": "ident.me" },
             { "key": "ipify", "label": "ipify.org" }
           ]
@@ -105,26 +103,11 @@
             { "key": "1", "label": "🇹🇼 TW | 台湾" },
             { "key": "2", "label": "🇼🇸 WS | 萨摩亚（占位）" }
           ],
-          "desc": "影响台湾地区显示时的旗帜样式"
+          "desc": "仅影响台湾地区显示时的旗帜样式"
         },
 
-        {
-          "id": "NetworkInfo_IconPreset",
-          "name": "脚本图标（预设）",
-          "type": "selects",
-          "val": "globe",
-          "items": [
-            { "key": "wifi",    "label": "📶 wifi.router" },
-            { "key": "globe",   "label": "🌐 globe.asia.australia" },
-            { "key": "dots",    "label": "📡 dot.radiowaves.left.and.right" },
-            { "key": "antenna", "label": "📡 antenna.radiowaves.left.and.right" },
-            { "key": "point",   "label": "🔺 point.3.connected.trianglepath.dotted" },
-            { "key": "custom",  "label": "✏️ 自定义（下方填写）" }
-          ],
-          "desc": "若选择“自定义”，将使用下方的图标名"
-        },
-        { "id": "NetworkInfo_Icon", "name": "脚本图标名（SF Symbols）", "type": "text", "val": "", "placeholder": "留空=使用上面的预设" },
-        { "id": "NetworkInfo_IconColor", "name": "面板图标颜色（HEX）", "type": "text", "val": "#1E90FF" },
+        { "id": "NetworkInfo_Icon",      "name": "面板图标名（SF Symbols）", "type": "text", "val": "globe.asia.australia" },
+        { "id": "NetworkInfo_IconColor", "name": "面板图标颜色（HEX）",       "type": "text", "val": "#1E90FF" },
 
         {
           "id": "NetworkInfo_SD_STYLE",
@@ -136,8 +119,8 @@
             { "key": "text", "label": "文字样式" }
           ]
         },
-        { "id": "NetworkInfo_SD_SHOW_LAT", "name": "显示延迟（Latency）", "type": "boolean", "val": true },
-        { "id": "NetworkInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码", "type": "boolean", "val": true },
+        { "id": "NetworkInfo_SD_SHOW_LAT",  "name": "显示延迟（Latency）", "type": "boolean", "val": true },
+        { "id": "NetworkInfo_SD_SHOW_HTTP", "name": "显示 HTTP 码",       "type": "boolean", "val": true },
 
         {
           "id": "NetworkInfo_SD_LANG",
@@ -150,7 +133,13 @@
           ]
         },
 
-        { "id": "NetworkInfo_SD_TIMEOUT_MS", "name": "服务检测单项超时（ms）", "type": "text", "val": "1000", "desc": "留空则按 Timeout×1000" },
+        {
+          "id": "NetworkInfo_SD_TIMEOUT_MS",
+          "name": "服务检测单项超时（ms）",
+          "type": "text",
+          "val": "",
+          "desc": "留空或填 0 则按 Timeout×1000，脚本内最小 2000ms 兜底"
+        },
 
         {
           "id": "NetworkInfo_SD_REGION_MODE",
@@ -160,7 +149,7 @@
           "items": [
             { "key": "full", "label": "🇯🇵 JP | 日本" },
             { "key": "abbr", "label": "🇯🇵JP" },
-            { "key": "flag", "label": "🇯🇵" }
+            { "key": "flag", "label": "🇯🇵（仅旗帜）" }
           ]
         },
 
@@ -170,8 +159,8 @@
           "type": "selects",
           "val": "check",
           "items": [
-            { "key": "check", "label": "✅ / ❇️ / ❎" },
-            { "key": "lock", "label": "🔓 / 🔐 / 🔒" },
+            { "key": "check",  "label": "✅ / ❇️ / ❎" },
+            { "key": "lock",   "label": "🔓 / 🔐 / 🔒" },
             { "key": "circle", "label": "⭕️ / ⛔️ / 🚫" }
           ]
         },
@@ -193,14 +182,14 @@
             { "key": "chatgpt_app", "label": "ChatGPT" },
             { "key": "chatgpt_web", "label": "ChatGPT Web" }
           ],
-          "desc": "优先级最高。清空=显式为空（不会回退到历史勾选）。"
+          "desc": "优先级最高；此处为空=显式为空（不会沿用历史勾选）。"
         },
         {
           "id": "NetworkInfo_SERVICES_TEXT",
           "name": "服务清单（文本备选）",
           "type": "text",
           "val": "",
-          "desc": "文本或 JSON 数组，分隔符支持英文/中文逗号；可用键：youtube/netflix/disney/hulu_us/hulu_jp/hbo/chatgpt_app/chatgpt_web。优先级次于多选，高于模块 arguments。"
+          "desc": "文本或 JSON 数组。分隔符：英文/中文逗号、分号、竖线、斜杠、空格与换行；大小写不敏感，顺序不限。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。可用键及别名见上文。优先级次于多选，高于模块 arguments。"
         }
       ]
     }
