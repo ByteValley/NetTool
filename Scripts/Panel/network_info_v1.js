@@ -203,7 +203,7 @@ const CFG = {
 };
 
 // —— 运行时映射（图标支持预设 + 自定义）——
-const ICON_PRESET = readKV(K('IconPreset')) ?? $args.IconPreset ?? 'antenna';
+const ICON_PRESET = CFG.IconPreset;  // ← 直接用 CFG
 const ICON_PRESET_MAP = {
   antenna: 'antenna.radiowaves.left.and.right',
   wifi:    'wifi.router',
@@ -211,11 +211,12 @@ const ICON_PRESET_MAP = {
   dots:    'dot.radiowaves.left.and.right',
   point:   'point.3.connected.trianglepath.dotted'
 };
-// 若 BoxJS/#!arguments 提供自定义图标名，则优先生效；否则使用预设
-const ICON_NAME  = (readKV(K('Icon')) ?? $args.Icon ?? '').trim()
+
+// 有自定义 Icon 就用自定义；否则用预设；最后兜底到 antenna
+const ICON_NAME  = (CFG.Icon || '').trim()
                 || ICON_PRESET_MAP[ICON_PRESET]
                 || 'antenna.radiowaves.left.and.right';
-const ICON_COLOR = readKV(K('IconColor')) ?? $args.IconColor ?? '#1E90FF';
+const ICON_COLOR = CFG.IconColor;
 
 const IPv6_ON  = !!CFG.IPv6;
 const MASK_IP  = !!CFG.MASK_IP;
