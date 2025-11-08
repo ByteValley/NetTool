@@ -2,17 +2,18 @@
   "id": "ByteValley.Panel",
   "name": "功能看板",
   "author": "ByteValley",
+  "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
   "description": "功能看板下的各子面板参数集合（仅包含：网络信息）。",
   "repo": "https://github.com/ByteValley/NetTool",
   "apps": [
     {
       "id": "ByteValley.Panel.NetworkInfo",
       "name": "网络信息",
-      "icon": "https://cdn.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
-      "descs_html": [
-        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
-        "<b>服务清单策略：</b>当 <code>NetworkInfo_SERVICES</code> 多选有内容时，以多选为准；若多选为空，则读取文本 <code>NetworkInfo_SERVICES_TEXT</code> 或模块参数 <code>SERVICES</code>。文本支持 <b>英文逗号 ,</b> 与 <b>中文逗号 ，</b>（亦兼容分号/竖线/斜杠/空格/换行）或 JSON 数组；<b>不区分大小写、顺序不限</b>。可用键：youtube、netflix、disney、hulu_us、hulu_jp、hbo、chatgpt_app（ChatGPT）、chatgpt_web（ChatGPT Web）。",
-        "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。"
+      "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
+      "icon_alt": [
+        "https://cdn.jsdelivr.net/gh/Orz-3/mini@master/Color/Network.png",
+        "https://raw.githubusercontent.com/Orz-3/mini/master/Color/Network.png",
+        "https://raw.gitmirror.com/Orz-3/mini/master/Color/Network.png"
       ],
       "keys": [
         "NetworkInfo_Update",
