@@ -12,7 +12,8 @@
         "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
         "<b>服务清单策略：</b>当 <code>NetworkInfo_SERVICES</code> 多选有内容时，以多选为准；若多选为空，则读取文本 <code>NetworkInfo_SERVICES_TEXT</code> 或模块参数 <code>SERVICES</code>。文本支持 <b>英文逗号 ,</b> 与 <b>中文逗号 ，</b>（亦兼容分号/竖线/斜杠/空格/换行）或 JSON 数组；<b>不区分大小写</b>、顺序不限。",
         "<b>可用键与常见别名：</b><br/>YouTube：<code>youtube</code>/<code>yt</code>/<code>youTube</code>/<code>youtube premium</code>/<code>油管</code><br/>Netflix：<code>netflix</code>/<code>nf</code>/<code>奈飞</code><br/>Disney+：<code>disney</code>/<code>disney+</code>/<code>迪士尼</code><br/>Hulu(美)：<code>hulu</code>/<code>hulu_us</code>/<code>huluus</code><br/>Hulu(日)：<code>hulujp</code>/<code>hulu_jp</code><br/>Max(HBO)：<code>hbo</code>/<code>max</code>/<code>最大</code><br/>ChatGPT：<code>chatgpt_app</code>/<code>chatgpt</code>/<code>gpt</code>/<code>openai</code><br/>ChatGPT Web：<code>chatgpt_web</code>/<code>chatgpt web</code>/<code>chatgpt-web</code>/<code>chatgptweb</code>",
-        "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。"
+        "取值优先级：<b>BoxJS</b>（NetworkInfo_*） → 模块 <code>#!arguments</code> → 代码默认值。",
+        "<b>缓存说明：</b>入口定位（按入口 IP）有短期缓存，缓存时长与刷新间隔联动：<code>TTL = min(Update, 3600)</code> 秒；更新更快时可降低反复查询震荡。"
       ],
       "keys": [
         "NetworkInfo_Update",
@@ -25,6 +26,7 @@
         "NetworkInfo_LANDING_IPv4",
         "NetworkInfo_LANDING_IPv6",
         "NetworkInfo_TW_FLAG_MODE",
+        "NetworkInfo_IconPreset",
         "NetworkInfo_Icon",
         "NetworkInfo_IconColor",
         "NetworkInfo_SD_STYLE",
@@ -36,13 +38,17 @@
         "NetworkInfo_SD_ICON_THEME",
         "NetworkInfo_SD_ARROW",
         "NetworkInfo_SERVICES",
-        "NetworkInfo_SERVICES_TEXT"
+        "NetworkInfo_SERVICES_TEXT",
+        "NetworkInfo_LOG",
+        "NetworkInfo_LOG_LEVEL",
+        "NetworkInfo_LOG_TO_PANEL",
+        "NetworkInfo_LOG_PUSH"
       ],
       "settings": [
-        { "id": "NetworkInfo_Update", "name": "刷新间隔（秒）", "type": "number", "val": 10 },
+        { "id": "NetworkInfo_Update",  "name": "刷新间隔（秒）", "type": "number", "val": 10, "desc": "面板刷新周期；同时影响入口定位缓存 TTL=min(Update,3600)" },
         { "id": "NetworkInfo_Timeout", "name": "脚本超时（秒）", "type": "number", "val": 8 },
 
-        { "id": "NetworkInfo_MASK_IP",  "name": "IP 脱敏（直连）", "type": "boolean", "val": true },
+        { "id": "NetworkInfo_MASK_IP",  "name": "IP 脱敏（直连）", "type": "boolean", "val": true,  "desc": "面板与日志都遵守此设置" },
         { "id": "NetworkInfo_MASK_POS", "name": "直连位置脱敏",     "type": "boolean", "val": true },
         { "id": "NetworkInfo_IPv6",     "name": "启用 IPv6",       "type": "boolean", "val": false },
 
@@ -122,7 +128,7 @@
           "desc": "若选择“自定义”，将使用下方的图标名"
         },
         { "id": "NetworkInfo_Icon", "name": "脚本图标名（SF Symbols）", "type": "text", "val": "", "placeholder": "留空=使用上面的预设" },
-        { "id": "NetworkInfo_IconColor", "name": "面板图标颜色（HEX）", "type": "text", "val": "#1E90FF" },
+        { "id": "NetworkInfo_IconColor", "name": "面板图标颜色（HEX）", "type": "text", "val": "#1E90FF", "placeholder": "#RRGGBB" },
 
         {
           "id": "NetworkInfo_SD_STYLE",
@@ -153,6 +159,7 @@
           "name": "服务检测单项超时（ms）",
           "type": "text",
           "val": "",
+          "placeholder": "留空或0=Timeout×1000，最小2000",
           "desc": "留空或填 0 则按 Timeout×1000，脚本内最小 2000ms 兜底"
         },
 
@@ -204,8 +211,21 @@
           "name": "服务清单（文本备选）",
           "type": "text",
           "val": "",
-          "desc": "文本或 JSON 数组。分隔符：英文/中文逗号、分号、竖线、斜杠、空格与换行；大小写不敏感，顺序不限。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。可用键及别名见上文。优先级次于多选，高于模块 arguments。"
-        }
+          "placeholder": "youtube, netflix, chatgpt_web 或 [\"youtube\",\"netflix\"]",
+          "desc": "文本或 JSON 数组。分隔符：英文/中文逗号、分号、竖线、斜杠、空格与换行；大小写不敏感，顺序不限。示例：YouTube，Netflix，ChatGPT 或 [\"youtube\",\"netflix\",\"chatgpt_web\"]。优先级次于多选，高于模块 arguments。"
+        },
+
+        { "id": "NetworkInfo_LOG",         "name": "开启日志（LOG）",             "type": "boolean", "val": false, "desc": "开启后输出关键行为/缓存命中等" },
+        { "id": "NetworkInfo_LOG_LEVEL",   "name": "日志级别（LOG_LEVEL）",       "type": "selects", "val": "info",
+          "items": [
+            { "key": "debug", "label": "debug（最详细）" },
+            { "key": "info",  "label": "info（默认）" },
+            { "key": "warn",  "label": "warn" },
+            { "key": "error", "label": "error" }
+          ]
+        },
+        { "id": "NetworkInfo_LOG_TO_PANEL","name": "日志附加到面板（LOG_TO_PANEL）", "type": "boolean", "val": false, "desc": "在面板底部追加“—— 调试 ——”区块（最多近 18 行）" },
+        { "id": "NetworkInfo_LOG_PUSH",    "name": "异常推送通知（LOG_PUSH）",     "type": "boolean", "val": true,  "desc": "脚本异常时系统通知提醒" }
       ]
     }
   ]
