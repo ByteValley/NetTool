@@ -1,7 +1,7 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley
- * Version: 2025-11-08R2
+ * Version: 2025-11-08R3
  *
  * 选择优先级（统一，BoxJS 最高）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
@@ -20,6 +20,11 @@
  *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
  *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
  *   · ChatGPT App(API) 地区多源回退，优先 Cloudflare 头
+ * - 日志相关（可在 BoxJS 或 #!arguments 配置）：
+ *   - LOG=1            开启日志（默认 0）
+ *   - LOG_LEVEL=info   级别：debug|info|warn|error
+ *   - LOG_TO_PANEL=0   是否把末尾附加“—— 调试 ——”区块（默认 0）
+ *   - LOG_PUSH=1       运行异常推送系统通知（默认 1）
  * =======================================================*/
 
 /* ===== 语言字典（固定 UI 词收口）===== */
@@ -45,7 +50,8 @@ const SD_STR = {
     fail: "检测失败",
     regionBlocked: "区域受限",
     nfFull: "已完整解锁",
-    nfOriginals: "仅解锁自制剧"
+    nfOriginals: "仅解锁自制剧",
+    debug: "调试"
   },
   "zh-Hant": {
     panelTitle: "網路資訊 𝕏",
@@ -68,7 +74,8 @@ const SD_STR = {
     fail: "檢測失敗",
     regionBlocked: "區域受限",
     nfFull: "已完整解鎖",
-    nfOriginals: "僅解鎖自製劇"
+    nfOriginals: "僅解鎖自製劇",
+    debug: "除錯"
   }
 };
 /* t() 取词工具 */
@@ -133,9 +140,39 @@ const toNum = (v, d) => {
 };
 const K = s => `NetworkInfo_${s}`;
 
-// 先预计算，避免对象字面量里自引用
+// 预读基础配置
 const UPDATE  = toNum(readKV(K('Update'))  ?? $args.Update  ?? 10, 10);
 const TIMEOUT = toNum(readKV(K('Timeout')) ?? $args.Timeout ?? 8,  8);
+
+// ===== 日志配置 =====
+const LOG_ON       = toBool(readKV(K('LOG'))          ?? $args.LOG,          false);
+const LOG_TO_PANEL = toBool(readKV(K('LOG_TO_PANEL')) ?? $args.LOG_TO_PANEL, false);
+const LOG_PUSH     = toBool(readKV(K('LOG_PUSH'))     ?? $args.LOG_PUSH,     true);
+const LOG_LEVEL    = (readKV(K('LOG_LEVEL')) ?? $args.LOG_LEVEL ?? 'info').toString().toLowerCase();
+
+const LOG_LEVELS = { debug:10, info:20, warn:30, error:40 };
+const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
+const DEBUG_LINES = [];
+function _maskMaybe(ip){ // 遵从 MASK_IP 配置
+  if (!ip) return '';
+  if (!MASK_IP) return ip;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { const p=ip.split('.'); return `${p[0]}.${p[1]}.*.*`; }
+  if (/:/.test(ip)) { const p=ip.split(':'); return [...p.slice(0,4),'*','*','*','*'].join(':'); }
+  return ip;
+}
+function log(level, ...args){
+  if (!LOG_ON) return;
+  const L = LOG_LEVELS[level] ?? 20;
+  if (L < LOG_THRESH) return;
+  const line = `[NI][${level.toUpperCase()}] ${args.map(x=>typeof x==='string'?x:JSON.stringify(x)).join(' ')}`;
+  try { console.log(line); } catch(_) {}
+  DEBUG_LINES.push(line);
+  if (DEBUG_LINES.length>120) DEBUG_LINES.shift();
+}
+function logErrPush(title, body){
+  if (LOG_PUSH) $notification?.post?.(title, "", body);
+  log('error', title, body);
+}
 
 // ===== 统一配置对象（后续直接用 CFG.*）=====
 const CFG = {
@@ -174,23 +211,18 @@ const CFG = {
   SD_ICON_THEME:  readKV(K('SD_ICON_THEME'))  ?? $args.SD_ICON_THEME  ?? 'check',
   SD_ARROW:       toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true),
 
-  // BoxJS 勾选（JSON 字符串). 若为空串/[]/null => 视为“无此键”，不阻塞回退
   SERVICES_BOX_CHECKED_RAW: (() => {
-    const v = readKV(K('SERVICES')); // 例如：["youtube","netflix"]
+    const v = readKV(K('SERVICES'));
     if (v === undefined || v === null) return null;
     const s = String(v).trim();
     if (!s || s === '[]' || /^null$/i.test(s)) return null;
     return s;
   })(),
-
-  // BoxJS 文本：NetworkInfo_SERVICES_TEXT（JSON 数组或逗号字符串）
   SERVICES_BOX_TEXT: (() => {
     const v = readKV(K('SERVICES_TEXT'));
     const s = (v != null) ? String(v).trim() : '';
     return s;
   })(),
-
-  // 模块参数文本：SERVICES=...（支持数组/JSON/逗号）
   SERVICES_ARG_TEXT: (() => {
     let v = $args.SERVICES;
     if (Array.isArray(v)) return JSON.stringify(v);
@@ -204,7 +236,7 @@ const ICON_PRESET = CFG.IconPreset;
 const ICON_PRESET_MAP = {
   wifi:    'wifi.router',
   globe:   'globe.asia.australia',
-  dots:    'dot.radiowaves.left.and-right',
+  dots:    'dot.radiowaves.left.and.right',
   antenna: 'antenna.radiowaves.left.and.right',
   point:   'point.3.connected.trianglepath.dotted'
 };
@@ -240,27 +272,48 @@ const SD_REGION_MODE = ['full','abbr','flag'].includes(String(CFG.SD_REGION_MODE
 const SD_ICON_THEME  = ['lock','circle','check'].includes(String(CFG.SD_ICON_THEME)) ? CFG.SD_ICON_THEME : 'check';
 const SD_ARROW       = !!CFG.SD_ARROW;
 
+// ===== 日志：启动总览 =====
+log('info', 'Start',
+    JSON.stringify({
+      Update: CFG.Update,
+      Timeout: CFG.Timeout,
+      IPv6: IPv6_ON,
+      SD_TIMEOUT_MS,
+      SD_STYLE,
+      SD_REGION_MODE,
+      TW_FLAG_MODE: TW_FLAG_MODE
+    })
+);
+
 /* ===================== 主流程 ===================== */
 ;(async () => {
   const preTouch = touchLandingOnceQuick().catch(()=>{});
 
+  const t0 = Date.now();
   const [cn, cn6] = await Promise.all([
-    getDirectV4(DOMESTIC_IPv4).catch(()=>({})),
-    IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch(()=>({})) : Promise.resolve({})
+    getDirectV4(DOMESTIC_IPv4).catch((e)=>{ log('warn','DirectV4 fail', String(e)); return {}; }),
+    IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch((e)=>{ log('warn','DirectV6 fail', String(e)); return {}; }) : Promise.resolve({})
   ]);
+  log('info', 'Direct fetched in', (Date.now()-t0)+'ms',
+      { v4: _maskMaybe(cn.ip||''), v6: _maskMaybe(cn6.ip||'') });
 
   await preTouch;
 
-  // 同时抓入口 IPv4 + IPv6
+  const t1 = Date.now();
   const { policyName, entrance4, entrance6 } = await getPolicyAndEntranceBoth();
+  log('info', 'EntranceBoth',
+      { policy: policyName||'-', v4:_maskMaybe(entrance4||''), v6:_maskMaybe(entrance6||'') , cost:(Date.now()-t1)+'ms' });
 
-  const ent4 = isIP(entrance4||'') ? await getEntranceBundle(entrance4).catch(()=>({ ip: entrance4 })) : {};
-  const ent6 = isIP(entrance6||'') ? await getEntranceBundle(entrance6).catch(()=>({ ip: entrance6 })) : {};
+  const ent4 = isIP(entrance4||'') ? await getEntranceBundle(entrance4).catch((e)=>{ log('warn','EntranceBundle v4 fail', String(e)); return { ip: entrance4 }; }) : {};
+  const ent6 = isIP(entrance6||'') ? await getEntranceBundle(entrance6).catch((e)=>{ log('warn','EntranceBundle v6 fail', String(e)); return { ip: entrance6 }; }) : {};
 
+  const t2 = Date.now();
   const [px, px6] = await Promise.all([
-    getLandingV4(LANDING_IPv4).catch(()=>({})),
-    IPv6_ON ? getLandingV6(LANDING_IPv6).catch(()=>({})) : Promise.resolve({})
+    getLandingV4(LANDING_IPv4).catch((e)=>{ log('warn','LandingV4 fail', String(e)); return {}; }),
+    IPv6_ON ? getLandingV6(LANDING_IPv6).catch((e)=>{ log('warn','LandingV6 fail', String(e)); return {}; }) : Promise.resolve({})
   ]);
+  log('info', 'Landing fetched in', (Date.now()-t2)+'ms',
+      { v4: _maskMaybe(px.ip||''), v6: _maskMaybe(px6.ip||'') });
 
   const nt = netTypeLine();
   const title = nt || t('panelTitle');
@@ -268,11 +321,9 @@ const SD_ARROW       = !!CFG.SD_ARROW;
   /* ====== 分组渲染 ====== */
   const parts = [];
 
-  // 顶部：执行时间 & 代理策略（不留白）
+  // 顶部
   parts.push(`${t('runAt')}: ${now()}`);
   parts.push(`${t('policy')}: ${policyName || '-'}`);
-
-  // 与“本地”之间留白一行
   parts.push('');
 
   // 本地
@@ -309,19 +360,28 @@ const SD_ARROW       = !!CFG.SD_ARROW;
     if (px.isp) parts.push(`${t('isp')}: ${fmtISP(px.isp, px.loc)}`);
   }
 
-  // 服务检测（分组）
+  // 服务检测
   const sdLines = await runServiceChecks();
   if (sdLines.length) {
     parts.push('', subTitle('服务检测'));
     parts.push(...sdLines);
   }
 
+  // 可选把日志拼到面板尾部
+  if (LOG_TO_PANEL && DEBUG_LINES.length){
+    parts.push('', subTitle(t('debug')));
+    const tail = DEBUG_LINES.slice(-18).join('\n');
+    parts.push(tail);
+  }
+
   const content = maybeTify(parts.join('\n'));
   $done({ title: maybeTify(title), content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
+
 })().catch(err => {
-  $notification?.post?.(t('panelTitle'), '脚本错误', String(err));
+  const msg = String(err);
+  logErrPush(t('panelTitle'), msg);
   const errTitle = t('panelTitle');
-  const errBody  = maybeTify(String(err));
+  const errBody  = maybeTify(msg);
   $done({ title: errTitle, content: errBody, icon: ICON_NAME, 'icon-color': ICON_COLOR });
 });
 
@@ -428,29 +488,37 @@ function httpGet(url, headers={}, timeoutMs=null, followRedirect=false){
     const req = { url, headers };
     if (timeoutMs != null) req.timeout = timeoutMs;
     if (followRedirect) req.followRedirect = true;
+    const start = Date.now();
     $httpClient.get(req,(err,resp,body)=>{
-      if (err) return reject(err);
-      resolve({ status: resp?.status || resp?.statusCode, headers: resp?.headers||{}, body });
+      const cost = Date.now()-start;
+      if (err) {
+        log('warn','HTTP GET fail', url, 'cost', cost+'ms', String(err));
+        return reject(err);
+      }
+      const status = resp?.status || resp?.statusCode;
+      log('debug', 'HTTP GET', url, 'status', status, 'cost', cost+'ms');
+      resolve({ status, headers: resp?.headers||{}, body });
     });
   });
 }
 function httpAPI(path='/v1/requests/recent'){
   return new Promise(res=>{
-    if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, res);
-    else res({});
+    if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, (x)=>{ log('debug','httpAPI', path, 'ok'); res(x); });
+    else { log('warn','httpAPI not available'); res({}); }
   });
 }
 
 /* ===================== 数据源：直连/落地/入口 ===================== */
 async function getDirectV4(p){
   try{
+    log('info','DirectV4 source', p);
     if (p==='cip')      return await d_cip();
     if (p==='163')      return await d_163();
     if (p==='bilibili') return await d_bili();
     if (p==='126')      return await d_126();
     if (p==='pingan')   return await d_pingan();
     return await d_ipip();
-  }catch(_){ try{return await d_ipip()}catch(e){} return {}; }
+  }catch(e){ log('warn','DirectV4 fallback ipip', String(e)); try{return await d_ipip()}catch(e2){ log('error','DirectV4 ipip fail', String(e2)); } return {}; }
 }
 async function d_ipip(){ const r=await httpGet('https://myip.ipip.net/json'); const j=JSON.parse(r.body||'{}'); const c0=j?.data?.location?.[0]; const flag=flagOf(c0==='中国'?'CN':c0); return { ip:j?.data?.ip||'', loc:[flag, j?.data?.location?.[0], j?.data?.location?.[1], j?.data?.location?.[2]].filter(Boolean).join(' ').replace(/\s*中国\s*/,'') , isp:j?.data?.location?.[4]||'' }; }
 async function d_cip(){ const r=await httpGet('http://cip.cc/'); const b=String(r.body||''); const ip=(b.match(/IP.*?:\s*(\S+)/)||[])[1]||''; const addr=(b.match(/地址.*?:\s*(.+)/)||[])[1]||''; const isp=(b.match(/运营商.*?:\s*(.+)/)||[])[1]||''; const isCN=/中国/.test(addr); return { ip, loc:[flagOf(isCN?'CN':''), addr.replace(/中国\s*/,'')].filter(Boolean).join(' '), isp:isp.replace(/中国\s*/,'') }; }
@@ -461,17 +529,19 @@ async function d_pingan(){ const r=await httpGet('https://rmb.pingan.com.cn/itam
 
 async function getDirectV6(p){
   try{
+    log('info','DirectV6 source', p);
     if (p==='neu6'){ const r=await httpGet('https://speed.neu6.edu.cn/getIP.php'); return { ip:String(r.body||'').trim() }; }
     const r=await httpGet('https://ipv6.ddnspod.com'); return { ip:String(r.body||'').trim() };
-  }catch(_){ return {}; }
+  }catch(e){ log('warn','DirectV6 fail', String(e)); return {}; }
 }
 
 async function getLandingV4(p){
   try{
+    log('info','LandingV4 source', p);
     if (p==='ipwhois') return await l_whois();
     if (p==='ipsb')    return await l_ipsb();
     return await l_ipapi();
-  }catch(_){ try{return await l_ipapi()}catch(e){} return {}; }
+  }catch(e){ log('warn','LandingV4 fallback ipapi', String(e)); try{return await l_ipapi()}catch(e2){ log('error','LandingV4 ipapi fail', String(e2)); } return {}; }
 }
 async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||'' }; }
 async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' }; }
@@ -479,10 +549,11 @@ async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip');
 
 async function getLandingV6(p){
   try{
+    log('info','LandingV6 source', p);
     if (p==='ident'){ const r=await httpGet('https://v6.ident.me'); return { ip:String(r.body||'').trim() }; }
     if (p==='ipify'){ const r=await httpGet('https://api6.ipify.org'); return { ip:String(r.body||'').trim() }; }
     const r=await httpGet('https://api-ipv6.ip.sb/ip'); return { ip:String(r.body||'').trim() };
-  }catch(_){ return {}; }
+  }catch(e){ log('warn','LandingV6 fail', String(e)); return {}; }
 }
 
 /* ===================== 入口/策略（稳态获取） ===================== */
@@ -500,13 +571,13 @@ function extractIP(str){
   return '';
 }
 
-// 预触发：同时命中 v4 与 v6
 async function touchLandingOnceQuick(){
   try { await httpGet('http://ip-api.com/json?lang=zh-CN', {}, 700, true); } catch(_) {}
   try { await httpGet('https://api-ipv6.ip.sb/ip', {}, 700, true); } catch(_) {}
+  log('debug','Pre-touch landing endpoints done');
 }
 
-// 同时抓入口 IPv4 + IPv6（优先从最近请求命中 IP 数据源）
+// 同时抓入口 IPv4 + IPv6
 async function getPolicyAndEntranceBoth(){
   const data = await httpAPI('/v1/requests/recent');
   const reqs = Array.isArray(data?.requests) ? data.requests : [];
@@ -521,26 +592,19 @@ async function getPolicyAndEntranceBoth(){
     else if (isIPv4(ip)) { if (!ip4) ip4 = ip; }
     if (policy && ip4 && ip6) break;
   }
-  // 兜底：任意代理请求（不要求来源匹配）
   if (!policy && !ip4 && !ip6){
-    const any = await (async ()=>{
-      const d = await httpAPI('/v1/requests/recent');
-      const rs = Array.isArray(d?.requests) ? d.requests : [];
-      const hit  = rs.find(i => /\(Proxy\)/.test(i.remoteAddress||'') && i.policyName);
-      if (!hit) return {};
-      return { policyName: hit.policyName, entranceIP: extractIP(hit.remoteAddress) };
-    })().catch(()=>({}));
-    policy = any.policyName || '';
-    if (any.entranceIP) (isIPv6(any.entranceIP) ? (ip6=any.entranceIP) : (ip4=any.entranceIP));
+    const d = await httpAPI('/v1/requests/recent');
+    const rs = Array.isArray(d?.requests) ? d.requests : [];
+    const hit  = rs.find(i => /\(Proxy\)/.test(i.remoteAddress||'') && i.policyName);
+    if (hit) { policy = hit.policyName; const eip = extractIP(hit.remoteAddress); if (eip) (isIPv6(eip)?(ip6=eip):(ip4=eip)); }
   }
+  log('debug','Policy/Entrance candidates', { policy, v4:_maskMaybe(ip4), v6:_maskMaybe(ip6), hits: hits.length });
   return { policyName: policy, entrance4: ip4, entrance6: ip6 };
 }
 
-/* —— 入口位置（国内/国际）超时+回退+缓存 —— */
+/* —— 入口位置缓存（跟 Update 联动） —— */
 const ENT_REQ_TO = Math.max(2500, (Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000));
-// 入口信息缓存时长（秒）：跟随 Update，但最多 3600 秒；下限 30 秒兜底
 const ENT_TTL_SEC = Math.max(30, Math.min(Number(CFG.Update) || 10, 3600));
-
 let ENT_CACHE = { ip: "", t: 0, data: null };
 
 async function withRetry(fn, retry = 1, delay = 260) {
@@ -552,7 +616,7 @@ async function withRetry(fn, retry = 1, delay = 260) {
   throw "retry-fail";
 }
 
-// 数据源：平安（国内）
+// 入口定位数据源
 async function loc_pingan(ip) {
   const r = await httpGet(
       'https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=' + encodeURIComponent(ip),
@@ -567,8 +631,6 @@ async function loc_pingan(ip) {
     isp: d.isp || ''
   };
 }
-
-// 数据源：ip-api（国际）
 async function loc_ipapi(ip) {
   const r = await httpGet(
       `http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`,
@@ -583,8 +645,6 @@ async function loc_ipapi(ip) {
     isp: j.isp || j.org || j.as || ''
   };
 }
-
-// 数据源：ipwhois（回退1）
 async function loc_ipwhois(ip) {
   const r = await httpGet(
       `https://ipwhois.app/json/${encodeURIComponent(ip)}?lang=zh-CN`,
@@ -599,8 +659,6 @@ async function loc_ipwhois(ip) {
     isp: (j.connection && j.connection.isp) || j.org || ''
   };
 }
-
-// 数据源：ip.sb（回退2）
 async function loc_ipsb(ip) {
   const r = await httpGet(
       `https://api.ip.sb/geoip/${encodeURIComponent(ip)}`,
@@ -615,23 +673,34 @@ async function loc_ipsb(ip) {
     isp: j.isp || j.organization || ''
   };
 }
-
-// B 链式回退：ip-api → ipwhois → ip.sb
 async function loc_chain(ip) {
   try { return await withRetry(() => loc_ipapi(ip),   1); } catch (_) {}
   try { return await withRetry(() => loc_ipwhois(ip), 1); } catch (_) {}
   return        await withRetry(() => loc_ipsb(ip),   0);
 }
 
-// 对外：并发拿 A/B；含动态 TTL 缓存
+// —— 带缓存的入口定位 —— //
 async function getEntranceBundle(ip) {
-  if (ENT_CACHE.ip === ip && (Date.now() - ENT_CACHE.t) < ENT_TTL_SEC * 1000 && ENT_CACHE.data) {
+  const now = Date.now();
+  if (ENT_CACHE.ip === ip && (now - ENT_CACHE.t) < ENT_TTL_SEC * 1000 && ENT_CACHE.data) {
+    const left = Math.max(0, ENT_TTL_SEC*1000 - (now-ENT_CACHE.t));
+    log('info','Entrance cache HIT', { ip:_maskMaybe(ip), ttl_ms_left:left });
     return ENT_CACHE.data;
   }
+  if (ENT_CACHE.ip === ip && ENT_CACHE.data) {
+    log('info','Entrance cache EXPIRED', { ip:_maskMaybe(ip), age_ms:(now-ENT_CACHE.t), ttl_ms: ENT_TTL_SEC*1000 });
+  } else {
+    log('info','Entrance cache MISS', { ip:_maskMaybe(ip) });
+  }
+
+  const t = Date.now();
   const [a, b] = await Promise.allSettled([
     withRetry(() => loc_pingan(ip), 1),
     withRetry(() => loc_chain(ip),  1)
   ]);
+  log('debug','Entrance locate results',
+      { pingan:a.status, chain:b.status, cost:(Date.now()-t)+'ms' });
+
   const res = {
     ip,
     loc1: a.status === 'fulfilled' ? (a.value.loc || '') : '',
@@ -639,7 +708,7 @@ async function getEntranceBundle(ip) {
     loc2: b.status === 'fulfilled' ? (b.value.loc || '') : '',
     isp2: b.status === 'fulfilled' ? (b.value.isp || '') : ''
   };
-  ENT_CACHE = { ip, t: Date.now(), data: res };
+  ENT_CACHE = { ip, t: now, data: res };
   return res;
 }
 
@@ -656,7 +725,6 @@ const SD_TESTS_MAP = {
 };
 const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 
-// 允许更多分隔符 & 别名归一
 const SD_ALIAS = {
   yt:'youtube', 'youtube':'youtube', 'youtube premium':'youtube', '油管':'youtube',
   nf:'netflix', 'netflix':'netflix', '奈飞':'netflix',
@@ -678,7 +746,6 @@ function parseServices(raw){
   const parts = s.split(/[,\uFF0C;|/ \t\r\n]+/);
   return normSvcList(parts);
 }
-
 function normSvcList(list){
   const out = [];
   for (let x of list){
@@ -690,24 +757,24 @@ function normSvcList(list){
   }
   return out;
 }
-
 function selectServices(){
   const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
   const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
   if (hasCheckboxKey) {
-    if (boxChecked.length > 0) return boxChecked;
+    if (boxChecked.length > 0) { log('info','Services from BoxJS checkbox', boxChecked); return boxChecked; }
     const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-    if (boxTextList.length > 0) return boxTextList;
+    if (boxTextList.length > 0) { log('info','Services from BoxJS text', boxTextList); return boxTextList; }
     const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-    if (argList.length > 0) return argList;
+    if (argList.length > 0) { log('info','Services from arguments', argList); return argList; }
+    log('info','Services default(all)');
     return SD_DEFAULT_ORDER.slice();
   }
-
   const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-  if (boxTextList.length > 0) return boxTextList;
+  if (boxTextList.length > 0) { log('info','Services from BoxJS text', boxTextList); return boxTextList; }
   const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-  if (argList.length > 0) return argList;
+  if (argList.length > 0) { log('info','Services from arguments', argList); return argList; }
+  log('info','Services default(all)');
   return SD_DEFAULT_ORDER.slice();
 }
 
@@ -723,9 +790,13 @@ function sd_httpGet(url, headers={}, followRedirect=true) {
         { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, followRedirect },
         (err, resp, data) => {
           const cost = sd_now() - start;
-          if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
-          resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
-            headers: resp.headers || {}, data: data || "" });
+          if (err || !resp) {
+            log('warn','sd_httpGet FAIL', url, 'cost', cost+'ms', String(err||''));
+            return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
+          }
+          const status = resp.status || resp.statusCode || 0;
+          log('debug','sd_httpGet OK', url, 'status', status, 'cost', cost+'ms');
+          resolve({ ok:true, status, cost, headers: resp.headers || {}, data: data || "" });
         }
     );
   });
@@ -737,9 +808,13 @@ function sd_httpPost(url, headers={}, body="") {
         { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, body },
         (err, resp, data) => {
           const cost = sd_now() - start;
-          if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
-          resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
-            headers: resp.headers || {}, data: data || "" });
+          if (err || !resp) {
+            log('warn','sd_httpPost FAIL', url, 'cost', cost+'ms', String(err||''));
+            return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
+          }
+          const status = resp.status || resp.statusCode || 0;
+          log('debug','sd_httpPost OK', url, 'status', status, 'cost', cost+'ms');
+          resolve({ ok:true, status, cost, headers: resp.headers || {}, data: data || "" });
         }
     );
   });
@@ -793,7 +868,7 @@ function sd_pickIcons(theme){
 const SD_ICONS = sd_pickIcons(SD_ICON_THEME);
 function sd_isPartial(tag){ return /自制|自製|original/i.test(String(tag||'')) || /部分/i.test(String(tag||'')); }
 
-/* —— 服务名 —— */
+/* —— 服务名（展示使用） —— */
 const SD_I18N = {
   "zh-Hans": {
     youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
@@ -805,7 +880,7 @@ const SD_I18N = {
   }
 }[SD_LANG];
 
-/* —— 各服务 —— */
+/* —— 各服务检查 —— */
 function sd_parseNFRegion(resp) {
   try {
     const xo = resp?.headers?.['x-originating-url']
@@ -822,6 +897,7 @@ function sd_parseNFRegion(resp) {
 }
 
 async function sd_testYouTube() {
+  log('debug','SD YouTube begin');
   const r = await sd_httpGet("https://www.youtube.com/premium?hl=en", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.youTube, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   let cc = "US";
@@ -833,12 +909,14 @@ async function sd_testYouTube() {
   return sd_renderLine({name:SD_I18N.youTube, ok:true, cc, cost:r.cost, status:r.status, tag:""});
 }
 async function sd_testChatGPTWeb() {
+  log('debug','SD ChatGPT Web begin');
   const r = await sd_httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   let cc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch(_){}
   return sd_renderLine({name:SD_I18N.chatgpt, ok:true, cc, cost:r.cost, status:r.status, tag:""});
 }
 async function sd_testChatGPTAppAPI() {
+  log('debug','SD ChatGPT App begin');
   const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   let cc = "";
@@ -855,6 +933,7 @@ const SD_NF_ORIGINAL = "80018499";
 const SD_NF_NONORIG  = "81280792";
 async function sd_nfGet(id){ return await sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true); }
 async function sd_testNetflix() {
+  log('debug','SD Netflix begin');
   try {
     const r1 = await sd_nfGet(SD_NF_NONORIG);
     if (!r1.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:t('fail')});
@@ -871,12 +950,13 @@ async function sd_testNetflix() {
       return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:t('nfFull'), state:'full'});
     }
     return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:`HTTP ${r1.status}`});
-  } catch(_){
+  } catch(e){
     return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:null, status:0, tag:t('fail')});
   }
 }
 
 async function sd_testDisney() {
+  log('debug','SD Disney+ begin');
   async function home() {
     const r = await sd_httpGet("https://www.disneyplus.com/", { "Accept-Language":"en" }, true);
     if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.data||"")) throw "NA";
@@ -920,18 +1000,21 @@ async function sd_testDisney() {
 }
 
 async function sd_testHuluUS() {
+  log('debug','SD Hulu US begin');
   const r = await sd_httpGet("https://www.hulu.com/", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.huluUS, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
   return sd_renderLine({name:SD_I18N.huluUS, ok:!blocked, cc: blocked?"": "US", cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
 }
 async function sd_testHuluJP() {
+  log('debug','SD Hulu JP begin');
   const r = await sd_httpGet("https://www.hulu.jp/", { "Accept-Language":"ja" }, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.huluJP, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
   return sd_renderLine({name:SD_I18N.huluJP, ok:!blocked, cc: blocked?"": "JP", cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
 }
 async function sd_testHBO() {
+  log('debug','SD Max(HBO) begin');
   const r = await sd_httpGet("https://www.max.com/", {}, true);
   if (!r.ok) return sd_renderLine({name:SD_I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
   const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
@@ -976,6 +1059,7 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const unlockedShort = t('unlocked');
   const blockedText   = t('notReachable');
 
+  const isNetflix = /netflix/i.test(String(name));
   const stateTextLong = (()=>{
     if (st==='full')    return t('nfFull');
     if (st==='partial') return t('nfOriginals');
@@ -983,9 +1067,9 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   })();
   const stateTextShort = (st==='blocked') ? blockedText : unlockedShort;
 
-  const isNetflix = /netflix/i.test(String(name));
   const showTag = (isNetflix && SD_STYLE === "text" && !SD_ARROW) ? "" : (tag || "");
 
+  // 文本模式（紧凑）
   if (SD_STYLE === "text" && !SD_ARROW) {
     const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
     const head  = `${left}，${t('region')}: ${regionText}`;
@@ -997,12 +1081,12 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
+  // 常规文本
   const stateTextStd = (()=>{
     if (st==='full') return t('unlocked');
     if (st==='partial') return t('partialUnlocked');
     return t('notReachable');
   })();
-
   if (SD_STYLE === "text") {
     const left  = `${name}: ${stateTextStd}`;
     const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
@@ -1014,13 +1098,13 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
+  // 图标模式
   const head = SD_ARROW ? `${icon} ${name} ➟ ${regionText}` : `${icon} ${name} ｜ ${regionText}`;
   const tail = [
     showTag,
     (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
     (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
   ].filter(Boolean).join(" ｜ ");
-
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
@@ -1029,10 +1113,13 @@ async function runServiceChecks(){
   try{
     const order = selectServices();
     if (!order.length) return [];
+    log('info','Service checks start', order);
     const tasks = order.map(k => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
     const lines = await Promise.all(tasks);
+    log('info','Service checks done');
     return lines.filter(Boolean);
-  }catch(_){
+  }catch(e){
+    log('error','Service checks error', String(e));
     return [];
   }
 }
