@@ -1,7 +1,7 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley
- * Version: 2025-11-08R3
+ * Version: 2025-11-08R4
  *
  * 选择优先级（统一，BoxJS 最高）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
@@ -26,6 +26,19 @@
  *   - LOG_TO_PANEL=0   是否把末尾附加“—— 调试 ——”区块（默认 0）
  *   - LOG_PUSH=1       运行异常推送系统通知（默认 1）
  * =======================================================*/
+
+// ====================== 常量 & 配置基线 ======================
+const CONSTS = Object.freeze({
+  MAX_RECENT_REQ: 150,    // 扫描最近请求数上限
+  PRETOUCH_TO_MS: 700,    // 预触发落地接口超时
+  RETRY_DELAY_MS: 260,    // withRetry 线性退避基数
+  SD_MIN_TIMEOUT: 2000,   // 服务检测最小超时
+  LOG_RING_MAX: 120,      // 面板尾部日志保留上限
+  DEBUG_TAIL_LINES: 18,   // 面板尾部展示的日志行数
+  ENT_MIN_REQ_TO: 2500,   // 入口定位最小请求超时
+  ENT_MIN_TTL: 30,        // 入口定位缓存 TTL 最小秒
+  ENT_MAX_TTL: 3600       // 入口定位缓存 TTL 最大秒
+});
 
 /* ===== 语言字典（固定 UI 词收口）===== */
 const SD_STR = {
@@ -78,24 +91,30 @@ const SD_STR = {
     debug: "除錯"
   }
 };
-/* t() 取词工具 */
-function t(key, ...args){
-  const lang = (typeof SD_LANG==="string" ? SD_LANG : "zh-Hans");
+
+/** 取词工具 */
+function t(key, ...args) {
+  const lang = (typeof SD_LANG === "string" ? SD_LANG : "zh-Hans");
   const pack = SD_STR[lang] || SD_STR["zh-Hans"];
   const v = pack[key];
   if (typeof v === "function") return v(...args);
-  return (v != null) ? v : key;
+  return v != null ? v : key;
 }
 
-/* ===== Compat shim: Surge / Loon / QuanX / BoxJS ===== */
-const readKV = k => {
-  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k);
-  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);
-  try { return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null; } catch (_) { return null; }
+// ====================== 运行环境适配层 ======================
+const readKV = (k) => {
+  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) {
+    return $persistentStore.read(k);
+  }
+  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) {
+    return $prefs.valueForKey(k);
+  }
+  try { return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null; }
+  catch (_) { return null; }
 };
 
-// 解析 $argument（支持字符串/对象）
-const parseArgs = raw => {
+/** 解析 $argument（支持字符串或对象） */
+const parseArgs = (raw) => {
   if (!raw) return {};
   if (typeof raw === 'object') return raw;
   if (typeof raw === 'string') {
@@ -112,69 +131,81 @@ const parseArgs = raw => {
 };
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
 
-// 兜底从原始 $argument 字符串读取指定参数（仅在对象无值时用）
-function readArgRaw(name){
-  try{
+/** 当 $args 对象无值时，从原始字符串兜底读取 */
+function readArgRaw(name) {
+  try {
     if (typeof $argument === 'string') {
       const re = new RegExp(`(?:^|&)${name}=([^&]*)`);
       const m = $argument.match(re);
       if (m) return decodeURIComponent(String(m[1]).replace(/\+/g, '%20'));
     }
-  }catch(_){}
+  } catch (_) {}
   return undefined;
 }
 
-// 辅助转换
-const toBool = (v, d=false) => {
-  if (v === undefined || v === null || v === '') return d;
+// ====================== 小工具（类型/拼接/格式） ======================
+const toBool = (v, d = false) => {
+  if (v == null || v === '') return d;
   if (typeof v === 'boolean') return v;
   const s = String(v).trim().toLowerCase();
-  if (['1','true','on','yes','y'].includes(s)) return true;
-  if (['0','false','off','no','n'].includes(s)) return false;
+  if ([ '1','true','on','yes','y' ].includes(s))  return true;
+  if ([ '0','false','off','no','n' ].includes(s)) return false;
   return d;
 };
 const toNum = (v, d) => {
-  if (v === undefined || v === null || v === '') return d;
+  if (v == null || v === '') return d;
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 };
-const K = s => `NetworkInfo_${s}`;
+const K = (s) => `NetworkInfo_${s}`;
+const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
-// 预读基础配置
+// ====================== 预读基础配置 ======================
 const UPDATE  = toNum(readKV(K('Update'))  ?? $args.Update  ?? 10, 10);
 const TIMEOUT = toNum(readKV(K('Timeout')) ?? $args.Timeout ?? 8,  8);
 
-// ===== 日志配置 =====
+// ====================== 日志系统 ======================
 const LOG_ON       = toBool(readKV(K('LOG'))          ?? $args.LOG,          false);
 const LOG_TO_PANEL = toBool(readKV(K('LOG_TO_PANEL')) ?? $args.LOG_TO_PANEL, false);
 const LOG_PUSH     = toBool(readKV(K('LOG_PUSH'))     ?? $args.LOG_PUSH,     true);
-const LOG_LEVEL    = (readKV(K('LOG_LEVEL')) ?? $args.LOG_LEVEL ?? 'info').toString().toLowerCase();
+const LOG_LEVEL    = (readKV(K('LOG_LEVEL')) ?? $args.LOG_LEVEL ?? 'info')
+    .toString().toLowerCase();
 
-const LOG_LEVELS = { debug:10, info:20, warn:30, error:40 };
+const LOG_LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
 const DEBUG_LINES = [];
-function _maskMaybe(ip){ // 遵从 MASK_IP 配置
+
+function _maskMaybe(ip) {
   if (!ip) return '';
   if (!MASK_IP) return ip;
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { const p=ip.split('.'); return `${p[0]}.${p[1]}.*.*`; }
-  if (/:/.test(ip)) { const p=ip.split(':'); return [...p.slice(0,4),'*','*','*','*'].join(':'); }
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(ip)) {
+    const p = ip.split('.');
+    return `${p[0]}.${p[1]}.*.*`;
+  }
+  if (/:/.test(ip)) {
+    const p = ip.split(':');
+    return joinNonEmpty([...p.slice(0, 4), '*','*','*','*'], ':');
+  }
   return ip;
 }
-function log(level, ...args){
+
+function log(level, ...args) {
   if (!LOG_ON) return;
   const L = LOG_LEVELS[level] ?? 20;
   if (L < LOG_THRESH) return;
-  const line = `[NI][${level.toUpperCase()}] ${args.map(x=>typeof x==='string'?x:JSON.stringify(x)).join(' ')}`;
-  try { console.log(line); } catch(_) {}
+  const msg = args.map((x) => typeof x === 'string' ? x : JSON.stringify(x));
+  const line = `[NI][${level.toUpperCase()}] ${msg.join(' ')}`;
+  try { console.log(line); } catch (_) {}
   DEBUG_LINES.push(line);
-  if (DEBUG_LINES.length>120) DEBUG_LINES.shift();
+  if (DEBUG_LINES.length > CONSTS.LOG_RING_MAX) DEBUG_LINES.shift();
 }
-function logErrPush(title, body){
+
+function logErrPush(title, body) {
   if (LOG_PUSH) $notification?.post?.(title, "", body);
   log('error', title, body);
 }
 
-// ===== 统一配置对象（后续直接用 CFG.*）=====
+// ====================== 统一配置对象（CFG.*） ======================
 const CFG = {
   Update:  UPDATE,
   Timeout: TIMEOUT,
@@ -183,8 +214,10 @@ const CFG = {
   MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
   IPv6:     toBool(readKV(K('IPv6'))     ?? $args.IPv6,     false),
 
-  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? $args.DOMIC_IPv4 ?? 'ipip',
-  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? $args.DOMIC_IPv6 ?? 'ddnspod',
+  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4
+      ?? $args.DOMIC_IPv4 ?? 'ipip',
+  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6
+      ?? $args.DOMIC_IPv6 ?? 'ddnspod',
   LANDING_IPv4:  readKV(K('LANDING_IPv4'))  ?? $args.LANDING_IPv4  ?? 'ipapi',
   LANDING_IPv6:  readKV(K('LANDING_IPv6'))  ?? $args.LANDING_IPv6  ?? 'ipsb',
 
@@ -203,7 +236,7 @@ const CFG = {
   SD_TIMEOUT_MS: (() => {
     const raw = readKV(K('SD_TIMEOUT_MS')) ?? $args.SD_TIMEOUT_MS;
     const fallback = TIMEOUT * 1000;
-    if (raw === '' || raw === undefined || raw === null) return fallback;
+    if (raw == null || raw === '') return fallback;
     return toNum(raw, fallback);
   })(),
 
@@ -213,42 +246,38 @@ const CFG = {
 
   SERVICES_BOX_CHECKED_RAW: (() => {
     const v = readKV(K('SERVICES'));
-    if (v === undefined || v === null) return null;
+    if (v == null) return null;
     const s = String(v).trim();
     if (!s || s === '[]' || /^null$/i.test(s)) return null;
     return s;
   })(),
   SERVICES_BOX_TEXT: (() => {
     const v = readKV(K('SERVICES_TEXT'));
-    const s = (v != null) ? String(v).trim() : '';
-    return s;
+    return v != null ? String(v).trim() : '';
   })(),
   SERVICES_ARG_TEXT: (() => {
     let v = $args.SERVICES;
     if (Array.isArray(v)) return JSON.stringify(v);
     if (v == null || v === '') v = readArgRaw('SERVICES');
-    return (v != null) ? String(v).trim() : '';
+    return v != null ? String(v).trim() : '';
   })()
 };
 
-// —— 运行时映射（图标支持预设 + 自定义）——
-const ICON_PRESET = CFG.IconPreset;
-const ICON_PRESET_MAP = {
-  wifi:    'wifi.router',
-  globe:   'globe.asia.australia',
-  dots:    'dot.radiowaves.left.and.right',
-  antenna: 'antenna.radiowaves.left.and.right',
-  point:   'point.3.connected.trianglepath.dotted'
-};
-const ICON_NAME  = (CFG.Icon || '').trim()
-    || ICON_PRESET_MAP[ICON_PRESET]
-    || 'globe.asia.australia';
+// ====================== 图标 & 开关映射 ======================
+const ICON_PRESET_MAP = Object.freeze({
+  wifi:   'wifi.router',
+  globe:  'globe.asia.australia',
+  dots:   'dot.radiowaves.left.and.right',
+  antenna:'antenna.radiowaves.left.and.right',
+  point:  'point.3.connected.trianglepath.dotted'
+});
+const ICON_NAME = (CFG.Icon || '').trim() ||
+    ICON_PRESET_MAP[CFG.IconPreset] || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
 const IPv6_ON  = !!CFG.IPv6;
 const MASK_IP  = !!CFG.MASK_IP;
-const MASK_POS = (typeof CFG.MASK_POS === 'boolean') ? CFG.MASK_POS : !!CFG.MASK_IP;
-
+const MASK_POS = typeof CFG.MASK_POS === 'boolean' ? CFG.MASK_POS : !!CFG.MASK_IP;
 const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
 
 const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;
@@ -256,77 +285,103 @@ const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;
 const LANDING_IPv4  = CFG.LANDING_IPv4;
 const LANDING_IPv6  = CFG.LANDING_IPv6;
 
-/* —— 服务检测参数 —— */
-const SD_STYLE       = (String(CFG.SD_STYLE).toLowerCase()==='text') ? 'text' : 'icon';
-const SD_SHOW_LAT    = !!CFG.SD_SHOW_LAT;
-const SD_SHOW_HTTP   = !!CFG.SD_SHOW_HTTP;
-const SD_LANG        = (String(CFG.SD_LANG).toLowerCase()==='zh-hant') ? 'zh-Hant' : 'zh-Hans';
+// ====================== 服务检测参数 ======================
+const SD_STYLE = (String(CFG.SD_STYLE).toLowerCase() === 'text') ? 'text' : 'icon';
+const SD_SHOW_LAT  = !!CFG.SD_SHOW_LAT;
+const SD_SHOW_HTTP = !!CFG.SD_SHOW_HTTP;
+const SD_LANG = (String(CFG.SD_LANG).toLowerCase()==='zh-hant') ? 'zh-Hant' : 'zh-Hans';
 
-const SD_TIMEOUT_MS  = (() => {
+const SD_TIMEOUT_MS = (() => {
   const v = Number(CFG.SD_TIMEOUT_MS);
   const fallback = (Number(CFG.Timeout) || 8) * 1000;
-  return Math.max(2000, Number.isFinite(v) ? v : fallback);
+  const ms = Number.isFinite(v) ? v : fallback;
+  return Math.max(CONSTS.SD_MIN_TIMEOUT, ms);
 })();
 
-const SD_REGION_MODE = ['full','abbr','flag'].includes(String(CFG.SD_REGION_MODE)) ? CFG.SD_REGION_MODE : 'full';
-const SD_ICON_THEME  = ['lock','circle','check'].includes(String(CFG.SD_ICON_THEME)) ? CFG.SD_ICON_THEME : 'check';
-const SD_ARROW       = !!CFG.SD_ARROW;
+const SD_REGION_MODE = ['full', 'abbr', 'flag']
+    .includes(String(CFG.SD_REGION_MODE)) ? CFG.SD_REGION_MODE : 'full';
+const SD_ICON_THEME = ['lock', 'circle', 'check']
+    .includes(String(CFG.SD_ICON_THEME)) ? CFG.SD_ICON_THEME : 'check';
+const SD_ARROW = !!CFG.SD_ARROW;
 
-// ===== 日志：启动总览 =====
-log('info', 'Start',
-    JSON.stringify({
-      Update: CFG.Update,
-      Timeout: CFG.Timeout,
-      IPv6: IPv6_ON,
-      SD_TIMEOUT_MS,
-      SD_STYLE,
-      SD_REGION_MODE,
-      TW_FLAG_MODE: TW_FLAG_MODE
-    })
-);
+const SD_ICONS = (() => {
+  switch (SD_ICON_THEME) {
+    case 'lock':   return { full:'🔓', partial:'🔐', blocked:'🔒' };
+    case 'circle': return { full:'⭕️', partial:'⛔️', blocked:'🚫' };
+    default:       return { full:'✅', partial:'❇️', blocked:'❎' };
+  }
+})();
 
-/* ===================== 主流程 ===================== */
+// ====================== 启动日志 ======================
+log('info', 'Start', JSON.stringify({
+  Update: CFG.Update,
+  Timeout: CFG.Timeout,
+  IPv6: IPv6_ON,
+  SD_TIMEOUT_MS,
+  SD_STYLE,
+  SD_REGION_MODE,
+  TW_FLAG_MODE
+}));
+
+// ====================== 主流程（IIFE） ======================
 ;(async () => {
-  const preTouch = touchLandingOnceQuick().catch(()=>{});
+  const preTouch = touchLandingOnceQuick().catch(() => {});
 
   const t0 = Date.now();
   const [cn, cn6] = await Promise.all([
-    getDirectV4(DOMESTIC_IPv4).catch((e)=>{ log('warn','DirectV4 fail', String(e)); return {}; }),
-    IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch((e)=>{ log('warn','DirectV6 fail', String(e)); return {}; }) : Promise.resolve({})
+    getDirectV4(DOMESTIC_IPv4).catch((e) => { log('warn','DirectV4', String(e)); return {}; }),
+    IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch((e) => { log('warn','DirectV6', String(e)); return {}; })
+        : Promise.resolve({})
   ]);
-  log('info', 'Direct fetched in', (Date.now()-t0)+'ms',
-      { v4: _maskMaybe(cn.ip||''), v6: _maskMaybe(cn6.ip||'') });
+  log('info', 'Direct fetched', (Date.now() - t0) + 'ms', {
+    v4: _maskMaybe(cn.ip || ''),
+    v6: _maskMaybe(cn6.ip || '')
+  });
 
   await preTouch;
 
   const t1 = Date.now();
   const { policyName, entrance4, entrance6 } = await getPolicyAndEntranceBoth();
-  log('info', 'EntranceBoth',
-      { policy: policyName||'-', v4:_maskMaybe(entrance4||''), v6:_maskMaybe(entrance6||'') , cost:(Date.now()-t1)+'ms' });
+  log('info', 'EntranceBoth', {
+    policy: policyName || '-',
+    v4: _maskMaybe(entrance4 || ''),
+    v6: _maskMaybe(entrance6 || ''),
+    cost: (Date.now() - t1) + 'ms'
+  });
 
-  const ent4 = isIP(entrance4||'') ? await getEntranceBundle(entrance4).catch((e)=>{ log('warn','EntranceBundle v4 fail', String(e)); return { ip: entrance4 }; }) : {};
-  const ent6 = isIP(entrance6||'') ? await getEntranceBundle(entrance6).catch((e)=>{ log('warn','EntranceBundle v6 fail', String(e)); return { ip: entrance6 }; }) : {};
+  const ent4 = isIP(entrance4 || '')
+      ? await getEntranceBundle(entrance4).catch((e) => {
+        log('warn','EntranceBundle v4', String(e));
+        return { ip: entrance4 };
+      })
+      : {};
+  const ent6 = isIP(entrance6 || '')
+      ? await getEntranceBundle(entrance6).catch((e) => {
+        log('warn','EntranceBundle v6', String(e));
+        return { ip: entrance6 };
+      })
+      : {};
 
   const t2 = Date.now();
   const [px, px6] = await Promise.all([
-    getLandingV4(LANDING_IPv4).catch((e)=>{ log('warn','LandingV4 fail', String(e)); return {}; }),
-    IPv6_ON ? getLandingV6(LANDING_IPv6).catch((e)=>{ log('warn','LandingV6 fail', String(e)); return {}; }) : Promise.resolve({})
+    getLandingV4(LANDING_IPv4).catch((e) => { log('warn','LandingV4', String(e)); return {}; }),
+    IPv6_ON ? getLandingV6(LANDING_IPv6).catch((e) => { log('warn','LandingV6', String(e)); return {}; })
+        : Promise.resolve({})
   ]);
-  log('info', 'Landing fetched in', (Date.now()-t2)+'ms',
-      { v4: _maskMaybe(px.ip||''), v6: _maskMaybe(px6.ip||'') });
+  log('info', 'Landing fetched', (Date.now() - t2) + 'ms', {
+    v4: _maskMaybe(px.ip || ''),
+    v6: _maskMaybe(px6.ip || '')
+  });
 
-  const nt = netTypeLine();
-  const title = nt || t('panelTitle');
+  const title = netTypeLine() || t('panelTitle');
 
-  /* ====== 分组渲染 ====== */
+  // 组装渲染
   const parts = [];
-
-  // 顶部
   parts.push(`${t('runAt')}: ${now()}`);
   parts.push(`${t('policy')}: ${policyName || '-'}`);
   parts.push('');
 
-  // 本地
+  // —— 本地 ——
   parts.push(subTitle('本地'));
   const directIPv4 = ipLine('IPv4', cn.ip);
   const directIPv6 = ipLine('IPv6', cn6.ip);
@@ -336,8 +391,9 @@ log('info', 'Start',
   parts.push(`${t('location')}: ${directLoc}`);
   if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
-  // 入口
-  if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && ent6.ip)) {
+  // —— 入口 ——
+  if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2))
+      || (ent6 && ent6.ip)) {
     parts.push('', subTitle('入口'));
     const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
     const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
@@ -349,7 +405,7 @@ log('info', 'Start',
     if (ent4.isp2) parts.push(`${t('isp')}²: ${String(ent4.isp2).trim()}`);
   }
 
-  // 落地
+  // —— 落地 ——
   if (px.ip || px6.ip || px.loc || px.isp) {
     parts.push('', subTitle('落地'));
     const landIPv4 = ipLine('IPv4', px.ip);
@@ -360,24 +416,24 @@ log('info', 'Start',
     if (px.isp) parts.push(`${t('isp')}: ${fmtISP(px.isp, px.loc)}`);
   }
 
-  // 服务检测
+  // —— 服务检测 ——
   const sdLines = await runServiceChecks();
   if (sdLines.length) {
     parts.push('', subTitle('服务检测'));
     parts.push(...sdLines);
   }
 
-  // 可选把日志拼到面板尾部
-  if (LOG_TO_PANEL && DEBUG_LINES.length){
+  // —— 调试尾巴（可选）——
+  if (LOG_TO_PANEL && DEBUG_LINES.length) {
     parts.push('', subTitle(t('debug')));
-    const tail = DEBUG_LINES.slice(-18).join('\n');
+    const tail = DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES).join('\n');
     parts.push(tail);
   }
 
   const content = maybeTify(parts.join('\n'));
   $done({ title: maybeTify(title), content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
 
-})().catch(err => {
+})().catch((err) => {
   const msg = String(err);
   logErrPush(t('panelTitle'), msg);
   const errTitle = t('panelTitle');
@@ -385,66 +441,90 @@ log('info', 'Start',
   $done({ title: errTitle, content: errBody, icon: ICON_NAME, 'icon-color': ICON_COLOR });
 });
 
-/* ===================== 工具 & 渲染 ===================== */
-function now(){ return new Date().toTimeString().split(' ')[0]; }
-function isIPv4(ip){ return /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/.test(ip||''); }
-function isIPv6(ip){ return /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,6}:[0-9a-fA-F]{1,4}){1}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0-1}[0-9]){0,1}[0-9]))$/.test(ip||''); }
-function isIP(ip){ return isIPv4(ip) || isIPv6(ip); }
+// ====================== 工具 & 渲染 ======================
+const IPV4_RE = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/;
+// IPv6 正则过长，使用分段字符串拼接便于维护（语义不变）
+const IPV6_SRC = [
+  '(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|',
+  '([0-9a-fA-F]{1,4}:){1,7}:|',
+  '([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|',
+  '([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|',
+  '([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|',
+  '([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|',
+  '([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|',
+  '[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|',
+  ':((:[0-9a-fA-F]{1,4}){1,7}|:)|',
+  '::(ffff(:0{1,4}){0,1}:){0,1}(',
+  '(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}',
+  '(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|',
+  '([0-9a-fA-F]{1,4}:){1,4}:(',
+  '(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}',
+  '(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))'
+].join('');
+const IPV6_RE = new RegExp(`^${IPV6_SRC}$`);
 
-function maskIP(ip){
+function now() { return new Date().toTimeString().split(' ')[0]; }
+function isIPv4(ip) { return IPV4_RE.test(ip || ''); }
+function isIPv6(ip) { return IPV6_RE.test(ip || ''); }
+function isIP(ip)   { return isIPv4(ip) || isIPv6(ip); }
+
+function maskIP(ip) {
   if (!ip || !MASK_IP) return ip || '';
   if (isIPv4(ip)) {
-    const p = ip.split('.'); return [p[0], p[1], '*', '*'].join('.');
-  } else if (isIPv6(ip)) {
-    const p = ip.split(':'); return [...p.slice(0,4), '*','*','*','*'].join(':');
+    const p = ip.split('.');
+    return [p[0], p[1], '*', '*'].join('.');
+  }
+  if (isIPv6(ip)) {
+    const p = ip.split(':');
+    return [...p.slice(0, 4), '*','*','*','*'].join(':');
   }
   return ip;
 }
 
-/* === 分组渲染工具 === */
-function subTitle(text){ return `—— ${text} ——`; }
-function ipLine(label, ip){ if (!ip) return null; return `${label}: ${maskIP(ip)}`; }
+function subTitle(text) { return `—— ${text} ——`; }
+function ipLine(label, ip) { return ip ? `${label}: ${maskIP(ip)}` : null; }
 
 function splitFlagRaw(s) {
-  const re=/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u;
-  const m=String(s||'').match(re);
-  let flag=m?m[0]:'';
-  let text=String(s||'').replace(re,'');
+  const re = /^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u;
+  const m = String(s || '').match(re);
+  let flag = m ? m[0] : '';
+  const text = String(s || '').replace(re, '');
   if (flag.includes('🇹🇼')) {
-    if (TW_FLAG_MODE===0) flag='🇨🇳';
-    else if (TW_FLAG_MODE===2) flag='🇼🇸';
+    if (TW_FLAG_MODE === 0) flag = '🇨🇳';
+    else if (TW_FLAG_MODE === 2) flag = '🇼🇸';
   }
   return { flag, text };
 }
-function onlyFlag(loc){ return splitFlagRaw(loc).flag || '-'; }
-function flagFirst(loc){ const {flag,text}=splitFlagRaw(loc); return (flag||'') + (text||''); }
+const onlyFlag  = (loc) => splitFlagRaw(loc).flag || '-';
+const flagFirst = (loc) => {
+  const { flag, text } = splitFlagRaw(loc);
+  return (flag || '') + (text || '');
+};
 
-function flagOf(code){
+function flagOf(code) {
   let cc = String(code || '').trim();
   if (!cc) return '';
   if (/^中国$|^CN$/i.test(cc)) cc = 'CN';
   if (cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return '';
   try {
-    if (cc.toUpperCase()==='TW') {
-      if (TW_FLAG_MODE===0) return '🇨🇳';
-      if (TW_FLAG_MODE===2) return '🇼🇸';
+    if (cc.toUpperCase() === 'TW') {
+      if (TW_FLAG_MODE === 0) return '🇨🇳';
+      if (TW_FLAG_MODE === 2) return '🇼🇸';
     }
-    const raw = String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt()));
-    return raw;
-  } catch(_) { return ''; }
+    return String.fromCodePoint(...[...cc.toUpperCase()]
+        .map((ch) => 127397 + ch.charCodeAt()));
+  } catch (_) { return ''; }
 }
 
-/* —— 规范中国境内运营商名称 —— */
-function fmtISP(isp, locStr){
+function fmtISP(isp, locStr) {
   const raw = String(isp || '').trim();
   if (!raw) return '';
   const txt = String(locStr || '');
   const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
   if (!isMainland) return raw;
 
-  const norm = raw.replace(/\s*\(中国\)\s*/,'').replace(/\s+/g,' ').trim();
+  const norm = raw.replace(/\s*\(中国\)\s*/, '').replace(/\s+/g, ' ').trim();
   const s = norm.toLowerCase();
-
   if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm))
     return '中国移动';
   if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /电信/.test(norm))
@@ -455,113 +535,239 @@ function fmtISP(isp, locStr){
     return '中国广电';
   if ((/cernet|china\s*education/).test(s) || /教育网/.test(norm))
     return '中国教育网';
-
   if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
   return raw;
 }
 
-/* —— 网络类型行（Wi-Fi / 蜂窝数据） —— */
-function radioToGen(r){
+function radioToGen(r) {
   const MAP = {
-    GPRS:'2.5G', EDGE:'2.75G', CDMA1x:'2.5G', WCDMA:'3G', HSDPA:'3.5G', HSUPA:'3.75G',
-    CDMAEVDORev0:'3.5G', CDMAEVDORevA:'3.5G', CDMAEVDORevB:'3.75G',
-    eHRPD:'3.9G', LTE:'4G', NRNSA:'5G', NR:'5G'
+    GPRS: '2.5G', EDGE: '2.75G', CDMA1x: '2.5G', WCDMA: '3G',
+    HSDPA: '3.5G', HSUPA: '3.75G', CDMAEVDORev0: '3.5G',
+    CDMAEVDORevA: '3.5G', CDMAEVDORevB: '3.75G', eHRPD: '3.9G',
+    LTE: '4G', NRNSA: '5G', NR: '5G'
   };
   return MAP[r] || '';
 }
-function netTypeLine(){
-  try{
+
+function netTypeLine() {
+  try {
     const ssid  = $network?.wifi?.ssid;
     const radio = $network?.['cellular-data']?.radio;
     if (ssid) return `${t('wifi')} | ${ssid}`;
-    if (radio){
-      const g = radioToGen(radio);
-      return `${t('cellular')} | ${t('gen')(g, radio)}`;
-    }
-  }catch(_){}
+    if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
+  } catch (_) {}
   return t('unknownNet');
 }
 
-/* ===================== HTTP 基础 ===================== */
-function httpGet(url, headers={}, timeoutMs=null, followRedirect=false){
-  return new Promise((resolve,reject)=>{
+// ====================== HTTP 基础 ======================
+/**
+ * GET 请求（支持超时/重定向）
+ * @param {string} url
+ * @param {object} headers
+ * @param {?number} timeoutMs
+ * @param {boolean} followRedirect
+ */
+function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
+  return new Promise((resolve, reject) => {
     const req = { url, headers };
     if (timeoutMs != null) req.timeout = timeoutMs;
     if (followRedirect) req.followRedirect = true;
     const start = Date.now();
-    $httpClient.get(req,(err,resp,body)=>{
-      const cost = Date.now()-start;
+    $httpClient.get(req, (err, resp, body) => {
+      const cost = Date.now() - start;
       if (err) {
-        log('warn','HTTP GET fail', url, 'cost', cost+'ms', String(err));
+        log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err));
         return reject(err);
       }
       const status = resp?.status || resp?.statusCode;
-      log('debug', 'HTTP GET', url, 'status', status, 'cost', cost+'ms');
-      resolve({ status, headers: resp?.headers||{}, body });
+      log('debug', 'HTTP GET', url, 'status', status, 'cost', cost + 'ms');
+      resolve({ status, headers: resp?.headers || {}, body });
     });
   });
 }
-function httpAPI(path='/v1/requests/recent'){
-  return new Promise(res=>{
-    if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, (x)=>{ log('debug','httpAPI', path, 'ok'); res(x); });
-    else { log('warn','httpAPI not available'); res({}); }
+function httpAPI(path = '/v1/requests/recent') {
+  return new Promise((res) => {
+    if (typeof $httpAPI === 'function') {
+      $httpAPI('GET', path, null, (x) => { log('debug','httpAPI', path, 'ok'); res(x); });
+    } else {
+      log('warn', 'httpAPI not available');
+      res({});
+    }
   });
 }
 
-/* ===================== 数据源：直连/落地/入口 ===================== */
-async function getDirectV4(p){
-  try{
-    log('info','DirectV4 source', p);
-    if (p==='cip')      return await d_cip();
-    if (p==='163')      return await d_163();
-    if (p==='bilibili') return await d_bili();
-    if (p==='126')      return await d_126();
-    if (p==='pingan')   return await d_pingan();
+// ====================== 数据源：直连/落地/入口 ======================
+async function getDirectV4(p) {
+  try {
+    log('info', 'DirectV4 source', p);
+    if (p === 'cip')      return await d_cip();
+    if (p === '163')      return await d_163();
+    if (p === 'bilibili') return await d_bili();
+    if (p === '126')      return await d_126();
+    if (p === 'pingan')   return await d_pingan();
     return await d_ipip();
-  }catch(e){ log('warn','DirectV4 fallback ipip', String(e)); try{return await d_ipip()}catch(e2){ log('error','DirectV4 ipip fail', String(e2)); } return {}; }
+  } catch (e) {
+    log('warn', 'DirectV4 fallback ipip', String(e));
+    try { return await d_ipip(); }
+    catch (e2) { log('error', 'DirectV4 ipip fail', String(e2)); }
+    return {};
+  }
 }
-async function d_ipip(){ const r=await httpGet('https://myip.ipip.net/json'); const j=JSON.parse(r.body||'{}'); const c0=j?.data?.location?.[0]; const flag=flagOf(c0==='中国'?'CN':c0); return { ip:j?.data?.ip||'', loc:[flag, j?.data?.location?.[0], j?.data?.location?.[1], j?.data?.location?.[2]].filter(Boolean).join(' ').replace(/\s*中国\s*/,'') , isp:j?.data?.location?.[4]||'' }; }
-async function d_cip(){ const r=await httpGet('http://cip.cc/'); const b=String(r.body||''); const ip=(b.match(/IP.*?:\s*(\S+)/)||[])[1]||''; const addr=(b.match(/地址.*?:\s*(.+)/)||[])[1]||''; const isp=(b.match(/运营商.*?:\s*(.+)/)||[])[1]||''; const isCN=/中国/.test(addr); return { ip, loc:[flagOf(isCN?'CN':''), addr.replace(/中国\s*/,'')].filter(Boolean).join(' '), isp:isp.replace(/中国\s*/,'') }; }
-async function d_163(){ const r=await httpGet('https://dashi.163.com/fgw/mailsrv-ipdetail/detail'); const d=(JSON.parse(r.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countryCode), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||d.org||'' }; }
-async function d_bili(){ const r=await httpGet('https://api.bilibili.com/x/web-interface/zone'); const d=(JSON.parse(r.body||'{}')||{}).data||{}; const flag=flagOf(d.country==='中国'?'CN':d.country); return { ip:d.addr||'', loc:[flag,d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
-async function d_126(){ const r=await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp'); const d=(JSON.parse(r.body||'{}')||{}).result||{}; return { ip:d.ip||'', loc:[flagOf(d.countrySymbol), d.country,d.province,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.operator||'' }; }
-async function d_pingan(){ const r=await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request'); const d=(JSON.parse(r.body||'{}')||{}).data||{}; return { ip:d.ip||'', loc:[flagOf(d.countryIsoCode), d.country,d.region,d.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:d.isp||'' }; }
-
-async function getDirectV6(p){
-  try{
-    log('info','DirectV6 source', p);
-    if (p==='neu6'){ const r=await httpGet('https://speed.neu6.edu.cn/getIP.php'); return { ip:String(r.body||'').trim() }; }
-    const r=await httpGet('https://ipv6.ddnspod.com'); return { ip:String(r.body||'').trim() };
-  }catch(e){ log('warn','DirectV6 fail', String(e)); return {}; }
+async function d_ipip() {
+  const r = await httpGet('https://myip.ipip.net/json');
+  const j = JSON.parse(r.body || '{}');
+  const loc = j?.data?.location || [];
+  const c0 = loc[0];
+  const flag = flagOf(c0 === '中国' ? 'CN' : c0);
+  return {
+    ip: j?.data?.ip || '',
+    loc: joinNonEmpty([ flag, loc[0], loc[1], loc[2] ], ' ')
+        .replace(/\s*中国\s*/, ''),
+    isp: loc[4] || ''
+  };
+}
+async function d_cip() {
+  const r = await httpGet('http://cip.cc/');
+  const b = String(r.body || '');
+  const ip   = (b.match(/IP.*?:\s*(\S+)/)      || [])[1] || '';
+  const addr = (b.match(/地址.*?:\s*(.+)/)      || [])[1] || '';
+  const isp  = (b.match(/运营商.*?:\s*(.+)/)    || [])[1] || '';
+  const isCN = /中国/.test(addr);
+  return {
+    ip,
+    loc: joinNonEmpty([ flagOf(isCN ? 'CN' : ''), addr.replace(/中国\s*/, '') ], ' '),
+    isp: isp.replace(/中国\s*/, '')
+  };
+}
+async function d_163() {
+  const r = await httpGet('https://dashi.163.com/fgw/mailsrv-ipdetail/detail');
+  const d = (JSON.parse(r.body || '{}') || {}).result || {};
+  return {
+    ip: d.ip || '',
+    loc: joinNonEmpty([ flagOf(d.countryCode), d.country, d.province, d.city ], ' ')
+        .replace(/\s*中国\s*/, ''),
+    isp: d.isp || d.org || ''
+  };
+}
+async function d_bili() {
+  const r = await httpGet('https://api.bilibili.com/x/web-interface/zone');
+  const d = (JSON.parse(r.body || '{}') || {}).data || {};
+  const flag = flagOf(d.country === '中国' ? 'CN' : d.country);
+  return {
+    ip: d.addr || '',
+    loc: joinNonEmpty([ flag, d.country, d.province, d.city ], ' ')
+        .replace(/\s*中国\s*/, ''),
+    isp: d.isp || ''
+  };
+}
+async function d_126() {
+  const r = await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp');
+  const d = (JSON.parse(r.body || '{}') || {}).result || {};
+  return {
+    ip: d.ip || '',
+    loc: joinNonEmpty([ flagOf(d.countrySymbol), d.country, d.province, d.city ], ' ')
+        .replace(/\s*中国\s*/, ''),
+    isp: d.operator || ''
+  };
+}
+async function d_pingan() {
+  const r = await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request');
+  const d = (JSON.parse(r.body || '{}') || {}).data || {};
+  return {
+    ip: d.ip || '',
+    loc: joinNonEmpty([ flagOf(d.countryIsoCode), d.country, d.region, d.city ], ' ')
+        .replace(/\s*中国\s*/, ''),
+    isp: d.isp || ''
+  };
 }
 
-async function getLandingV4(p){
-  try{
-    log('info','LandingV4 source', p);
-    if (p==='ipwhois') return await l_whois();
-    if (p==='ipsb')    return await l_ipsb();
+async function getDirectV6(p) {
+  try {
+    log('info', 'DirectV6 source', p);
+    if (p === 'neu6') {
+      const r = await httpGet('https://speed.neu6.edu.cn/getIP.php');
+      return { ip: String(r.body || '').trim() };
+    }
+    const r = await httpGet('https://ipv6.ddnspod.com');
+    return { ip: String(r.body || '').trim() };
+  } catch (e) {
+    log('warn', 'DirectV6 fail', String(e));
+    return {};
+  }
+}
+
+async function getLandingV4(p) {
+  try {
+    log('info', 'LandingV4 source', p);
+    if (p === 'ipwhois') return await l_whois();
+    if (p === 'ipsb')    return await l_ipsb();
     return await l_ipapi();
-  }catch(e){ log('warn','LandingV4 fallback ipapi', String(e)); try{return await l_ipapi()}catch(e2){ log('error','LandingV4 ipapi fail', String(e2)); } return {}; }
+  } catch (e) {
+    log('warn', 'LandingV4 fallback ipapi', String(e));
+    try { return await l_ipapi(); }
+    catch (e2) { log('error','LandingV4 ipapi fail', String(e2)); }
+    return {};
+  }
 }
-async function l_ipapi(){ const r=await httpGet('http://ip-api.com/json?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.query||'', loc:[flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/,''), j.regionName?.split(/\s+or\s+/)[0], j.city].filter(Boolean).join(' '), isp:j.isp||j.org||'' }; }
-async function l_whois(){ const r=await httpGet('https://ipwhois.app/widget.php?lang=zh-CN'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'',    loc:[flagOf(j.country_code), j.country?.replace(/\s*中国\s*/,''), j.region, j.city].filter(Boolean).join(' '), isp:j?.connection?.isp||'' }; }
-async function l_ipsb(){  const r=await httpGet('https://api-ipv4.ip.sb/geoip'); const j=JSON.parse(r.body||'{}'); return { ip:j.ip||'', loc:[flagOf(j.country_code), j.country, j.region, j.city].filter(Boolean).join(' ').replace(/\s*中国\s*/,''), isp:j.isp||j.organization||'' }; }
-
-async function getLandingV6(p){
-  try{
-    log('info','LandingV6 source', p);
-    if (p==='ident'){ const r=await httpGet('https://v6.ident.me'); return { ip:String(r.body||'').trim() }; }
-    if (p==='ipify'){ const r=await httpGet('https://api6.ipify.org'); return { ip:String(r.body||'').trim() }; }
-    const r=await httpGet('https://api-ipv6.ip.sb/ip'); return { ip:String(r.body||'').trim() };
-  }catch(e){ log('warn','LandingV6 fail', String(e)); return {}; }
+async function l_ipapi() {
+  const r = await httpGet('http://ip-api.com/json?lang=zh-CN');
+  const j = JSON.parse(r.body || '{}');
+  return {
+    ip: j.query || '',
+    loc: joinNonEmpty([
+      flagOf(j.countryCode),
+      j.country?.replace(/\s*中国\s*/, ''),
+      j.regionName?.split(/\s+or\s+/)[0],
+      j.city
+    ], ' '),
+    isp: j.isp || j.org || ''
+  };
+}
+async function l_whois() {
+  const r = await httpGet('https://ipwhois.app/widget.php?lang=zh-CN');
+  const j = JSON.parse(r.body || '{}');
+  return {
+    ip: j.ip || '',
+    loc: joinNonEmpty([
+      flagOf(j.country_code),
+      j.country?.replace(/\s*中国\s*/, ''),
+      j.region,
+      j.city
+    ], ' '),
+    isp: (j?.connection?.isp) || ''
+  };
+}
+async function l_ipsb() {
+  const r = await httpGet('https://api-ipv4.ip.sb/geoip');
+  const j = JSON.parse(r.body || '{}');
+  return {
+    ip: j.ip || '',
+    loc: joinNonEmpty([
+      flagOf(j.country_code), j.country, j.region, j.city
+    ], ' ').replace(/\s*中国\s*/, ''),
+    isp: j.isp || j.organization || ''
+  };
 }
 
-/* ===================== 入口/策略（稳态获取） ===================== */
+async function getLandingV6(p) {
+  try {
+    log('info', 'LandingV6 source', p);
+    if (p === 'ident') { const r = await httpGet('https://v6.ident.me'); return { ip: String(r.body || '').trim() }; }
+    if (p === 'ipify') { const r = await httpGet('https://api6.ipify.org'); return { ip: String(r.body || '').trim() }; }
+    const r = await httpGet('https://api-ipv6.ip.sb/ip');
+    return { ip: String(r.body || '').trim() };
+  } catch (e) {
+    log('warn', 'LandingV6 fail', String(e));
+    return {};
+  }
+}
+
+// ====================== 入口/策略（稳态获取） ======================
 const ENT_SOURCES_RE = /(ip-api\.com|ipwhois\.app|ip\.sb|ipinfo\.io|ident\.me|ipify\.org)/i;
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function extractIP(str){
-  const s = String(str||'').replace(/\(Proxy\)/i,'').trim();
+function extractIP(str) {
+  const s = String(str || '').replace(/\(Proxy\)/i, '').trim();
   let m = s.match(/\[([0-9a-fA-F:]+)\]/);
   if (m && isIPv6(m[1])) return m[1];
   m = s.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
@@ -571,63 +777,79 @@ function extractIP(str){
   return '';
 }
 
-async function touchLandingOnceQuick(){
-  try { await httpGet('http://ip-api.com/json?lang=zh-CN', {}, 700, true); } catch(_) {}
-  try { await httpGet('https://api-ipv6.ip.sb/ip', {}, 700, true); } catch(_) {}
-  log('debug','Pre-touch landing endpoints done');
+async function touchLandingOnceQuick() {
+  try { await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true); } catch (_) {}
+  try { await httpGet('https://api-ipv6.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true); } catch (_) {}
+  log('debug', 'Pre-touch landing endpoints done');
 }
 
-// 同时抓入口 IPv4 + IPv6
-async function getPolicyAndEntranceBoth(){
+async function getPolicyAndEntranceBoth() {
   const data = await httpAPI('/v1/requests/recent');
   const reqs = Array.isArray(data?.requests) ? data.requests : [];
-  const hits = reqs.slice(0, 150).filter(i => ENT_SOURCES_RE.test(i.URL||''));
+  const hits = reqs.slice(0, CONSTS.MAX_RECENT_REQ)
+      .filter((i) => ENT_SOURCES_RE.test(i.URL || ''));
+
   let policy = '';
   let ip4 = '', ip6 = '';
-  for (const i of hits){
+
+  for (const i of hits) {
     if (!policy && i.policyName) policy = i.policyName;
-    const ip = extractIP(i.remoteAddress||'');
+    const ip = extractIP(i.remoteAddress || '');
     if (!ip) continue;
     if (isIPv6(ip)) { if (!ip6) ip6 = ip; }
     else if (isIPv4(ip)) { if (!ip4) ip4 = ip; }
     if (policy && ip4 && ip6) break;
   }
-  if (!policy && !ip4 && !ip6){
+
+  if (!policy && !ip4 && !ip6) {
     const d = await httpAPI('/v1/requests/recent');
     const rs = Array.isArray(d?.requests) ? d.requests : [];
-    const hit  = rs.find(i => /\(Proxy\)/.test(i.remoteAddress||'') && i.policyName);
-    if (hit) { policy = hit.policyName; const eip = extractIP(hit.remoteAddress); if (eip) (isIPv6(eip)?(ip6=eip):(ip4=eip)); }
+    const hit = rs.find((i) => /\(Proxy\)/.test(i.remoteAddress || '') && i.policyName);
+    if (hit) {
+      policy = hit.policyName;
+      const eip = extractIP(hit.remoteAddress);
+      if (eip) (isIPv6(eip) ? (ip6 = eip) : (ip4 = eip));
+    }
   }
-  log('debug','Policy/Entrance candidates', { policy, v4:_maskMaybe(ip4), v6:_maskMaybe(ip6), hits: hits.length });
+  log('debug', 'Policy/Entrance candidates', {
+    policy, v4: _maskMaybe(ip4), v6: _maskMaybe(ip6), hits: hits.length
+  });
   return { policyName: policy, entrance4: ip4, entrance6: ip6 };
 }
 
-/* —— 入口位置缓存（跟 Update 联动） —— */
-const ENT_REQ_TO = Math.max(2500, (Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000));
-const ENT_TTL_SEC = Math.max(30, Math.min(Number(CFG.Update) || 10, 3600));
+// —— 入口位置缓存（跟 Update 联动） ——
+const ENT_REQ_TO = Math.max(
+    CONSTS.ENT_MIN_REQ_TO,
+    (Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000)
+);
+const ENT_TTL_SEC = Math.max(
+    CONSTS.ENT_MIN_TTL,
+    Math.min(Number(CFG.Update) || 10, CONSTS.ENT_MAX_TTL)
+);
 let ENT_CACHE = { ip: "", t: 0, data: null };
 
-async function withRetry(fn, retry = 1, delay = 260) {
+async function withRetry(fn, retry = 1, delay = CONSTS.RETRY_DELAY_MS) {
   try { return await fn(); } catch (_) {}
   for (let i = 0; i < retry; i++) {
     await sleep(delay * (i + 1));
     try { return await fn(); } catch (_) {}
   }
-  throw "retry-fail";
+  throw 'retry-fail';
 }
 
-// 入口定位数据源
 async function loc_pingan(ip) {
   const r = await httpGet(
-      'https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=' + encodeURIComponent(ip),
+      'https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=' +
+      encodeURIComponent(ip),
       {},
       ENT_REQ_TO
   );
   const d = (JSON.parse(r.body || '{}') || {}).data || {};
-  if (!d || (!d.countryIsoCode && !d.country)) throw "pingan-empty";
+  if (!d || (!d.countryIsoCode && !d.country)) throw 'pingan-empty';
   return {
-    loc: [flagOf(d.countryIsoCode), d.country, d.region, d.city]
-        .filter(Boolean).join(' ').replace(/\s*中国\s*/, ''),
+    loc: joinNonEmpty([
+      flagOf(d.countryIsoCode), d.country, d.region, d.city
+    ], ' ').replace(/\s*中国\s*/, ''),
     isp: d.isp || ''
   };
 }
@@ -638,10 +860,14 @@ async function loc_ipapi(ip) {
       ENT_REQ_TO
   );
   const j = JSON.parse(r.body || '{}');
-  if (j.status && j.status !== "success") throw "ipapi-fail";
+  if (j.status && j.status !== 'success') throw 'ipapi-fail';
   return {
-    loc: [flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ''), j.regionName?.split(/\s+or\s+/)[0], j.city]
-        .filter(Boolean).join(' '),
+    loc: joinNonEmpty([
+      flagOf(j.countryCode),
+      j.country?.replace(/\s*中国\s*/, ''),
+      j.regionName?.split(/\s+or\s+/)[0],
+      j.city
+    ], ' '),
     isp: j.isp || j.org || j.as || ''
   };
 }
@@ -652,10 +878,11 @@ async function loc_ipwhois(ip) {
       ENT_REQ_TO
   );
   const j = JSON.parse(r.body || '{}');
-  if (j.success === false || (!j.country && !j.country_code)) throw "ipwhois-fail";
+  if (j.success === false || (!j.country && !j.country_code)) throw 'ipwhois-fail';
   return {
-    loc: [flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city]
-        .filter(Boolean).join(' '),
+    loc: joinNonEmpty([
+      flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city
+    ], ' '),
     isp: (j.connection && j.connection.isp) || j.org || ''
   };
 }
@@ -666,31 +893,34 @@ async function loc_ipsb(ip) {
       ENT_REQ_TO
   );
   const j = JSON.parse(r.body || '{}');
-  if (!j || (!j.country && !j.country_code)) throw "ipsb-fail";
+  if (!j || (!j.country && !j.country_code)) throw 'ipsb-fail';
   return {
-    loc: [flagOf(j.country_code), j.country, j.region, j.city]
-        .filter(Boolean).join(' ').replace(/\s*中国\s*/, ''),
+    loc: joinNonEmpty([
+      flagOf(j.country_code), j.country, j.region, j.city
+    ], ' ').replace(/\s*中国\s*/, ''),
     isp: j.isp || j.organization || ''
   };
 }
 async function loc_chain(ip) {
   try { return await withRetry(() => loc_ipapi(ip),   1); } catch (_) {}
   try { return await withRetry(() => loc_ipwhois(ip), 1); } catch (_) {}
-  return        await withRetry(() => loc_ipsb(ip),   0);
+  return      await withRetry(() => loc_ipsb(ip),    0);
 }
 
-// —— 带缓存的入口定位 —— //
 async function getEntranceBundle(ip) {
   const now = Date.now();
-  if (ENT_CACHE.ip === ip && (now - ENT_CACHE.t) < ENT_TTL_SEC * 1000 && ENT_CACHE.data) {
-    const left = Math.max(0, ENT_TTL_SEC*1000 - (now-ENT_CACHE.t));
-    log('info','Entrance cache HIT', { ip:_maskMaybe(ip), ttl_ms_left:left });
+  const fresh = (now - ENT_CACHE.t) < ENT_TTL_SEC * 1000;
+  if (ENT_CACHE.ip === ip && fresh && ENT_CACHE.data) {
+    const left = Math.max(0, ENT_TTL_SEC * 1000 - (now - ENT_CACHE.t));
+    log('info', 'Entrance cache HIT', { ip: _maskMaybe(ip), ttl_ms_left: left });
     return ENT_CACHE.data;
   }
   if (ENT_CACHE.ip === ip && ENT_CACHE.data) {
-    log('info','Entrance cache EXPIRED', { ip:_maskMaybe(ip), age_ms:(now-ENT_CACHE.t), ttl_ms: ENT_TTL_SEC*1000 });
+    log('info', 'Entrance cache EXPIRED', {
+      ip: _maskMaybe(ip), age_ms: (now - ENT_CACHE.t), ttl_ms: ENT_TTL_SEC * 1000
+    });
   } else {
-    log('info','Entrance cache MISS', { ip:_maskMaybe(ip) });
+    log('info', 'Entrance cache MISS', { ip: _maskMaybe(ip) });
   }
 
   const t = Date.now();
@@ -698,8 +928,9 @@ async function getEntranceBundle(ip) {
     withRetry(() => loc_pingan(ip), 1),
     withRetry(() => loc_chain(ip),  1)
   ]);
-  log('debug','Entrance locate results',
-      { pingan:a.status, chain:b.status, cost:(Date.now()-t)+'ms' });
+  log('debug', 'Entrance locate results', {
+    pingan: a.status, chain: b.status, cost: (Date.now() - t) + 'ms'
+  });
 
   const res = {
     ip,
@@ -712,43 +943,43 @@ async function getEntranceBundle(ip) {
   return res;
 }
 
-/* ===================== 服务清单解析 & 检测 ===================== */
+// ====================== 服务清单解析 & 检测 ======================
 const SD_TESTS_MAP = {
-  youtube:      () => sd_testYouTube(),
-  netflix:      () => sd_testNetflix(),
-  disney:       () => sd_testDisney(),
-  chatgpt_web:  () => sd_testChatGPTWeb(),
-  chatgpt_app:  () => sd_testChatGPTAppAPI(),
-  hulu_us:      () => sd_testHuluUS(),
-  hulu_jp:      () => sd_testHuluJP(),
-  hbo:          () => sd_testHBO()
+  youtube:     () => sd_testYouTube(),
+  netflix:     () => sd_testNetflix(),
+  disney:      () => sd_testDisney(),
+  chatgpt_web: () => sd_testChatGPTWeb(),
+  chatgpt_app: () => sd_testChatGPTAppAPI(),
+  hulu_us:     () => sd_testHuluUS(),
+  hulu_jp:     () => sd_testHuluJP(),
+  hbo:         () => sd_testHBO()
 };
 const SD_DEFAULT_ORDER = Object.keys(SD_TESTS_MAP);
 
 const SD_ALIAS = {
-  yt:'youtube', 'youtube':'youtube', 'youtube premium':'youtube', '油管':'youtube',
-  nf:'netflix', 'netflix':'netflix', '奈飞':'netflix',
-  'disney':'disney', 'disney+':'disney', '迪士尼':'disney',
-  'chatgpt':'chatgpt_app', gpt:'chatgpt_app', openai:'chatgpt_app',
-  'chatgpt_web':'chatgpt_web', 'chatgpt-web':'chatgpt_web', 'chatgpt web':'chatgpt_web',
-  hulu:'hulu_us', huluus:'hulu_us', hulujp:'hulu_jp',
-  hbo:'hbo', max:'hbo', '最大':'hbo'
+  yt: 'youtube', 'youtube': 'youtube', 'youtube premium': 'youtube', '油管': 'youtube',
+  nf: 'netflix', 'netflix': 'netflix', '奈飞': 'netflix',
+  'disney': 'disney', 'disney+': 'disney', '迪士尼': 'disney',
+  'chatgpt': 'chatgpt_app', gpt: 'chatgpt_app', openai: 'chatgpt_app',
+  'chatgpt_web': 'chatgpt_web', 'chatgpt-web': 'chatgpt_web', 'chatgpt web': 'chatgpt_web',
+  hulu: 'hulu_us', huluus: 'hulu_us', hulujp: 'hulu_jp',
+  hbo: 'hbo', max: 'hbo', '最大': 'hbo'
 };
 
-function parseServices(raw){
+function parseServices(raw) {
   if (raw == null) return [];
   let s = String(raw).trim();
   if (!s || s === '[]' || s === '{}' || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
   try {
     const arr = JSON.parse(s);
     if (Array.isArray(arr)) return normSvcList(arr);
-  } catch(_){}
-  const parts = s.split(/[,\uFF0C;|/ \t\r\n]+/);
+  } catch (_) {}
+  const parts = s.split(/[\,\uFF0C;|\/ \t\r\n]+/);
   return normSvcList(parts);
 }
-function normSvcList(list){
+function normSvcList(list) {
   const out = [];
-  for (let x of list){
+  for (let x of list) {
     let k = String(x ?? '').trim().toLowerCase();
     if (!k) continue;
     k = SD_ALIAS[k] || k;
@@ -757,135 +988,134 @@ function normSvcList(list){
   }
   return out;
 }
-function selectServices(){
+function selectServices() {
   const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
   const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
   if (hasCheckboxKey) {
-    if (boxChecked.length > 0) { log('info','Services from BoxJS checkbox', boxChecked); return boxChecked; }
-    const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-    if (boxTextList.length > 0) { log('info','Services from BoxJS text', boxTextList); return boxTextList; }
-    const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-    if (argList.length > 0) { log('info','Services from arguments', argList); return argList; }
-    log('info','Services default(all)');
+    if (boxChecked.length) return (log('info','Services: BoxJS checkbox', boxChecked), boxChecked);
+    const fromText = parseServices(CFG.SERVICES_BOX_TEXT);
+    if (fromText.length)  return (log('info','Services: BoxJS text', fromText), fromText);
+    const fromArg  = parseServices(CFG.SERVICES_ARG_TEXT);
+    if (fromArg.length)   return (log('info','Services: arguments', fromArg), fromArg);
+    log('info','Services: default(all)');
     return SD_DEFAULT_ORDER.slice();
   }
-  const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-  if (boxTextList.length > 0) { log('info','Services from BoxJS text', boxTextList); return boxTextList; }
-  const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-  if (argList.length > 0) { log('info','Services from arguments', argList); return argList; }
-  log('info','Services default(all)');
+  const fromText = parseServices(CFG.SERVICES_BOX_TEXT);
+  if (fromText.length)  return (log('info','Services: BoxJS text', fromText), fromText);
+  const fromArg  = parseServices(CFG.SERVICES_ARG_TEXT);
+  if (fromArg.length)   return (log('info','Services: arguments', fromArg), fromArg);
+  log('info','Services: default(all)');
   return SD_DEFAULT_ORDER.slice();
 }
 
-/* —— HTTP 请求工具（服务检测） —— */
-function sd_now(){ return Date.now(); }
+// ====================== 服务检测 HTTP 工具 ======================
+const sd_now = () => Date.now();
 const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const SD_BASE_HEADERS = { "User-Agent": SD_UA, "Accept-Language": "en" };
 
-function sd_httpGet(url, headers={}, followRedirect=true) {
+function sd_httpGet(url, headers = {}, followRedirect = true) {
   return new Promise((resolve) => {
     const start = sd_now();
-    $httpClient.get(
-        { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, followRedirect },
-        (err, resp, data) => {
-          const cost = sd_now() - start;
-          if (err || !resp) {
-            log('warn','sd_httpGet FAIL', url, 'cost', cost+'ms', String(err||''));
-            return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
-          }
-          const status = resp.status || resp.statusCode || 0;
-          log('debug','sd_httpGet OK', url, 'status', status, 'cost', cost+'ms');
-          resolve({ ok:true, status, cost, headers: resp.headers || {}, data: data || "" });
-        }
-    );
+    $httpClient.get({
+      url,
+      headers: { ...SD_BASE_HEADERS, ...headers },
+      timeout: SD_TIMEOUT_MS,
+      followRedirect
+    }, (err, resp, data) => {
+      const cost = sd_now() - start;
+      if (err || !resp) {
+        log('warn', 'sd_httpGet FAIL', url, 'cost', cost + 'ms', String(err || ''));
+        return resolve({ ok: false, status: 0, cost, headers: {}, data: "" });
+      }
+      const status = resp.status || resp.statusCode || 0;
+      log('debug', 'sd_httpGet OK', url, 'status', status, 'cost', cost + 'ms');
+      resolve({ ok: true, status, cost, headers: resp.headers || {}, data: data || "" });
+    });
   });
 }
-function sd_httpPost(url, headers={}, body="") {
+function sd_httpPost(url, headers = {}, body = "") {
   return new Promise((resolve) => {
     const start = sd_now();
-    $httpClient.post(
-        { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, body },
-        (err, resp, data) => {
-          const cost = sd_now() - start;
-          if (err || !resp) {
-            log('warn','sd_httpPost FAIL', url, 'cost', cost+'ms', String(err||''));
-            return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
-          }
-          const status = resp.status || resp.statusCode || 0;
-          log('debug','sd_httpPost OK', url, 'status', status, 'cost', cost+'ms');
-          resolve({ ok:true, status, cost, headers: resp.headers || {}, data: data || "" });
-        }
-    );
+    $httpClient.post({
+      url,
+      headers: { ...SD_BASE_HEADERS, ...headers },
+      timeout: SD_TIMEOUT_MS,
+      body
+    }, (err, resp, data) => {
+      const cost = sd_now() - start;
+      if (err || !resp) {
+        log('warn', 'sd_httpPost FAIL', url, 'cost', cost + 'ms', String(err || ''));
+        return resolve({ ok: false, status: 0, cost, headers: {}, data: "" });
+      }
+      const status = resp.status || resp.statusCode || 0;
+      log('debug', 'sd_httpPost OK', url, 'status', status, 'cost', cost + 'ms');
+      resolve({ ok: true, status, cost, headers: resp.headers || {}, data: data || "" });
+    });
   });
 }
 
-/* —— 台湾旗模式（服务检测渲染用）—— */
-function sd_flagFromCC(cc){
-  cc = (cc||'').toUpperCase();
+// ====================== 台湾旗模式（服务检测渲染） ======================
+function sd_flagFromCC(cc) {
+  cc = (cc || '').toUpperCase();
   if (!/^[A-Z]{2}$/.test(cc)) return '';
-  if (cc==='TW') {
-    if (TW_FLAG_MODE===0) return '🇨🇳';
-    if (TW_FLAG_MODE===2) return '🇼🇸';
+  if (cc === 'TW') {
+    if (TW_FLAG_MODE === 0) return '🇨🇳';
+    if (TW_FLAG_MODE === 2) return '🇼🇸';
   }
   try {
-    const cps = [...cc].map(c => 0x1F1E6 + (c.charCodeAt(0)-65));
+    const cps = [...cc].map((c) => 0x1F1E6 + (c.charCodeAt(0) - 65));
     return String.fromCodePoint(...cps);
   } catch { return ''; }
 }
 
-const SD_CC_NAME = {
-  "zh-Hans": { CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
+const SD_CC_NAME = ({
+  "zh-Hans": {
+    CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国",
     SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚",
     IN:"印度", AU:"澳大利亚", NZ:"新西兰", CA:"加拿大", GB:"英国", DE:"德国", FR:"法国",
-    NL:"荷兰", ES:"西班牙", IT:"意大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄罗斯" },
-  "zh-Hant": { CN:"中國", TW:"台灣", HK:"中國香港", MO:"中國澳門", JP:"日本", KR:"南韓", US:"美國",
+    NL:"荷兰", ES:"西班牙", IT:"意大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄罗斯"
+  },
+  "zh-Hant": {
+    CN:"中國", TW:"台灣", HK:"中國香港", MO:"中國澳門", JP:"日本", KR:"南韓", US:"美國",
     SG:"新加坡", MY:"馬來西亞", TH:"泰國", VN:"越南", PH:"菲律賓", ID:"印尼",
     IN:"印度", AU:"澳洲", NZ:"紐西蘭", CA:"加拿大", GB:"英國", DE:"德國", FR:"法國",
-    NL:"荷蘭", ES:"西班牙", IT:"義大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄羅斯" }
-}[SD_LANG];
+    NL:"荷蘭", ES:"西班牙", IT:"義大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄羅斯"
+  }
+})[SD_LANG];
 
-function sd_ccPretty(cc){
-  cc = (cc||'').toUpperCase();
+function sd_ccPretty(cc) {
+  cc = (cc || '').toUpperCase();
   const flag = sd_flagFromCC(cc);
   const name = SD_CC_NAME[cc];
-  if (!cc) return "—";
-  if (SD_REGION_MODE==='flag') return flag || "—";
-  if (SD_REGION_MODE==='abbr') return (flag||'') + cc;
+  if (!cc) return '—';
+  if (SD_REGION_MODE === 'flag') return flag || '—';
+  if (SD_REGION_MODE === 'abbr') return (flag || '') + cc;
   if (flag && name) return `${flag} ${cc} | ${name}`;
   if (flag) return `${flag} ${cc}`;
   return cc;
 }
 
-// —— 三态图标主题 —— //
-function sd_pickIcons(theme){
-  switch(theme){
-    case 'lock':   return { full:'🔓', partial:'🔐', blocked:'🔒' };
-    case 'circle': return { full:'⭕️', partial:'⛔️', blocked:'🚫' };
-    default:       return { full:'✅', partial:'❇️', blocked:'❎' };
-  }
-}
-const SD_ICONS = sd_pickIcons(SD_ICON_THEME);
-function sd_isPartial(tag){ return /自制|自製|original/i.test(String(tag||'')) || /部分/i.test(String(tag||'')); }
+const isPartial = (tag) => /自制|自製|original/i.test(String(tag || '')) || /部分/i.test(String(tag || ''));
 
-/* —— 服务名（展示使用） —— */
-const SD_I18N = {
+const SD_I18N = ({
   "zh-Hans": {
-    youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
-    netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)"
+    youTube: "YouTube", chatgpt_app: "ChatGPT", chatgpt: "ChatGPT Web",
+    netflix: "Netflix", disney: "Disney+", huluUS: "Hulu(美)",
+    huluJP: "Hulu(日)", hbo: "Max(HBO)"
   },
   "zh-Hant": {
-    youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web",
-    netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)"
+    youTube: "YouTube", chatgpt_app: "ChatGPT", chatgpt: "ChatGPT Web",
+    netflix: "Netflix", disney: "Disney+", huluUS: "Hulu(美)",
+    huluJP: "Hulu(日)", hbo: "Max(HBO)"
   }
-}[SD_LANG];
+})[SD_LANG];
 
-/* —— 各服务检查 —— */
 function sd_parseNFRegion(resp) {
   try {
-    const xo = resp?.headers?.['x-originating-url']
-        || resp?.headers?.['X-Origining-URL']
-        || resp?.headers?.['X-Originating-URL'];
+    const xo = resp?.headers?.['x-originating-url'] ||
+        resp?.headers?.['X-Origining-URL'] ||
+        resp?.headers?.['X-Originating-URL'];
     if (xo) {
       const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
       if (m) return m[1].toUpperCase();
@@ -897,253 +1127,254 @@ function sd_parseNFRegion(resp) {
 }
 
 async function sd_testYouTube() {
-  log('debug','SD YouTube begin');
-  const r = await sd_httpGet("https://www.youtube.com/premium?hl=en", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.youTube, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
-  let cc = "US";
+  log('debug', 'SD YouTube begin');
+  const r = await sd_httpGet('https://www.youtube.com/premium?hl=en', {}, true);
+  if (!r.ok) return sd_renderLine({ name: SD_I18N.youTube, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable') });
+  let cc = 'US';
   try {
     let m = r.data.match(/"countryCode":"([A-Z]{2})"/);
     if (!m) m = r.data.match(/["']INNERTUBE_CONTEXT_GL["']\s*:\s*["']([A-Z]{2})["']/);
     if (m) cc = m[1];
-  } catch(_){}
-  return sd_renderLine({name:SD_I18N.youTube, ok:true, cc, cost:r.cost, status:r.status, tag:""});
+  } catch (_) {}
+  return sd_renderLine({ name: SD_I18N.youTube, ok: true, cc, cost: r.cost, status: r.status, tag: '' });
 }
 async function sd_testChatGPTWeb() {
-  log('debug','SD ChatGPT Web begin');
-  const r = await sd_httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
-  let cc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch(_){}
-  return sd_renderLine({name:SD_I18N.chatgpt, ok:true, cc, cost:r.cost, status:r.status, tag:""});
+  log('debug', 'SD ChatGPT Web begin');
+  const r = await sd_httpGet('https://chatgpt.com/cdn-cgi/trace', {}, true);
+  if (!r.ok) return sd_renderLine({ name: SD_I18N.chatgpt, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable') });
+  let cc = '';
+  try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch (_) {}
+  return sd_renderLine({ name: SD_I18N.chatgpt, ok: true, cc, cost: r.cost, status: r.status, tag: '' });
 }
 async function sd_testChatGPTAppAPI() {
-  log('debug','SD ChatGPT App begin');
-  const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.chatgpt_app, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
-  let cc = "";
+  log('debug', 'SD ChatGPT App begin');
+  const r = await sd_httpGet('https://api.openai.com/v1/models', {}, true);
+  if (!r.ok) return sd_renderLine({ name: SD_I18N.chatgpt_app, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable') });
+  let cc = '';
   try {
     const h = r.headers || {};
-    cc = (h['cf-ipcountry'] || h['CF-IPCountry'] || h['Cf-IpCountry'] || "").toString().toUpperCase();
-    if (!/^[A-Z]{2}$/.test(cc)) cc = "";
-  } catch(_){}
+    cc = (h['cf-ipcountry'] || h['CF-IPCountry'] || h['Cf-IpCountry'] || '')
+        .toString().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(cc)) cc = '';
+  } catch (_) {}
   if (!cc) cc = await sd_queryLandingCCMulti();
-  return sd_renderLine({name:SD_I18N.chatgpt_app, ok:true, cc, cost:r.cost, status:r.status, tag:""});
+  return sd_renderLine({ name: SD_I18N.chatgpt_app, ok: true, cc, cost: r.cost, status: r.status, tag: '' });
 }
 
-const SD_NF_ORIGINAL = "80018499";
-const SD_NF_NONORIG  = "81280792";
-async function sd_nfGet(id){ return await sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true); }
+const SD_NF_ORIGINAL = '80018499';
+const SD_NF_NONORIG  = '81280792';
+const sd_nfGet = (id) => sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true);
+
 async function sd_testNetflix() {
-  log('debug','SD Netflix begin');
+  log('debug', 'SD Netflix begin');
   try {
     const r1 = await sd_nfGet(SD_NF_NONORIG);
-    if (!r1.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:t('fail')});
-    if (r1.status === 403) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:t('regionBlocked')});
+    if (!r1.ok) return sd_renderLine({ name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: t('fail') });
+    if (r1.status === 403) return sd_renderLine({ name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: t('regionBlocked') });
     if (r1.status === 404) {
       const r2 = await sd_nfGet(SD_NF_ORIGINAL);
-      if (!r2.ok) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:t('fail')});
-      if (r2.status === 404) return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r2.cost, status:r2.status, tag:t('regionBlocked')});
-      const cc = sd_parseNFRegion(r2) || "";
-      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r2.cost, status:r2.status, tag:t('nfOriginals'), state:'partial'});
+      if (!r2.ok) return sd_renderLine({ name: SD_I18N.netflix, ok: false, cc: '', cost: r2.cost, status: r2.status, tag: t('fail') });
+      if (r2.status === 404) return sd_renderLine({ name: SD_I18N.netflix, ok: false, cc: '', cost: r2.cost, status: r2.status, tag: t('regionBlocked') });
+      const cc = sd_parseNFRegion(r2) || '';
+      return sd_renderLine({ name: SD_I18N.netflix, ok: true, cc, cost: r2.cost, status: r2.status, tag: t('nfOriginals'), state: 'partial' });
     }
     if (r1.status === 200) {
-      const cc = sd_parseNFRegion(r1) || "";
-      return sd_renderLine({name:SD_I18N.netflix, ok:true, cc, cost:r1.cost, status:r1.status, tag:t('nfFull'), state:'full'});
+      const cc = sd_parseNFRegion(r1) || '';
+      return sd_renderLine({ name: SD_I18N.netflix, ok: true, cc, cost: r1.cost, status: r1.status, tag: t('nfFull'), state: 'full' });
     }
-    return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:r1.cost, status:r1.status, tag:`HTTP ${r1.status}`});
-  } catch(e){
-    return sd_renderLine({name:SD_I18N.netflix, ok:false, cc:"", cost:null, status:0, tag:t('fail')});
+    return sd_renderLine({ name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: `HTTP ${r1.status}` });
+  } catch (e) {
+    return sd_renderLine({ name: SD_I18N.netflix, ok: false, cc: '', cost: null, status: 0, tag: t('fail') });
   }
 }
 
 async function sd_testDisney() {
-  log('debug','SD Disney+ begin');
+  log('debug', 'SD Disney+ begin');
   async function home() {
-    const r = await sd_httpGet("https://www.disneyplus.com/", { "Accept-Language":"en" }, true);
-    if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.data||"")) throw "NA";
-    let cc=""; try {
-      const m = r.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || r.data.match(/data-country=["']([A-Z]{2})["']/i);
+    const r = await sd_httpGet('https://www.disneyplus.com/', { 'Accept-Language': 'en' }, true);
+    if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.data || '')) {
+      throw 'NA';
+    }
+    let cc = '';
+    try {
+      const m = r.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) ||
+          r.data.match(/data-country=["']([A-Z]{2})["']/i);
       if (m) cc = m[1];
-    } catch(_){}
-    return { cc, cost:r.cost, status:r.status };
+    } catch (_) {}
+    return { cc, cost: r.cost, status: r.status };
   }
   async function bam() {
     const headers = {
-      "Accept-Language":"en",
-      "Authorization":"ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84",
-      "Content-Type":"application/json",
-      "User-Agent": SD_UA
+      'Accept-Language': 'en',
+      'Authorization': 'ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84',
+      'Content-Type': 'application/json',
+      'User-Agent': SD_UA
     };
     const body = JSON.stringify({
-      query:'mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }',
-      variables:{ input:{ applicationRuntime:'chrome', attributes:{ browserName:'chrome', browserVersion:'120.0.0.0', manufacturer:'apple', model:null, operatingSystem:'macintosh', operatingSystemVersion:'10.15.7', osDeviceIds:[] }, deviceFamily:'browser', deviceLanguage:'en', deviceProfile:'macosx' } }
+      query: 'mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }',
+      variables: {
+        input: {
+          applicationRuntime: 'chrome',
+          attributes: {
+            browserName: 'chrome', browserVersion: '120.0.0.0', manufacturer: 'apple',
+            model: null, operatingSystem: 'macintosh', operatingSystemVersion: '10.15.7',
+            osDeviceIds: []
+          },
+          deviceFamily: 'browser', deviceLanguage: 'en', deviceProfile: 'macosx'
+        }
+      }
     });
-    const r = await sd_httpPost("https://disney.api.edge.bamgrid.com/graph/v1/device/graphql", headers, body);
-    if (!r.ok || r.status !== 200) throw "NA";
-    const d = JSON.parse(r.data || "{}");
-    if (d?.errors) throw "NA";
+    const r = await sd_httpPost('https://disney.api.edge.bamgrid.com/graph/v1/device/graphql', headers, body);
+    if (!r.ok || r.status !== 200) throw 'NA';
+    const d = JSON.parse(r.data || '{}');
+    if (d?.errors) throw 'NA';
     const inLoc = d?.extensions?.sdk?.session?.inSupportedLocation;
     const cc    = d?.extensions?.sdk?.session?.location?.countryCode;
-    return { inLoc, cc, cost:r.cost, status:r.status };
+    return { inLoc, cc, cost: r.cost, status: r.status };
   }
-  function timeout(ms, code){ return new Promise((_,rej)=>setTimeout(()=>rej(code),ms)); }
+  const timeout = (ms, code) => new Promise((_, rej) => setTimeout(() => rej(code), ms));
 
   try {
-    const h = await Promise.race([home(), timeout(7000,"TO")]);
-    const b = await Promise.race([bam(),  timeout(7000,"TO")]).catch(()=>({}));
+    const h = await Promise.race([ home(), timeout(7000, 'TO') ]);
+    const b = await Promise.race([ bam(),  timeout(7000, 'TO') ]).catch(() => ({}));
     const blocked = (b && b.inLoc === false);
-    const cc = blocked ? "" : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || "");
-    return sd_renderLine({name:SD_I18N.disney, ok:!blocked, cc, cost:(b?.cost||h?.cost||0), status:(b?.status||h?.status||0), tag: blocked ? t('regionBlocked') : ""});
-  } catch(e){
-    const tag = (e==="TO") ? t('timeout') : t('fail');
-    return sd_renderLine({name:SD_I18N.disney, ok:false, cc:"", cost:null, status:0, tag});
+    const cc = blocked ? '' : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || '');
+    return sd_renderLine({ name: SD_I18N.disney, ok: !blocked, cc, cost: (b?.cost || h?.cost || 0), status: (b?.status || h?.status || 0), tag: blocked ? t('regionBlocked') : '' });
+  } catch (e) {
+    const tag = (e === 'TO') ? t('timeout') : t('fail');
+    return sd_renderLine({ name: SD_I18N.disney, ok: false, cc: '', cost: null, status: 0, tag });
   }
 }
 
 async function sd_testHuluUS() {
-  log('debug','SD Hulu US begin');
-  const r = await sd_httpGet("https://www.hulu.com/", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.huluUS, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
-  const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
-  return sd_renderLine({name:SD_I18N.huluUS, ok:!blocked, cc: blocked?"": "US", cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
+  log('debug', 'SD Hulu US begin');
+  const r = await sd_httpGet('https://www.hulu.com/', {}, true);
+  if (!r.ok) return sd_renderLine({ name: SD_I18N.huluUS, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable') });
+  const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || '');
+  return sd_renderLine({ name: SD_I18N.huluUS, ok: !blocked, cc: blocked ? '' : 'US', cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : '' });
 }
 async function sd_testHuluJP() {
-  log('debug','SD Hulu JP begin');
-  const r = await sd_httpGet("https://www.hulu.jp/", { "Accept-Language":"ja" }, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.huluJP, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
-  const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
-  return sd_renderLine({name:SD_I18N.huluJP, ok:!blocked, cc: blocked?"": "JP", cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
+  log('debug', 'SD Hulu JP begin');
+  const r = await sd_httpGet('https://www.hulu.jp/', { 'Accept-Language': 'ja' }, true);
+  if (!r.ok) return sd_renderLine({ name: SD_I18N.huluJP, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable') });
+  const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || '');
+  return sd_renderLine({ name: SD_I18N.huluJP, ok: !blocked, cc: blocked ? '' : 'JP', cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : '' });
 }
 async function sd_testHBO() {
-  log('debug','SD Max(HBO) begin');
-  const r = await sd_httpGet("https://www.max.com/", {}, true);
-  if (!r.ok) return sd_renderLine({name:SD_I18N.hbo, ok:false, cc:"", cost:r.cost, status:r.status, tag:t('notReachable')});
-  const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
-  let cc=""; try { const m = String(r.data||"").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch(_){}
+  log('debug', 'SD Max(HBO) begin');
+  const r = await sd_httpGet('https://www.max.com/', {}, true);
+  if (!r.ok) return sd_renderLine({ name: SD_I18N.hbo, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable') });
+  const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || '');
+  let cc = '';
+  try { const m = String(r.data || '').match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch (_) {}
   if (!cc) cc = await sd_queryLandingCCMulti();
-  return sd_renderLine({name:SD_I18N.hbo, ok:!blocked, cc: blocked?"": cc, cost:r.cost, status:r.status, tag: blocked ? t('regionBlocked') : ""});
+  return sd_renderLine({ name: SD_I18N.hbo, ok: !blocked, cc: blocked ? '' : cc, cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : '' });
 }
 
-// 多源回退（更稳）
 async function sd_queryLandingCC() {
-  const r = await sd_httpGet("http://ip-api.com/json", {}, true);
+  const r = await sd_httpGet('http://ip-api.com/json', {}, true);
   if (r.ok && r.status === 200) {
-    try { const j = JSON.parse(r.data || "{}"); return (j.countryCode || "").toUpperCase(); }
-    catch(_){ return ""; }
+    try { const j = JSON.parse(r.data || '{}'); return (j.countryCode || '').toUpperCase(); }
+    catch (_) { return ''; }
   }
-  return "";
+  return '';
 }
-async function sd_queryLandingCCMulti(){
+async function sd_queryLandingCCMulti() {
   let cc = await sd_queryLandingCC();
   if (cc) return cc;
 
-  let r = await sd_httpGet("https://api.ip.sb/geoip", {}, true);
-  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_code) return j.country_code.toUpperCase(); }catch(_){}
+  let r = await sd_httpGet('https://api.ip.sb/geoip', {}, true);
+  if (r.ok && r.status === 200) try { const j = JSON.parse(r.data || '{}'); if (j.country_code) return j.country_code.toUpperCase(); } catch (_) {}
 
-  r = await sd_httpGet("https://ipinfo.io/json", {}, true);
-  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country) return j.country.toUpperCase(); }catch(_){}
+  r = await sd_httpGet('https://ipinfo.io/json', {}, true);
+  if (r.ok && r.status === 200) try { const j = JSON.parse(r.data || '{}'); if (j.country) return j.country.toUpperCase(); } catch (_) {}
 
-  r = await sd_httpGet("https://ifconfig.co/json", {"Accept-Language":"en"}, true);
-  if (r.ok && r.status===200) try{ const j=JSON.parse(r.data||"{}"); if(j.country_iso) return j.country_iso.toUpperCase(); }catch(_){}
+  r = await sd_httpGet('https://ifconfig.co/json', { 'Accept-Language': 'en' }, true);
+  if (r.ok && r.status === 200) try { const j = JSON.parse(r.data || '{}'); if (j.country_iso) return j.country_iso.toUpperCase(); } catch (_) {}
 
-  return "";
+  return '';
 }
 
-/* —— 渲染（仅 Netflix 区分“完整/自制剧”，其它服务统一“已解锁/不可达”）—— */
-function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
-  const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
-
-  const icon = sd_pickIcons(SD_ICON_THEME)[st];
-  const regionChunk = cc ? sd_ccPretty(cc) : "";
-  const regionText  = regionChunk || "-";
+function sd_renderLine({ name, ok, cc, cost, status, tag, state }) {
+  const st = state ? state : (ok ? (isPartial(tag) ? 'partial' : 'full') : 'blocked');
+  const icon = SD_ICONS[st];
+  const regionChunk = cc ? sd_ccPretty(cc) : '';
+  const regionText  = regionChunk || '-';
 
   const unlockedShort = t('unlocked');
   const blockedText   = t('notReachable');
 
   const isNetflix = /netflix/i.test(String(name));
-  const stateTextLong = (()=>{
-    if (st==='full')    return t('nfFull');
-    if (st==='partial') return t('nfOriginals');
-    return blockedText;
-  })();
-  const stateTextShort = (st==='blocked') ? blockedText : unlockedShort;
-
-  const showTag = (isNetflix && SD_STYLE === "text" && !SD_ARROW) ? "" : (tag || "");
+  const stateTextLong = (st === 'full')    ? t('nfFull') :
+      (st === 'partial') ? t('nfOriginals') : blockedText;
+  const stateTextShort = (st === 'blocked') ? blockedText : unlockedShort;
+  const showTag = (isNetflix && SD_STYLE === 'text' && !SD_ARROW) ? '' : (tag || '');
 
   // 文本模式（紧凑）
-  if (SD_STYLE === "text" && !SD_ARROW) {
-    const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
-    const head  = `${left}，${t('region')}: ${regionText}`;
-    const tail = [
-      showTag,
-      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
-      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-    ].filter(Boolean).join(" ｜ ");
+  if (SD_STYLE === 'text' && !SD_ARROW) {
+    const left = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
+    const head = `${left}，${t('region')}: ${regionText}`;
+    const tail = [ showTag,
+      (SD_SHOW_LAT && cost != null) ? `${cost}ms` : '',
+      (SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : ''
+    ].filter(Boolean).join(' ｜ ');
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
   // 常规文本
-  const stateTextStd = (()=>{
-    if (st==='full') return t('unlocked');
-    if (st==='partial') return t('partialUnlocked');
-    return t('notReachable');
-  })();
-  if (SD_STYLE === "text") {
-    const left  = `${name}: ${stateTextStd}`;
-    const head  = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
-    const tail = [
-      showTag,
-      (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
-      (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-    ].filter(Boolean).join(" ｜ ");
+  if (SD_STYLE === 'text') {
+    const left = `${name}: ${st === 'full' ? t('unlocked') : st === 'partial' ? t('partialUnlocked') : t('notReachable')}`;
+    const head = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
+    const tail = [ showTag,
+      (SD_SHOW_LAT && cost != null) ? `${cost}ms` : '',
+      (SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : ''
+    ].filter(Boolean).join(' ｜ ');
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
   // 图标模式
-  const head = SD_ARROW ? `${icon} ${name} ➟ ${regionText}` : `${icon} ${name} ｜ ${regionText}`;
-  const tail = [
-    showTag,
-    (SD_SHOW_LAT && cost!=null) ? `${cost}ms` : "",
-    (SD_SHOW_HTTP && status>0) ? `HTTP ${status}` : ""
-  ].filter(Boolean).join(" ｜ ");
+  const head = SD_ARROW ? `${icon} ${name} ➟ ${regionText}`
+      : `${icon} ${name} ｜ ${regionText}`;
+  const tail = [ showTag,
+    (SD_SHOW_LAT && cost != null) ? `${cost}ms` : '',
+    (SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : ''
+  ].filter(Boolean).join(' ｜ ');
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
-/* —— 运行队列 —— */
-async function runServiceChecks(){
-  try{
+async function runServiceChecks() {
+  try {
     const order = selectServices();
     if (!order.length) return [];
-    log('info','Service checks start', order);
-    const tasks = order.map(k => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
+    log('info', 'Service checks start', order);
+    const tasks = order.map((k) => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
     const lines = await Promise.all(tasks);
-    log('info','Service checks done');
+    log('info', 'Service checks done');
     return lines.filter(Boolean);
-  }catch(e){
-    log('error','Service checks error', String(e));
+  } catch (e) {
+    log('error', 'Service checks error', String(e));
     return [];
   }
 }
 
-/* —— 简→繁（仅在 zh-Hant 开启）：短语优先 + 字符兜底 —— */
-function zhHansToHantOnce(s){
+// ====================== 简→繁（仅在 zh-Hant） ======================
+function zhHansToHantOnce(s) {
   if (!s) return s;
   const phraseMap = [
-    ['网络', '網路'], ['蜂窝数据', '行動數據'], ['代理策略', '代理策略'],
-    ['执行时间', '執行時間'], ['落地 IP', '落地 IP'], ['入口', '入口'],
-    ['位置', '位置'], ['运营商', '運營商'], ['区域', '區域'],
-    ['不可达', '不可達'], ['检测失败', '檢測失敗'], ['超时', '逾時'],
-    ['区域受限', '區域受限'], ['已解锁', '已解鎖'], ['部分解锁', '部分解鎖'],
-    ['已完整解锁', '已完整解鎖'], ['仅解锁自制剧', '僅解鎖自製劇'],
-    ['中国香港', '中國香港'], ['中国澳门', '中國澳門'],
-    ['中国移动', '中國移動'], ['中国联通', '中國聯通'], ['中国电信', '中國電信'],
-    ['中国广电', '中國廣電'], ['中国教育网', '中國教育網']
+    ['网络','網路'], ['蜂窝数据','行動數據'], ['代理策略','代理策略'],
+    ['执行时间','執行時間'], ['落地 IP','落地 IP'], ['入口','入口'],
+    ['位置','位置'], ['运营商','運營商'], ['区域','區域'],
+    ['不可达','不可達'], ['检测失败','檢測失敗'], ['超时','逾時'],
+    ['区域受限','區域受限'], ['已解锁','已解鎖'], ['部分解锁','部分解鎖'],
+    ['已完整解锁','已完整解鎖'], ['仅解锁自制剧','僅解鎖自製劇'],
+    ['中国香港','中國香港'], ['中国澳门','中國澳門'],
+    ['中国移动','中國移動'], ['中国联通','中國聯通'], ['中国电信','中國電信'],
+    ['中国广电','中國廣電'], ['中国教育网','中國教育網']
   ];
   for (const [hans, hant] of phraseMap) s = s.replace(new RegExp(hans, 'g'), hant);
-  const charMap = { '网':'網', '络':'絡', '运':'運', '营':'營', '达':'達', '检':'檢', '测':'測', '时':'時', '区':'區', '术':'術', '产':'產', '广':'廣', '电':'電', '联':'聯', '动':'動', '数':'數', '汉':'漢', '气':'氣', '历':'曆', '宁':'寧' };
-  s = s.replace(/[\u4E00-\u9FFF]/g, ch => charMap[ch] || ch);
-  return s;
+  const charMap = { '网':'網','络':'絡','运':'運','营':'營','达':'達','检':'檢','测':'測','时':'時','区':'區','术':'術','产':'產','广':'廣','电':'電','联':'聯','动':'動','数':'數','汉':'漢','气':'氣','历':'曆','宁':'寧' };
+  return s.replace(/[\u4E00-\u9FFF]/g, (ch) => charMap[ch] || ch);
 }
-function maybeTify(content){
-  if (SD_LANG === 'zh-Hant') return zhHansToHantOnce(content);
-  return content;
+function maybeTify(content) {
+  return SD_LANG === 'zh-Hant' ? zhHansToHantOnce(content) : content;
 }
