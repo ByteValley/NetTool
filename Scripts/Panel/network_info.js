@@ -1,13 +1,15 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
  * by ByteValley (merged & patched by ChatGPT)
- * Version: 2025-11-08 (t() 工程化 + S2T 兜底)
+ * Version: 2025-11-08 (t() 工程化 + S2T 兜底 + 子标题/分组)
  *
  * 选择优先级（统一）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
  *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
  *
- * - 标题显示网络类型；第一行显示代理策略
+ * - 标题显示网络类型；第一行显示代理策略（子标题风格）
+ * - 分组子标题：本机（直连）/ 入口 / 落地 / 服务检测
+ * - IPv4/IPv6 分行显示（仅渲染存在的那个）
  * - 直连/入口/落地 IP 与位置（直连位置可脱敏为仅旗帜；默认跟随 MASK_IP）
  * - 中国境内运营商规范化
  * - 服务检测并发执行，Netflix“完整/自制剧”，其它服务“已解锁/不可达”
@@ -154,13 +156,11 @@ const CFG = {
 
   TW_FLAG_MODE:  toNum(readKV(K('TW_FLAG_MODE')) ?? $args.TW_FLAG_MODE ?? 1, 1),
 
-  // ✅ 新增：图标预设；支持 BoxJS/#!arguments 覆盖
+  // ✅ 图标预设；支持 BoxJS/#!arguments 覆盖
   IconPreset: readKV(K('IconPreset')) ?? $args.IconPreset ?? 'globe.asia.australia',
-  // ✅ 修改：Icon 默认给空串，让预设能生效（有值仍优先）
   Icon:      readKV(K('Icon'))      ?? $args.Icon      ?? '',
-  // 保留颜色（仍可 BoxJS/#!arguments 覆盖）
   IconColor: readKV(K('IconColor')) ?? $args.IconColor ?? '#1E90FF',
-  
+
   SD_STYLE:     readKV(K('SD_STYLE'))     ?? $args.SD_STYLE     ?? 'icon',
   SD_SHOW_LAT:  toBool(readKV(K('SD_SHOW_LAT'))  ?? $args.SD_SHOW_LAT,  true),
   SD_SHOW_HTTP: toBool(readKV(K('SD_SHOW_HTTP')) ?? $args.SD_SHOW_HTTP, true),
@@ -203,7 +203,7 @@ const CFG = {
 };
 
 // —— 运行时映射（图标支持预设 + 自定义）——
-const ICON_PRESET = CFG.IconPreset;  // ← 直接用 CFG
+const ICON_PRESET = CFG.IconPreset;
 const ICON_PRESET_MAP = {
   wifi:    'wifi.router',
   globe:   'globe.asia.australia',
@@ -211,11 +211,9 @@ const ICON_PRESET_MAP = {
   antenna: 'antenna.radiowaves.left.and.right',
   point:   'point.3.connected.trianglepath.dotted'
 };
-
-// 有自定义 Icon 就用自定义；否则用预设；最后兜底到 globe
 const ICON_NAME  = (CFG.Icon || '').trim()
-                || ICON_PRESET_MAP[ICON_PRESET]
-                || 'globe.asia.australia';
+    || ICON_PRESET_MAP[ICON_PRESET]
+    || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
 const IPv6_ON  = !!CFG.IPv6;
@@ -267,37 +265,57 @@ const SD_ARROW       = !!CFG.SD_ARROW;
   const nt = netTypeLine();
   const title = nt || t('panelTitle');
 
-  const directLines = [];
-  directLines.push(`${t('policy')}: ${policyName || '-'}`);
-  directLines.push(lineIP(t('ip'), cn.ip, cn6.ip));
+  /* ====== 分组渲染（带子标题 + IPv4/IPv6 分行）====== */
+  const parts = [];
+
+  // 本机（直连）
+  parts.push(subTitle('本机（直连）'));
+  parts.push(`【${t('policy')}】${policyName || '-'}`);
+
+  const directIPv4 = ipLine('IPv4', cn.ip);
+  const directIPv6 = ipLine('IPv6', cn6.ip);
+  if (directIPv4) parts.push(directIPv4);
+  if (directIPv6) parts.push(directIPv6);
 
   const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
-  directLines.push(`${t('location')}: ${directLoc}`);
-  if (cn.isp) directLines.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
+  parts.push(`${t('location')}: ${directLoc}`);
+  if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
-  const entranceLines = [];
-  if (ent && (ent.ip || ent.loc1 || ent.loc2)) {
-    entranceLines.push(lineIP(t('entrance'), ent.ip, ''));
-    if (ent.loc1) entranceLines.push(`${t('location')}¹: ${flagFirst(ent.loc1)}`);
-    if (ent.isp1) entranceLines.push(`${t('isp')}¹: ${fmtISP(ent.isp1, ent.loc1)}`);
-    if (ent.loc2) entranceLines.push(`${t('location')}²: ${flagFirst(ent.loc2)}`);
-    if (ent.isp2) entranceLines.push(`${t('isp')}²: ${String(ent.isp2).trim()}`);
+  // 入口
+  if (ent && (ent.ip || ent.loc1 || ent.loc2 || ent.isp1 || ent.isp2)) {
+    parts.push('', subTitle('入口'));
+    const entIPv4 = ipLine('IPv4', ent.ip && isIPv4(ent.ip) ? ent.ip : '');
+    const entIPv6 = ipLine('IPv6', ent.ip && isIPv6(ent.ip) ? ent.ip : '');
+    if (entIPv4) parts.push(entIPv4);
+    if (entIPv6) parts.push(entIPv6);
+
+    if (ent.loc1) parts.push(`${t('location')}¹: ${flagFirst(ent.loc1)}`);
+    if (ent.isp1) parts.push(`${t('isp')}¹: ${fmtISP(ent.isp1, ent.loc1)}`);
+    if (ent.loc2) parts.push(`${t('location')}²: ${flagFirst(ent.loc2)}`);
+    if (ent.isp2) parts.push(`${t('isp')}²: ${String(ent.isp2).trim()}`);
   }
 
-  const landingLines = [
-    lineIP(t('landingIP'), px.ip, px6.ip),
-    px.loc ? `${t('location')}: ${flagFirst(px.loc)}` : undefined,
-    px.isp ? `${t('isp')}: ${fmtISP(px.isp, px.loc)}` : undefined
-  ].filter(Boolean);
+  // 落地
+  if (px.ip || px6.ip || px.loc || px.isp) {
+    parts.push('', subTitle('落地'));
+    const landIPv4 = ipLine('IPv4', px.ip);
+    const landIPv6 = ipLine('IPv6', px6.ip);
+    if (landIPv4) parts.push(landIPv4);
+    if (landIPv6) parts.push(landIPv6);
 
-  const parts = [];
-  parts.push(...directLines);
-  if (entranceLines.length) parts.push('', ...entranceLines);
-  if (landingLines.length)  parts.push('', ...landingLines);
-  parts.push(`${t('runAt')}: ${now()}`);
+    if (px.loc) parts.push(`${t('location')}: ${flagFirst(px.loc)}`);
+    if (px.isp) parts.push(`${t('isp')}: ${fmtISP(px.isp, px.loc)}`);
+  }
 
+  // 执行时间
+  parts.push('', `${t('runAt')}: ${now()}`);
+
+  // 服务检测（分组）
   const sdLines = await runServiceChecks();
-  if (sdLines.length) parts.push('', ...sdLines);
+  if (sdLines.length) {
+    parts.push('', subTitle('服务检测'));
+    parts.push(...sdLines);
+  }
 
   const content = maybeTify(parts.join('\n'));
   $done({ title: maybeTify(title), content, icon: ICON_NAME, 'icon-color': ICON_COLOR });
@@ -324,6 +342,17 @@ function maskIP(ip){
   return ip;
 }
 
+/* === 分组渲染工具（新增） === */
+// 子标题行（可按需更换样式，如 ▓▓▓/════ 等）
+function subTitle(text){
+  return `—— ${text} ——`;
+}
+// IPv4/IPv6 独立行（仅渲染存在的 IP；自动脱敏）
+function ipLine(label, ip){
+  if (!ip) return null;
+  return `${label}: ${maskIP(ip)}`;
+}
+
 function splitFlagRaw(s) {
   const re=/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u;
   const m=String(s||'').match(re);
@@ -337,12 +366,6 @@ function splitFlagRaw(s) {
 }
 function onlyFlag(loc){ return splitFlagRaw(loc).flag || '-'; }
 function flagFirst(loc){ const {flag,text}=splitFlagRaw(loc); return (flag||'') + (text||''); }
-
-function lineIP(label, ip4, ip6){
-  const a = `${label}: ${maskIP(ip4) || '-'}`;
-  const b = ip6 ? `\n${maskIP(ip6)}` : '';
-  return a + b;
-}
 
 function flagOf(code){
   let cc = String(code || '').trim();
@@ -379,7 +402,7 @@ function fmtISP(isp, locStr){
     return '中国联通';
   if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /广电/.test(norm))
     return '中国广电';
-  if (/(cernet|china\s*education)/.test(s) || /教育网/.test(norm))
+  if ((/cernet|china\s*education/).test(s) || /教育网/.test(norm))
     return '中国教育网';
 
   if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
@@ -653,7 +676,7 @@ const SD_ALIAS = {
   'disney':'disney',
   'disney+':'disney',
   '迪士尼':'disney',
-  
+
   'chatgpt':'chatgpt_app',
   'gpt':'chatgpt_app',
   'openai':'chatgpt_app',
@@ -678,13 +701,11 @@ function parseServices(raw){
   let s = String(raw).trim();
   if (!s || s === '[]' || s === '{}' || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
 
-  // 1) 先尝试 JSON 数组
   try {
     const arr = JSON.parse(s);
     if (Array.isArray(arr)) return normSvcList(arr);
   } catch(_) {}
 
-  // 2) 退化为“分隔符”解析：英文/中文逗号、分号、竖线、斜杠、空白、换行
   const parts = s.split(/[,\uFF0C;\|/ \t\r\n]+/);
   return normSvcList(parts);
 }
@@ -695,43 +716,36 @@ function normSvcList(list){
   for (let x of list){
     let k = String(x ?? '').trim().toLowerCase();
     if (!k) continue;
-    k = SD_ALIAS[k] || k;                // 别名归一
-    if (!SD_TESTS_MAP[k]) continue;      // 只接受有实现的键
-    if (!out.includes(k)) out.push(k);   // 按输入顺序去重
+    k = SD_ALIAS[k] || k;
+    if (!SD_TESTS_MAP[k]) continue;
+    if (!out.includes(k)) out.push(k);
   }
   return out;
 }
 
 // 统一选择逻辑（优先级：BoxJS 勾选 > BoxJS 文本 > arguments 文本 > 全部）
 function selectServices(){
-  // 1) BoxJS 勾选（checkboxes 数组字符串）
   const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
   const boxChecked = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
 
   if (hasCheckboxKey) {
     if (boxChecked.length > 0) return boxChecked;
 
-    // 继续看 BoxJS 文本
     const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
     if (boxTextList.length > 0) return boxTextList;
 
-    // 再看 arguments 文本
     const argList = parseServices(CFG.SERVICES_ARG_TEXT);
     if (argList.length > 0) return argList;
 
-    // 都空 → 默认全开
     return SD_DEFAULT_ORDER.slice();
   }
 
-  // 2) 没有“勾选键”时：BoxJS 文本
   const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
   if (boxTextList.length > 0) return boxTextList;
 
-  // 3) arguments 文本
   const argList = parseServices(CFG.SERVICES_ARG_TEXT);
   if (argList.length > 0) return argList;
 
-  // 4) 全部
   return SD_DEFAULT_ORDER.slice();
 }
 
@@ -744,13 +758,13 @@ function sd_httpGet(url, headers={}, followRedirect=true) {
   return new Promise((resolve) => {
     const start = sd_now();
     $httpClient.get(
-      { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, followRedirect },
-      (err, resp, data) => {
-        const cost = sd_now() - start;
-        if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
-        resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
-                  headers: resp.headers || {}, data: data || "" });
-      }
+        { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, followRedirect },
+        (err, resp, data) => {
+          const cost = sd_now() - start;
+          if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
+          resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
+            headers: resp.headers || {}, data: data || "" });
+        }
     );
   });
 }
@@ -758,13 +772,13 @@ function sd_httpPost(url, headers={}, body="") {
   return new Promise((resolve) => {
     const start = sd_now();
     $httpClient.post(
-      { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, body },
-      (err, resp, data) => {
-        const cost = sd_now() - start;
-        if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
-        resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
-                  headers: resp.headers || {}, data: data || "" });
-      }
+        { url, headers: { ...SD_BASE_HEADERS, ...headers }, timeout: SD_TIMEOUT_MS, body },
+        (err, resp, data) => {
+          const cost = sd_now() - start;
+          if (err || !resp) return resolve({ ok:false, status:0, cost, headers:{}, data:"" });
+          resolve({ ok:true, status: resp.status || resp.statusCode || 0, cost,
+            headers: resp.headers || {}, data: data || "" });
+        }
     );
   });
 }
@@ -833,8 +847,8 @@ const SD_I18N = {
 function sd_parseNFRegion(resp) {
   try {
     const xo = resp?.headers?.['x-originating-url']
-            || resp?.headers?.['X-Origining-URL']
-            || resp?.headers?.['X-Originating-URL'];
+        || resp?.headers?.['X-Origining-URL']
+        || resp?.headers?.['X-Originating-URL'];
     if (xo) {
       const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
       if (m) return m[1].toUpperCase();
@@ -989,13 +1003,8 @@ async function sd_queryLandingCCMulti(){
   return "";
 }
 
-/* —— 渲染（仅 Netflix 区分“完整/自制剧”，其它服务统一“已解锁/不可达”）——
- * text+无箭头：Netflix 用长文案，其它服务用“已解锁/不可达”；句式为“区域: …”
- * text+箭头：保持“已解锁/部分解锁/不可达”短文案
- * icon：沿用原逻辑
- */
+/* —— 渲染（仅 Netflix 区分“完整/自制剧”，其它服务统一“已解锁/不可达”）—— */
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
-  // 归一化：full / partial / blocked
   const st = state ? state : (ok ? (sd_isPartial(tag) ? 'partial' : 'full') : 'blocked');
 
   const icon = sd_pickIcons(SD_ICON_THEME)[st];
@@ -1005,22 +1014,16 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const unlockedShort = t('unlocked');
   const blockedText   = t('notReachable');
 
-  // Netflix 专用长文案
   const stateTextLong = (()=>{
     if (st==='full')    return t('nfFull');
     if (st==='partial') return t('nfOriginals');
     return blockedText;
   })();
-
-  // 其它服务短文案（full/partial → 已解锁）
   const stateTextShort = (st==='blocked') ? blockedText : unlockedShort;
 
   const isNetflix = /netflix/i.test(String(name));
-
-  // 关键：text + 无箭头 + Netflix 时隐藏尾部 tag（避免与左侧长文案重复）
   const showTag = (isNetflix && SD_STYLE === "text" && !SD_ARROW) ? "" : (tag || "");
 
-  // ① text + 无箭头
   if (SD_STYLE === "text" && !SD_ARROW) {
     const left  = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
     const head  = `${left}，${t('region')}: ${regionText}`;
@@ -1032,7 +1035,6 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  // ② text + 箭头：标准短文案
   const stateTextStd = (()=>{
     if (st==='full') return t('unlocked');
     if (st==='partial') return t('partialUnlocked');
@@ -1050,10 +1052,9 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  // ③ icon 样式
   const head = SD_ARROW
-    ? `${icon} ${name} ➟ ${regionText}`
-    : `${icon} ${name} ｜ ${regionText}`;
+      ? `${icon} ${name} ➟ ${regionText}`
+      : `${icon} ${name} ｜ ${regionText}`;
 
   const tail = [
     showTag,
@@ -1080,28 +1081,19 @@ async function runServiceChecks(){
 /* —— 简→繁（仅在 zh-Hant 开启）：短语优先 + 字符兜底 —— */
 function zhHansToHantOnce(s){
   if (!s) return s;
-  // 1) 常用短语优先（避免被单字替换拆散）
   const phraseMap = [
-    // 面板 UI
     ['网络', '網路'], ['蜂窝数据', '行動數據'], ['代理策略', '代理策略'],
     ['执行时间', '執行時間'], ['落地 IP', '落地 IP'], ['入口', '入口'],
     ['位置', '位置'], ['运营商', '運營商'], ['区域', '區域'],
     ['不可达', '不可達'], ['检测失败', '檢測失敗'], ['超时', '逾時'],
     ['区域受限', '區域受限'], ['已解锁', '已解鎖'], ['部分解锁', '部分解鎖'],
     ['已完整解锁', '已完整解鎖'], ['仅解锁自制剧', '僅解鎖自製劇'],
-
-    // 直连位置里常见地名（按需增补）
     ['中国香港', '中國香港'], ['中国澳门', '中國澳門'],
-
-    // 运营商（fmtISP 的结果如果是简体，这里转为繁体）
     ['中国移动', '中國移動'], ['中国联通', '中國聯通'], ['中国电信', '中國電信'],
     ['中国广电', '中國廣電'], ['中国教育网', '中國教育網']
   ];
-  for (const [hans, hant] of phraseMap) {
-    s = s.replace(new RegExp(hans, 'g'), hant);
-  }
+  for (const [hans, hant] of phraseMap) s = s.replace(new RegExp(hans, 'g'), hant);
 
-  // 2) 字符兜底（只放面板常见字，避免过度替换）
   const charMap = {
     '网':'網', '络':'絡', '运':'運', '营':'營', '达':'達', '检':'檢', '测':'測',
     '时':'時', '区':'區', '术':'術', '产':'產', '广':'廣', '电':'電', '联':'聯',
