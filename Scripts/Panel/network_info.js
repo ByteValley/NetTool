@@ -431,15 +431,15 @@ log('info', 'Start', JSON.stringify({
     log('info', 'Landing fetched', (Date.now() - t2) + 'ms', {
         v4: _maskMaybe(px.ip || ''), v6: _maskMaybe(px6.ip || '')
     });
-    
-log('info', '$network peek', JSON.stringify({
-  wifi: $network?.wifi,
-  cellular: $network?.cellular || $network?.['cellular-data'],
-  v4: $network?.v4,
-  v6: $network?.v6,
-}));
-const trial = netTypeLine() || '';
-const title = /未知|unknown/i.test(trial) ? buildNetTitleHard() : trial;
+
+    log('info', '$network peek', JSON.stringify({
+        wifi: $network?.wifi,
+        cellular: $network?.cellular || $network?.['cellular-data'],
+        v4: $network?.v4,
+        v6: $network?.v6,
+    }));
+    const trial = netTypeLine() || '';
+    const title = /未知|unknown/i.test(trial) ? buildNetTitleHard() : trial;
 
     // 组装渲染
     const parts = [];
@@ -613,65 +613,66 @@ function fmtISP(isp, locStr) {
 }
 
 function radioToGen(r) {
-  if (!r) return '';
-  const x = String(r).toUpperCase().replace(/\s+/g, '');
-  const alias = { 'NR5G':'NR', 'NRSA':'NR', 'NRNSA':'NRNSA', 'LTEA':'LTE', 'LTE+':'LTE', 'LTEPLUS':'LTE' };
-  const k = alias[x] || x;
-  const MAP = {
-    GPRS:'2.5G', EDGE:'2.75G', CDMA1X:'2.5G', WCDMA:'3G',
-    HSDPA:'3.5G', HSUPA:'3.75G', CDMAEVD0REV0:'3.5G',
-    CDMAEVD0REVA:'3.5G', CDMAEVD0REVB:'3.75G', EHRPD:'3.9G',
-    LTE:'4G', NRNSA:'5G', NR:'5G'
-  };
-  return MAP[k] || '';
+    if (!r) return '';
+    const x = String(r).toUpperCase().replace(/\s+/g, '');
+    const alias = {'NR5G': 'NR', 'NRSA': 'NR', 'NRNSA': 'NRNSA', 'LTEA': 'LTE', 'LTE+': 'LTE', 'LTEPLUS': 'LTE'};
+    const k = alias[x] || x;
+    const MAP = {
+        GPRS: '2.5G', EDGE: '2.75G', CDMA1X: '2.5G', WCDMA: '3G',
+        HSDPA: '3.5G', HSUPA: '3.75G', CDMAEVD0REV0: '3.5G',
+        CDMAEVD0REVA: '3.5G', CDMAEVD0REVB: '3.75G', EHRPD: '3.9G',
+        LTE: '4G', NRNSA: '5G', NR: '5G'
+    };
+    return MAP[k] || '';
 }
 
 function netTypeLine() {
-  try {
-    const n = $network || {};
-    const ssid  = n.wifi?.ssid;
-    const bssid = n.wifi?.bssid;
+    try {
+        const n = $network || {};
+        const ssid = n.wifi?.ssid;
+        const bssid = n.wifi?.bssid;
 
-    // 先判断 Wi-Fi（即使拿不到 SSID 也给 Wi-Fi 的兜底）
-    if (ssid || bssid) return `${t('wifi')} | ${ssid || '-'}`;
+        // 先判断 Wi-Fi（即使拿不到 SSID 也给 Wi-Fi 的兜底）
+        if (ssid || bssid) return `${t('wifi')} | ${ssid || '-'}`;
 
-    // 兼容 iPad：既查 cellular 也查 cellular-data
-    const radio = (n.cellular?.radio) || (n['cellular-data']?.radio);
-    if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
-      
-    // 接口名兜底：pdp* 基本是蜂窝，en*/eth*/wlan* 多为 Wi-Fi
-    const iface = n.v4?.primaryInterface || n.v6?.primaryInterface || '';
-    if (/^pdp/i.test(iface))              return `${t('cellular')} | -`;
-    if (/^(en|eth|wlan)/i.test(iface))    return `${t('wifi')} | -`;
-  } catch (_) {}
+        // 兼容 iPad：既查 cellular 也查 cellular-data
+        const radio = (n.cellular?.radio) || (n['cellular-data']?.radio);
+        if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
+
+        // 接口名兜底：pdp* 基本是蜂窝，en*/eth*/wlan* 多为 Wi-Fi
+        const iface = n.v4?.primaryInterface || n.v6?.primaryInterface || '';
+        if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
+        if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
+    } catch (_) {
+    }
     log('info', 'netType detect', JSON.stringify({
-  ssid: $network?.wifi?.ssid,
-  radio: $network?.cellular?.radio || $network?.['cellular-data']?.radio,
-  iface4: $network?.v4?.primaryInterface,
-  iface6: $network?.v6?.primaryInterface
-}));
-  return t('unknownNet');
+        ssid: $network?.wifi?.ssid,
+        radio: $network?.cellular?.radio || $network?.['cellular-data']?.radio,
+        iface4: $network?.v4?.primaryInterface,
+        iface6: $network?.v6?.primaryInterface
+    }));
+    return t('unknownNet');
 }
 
 function buildNetTitleHard() {
-  const n = $network || {};
-  const ssid  = n.wifi && (n.wifi.ssid || n.wifi.bssid);
-  const radio = (n.cellular && n.cellular.radio) || (n['cellular-data'] && n['cellular-data'].radio) || '';
-  const iface = (n.v4 && n.v4.primaryInterface) || (n.v6 && n.v6.primaryInterface) || '';
+    const n = $network || {};
+    const ssid = n.wifi && (n.wifi.ssid || n.wifi.bssid);
+    const radio = (n.cellular && n.cellular.radio) || (n['cellular-data'] && n['cellular-data'].radio) || '';
+    const iface = (n.v4 && n.v4.primaryInterface) || (n.v6 && n.v6.primaryInterface) || '';
 
-  // Wi-Fi 优先（只要有 SSID 或 BSSID 就认 Wi-Fi）
-  if (ssid) return `${t('wifi')} | ${n.wifi.ssid || '-'}`;
+    // Wi-Fi 优先（只要有 SSID 或 BSSID 就认 Wi-Fi）
+    if (ssid) return `${t('wifi')} | ${n.wifi.ssid || '-'}`;
 
-  // 有制式就认蜂窝，并带出代际
-  if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
-    
-  // 没拿到 radio，但主接口是 pdp* 也按蜂窝
-  if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
+    // 有制式就认蜂窝，并带出代际
+    if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
 
-  // 类似 en*/eth*/wlan* 的按 Wi-Fi
-  if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
+    // 没拿到 radio，但主接口是 pdp* 也按蜂窝
+    if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
 
-  return t('unknownNet');
+    // 类似 en*/eth*/wlan* 的按 Wi-Fi
+    if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
+
+    return t('unknownNet');
 }
 
 // ====================== HTTP 基础 ======================
