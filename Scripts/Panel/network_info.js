@@ -637,8 +637,8 @@ function netTypeLine() {
 
     // 兼容 iPad：既查 cellular 也查 cellular-data
     const radio = (n.cellular?.radio) || (n['cellular-data']?.radio);
-    if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
-
+    if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
+      
     // 接口名兜底：pdp* 基本是蜂窝，en*/eth*/wlan* 多为 Wi-Fi
     const iface = n.v4?.primaryInterface || n.v6?.primaryInterface || '';
     if (/^pdp/i.test(iface))              return `${t('cellular')} | -`;
@@ -663,8 +663,8 @@ function buildNetTitleHard() {
   if (ssid) return `${t('wifi')} | ${n.wifi.ssid || '-'}`;
 
   // 有制式就认蜂窝，并带出代际
-  if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
-
+  if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
+    
   // 没拿到 radio，但主接口是 pdp* 也按蜂窝
   if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
 
