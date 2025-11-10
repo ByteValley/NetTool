@@ -628,21 +628,27 @@ function radioToGen(r) {
 function netTypeLine() {
   try {
     const n = $network || {};
-    const ssid = n.wifi?.ssid;
+    const ssid  = n.wifi?.ssid;
+    const bssid = n.wifi?.bssid;
 
-    // 先看 Wi-Fi（即使拿不到 SSID，也给出“Wi-Fi | -”的兜底）
-    if (ssid) return `${t('wifi')} | ${ssid}`;
+    // 先判断 Wi-Fi（即使拿不到 SSID 也给 Wi-Fi 的兜底）
+    if (ssid || bssid) return `${t('wifi')} | ${ssid || '-'}`;
 
-    // 兼容：既查 cellular 也查 cellular-data
-    const cell = n.cellular || n['cellular-data'] || {};
-    const radio = cell.radio;
+    // 兼容 iPad：既查 cellular 也查 cellular-data
+    const radio = (n.cellular?.radio) || (n['cellular-data']?.radio);
     if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
 
-    // 接口名兜底（pdp 开头基本可判断为蜂窝；en 开头多为 Wi-Fi）
+    // 接口名兜底：pdp* 基本是蜂窝，en*/eth*/wlan* 多为 Wi-Fi
     const iface = n.v4?.primaryInterface || n.v6?.primaryInterface || '';
-    if (/^pdp/i.test(iface)) return `${t('cellular')} | 4G/5G`;
-    if (/^en/i.test(iface))  return `${t('wifi')} | -`;
+    if (/^pdp/i.test(iface))              return `${t('cellular')} | -`;
+    if (/^(en|eth|wlan)/i.test(iface))    return `${t('wifi')} | -`;
   } catch (_) {}
+    log('info', 'netType detect', JSON.stringify({
+  ssid: $network?.wifi?.ssid,
+  radio: $network?.cellular?.radio || $network?.['cellular-data']?.radio,
+  iface4: $network?.v4?.primaryInterface,
+  iface6: $network?.v6?.primaryInterface
+}));
   return t('unknownNet');
 }
 
