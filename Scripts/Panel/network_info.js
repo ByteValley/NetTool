@@ -72,7 +72,7 @@ const SD_STR = {
     "zh-Hant": {
         panelTitle: "網路資訊 𝕏",
         wifi: "Wi-Fi",
-        cellular: "行動數據",
+        cellular: "行動服務",
         unknownNet: "網路 | 未知",
         gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
         policy: "代理策略",
@@ -1608,7 +1608,7 @@ async function runServiceChecks() {
 function zhHansToHantOnce(s) {
     if (!s) return s;
     const phraseMap = [
-        ['网络', '網路'], ['蜂窝数据', '行動數據'], ['代理策略', '代理策略'],
+        ['网络', '網路'], ['蜂窝数据', '行動服務'], ['代理策略', '代理策略'],
         ['执行时间', '執行時間'], ['落地 IP', '落地 IP'], ['入口', '入口'],
         ['位置', '位置'], ['运营商', '運營商'], ['区域', '區域'],
         ['不可达', '不可達'], ['检测失败', '檢測失敗'], ['超时', '逾時'],
