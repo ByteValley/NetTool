@@ -1,27 +1,28 @@
 /* =========================================================
  * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
- * by ByteValley  — 超时稳态增强版
- * Version: 2025-11-08R8  (新增：全局看门狗/按时截断 + HTTP默认超时 + 服务检测并发与数量裁剪)
+ * by ByteValley
+ * Version: 2025-11-08R8
+ *  - 统一：SUBTITLE_STYLE / SUBTITLE_MINIMAL / GAP_LINES（移除 ST_*）
+ *  - 修复：子标题样式开关 & 渲染调用一致
+ *  - 清理：冗余注释与旧键读取路径
  *
  * 选择优先级（统一，BoxJS 最高）：
  *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
  *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
  *
  * - 标题显示网络类型；顶部显示 执行时间 → 代理策略（紧邻）
- * - 分组子标题：本地 / 入口 / 落地 / 服务检测（留白由 ST_GAP_LINES 控制）
+ * - 分组子标题：本地 / 入口 / 落地 / 服务检测（留白由 GAP_LINES 控制）
  * - IPv4/IPv6 分行显示（仅渲染存在的那个；IP 可按 MASK_IP 脱敏）
  * - 直连/入口/落地 位置展示支持台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
  * - 中国境内运营商规范化
- * - 服务检测并发与裁剪：限流（SD_CONC）+ 限量（SD_MAX）+ 按时截断（RT_BUDGET）
+ * - 服务检测并发执行；Netflix区分“完整/自制剧”，其它统一“已解锁/不可达”
  * - 入口/策略获取：预触发落地(v4/v6) → 扫描最近请求抓入口IPv4+IPv6 → 任意代理请求兜底
  * - 入口定位缓存 TTL 跟 Update 联动：TTL = max(30, min(Update, 3600)) 秒
  * - 可调：
- *   · RT_BUDGET：脚本总预算秒数（默认 25，范围 5～60；到点必定 $done 输出部分结果）
- *   · SD_CONC：服务检测并发数（默认 2，建议 1～3）
- *   · SD_MAX：最多检测的服务个数（默认不限 = 全部）
  *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
  *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
  *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
+ *   · ChatGPT App(API) 地区多源回退，优先 Cloudflare 头
  * - 日志相关（可在 BoxJS 或 #!arguments 配置）：
  *   - LOG=1            开启日志（默认 0）
  *   - LOG_LEVEL=info   级别：debug|info|warn|error
@@ -39,17 +40,15 @@ const CONSTS = Object.freeze({
   DEBUG_TAIL_LINES: 18,
   ENT_MIN_REQ_TO: 2500,
   ENT_MIN_TTL: 30,
-  ENT_MAX_TTL: 3600,
-  RT_MIN_MS: 5000,
-  RT_MAX_MS: 60000,
+  ENT_MAX_TTL: 3600
 });
 
-// ====================== 语言字典（固定 UI 词收口）======================
+/* ===== 语言字典（固定 UI 词收口）===== */
 const SD_STR = {
   "zh-Hans": {
     panelTitle: "网络信息 𝕏",
     wifi: "Wi-Fi",
-    cellular: "蜂窝数据",
+    cellular: "蜂窝网络",
     unknownNet: "网络 | 未知",
     gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
     policy: "代理策略",
@@ -73,7 +72,7 @@ const SD_STR = {
   "zh-Hant": {
     panelTitle: "網路資訊 𝕏",
     wifi: "Wi-Fi",
-    cellular: "行動數據",
+    cellular: "行動服務",
     unknownNet: "網路 | 未知",
     gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
     policy: "代理策略",
@@ -95,6 +94,8 @@ const SD_STR = {
     debug: "除錯"
   }
 };
+
+/** 取词工具 */
 function t(key, ...args) {
   const lang = (typeof SD_LANG === "string" ? SD_LANG : "zh-Hans");
   const pack = SD_STR[lang] || SD_STR["zh-Hans"];
@@ -105,18 +106,20 @@ function t(key, ...args) {
 
 // ====================== 运行环境适配层 ======================
 const readKV = (k) => {
-  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) return $persistentStore.read(k);
-  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) return $prefs.valueForKey(k);
-  try { return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null; } catch (_) { return null; }
-};
-const writeKV = (k, v) => {
+  if (typeof $persistentStore !== 'undefined' && $persistentStore.read) {
+    return $persistentStore.read(k);
+  }
+  if (typeof $prefs !== 'undefined' && $prefs.valueForKey) {
+    return $prefs.valueForKey(k);
+  }
   try {
-    if (typeof $persistentStore !== 'undefined' && $persistentStore.write) return $persistentStore.write(String(v ?? ''), k);
-    if (typeof $prefs !== 'undefined' && $prefs.setValueForKey) return $prefs.setValueForKey(String(v ?? ''), k);
-    if (typeof localStorage !== 'undefined') return localStorage.setItem(k, String(v ?? ''));
-  } catch (_) {}
-  return false;
+    return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null;
+  } catch (_) {
+    return null;
+  }
 };
+
+/** 解析 $argument（支持字符串或对象） */
 const parseArgs = (raw) => {
   if (!raw) return {};
   if (typeof raw === 'object') return raw;
@@ -132,6 +135,8 @@ const parseArgs = (raw) => {
   return {};
 };
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
+
+/** 当 $args 对象无值时，从原始字符串兜底读取 */
 function readArgRaw(name) {
   try {
     if (typeof $argument === 'string') {
@@ -139,11 +144,12 @@ function readArgRaw(name) {
       const m = $argument.match(re);
       if (m) return decodeURIComponent(String(m[1]).replace(/\+/g, '%20'));
     }
-  } catch (_) {}
+  } catch (_) {
+  }
   return undefined;
 }
 
-// ====================== 小工具（类型/拼接/格式）======================
+// ====================== 小工具（类型/拼接/格式） ======================
 const toBool = (v, d = false) => {
   if (v == null || v === '') return d;
   if (typeof v === 'boolean') return v;
@@ -169,9 +175,11 @@ const LOG_ON = toBool(readKV(K('LOG')) ?? $args.LOG, false);
 const LOG_TO_PANEL = toBool(readKV(K('LOG_TO_PANEL')) ?? $args.LOG_TO_PANEL, false);
 const LOG_PUSH = toBool(readKV(K('LOG_PUSH')) ?? $args.LOG_PUSH, true);
 const LOG_LEVEL = (readKV(K('LOG_LEVEL')) ?? $args.LOG_LEVEL ?? 'info').toString().toLowerCase();
+
 const LOG_LEVELS = {debug: 10, info: 20, warn: 30, error: 40};
 const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
 const DEBUG_LINES = [];
+
 function _maskMaybe(ip) {
   if (!ip) return '';
   if (!MASK_IP) return ip;
@@ -185,45 +193,54 @@ function _maskMaybe(ip) {
   }
   return ip;
 }
+
 function log(level, ...args) {
   if (!LOG_ON) return;
   const L = LOG_LEVELS[level] ?? 20;
   if (L < LOG_THRESH) return;
   const msg = args.map((x) => typeof x === 'string' ? x : JSON.stringify(x));
   const line = `[NI][${level.toUpperCase()}] ${msg.join(' ')}`;
-  try { console.log(line); } catch (_) {}
+  try {
+    console.log(line);
+  } catch (_) {
+  }
   DEBUG_LINES.push(line);
   if (DEBUG_LINES.length > CONSTS.LOG_RING_MAX) DEBUG_LINES.shift();
 }
+
 function logErrPush(title, body) {
   if (LOG_PUSH) $notification?.post?.(title, "", body);
   log('error', title, body);
 }
 
-// ====================== 子标题样式：新样式 + 旧别名兼容 ======================
+// ====================== 子标题样式（新键） ======================
 const SUBTITLE_STYLES = Object.freeze({
   line: (s) => `——${s}——`,
   cnBracket: (s) => `【${s}】`,
   cnQuote: (s) => `「${s}」`,
   square: (s) => `[${s}]`,
   curly: (s) => `{${s}}`,
-  angle: (s) => `《${s}»`,
+  angle: (s) => `《${s}》`,
   pipe: (s) => `║${s}║`,
   bullet: (s) => `·${s} ·`,
   plain: (s) => `${s}`,
 });
+
 function normalizeSubStyle(v) {
   const k = String(v ?? 'line').trim();
   return SUBTITLE_STYLES[k] ? k : 'line';
 }
+
 function makeSubTitleRenderer(styleKey, minimal = false) {
   const key = normalizeSubStyle(styleKey);
   const fn = SUBTITLE_STYLES[key] || SUBTITLE_STYLES.line;
   return minimal ? (s) => String(s) : (s) => fn(String(s));
 }
+
+/** 分组标题：插入留白 + 应用样式/纯净模式 */
 function pushGroupTitle(parts, title) {
-  for (let i = 0; i < CFG.ST_GAP_LINES; i++) parts.push('');
-  const render = makeSubTitleRenderer(CFG.ST_SUBTITLE_STYLE, CFG.ST_SUBTITLE_MINIMAL);
+  for (let i = 0; i < CFG.GAP_LINES; i++) parts.push('');
+  const render = makeSubTitleRenderer(CFG.SUBTITLE_STYLE, CFG.SUBTITLE_MINIMAL);
   parts.push(render(title));
 }
 
@@ -236,13 +253,16 @@ const CFG = {
   MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
   IPv6: toBool(readKV(K('IPv6')) ?? $args.IPv6, false),
 
-  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4 ?? $args.DOMIC_IPv4 ?? 'ipip',
-  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6 ?? $args.DOMIC_IPv6 ?? 'ddnspod',
+  DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4
+      ?? $args.DOMIC_IPv4 /* legacy */ ?? 'ipip',
+  DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6
+      ?? $args.DOMIC_IPv6 /* legacy */ ?? 'ddnspod',
   LANDING_IPv4: readKV(K('LANDING_IPv4')) ?? $args.LANDING_IPv4 ?? 'ipapi',
   LANDING_IPv6: readKV(K('LANDING_IPv6')) ?? $args.LANDING_IPv6 ?? 'ipsb',
 
   TW_FLAG_MODE: toNum(readKV(K('TW_FLAG_MODE')) ?? $args.TW_FLAG_MODE ?? 1, 1),
 
+  // 图标预设 / 自定义（默认值用“预设键”，不是最终成品名）
   IconPreset: readKV(K('IconPreset')) ?? $args.IconPreset ?? 'globe',
   Icon: readKV(K('Icon')) ?? $args.Icon ?? '',
   IconColor: readKV(K('IconColor')) ?? $args.IconColor ?? '#1E90FF',
@@ -270,7 +290,10 @@ const CFG = {
     if (!s || s === '[]' || /^null$/i.test(s)) return null;
     return s;
   })(),
-  SERVICES_BOX_TEXT: (() => (readKV(K('SERVICES_TEXT')) ?? '').toString().trim())(),
+  SERVICES_BOX_TEXT: (() => {
+    const v = readKV(K('SERVICES_TEXT'));
+    return v != null ? String(v).trim() : '';
+  })(),
   SERVICES_ARG_TEXT: (() => {
     let v = $args.SERVICES;
     if (Array.isArray(v)) return JSON.stringify(v);
@@ -278,18 +301,12 @@ const CFG = {
     return v != null ? String(v).trim() : '';
   })(),
 
-  ST_SUBTITLE_STYLE: normalizeSubStyle((readKV(K('ST_SUBTITLE_STYLE')) ?? $args.ST_SUBTITLE_STYLE ?? 'line').toString().trim()),
-  ST_SUBTITLE_MINIMAL: toBool(readKV(K('ST_SUBTITLE_MINIMAL')) ?? $args.ST_SUBTITLE_MINIMAL, false),
-  ST_GAP_LINES: Math.max(0, Math.min(2, toNum(readKV(K('ST_GAP_LINES')) ?? $args.ST_GAP_LINES, 1))),
-
-  // 新增：脚本总预算（秒），并发与数量
-  RT_BUDGET_SEC: Math.max(5, Math.min(60, toNum(readKV(K('RT_BUDGET')) ?? $args.RT_BUDGET ?? 25, 25))),
-  SD_CONC: Math.max(1, Math.min(4, toNum(readKV(K('SD_CONC')) ?? $args.SD_CONC ?? 2, 2))),
-  SD_MAX: (() => {
-    const v = readKV(K('SD_MAX')) ?? $args.SD_MAX;
-    const n = toNum(v, NaN);
-    return Number.isFinite(n) ? Math.max(1, n) : null; // null 代表不限
-  })(),
+  // —— 子标题新键（与 BoxJS 对齐）——
+  SUBTITLE_STYLE: normalizeSubStyle(
+      (readKV(K('SUBTITLE_STYLE')) ?? $args.SUBTITLE_STYLE ?? 'line').toString().trim()
+  ),
+  SUBTITLE_MINIMAL: toBool(readKV(K('SUBTITLE_MINIMAL')) ?? $args.SUBTITLE_MINIMAL, false),
+  GAP_LINES: Math.max(0, Math.min(2, toNum(readKV(K('GAP_LINES')) ?? $args.GAP_LINES, 1)))
 };
 
 // ====================== 图标 & 开关映射 ======================
@@ -300,7 +317,8 @@ const ICON_PRESET_MAP = Object.freeze({
   antenna: 'antenna.radiowaves.left.and.right',
   point: 'point.3.connected.trianglepath.dotted'
 });
-const ICON_NAME = (CFG.Icon || '').trim() || ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || 'globe.asia.australia';
+const ICON_NAME = (CFG.Icon || '').trim() ||
+    ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
 const IPv6_ON = !!CFG.IPv6;
@@ -318,116 +336,178 @@ const SD_STYLE = (String(CFG.SD_STYLE).toLowerCase() === 'text') ? 'text' : 'ico
 const SD_SHOW_LAT = !!CFG.SD_SHOW_LAT;
 const SD_SHOW_HTTP = !!CFG.SD_SHOW_HTTP;
 const SD_LANG = (String(CFG.SD_LANG).toLowerCase() === 'zh-hant') ? 'zh-Hant' : 'zh-Hans';
-const SD_TIMEOUT_MS = Math.max(CONSTS.SD_MIN_TIMEOUT, Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000);
+
+const SD_TIMEOUT_MS = (() => {
+  const v = Number(CFG.SD_TIMEOUT_MS);
+  const fallback = (Number(CFG.Timeout) || 8) * 1000;
+  const ms = Number.isFinite(v) ? v : fallback;
+  return Math.max(CONSTS.SD_MIN_TIMEOUT, ms);
+})();
+
 const SD_REGION_MODE = ['full', 'abbr', 'flag'].includes(String(CFG.SD_REGION_MODE)) ? CFG.SD_REGION_MODE : 'full';
 const SD_ICON_THEME = ['lock', 'circle', 'check'].includes(String(CFG.SD_ICON_THEME)) ? CFG.SD_ICON_THEME : 'check';
 const SD_ARROW = !!CFG.SD_ARROW;
+
 const SD_ICONS = (() => {
   switch (SD_ICON_THEME) {
-    case 'lock': return {full: '🔓', partial: '🔐', blocked: '🔒'};
-    case 'circle': return {full: '⭕️', partial: '⛔️', blocked: '🚫'};
-    default: return {full: '✅', partial: '❇️', blocked: '❎'};
+    case 'lock':
+      return {full: '🔓', partial: '🔐', blocked: '🔒'};
+    case 'circle':
+      return {full: '⭕️', partial: '⛔️', blocked: '🚫'};
+    default:
+      return {full: '✅', partial: '❇️', blocked: '❎'};
   }
 })();
 
-// ====================== 看门狗（按时截断，必定 $done） ======================
-const RUNTIME_BUDGET_MS = Math.max(CONSTS.RT_MIN_MS, Math.min(CONSTS.RT_MAX_MS, CFG.RT_BUDGET_SEC * 1000));
-const HTTP_DEF_TO_MS = Math.max(1000, (Number(CFG.Timeout) || 8) * 1000);
-const DEADLINE_AT = Date.now() + RUNTIME_BUDGET_MS;
-let DONE = false;
-function safeDone(payload) { if (DONE) return; DONE = true; try { $done(payload); } catch (_) {} }
-const watchdog = setTimeout(() => {
-  try {
-    const {title, content} = renderPanel(true, '⏳ 已达预算时限，展示当前可得结果');
-    safeDone({title, content, icon: ICON_NAME, 'icon-color': ICON_COLOR});
-  } catch (e) {
-    safeDone({title: t('panelTitle'), content: String(e), icon: ICON_NAME, 'icon-color': ICON_COLOR});
-  }
-}, Math.max(1000, RUNTIME_BUDGET_MS - 200)); // 留 200ms 余量
-
 // ====================== 启动日志 ======================
 log('info', 'Start', JSON.stringify({
-  Update: CFG.Update, Timeout: CFG.Timeout, IPv6: IPv6_ON,
-  SD_TIMEOUT_MS, SD_STYLE, SD_REGION_MODE, TW_FLAG_MODE,
-  ST_SUBTITLE_STYLE: CFG.ST_SUBTITLE_STYLE, ST_SUBTITLE_MINIMAL: CFG.ST_SUBTITLE_MINIMAL, ST_GAP_LINES: CFG.ST_GAP_LINES,
-  RT_BUDGET_MS: RUNTIME_BUDGET_MS, SD_CONC: CFG.SD_CONC, SD_MAX: CFG.SD_MAX
+  Update: CFG.Update,
+  Timeout: CFG.Timeout,
+  IPv6: IPv6_ON,
+  SD_TIMEOUT_MS,
+  SD_STYLE,
+  SD_REGION_MODE,
+  TW_FLAG_MODE,
+  SUBTITLE_STYLE: CFG.SUBTITLE_STYLE,
+  SUBTITLE_MINIMAL: CFG.SUBTITLE_MINIMAL,
+  GAP_LINES: CFG.GAP_LINES
 }));
-
-// ====================== 面板状态（随取随渲染） ======================
-const STATE = {
-  runAt: now(),
-  policy: '-',
-  cn: {}, cn6: {},
-  ent4: '', ent6: '',
-  entB4: {}, entB6: {},
-  px: {}, px6: {},
-  sdLines: [],
-  partialNote: '',
-};
 
 // ====================== 主流程（IIFE） ======================
 ;(async () => {
-  const preTouch = touchLandingOnceQuick().catch(() => {});
+  const preTouch = touchLandingOnceQuick().catch(() => {
+  });
 
-  // 直连
   const t0 = Date.now();
   const [cn, cn6] = await Promise.all([
-    getDirectV4(DOMESTIC_IPv4).catch((e) => { log('warn', 'DirectV4', String(e)); return {}; }),
-    IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch((e) => { log('warn', 'DirectV6', String(e)); return {}; }) : Promise.resolve({})
+    getDirectV4(DOMESTIC_IPv4).catch((e) => {
+      log('warn', 'DirectV4', String(e));
+      return {};
+    }),
+    IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch((e) => {
+      log('warn', 'DirectV6', String(e));
+      return {};
+    }) : Promise.resolve({})
   ]);
-  STATE.cn = cn; STATE.cn6 = cn6;
-  log('info', 'Direct fetched', (Date.now() - t0) + 'ms', {v4: _maskMaybe(cn.ip || ''), v6: _maskMaybe(cn6.ip || '')});
+  log('info', 'Direct fetched', (Date.now() - t0) + 'ms', {
+    v4: _maskMaybe(cn.ip || ''), v6: _maskMaybe(cn6.ip || '')
+  });
 
   await preTouch;
 
-  // 策略与入口
   const t1 = Date.now();
   const {policyName, entrance4, entrance6} = await getPolicyAndEntranceBoth();
-  STATE.policy = policyName || '-';
-  STATE.ent4 = entrance4 || '';
-  STATE.ent6 = entrance6 || '';
-  log('info', 'EntranceBoth', {policy: STATE.policy, v4: _maskMaybe(STATE.ent4), v6: _maskMaybe(STATE.ent6), cost: (Date.now() - t1) + 'ms'});
+  log('info', 'EntranceBoth', {
+    policy: policyName || '-',
+    v4: _maskMaybe(entrance4 || ''),
+    v6: _maskMaybe(entrance6 || ''),
+    cost: (Date.now() - t1) + 'ms'
+  });
 
-  // 入口位置（带缓存 + 预算感知：若已近截止，只做 v4）
-  if (isIP(STATE.ent4)) {
-    STATE.entB4 = await getEntranceBundle(STATE.ent4).catch((e) => { log('warn', 'EntranceBundle v4', String(e)); return {ip: STATE.ent4}; });
-  }
-  if (isIP(STATE.ent6) && Date.now() + 400 < DEADLINE_AT) {
-    STATE.entB6 = await getEntranceBundle(STATE.ent6).catch((e) => { log('warn', 'EntranceBundle v6', String(e)); return {ip: STATE.ent6}; });
+  const ent4 = isIP(entrance4 || '')
+      ? await getEntranceBundle(entrance4).catch((e) => {
+        log('warn', 'EntranceBundle v4', String(e));
+        return {ip: entrance4};
+      })
+      : {};
+  const ent6 = isIP(entrance6 || '')
+      ? await getEntranceBundle(entrance6).catch((e) => {
+        log('warn', 'EntranceBundle v6', String(e));
+        return {ip: entrance6};
+      })
+      : {};
+
+  const t2 = Date.now();
+  const [px, px6] = await Promise.all([
+    getLandingV4(LANDING_IPv4).catch((e) => {
+      log('warn', 'LandingV4', String(e));
+      return {};
+    }),
+    IPv6_ON ? getLandingV6(LANDING_IPv6).catch((e) => {
+      log('warn', 'LandingV6', String(e));
+      return {};
+    }) : Promise.resolve({})
+  ]);
+  log('info', 'Landing fetched', (Date.now() - t2) + 'ms', {
+    v4: _maskMaybe(px.ip || ''), v6: _maskMaybe(px6.ip || '')
+  });
+
+  log('info', '$network peek', JSON.stringify({
+    wifi: $network?.wifi,
+    cellular: $network?.cellular || $network?.['cellular-data'],
+    v4: $network?.v4,
+    v6: $network?.v6,
+  }));
+  const trial = netTypeLine() || '';
+  const title = /未知|unknown/i.test(trial) ? buildNetTitleHard() : trial;
+
+  // 组装渲染
+  const parts = [];
+  parts.push(`${t('runAt')}: ${now()}`);
+  parts.push(`${t('policy')}: ${policyName || '-'}`);
+
+  // 本地
+  pushGroupTitle(parts, '本地');
+  const directIPv4 = ipLine('IPv4', cn.ip);
+  const directIPv6 = ipLine('IPv6', cn6.ip);
+  if (directIPv4) parts.push(directIPv4);
+  if (directIPv6) parts.push(directIPv6);
+  const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
+  parts.push(`${t('location')}: ${directLoc}`);
+  if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
+
+  // 入口
+  if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && ent6.ip)) {
+    pushGroupTitle(parts, '入口');
+    const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
+    const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
+    if (entIPv4) parts.push(entIPv4);
+    if (entIPv6) parts.push(entIPv6);
+    if (ent4.loc1) parts.push(`${t('location')}¹: ${flagFirst(ent4.loc1)}`);
+    if (ent4.isp1) parts.push(`${t('isp')}¹: ${fmtISP(ent4.isp1, ent4.loc1)}`);
+    if (ent4.loc2) parts.push(`${t('location')}²: ${flagFirst(ent4.loc2)}`);
+    if (ent4.isp2) parts.push(`${t('isp')}²: ${String(ent4.isp2).trim()}`);
   }
 
   // 落地
-  const t2 = Date.now();
-  const [px, px6] = await Promise.all([
-    getLandingV4(LANDING_IPv4).catch((e) => { log('warn', 'LandingV4', String(e)); return {}; }),
-    (IPv6_ON && Date.now() + 600 < DEADLINE_AT) ? getLandingV6(LANDING_IPv6).catch((e) => { log('warn', 'LandingV6', String(e)); return {}; }) : Promise.resolve({})
-  ]);
-  STATE.px = px; STATE.px6 = px6;
-  log('info', 'Landing fetched', (Date.now() - t2) + 'ms', {v4: _maskMaybe(px.ip || ''), v6: _maskMaybe(px6.ip || '')});
-
-  // 服务检测（并发 + 数量裁剪 + 预算感知）
-  if (Date.now() + 800 < DEADLINE_AT) {
-    STATE.sdLines = await runServiceChecksWithBudget(DEADLINE_AT);
-  } else {
-    STATE.partialNote = '（预算不足，跳过服务检测）';
+  if (px.ip || px6.ip || px.loc || px.isp) {
+    pushGroupTitle(parts, '落地');
+    const landIPv4 = ipLine('IPv4', px.ip);
+    const landIPv6 = ipLine('IPv6', px6.ip);
+    if (landIPv4) parts.push(landIPv4);
+    if (landIPv6) parts.push(landIPv6);
+    if (px.loc) parts.push(`${t('location')}: ${flagFirst(px.loc)}`);
+    if (px.isp) parts.push(`${t('isp')}: ${fmtISP(px.isp, px.loc)}`);
   }
 
-  // 收尾
-  clearTimeout(watchdog);
-  const {title, content} = renderPanel(false, '');
-  safeDone({title, content, icon: ICON_NAME, 'icon-color': ICON_COLOR});
+  // 服务检测
+  const sdLines = await runServiceChecks();
+  if (sdLines.length) {
+    pushGroupTitle(parts, '服务检测');
+    parts.push(...sdLines);
+  }
+
+  // 调试尾巴（可选）
+  if (LOG_TO_PANEL && DEBUG_LINES.length) {
+    pushGroupTitle(parts, t('debug'));
+    const tail = DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES).join('\n');
+    parts.push(tail);
+  }
+
+  const content = maybeTify(parts.join('\n'));
+  $done({title: maybeTify(title), content, icon: ICON_NAME, 'icon-color': ICON_COLOR});
 
 })().catch((err) => {
-  clearTimeout(watchdog);
   const msg = String(err);
   logErrPush(t('panelTitle'), msg);
   const errTitle = t('panelTitle');
   const errBody = maybeTify(msg);
-  safeDone({title: errTitle, content: errBody, icon: ICON_NAME, 'icon-color': ICON_COLOR});
+  $done({title: errTitle, content: errBody, icon: ICON_NAME, 'icon-color': ICON_COLOR});
 });
 
 // ====================== 工具 & 渲染 ======================
 const IPV4_RE = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/;
+// IPv6 正则过长，使用分段字符串拼接便于维护（语义不变）
 const IPV6_SRC = [
   '(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|',
   '([0-9a-fA-F]{1,4}:){1,7}:|',
@@ -446,17 +526,40 @@ const IPV6_SRC = [
   '(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))'
 ].join('');
 const IPV6_RE = new RegExp(`^${IPV6_SRC}$`);
-function now() { return new Date().toTimeString().split(' ')[0]; }
-function isIPv4(ip) { return IPV4_RE.test(ip || ''); }
-function isIPv6(ip) { return IPV6_RE.test(ip || ''); }
-function isIP(ip) { return isIPv4(ip) || isIPv6(ip); }
+
+function now() {
+  return new Date().toTimeString().split(' ')[0];
+}
+
+function isIPv4(ip) {
+  return IPV4_RE.test(ip || '');
+}
+
+function isIPv6(ip) {
+  return IPV6_RE.test(ip || '');
+}
+
+function isIP(ip) {
+  return isIPv4(ip) || isIPv6(ip);
+}
+
 function maskIP(ip) {
   if (!ip || !MASK_IP) return ip || '';
-  if (isIPv4(ip)) { const p = ip.split('.'); return [p[0], p[1], '*', '*'].join('.'); }
-  if (isIPv6(ip)) { const p = ip.split(':'); return [...p.slice(0, 4), '*', '*', '*', '*'].join(':'); }
+  if (isIPv4(ip)) {
+    const p = ip.split('.');
+    return [p[0], p[1], '*', '*'].join('.');
+  }
+  if (isIPv6(ip)) {
+    const p = ip.split(':');
+    return [...p.slice(0, 4), '*', '*', '*', '*'].join(':');
+  }
   return ip;
 }
-function ipLine(label, ip) { return ip ? `${label}: ${maskIP(ip)}` : null; }
+
+function ipLine(label, ip) {
+  return ip ? `${label}: ${maskIP(ip)}` : null;
+}
+
 function splitFlagRaw(s) {
   const re = /^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u;
   const m = String(s || '').match(re);
@@ -468,8 +571,13 @@ function splitFlagRaw(s) {
   }
   return {flag, text};
 }
+
 const onlyFlag = (loc) => splitFlagRaw(loc).flag || '-';
-const flagFirst = (loc) => { const {flag, text} = splitFlagRaw(loc); return (flag || '') + (text || ''); };
+const flagFirst = (loc) => {
+  const {flag, text} = splitFlagRaw(loc);
+  return (flag || '') + (text || '');
+};
+
 function flagOf(code) {
   let cc = String(code || '').trim();
   if (!cc) return '';
@@ -481,13 +589,18 @@ function flagOf(code) {
       if (TW_FLAG_MODE === 2) return '🇼🇸';
     }
     return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 127397 + ch.charCodeAt()));
-  } catch (_) { return ''; }
+  } catch (_) {
+    return '';
+  }
 }
+
 function fmtISP(isp, locStr) {
-  const raw = String(isp || '').trim(); if (!raw) return '';
+  const raw = String(isp || '').trim();
+  if (!raw) return '';
   const txt = String(locStr || '');
   const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
   if (!isMainland) return raw;
+
   const norm = raw.replace(/\s*\(中国\)\s*/, '').replace(/\s+/g, ' ').trim();
   const s = norm.toLowerCase();
   if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm)) return '中国移动';
@@ -498,67 +611,206 @@ function fmtISP(isp, locStr) {
   if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm;
   return raw;
 }
+
 function radioToGen(r) {
-  const MAP = {GPRS:'2.5G', EDGE:'2.75G', CDMA1x:'2.5G', WCDMA:'3G', HSDPA:'3.5G', HSUPA:'3.75G', CDMAEVDORev0:'3.5G',
-    CDMAEVDORevA:'3.5G', CDMAEVDORevB:'3.75G', eHRPD:'3.9G', LTE:'4G', NRNSA:'5G', NR:'5G'};
-  return MAP[r] || '';
+  if (!r) return '';
+  const x = String(r).toUpperCase().replace(/\s+/g, '');
+  const alias = {'NR5G': 'NR', 'NRSA': 'NR', 'NRNSA': 'NRNSA', 'LTEA': 'LTE', 'LTE+': 'LTE', 'LTEPLUS': 'LTE'};
+  const k = alias[x] || x;
+  const MAP = {
+    GPRS: '2.5G', EDGE: '2.75G', CDMA1X: '2.5G', WCDMA: '3G',
+    HSDPA: '3.5G', HSUPA: '3.75G', CDMAEVD0REV0: '3.5G',
+    CDMAEVD0REVA: '3.5G', CDMAEVD0REVB: '3.75G', EHRPD: '3.9G',
+    LTE: '4G', NRNSA: '5G', NR: '5G'
+  };
+  return MAP[k] || '';
 }
+
 function netTypeLine() {
   try {
-    const ssid = $network?.wifi?.ssid;
-    const radio = $network?.['cellular-data']?.radio;
-    if (ssid) return `${t('wifi')} | ${ssid}`;
-    if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
-  } catch (_) {}
+    const n = $network || {};
+    const ssid = n.wifi?.ssid;
+    const bssid = n.wifi?.bssid;
+
+    // 先判断 Wi-Fi（即使拿不到 SSID 也给 Wi-Fi 的兜底）
+    if (ssid || bssid) return `${t('wifi')} | ${ssid || '-'}`;
+
+    // 兼容 iPad：既查 cellular 也查 cellular-data
+    const radio = (n.cellular?.radio) || (n['cellular-data']?.radio);
+    if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
+
+    // 接口名兜底：pdp* 基本是蜂窝，en*/eth*/wlan* 多为 Wi-Fi
+    const iface = n.v4?.primaryInterface || n.v6?.primaryInterface || '';
+    if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
+    if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
+  } catch (_) {
+  }
+  log('info', 'netType detect', JSON.stringify({
+    ssid: $network?.wifi?.ssid,
+    radio: $network?.cellular?.radio || $network?.['cellular-data']?.radio,
+    iface4: $network?.v4?.primaryInterface,
+    iface6: $network?.v6?.primaryInterface
+  }));
   return t('unknownNet');
 }
 
-// ====================== HTTP 基础（统一默认超时） ======================
+function buildNetTitleHard() {
+  const n = $network || {};
+  const ssid = n.wifi && (n.wifi.ssid || n.wifi.bssid);
+  const radio = (n.cellular && n.cellular.radio) || (n['cellular-data'] && n['cellular-data'].radio) || '';
+  const iface = (n.v4 && n.v4.primaryInterface) || (n.v6 && n.v6.primaryInterface) || '';
+
+  // Wi-Fi 优先（只要有 SSID 或 BSSID 就认 Wi-Fi）
+  if (ssid) return `${t('wifi')} | ${n.wifi.ssid || '-'}`;
+
+  // 有制式就认蜂窝，并带出代际
+  if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
+
+  // 没拿到 radio，但主接口是 pdp* 也按蜂窝
+  if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
+
+  // 类似 en*/eth*/wlan* 的按 Wi-Fi
+  if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
+
+  return t('unknownNet');
+}
+
+// ====================== HTTP 基础 ======================
 function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
   return new Promise((resolve, reject) => {
-    const req = {url, headers, timeout: timeoutMs != null ? timeoutMs : HTTP_DEF_TO_MS};
+    const req = {url, headers};
+    if (timeoutMs != null) req.timeout = timeoutMs;
     if (followRedirect) req.followRedirect = true;
     const start = Date.now();
     $httpClient.get(req, (err, resp, body) => {
       const cost = Date.now() - start;
-      if (err) { log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err)); return reject(err); }
+      if (err) {
+        log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err));
+        return reject(err);
+      }
       const status = resp?.status || resp?.statusCode;
       log('debug', 'HTTP GET', url, 'status', status, 'cost', cost + 'ms');
       resolve({status, headers: resp?.headers || {}, body});
     });
   });
 }
+
 function httpAPI(path = '/v1/requests/recent') {
   return new Promise((res) => {
-    if (typeof $httpAPI === 'function') $httpAPI('GET', path, null, (x) => { log('debug', 'httpAPI', path, 'ok'); res(x); });
-    else { log('warn', 'httpAPI not available'); res({}); }
+    if (typeof $httpAPI === 'function') {
+      $httpAPI('GET', path, null, (x) => {
+        log('debug', 'httpAPI', path, 'ok');
+        res(x);
+      });
+    } else {
+      log('warn', 'httpAPI not available');
+      res({});
+    }
   });
 }
 
 // ====================== 数据源：直连/落地/入口 ======================
 async function getDirectV4(p) {
+  const tryOrder = [p, '163', '126', 'bilibili', 'pingan', 'ipip', 'cip']
+      .filter((x, i, a) => x && a.indexOf(x) === i); // 去重并保序
+
+  log('info', 'DirectV4 begin, prefer=', p, 'order=', JSON.stringify(tryOrder));
+
+  // 判定 loc 是否已经细到“市/区/县”，或至少有 3 段（国家 省 市）
+  const hasCity = (loc) => {
+    if (!loc) return false;
+    try {
+      // 去掉前缀国旗
+      const s = String(loc).replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, '').trim();
+      if (/市|区|縣|县|州|市辖/.test(s)) return true;
+      const parts = s.split(/\s+/).filter(Boolean);
+      // 常见格式：🇨🇳 中国 浙江 杭州 → 4 段；或 CN China Zhejiang Hangzhou
+      return parts.length >= 3;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  let firstOK = null; // 兜底（首个成功的结果）
+  const attempts = [];
+
+  for (const src of tryOrder) {
+    const t0 = Date.now();
+    try {
+      let r;
+      if (src === 'cip') r = await d_cip();
+      else if (src === '163') r = await d_163();
+      else if (src === 'bilibili') r = await d_bili();
+      else if (src === '126') r = await d_126();
+      else if (src === 'pingan') r = await d_pingan();
+      else r = await d_ipip(); // 默认 ipip
+
+      const cost = Date.now() - t0;
+      const ok = !!(r && r.ip);
+      const cityOK = ok && hasCity(r.loc);
+
+      attempts.push({src, ok, cityOK, ip: _maskMaybe(r?.ip || ''), loc: r?.loc || '', cost});
+
+      log('debug', 'DirectV4 try', JSON.stringify({
+        source: src,
+        ok, cityOK,
+        ip: _maskMaybe(r?.ip || ''),
+        loc: r?.loc || '',
+        isp: r?.isp || '',
+        cost_ms: cost
+      }));
+
+      if (ok && !firstOK) firstOK = r;          // 记录第一个成功
+      if (ok && cityOK) {
+        log('info', 'DirectV4 HIT city-level at', src, 'cost', cost + 'ms');
+        return r;                                // 命中“市级”直接返回
+      }
+      // 未细到市，继续尝试下一个源
+    } catch (e) {
+      const cost = Date.now() - t0;
+      attempts.push({src, ok: false, cityOK: false, ip: '', loc: '', cost, err: String(e)});
+      log('warn', 'DirectV4 source fail', src, 'cost', cost + 'ms', String(e));
+      // 继续下一源
+    }
+  }
+
+  // 全部尝试完：用第一个成功的结果兜底
+  if (firstOK) {
+    log('info', 'DirectV4 fallback to firstOK (no city-level hit)', JSON.stringify({
+      ip: _maskMaybe(firstOK.ip || ''),
+      loc: firstOK.loc || '',
+      isp: firstOK.isp || ''
+    }));
+    return firstOK;
+  }
+
+  // 所有源都失败，做一次 ipip 的最后兜底（并记录日志）
   try {
-    log('info', 'DirectV4 source', p);
-    if (p === 'cip') return await d_cip();
-    if (p === '163') return await d_163();
-    if (p === 'bilibili') return await d_bili();
-    if (p === '126') return await d_126();
-    if (p === 'pingan') return await d_pingan();
-    return await d_ipip();
-  } catch (e) {
-    log('warn', 'DirectV4 fallback ipip', String(e));
-    try { return await d_ipip(); } catch (e2) { log('error', 'DirectV4 ipip fail', String(e2)); }
+    log('warn', 'DirectV4 all sources failed, final ipip fallback');
+    const r = await d_ipip();
+    log('info', 'DirectV4 final ipip result', JSON.stringify({
+      ip: _maskMaybe(r.ip || ''), loc: r.loc || '', isp: r.isp || ''
+    }));
+    return r;
+  } catch (e2) {
+    log('error', 'DirectV4 ipip final fail', String(e2));
     return {};
   }
 }
+
 async function d_ipip() {
   const r = await httpGet('https://myip.ipip.net/json');
   const j = JSON.parse(r.body || '{}');
   const loc = j?.data?.location || [];
   const c0 = loc[0];
   const flag = flagOf(c0 === '中国' ? 'CN' : c0);
-  return { ip: j?.data?.ip || '', loc: joinNonEmpty([flag, loc[0], loc[1], loc[2]], ' ').replace(/\s*中国\s*/, ''), isp: loc[4] || '' };
+  return {
+    ip: j?.data?.ip || '',
+    loc: joinNonEmpty([flag, loc[0], loc[1], loc[2]], ' ').replace(/\s*中国\s*/, ''),
+    isp: loc[4] || ''
+  };
 }
+
 async function d_cip() {
   const r = await httpGet('http://cip.cc/');
   const b = String(r.body || '');
@@ -566,37 +818,69 @@ async function d_cip() {
   const addr = (b.match(/地址.*?:\s*(.+)/) || [])[1] || '';
   const isp = (b.match(/运营商.*?:\s*(.+)/) || [])[1] || '';
   const isCN = /中国/.test(addr);
-  return { ip, loc: joinNonEmpty([flagOf(isCN ? 'CN' : ''), addr.replace(/中国\s*/, '')], ' '), isp: isp.replace(/中国\s*/, '') };
+  return {
+    ip,
+    loc: joinNonEmpty([flagOf(isCN ? 'CN' : ''), addr.replace(/中国\s*/, '')], ' '),
+    isp: isp.replace(/中国\s*/, '')
+  };
 }
+
 async function d_163() {
   const r = await httpGet('https://dashi.163.com/fgw/mailsrv-ipdetail/detail');
   const d = (JSON.parse(r.body || '{}') || {}).result || {};
-  return { ip: d.ip || '', loc: joinNonEmpty([flagOf(d.countryCode), d.country, d.province, d.city], ' ').replace(/\s*中国\s*/, ''), isp: d.isp || d.org || '' };
+  return {
+    ip: d.ip || '',
+    loc: joinNonEmpty([flagOf(d.countryCode), d.country, d.province, d.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: d.isp || d.org || ''
+  };
 }
+
 async function d_bili() {
   const r = await httpGet('https://api.bilibili.com/x/web-interface/zone');
   const d = (JSON.parse(r.body || '{}') || {}).data || {};
   const flag = flagOf(d.country === '中国' ? 'CN' : d.country);
-  return { ip: d.addr || '', loc: joinNonEmpty([flag, d.country, d.province, d.city], ' ').replace(/\s*中国\s*/, ''), isp: d.isp || '' };
+  return {
+    ip: d.addr || '',
+    loc: joinNonEmpty([flag, d.country, d.province, d.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: d.isp || ''
+  };
 }
+
 async function d_126() {
   const r = await httpGet('https://ipservice.ws.126.net/locate/api/getLocByIp');
   const d = (JSON.parse(r.body || '{}') || {}).result || {};
-  return { ip: d.ip || '', loc: joinNonEmpty([flagOf(d.countrySymbol), d.country, d.province, d.city], ' ').replace(/\s*中国\s*/, ''), isp: d.operator || '' };
+  return {
+    ip: d.ip || '',
+    loc: joinNonEmpty([flagOf(d.countrySymbol), d.country, d.province, d.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: d.operator || ''
+  };
 }
+
 async function d_pingan() {
   const r = await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request');
   const d = (JSON.parse(r.body || '{}') || {}).data || {};
-  return { ip: d.ip || '', loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], ' ').replace(/\s*中国\s*/, ''), isp: d.isp || '' };
+  return {
+    ip: d.ip || '',
+    loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: d.isp || ''
+  };
 }
+
 async function getDirectV6(p) {
   try {
     log('info', 'DirectV6 source', p);
-    if (p === 'neu6') { const r = await httpGet('https://speed.neu6.edu.cn/getIP.php'); return {ip: String(r.body || '').trim()}; }
+    if (p === 'neu6') {
+      const r = await httpGet('https://speed.neu6.edu.cn/getIP.php');
+      return {ip: String(r.body || '').trim()};
+    }
     const r = await httpGet('https://ipv6.ddnspod.com');
     return {ip: String(r.body || '').trim()};
-  } catch (e) { log('warn', 'DirectV6 fail', String(e)); return {}; }
+  } catch (e) {
+    log('warn', 'DirectV6 fail', String(e));
+    return {};
+  }
 }
+
 async function getLandingV4(p) {
   try {
     log('info', 'LandingV4 source', p);
@@ -605,62 +889,110 @@ async function getLandingV4(p) {
     return await l_ipapi();
   } catch (e) {
     log('warn', 'LandingV4 fallback ipapi', String(e));
-    try { return await l_ipapi(); } catch (e2) { log('error', 'LandingV4 ipapi fail', String(e2)); }
+    try {
+      return await l_ipapi();
+    } catch (e2) {
+      log('error', 'LandingV4 ipapi fail', String(e2));
+    }
     return {};
   }
 }
+
 async function l_ipapi() {
   const r = await httpGet('http://ip-api.com/json?lang=zh-CN');
   const j = JSON.parse(r.body || '{}');
-  return { ip: j.query || '', loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ''), j.regionName?.split(/\s+or\s+/)[0], j.city], ' '), isp: j.isp || j.org || '' };
+  return {
+    ip: j.query || '',
+    loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ''), j.regionName?.split(/\s+or\s+/)[0], j.city], ' '),
+    isp: j.isp || j.org || ''
+  };
 }
+
 async function l_whois() {
   const r = await httpGet('https://ipwhois.app/widget.php?lang=zh-CN');
   const j = JSON.parse(r.body || '{}');
-  return { ip: j.ip || '', loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city], ' '), isp: (j?.connection?.isp) || '' };
+  return {
+    ip: j.ip || '',
+    loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city], ' '),
+    isp: (j?.connection?.isp) || ''
+  };
 }
+
 async function l_ipsb() {
   const r = await httpGet('https://api-ipv4.ip.sb/geoip');
   const j = JSON.parse(r.body || '{}');
-  return { ip: j.ip || '', loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], ' ').replace(/\s*中国\s*/, ''), isp: j.isp || j.organization || '' };
+  return {
+    ip: j.ip || '',
+    loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: j.isp || j.organization || ''
+  };
 }
+
 async function getLandingV6(p) {
   try {
     log('info', 'LandingV6 source', p);
-    if (p === 'ident') { const r = await httpGet('https://v6.ident.me'); return {ip: String(r.body || '').trim()}; }
-    if (p === 'ipify') { const r = await httpGet('https://api6.ipify.org'); return {ip: String(r.body || '').trim()}; }
-    const r = await httpGet('https://api-ipv6.ip.sb/ip'); return {ip: String(r.body || '').trim()};
-  } catch (e) { log('warn', 'LandingV6 fail', String(e)); return {}; }
+    if (p === 'ident') {
+      const r = await httpGet('https://v6.ident.me');
+      return {ip: String(r.body || '').trim()};
+    }
+    if (p === 'ipify') {
+      const r = await httpGet('https://api6.ipify.org');
+      return {ip: String(r.body || '').trim()};
+    }
+    const r = await httpGet('https://api-ipv6.ip.sb/ip');
+    return {ip: String(r.body || '').trim()};
+  } catch (e) {
+    log('warn', 'LandingV6 fail', String(e));
+    return {};
+  }
 }
 
 // ====================== 入口/策略（稳态获取） ======================
 const ENT_SOURCES_RE = /(ip-api\.com|ipwhois\.app|ip\.sb|ipinfo\.io|ident\.me|ipify\.org)/i;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 function extractIP(str) {
   const s = String(str || '').replace(/\(Proxy\)/i, '').trim();
-  let m = s.match(/\[([0-9a-fA-F:]+)]/); if (m && isIPv6(m[1])) return m[1];
-  m = s.match(/(\d{1,3}(?:\.\d{1,3}){3})/); if (m && isIPv4(m[1])) return m[1];
-  m = s.match(/([0-9a-fA-F:]{2,})/); if (m && isIPv6(m[1])) return m[1];
+  let m = s.match(/\[([0-9a-fA-F:]+)]/);
+  if (m && isIPv6(m[1])) return m[1];
+  m = s.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+  if (m && isIPv4(m[1])) return m[1];
+  m = s.match(/([0-9a-fA-F:]{2,})/);
+  if (m && isIPv6(m[1])) return m[1];
   return '';
 }
+
 async function touchLandingOnceQuick() {
-  try { await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true); } catch (_) {}
-  try { await httpGet('https://api-ipv6.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true); } catch (_) {}
+  try {
+    await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true);
+  } catch (_) {
+  }
+  try {
+    await httpGet('https://api-ipv6.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true);
+  } catch (_) {
+  }
   log('debug', 'Pre-touch landing endpoints done');
 }
+
 async function getPolicyAndEntranceBoth() {
   const data = await httpAPI('/v1/requests/recent');
   const reqs = Array.isArray(data?.requests) ? data.requests : [];
   const hits = reqs.slice(0, CONSTS.MAX_RECENT_REQ).filter((i) => ENT_SOURCES_RE.test(i.URL || ''));
-  let policy = ''; let ip4 = '', ip6 = '';
+
+  let policy = '';
+  let ip4 = '', ip6 = '';
   for (const i of hits) {
     if (!policy && i.policyName) policy = i.policyName;
     const ip = extractIP(i.remoteAddress || '');
     if (!ip) continue;
-    if (isIPv6(ip)) { if (!ip6) ip6 = ip; }
-    else if (isIPv4(ip)) { if (!ip4) ip4 = ip; }
+    if (isIPv6(ip)) {
+      if (!ip6) ip6 = ip;
+    } else if (isIPv4(ip)) {
+      if (!ip4) ip4 = ip;
+    }
     if (policy && ip4 && ip6) break;
   }
+
   if (!policy && !ip4 && !ip6) {
     const d = await httpAPI('/v1/requests/recent');
     const rs = Array.isArray(d?.requests) ? d.requests : [];
@@ -678,63 +1010,92 @@ async function getPolicyAndEntranceBoth() {
 // —— 入口位置缓存（跟 Update 联动） ——
 const ENT_REQ_TO = Math.max(CONSTS.ENT_MIN_REQ_TO, (Number(CFG.SD_TIMEOUT_MS) || (Number(CFG.Timeout) || 8) * 1000));
 const ENT_TTL_SEC = Math.max(CONSTS.ENT_MIN_TTL, Math.min(Number(CFG.Update) || 10, CONSTS.ENT_MAX_TTL));
-const ENT_CACHE_KEY = K('ENT_CACHE_V1');
-let ENT_CACHE = (() => {
-  try {
-    const raw = readKV(ENT_CACHE_KEY);
-    if (!raw) return {ip: "", t: 0, data: null};
-    const obj = JSON.parse(raw);
-    if (obj && typeof obj === 'object') return obj;
-  } catch (_) {}
-  return {ip: "", t: 0, data: null};
-})();
+let ENT_CACHE = {ip: "", t: 0, data: null};
+
 async function withRetry(fn, retry = 1, delay = CONSTS.RETRY_DELAY_MS) {
-  try { return await fn(); } catch (_) {}
+  try {
+    return await fn();
+  } catch (_) {
+  }
   for (let i = 0; i < retry; i++) {
     await sleep(delay * (i + 1));
-    try { return await fn(); } catch (_) {}
+    try {
+      return await fn();
+    } catch (_) {
+    }
   }
   throw 'retry-fail';
 }
+
 async function loc_pingan(ip) {
   const r = await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=' + encodeURIComponent(ip), {}, ENT_REQ_TO);
   const d = (JSON.parse(r.body || '{}') || {}).data || {};
   if (!d || (!d.countryIsoCode && !d.country)) throw 'pingan-empty';
-  return { loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], ' ').replace(/\s*中国\s*/, ''), isp: d.isp || '' };
+  return {
+    loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: d.isp || ''
+  };
 }
+
 async function loc_ipapi(ip) {
   const r = await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, ENT_REQ_TO);
   const j = JSON.parse(r.body || '{}');
   if (j.status && j.status !== 'success') throw 'ipapi-fail';
-  return { loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ''), j.regionName?.split(/\s+or\s+/)[0], j.city], ' '), isp: j.isp || j.org || j.as || '' };
+  return {
+    loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ''), j.regionName?.split(/\s+or\s+/)[0], j.city], ' '),
+    isp: j.isp || j.org || j.as || ''
+  };
 }
+
 async function loc_ipwhois(ip) {
   const r = await httpGet(`https://ipwhois.app/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, ENT_REQ_TO);
   const j = JSON.parse(r.body || '{}');
   if (j.success === false || (!j.country && !j.country_code)) throw 'ipwhois-fail';
-  return { loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city], ' '), isp: (j.connection && j.connection.isp) || j.org || '' };
+  return {
+    loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ''), j.region, j.city], ' '),
+    isp: (j.connection && j.connection.isp) || j.org || ''
+  };
 }
+
 async function loc_ipsb(ip) {
   const r = await httpGet(`https://api.ip.sb/geoip/${encodeURIComponent(ip)}`, {}, ENT_REQ_TO);
   const j = JSON.parse(r.body || '{}');
   if (!j || (!j.country && !j.country_code)) throw 'ipsb-fail';
-  return { loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], ' ').replace(/\s*中国\s*/, ''), isp: j.isp || j.organization || '' };
+  return {
+    loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], ' ').replace(/\s*中国\s*/, ''),
+    isp: j.isp || j.organization || ''
+  };
 }
+
 async function loc_chain(ip) {
-  try { return await withRetry(() => loc_ipapi(ip), 1); } catch (_) {}
-  try { return await withRetry(() => loc_ipwhois(ip), 1); } catch (_) {}
+  try {
+    return await withRetry(() => loc_ipapi(ip), 1);
+  } catch (_) {
+  }
+  try {
+    return await withRetry(() => loc_ipwhois(ip), 1);
+  } catch (_) {
+  }
   return await withRetry(() => loc_ipsb(ip), 0);
 }
+
 async function getEntranceBundle(ip) {
-  const nowt = Date.now();
-  const fresh = (nowt - ENT_CACHE.t) < ENT_TTL_SEC * 1000;
+  const now = Date.now();
+  const fresh = (now - ENT_CACHE.t) < ENT_TTL_SEC * 1000;
   if (ENT_CACHE.ip === ip && fresh && ENT_CACHE.data) {
-    const left = Math.max(0, ENT_TTL_SEC * 1000 - (nowt - ENT_CACHE.t));
+    const left = Math.max(0, ENT_TTL_SEC * 1000 - (now - ENT_CACHE.t));
     log('info', 'Entrance cache HIT', {ip: _maskMaybe(ip), ttl_ms_left: left});
     return ENT_CACHE.data;
   }
-  if (ENT_CACHE.ip === ip && ENT_CACHE.data) log('info', 'Entrance cache EXPIRED', {ip: _maskMaybe(ip), age_ms: (nowt - ENT_CACHE.t), ttl_ms: ENT_TTL_SEC * 1000});
-  else log('info', 'Entrance cache MISS', {ip: _maskMaybe(ip)});
+  if (ENT_CACHE.ip === ip && ENT_CACHE.data) {
+    log('info', 'Entrance cache EXPIRED', {
+      ip: _maskMaybe(ip),
+      age_ms: (now - ENT_CACHE.t),
+      ttl_ms: ENT_TTL_SEC * 1000
+    });
+  } else {
+    log('info', 'Entrance cache MISS', {ip: _maskMaybe(ip)});
+  }
 
   const t = Date.now();
   const [a, b] = await Promise.allSettled([withRetry(() => loc_pingan(ip), 1), withRetry(() => loc_chain(ip), 1)]);
@@ -747,8 +1108,7 @@ async function getEntranceBundle(ip) {
     loc2: b.status === 'fulfilled' ? (b.value.loc || '') : '',
     isp2: b.status === 'fulfilled' ? (b.value.isp || '') : ''
   };
-  ENT_CACHE = {ip, t: nowt, data: res};
-  try { writeKV(ENT_CACHE_KEY, JSON.stringify(ENT_CACHE)); } catch (_) {}
+  ENT_CACHE = {ip, t: now, data: res};
   return res;
 }
 
@@ -773,14 +1133,20 @@ const SD_ALIAS = {
   hulu: 'hulu_us', '葫芦': 'hulu_us', huluus: 'hulu_us', hulujp: 'hulu_jp',
   hbo: 'hbo', max: 'hbo'
 };
+
 function parseServices(raw) {
   if (raw == null) return [];
   let s = String(raw).trim();
   if (!s || s === '[]' || s === '{}' || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
-  try { const arr = JSON.parse(s); if (Array.isArray(arr)) return normSvcList(arr); } catch (_) {}
+  try {
+    const arr = JSON.parse(s);
+    if (Array.isArray(arr)) return normSvcList(arr);
+  } catch (_) {
+  }
   const parts = s.split(/[,\uFF0C;|\/ \t\r\n]+/);
   return normSvcList(parts);
 }
+
 function normSvcList(list) {
   const out = [];
   for (let x of list) {
@@ -792,14 +1158,18 @@ function normSvcList(list) {
   }
   return out;
 }
+
 function selectServices() {
   const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
   const candidates = hasCheckboxKey
-    ? [["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW], ["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]]
-    : [["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]];
+      ? [["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW], ["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]]
+      : [["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]];
   for (const [label, raw] of candidates) {
     const list = parseServices(raw);
-    if (list.length > 0) { log("info", `Services: ${label}`, list); return list; }
+    if (list.length > 0) {
+      log("info", `Services: ${label}`, list);
+      return list;
+    }
   }
   log("info", "Services: default(all)");
   return SD_DEFAULT_ORDER.slice();
@@ -809,6 +1179,7 @@ function selectServices() {
 const sd_now = () => Date.now();
 const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const SD_BASE_HEADERS = {"User-Agent": SD_UA, "Accept-Language": "en"};
+
 function sd_httpGet(url, headers = {}, followRedirect = true) {
   return new Promise((resolve) => {
     const start = sd_now();
@@ -819,13 +1190,17 @@ function sd_httpGet(url, headers = {}, followRedirect = true) {
       followRedirect
     }, (err, resp, data) => {
       const cost = sd_now() - start;
-      if (err || !resp) { log('warn', 'sd_httpGet FAIL', url, 'cost', cost + 'ms', String(err || '')); return resolve({ok: false, status: 0, cost, headers: {}, data: ""}); }
+      if (err || !resp) {
+        log('warn', 'sd_httpGet FAIL', url, 'cost', cost + 'ms', String(err || ''));
+        return resolve({ok: false, status: 0, cost, headers: {}, data: ""});
+      }
       const status = resp.status || resp.statusCode || 0;
       log('debug', 'sd_httpGet OK', url, 'status', status, 'cost', cost + 'ms');
       resolve({ok: true, status, cost, headers: resp.headers || {}, data: data || ""});
     });
   });
 }
+
 function sd_httpPost(url, headers = {}, body = "") {
   return new Promise((resolve) => {
     const start = sd_now();
@@ -836,7 +1211,10 @@ function sd_httpPost(url, headers = {}, body = "") {
       body
     }, (err, resp, data) => {
       const cost = sd_now() - start;
-      if (err || !resp) { log('warn', 'sd_httpPost FAIL', url, 'cost', cost + 'ms', String(err || '')); return resolve({ok: false, status: 0, cost, headers: {}, data: ""}); }
+      if (err || !resp) {
+        log('warn', 'sd_httpPost FAIL', url, 'cost', cost + 'ms', String(err || ''));
+        return resolve({ok: false, status: 0, cost, headers: {}, data: ""});
+      }
       const status = resp.status || resp.statusCode || 0;
       log('debug', 'sd_httpPost OK', url, 'status', status, 'cost', cost + 'ms');
       resolve({ok: true, status, cost, headers: resp.headers || {}, data: data || ""});
@@ -852,12 +1230,29 @@ function sd_flagFromCC(cc) {
     if (TW_FLAG_MODE === 0) return '🇨🇳';
     if (TW_FLAG_MODE === 2) return '🇼🇸';
   }
-  try { const cps = [...cc].map((c) => 0x1F1E6 + (c.charCodeAt(0) - 65)); return String.fromCodePoint(...cps); } catch { return ''; }
+  try {
+    const cps = [...cc].map((c) => 0x1F1E6 + (c.charCodeAt(0) - 65));
+    return String.fromCodePoint(...cps);
+  } catch {
+    return '';
+  }
 }
+
 const SD_CC_NAME = ({
-  "zh-Hans": { CN:"中国", TW:"台湾", HK:"中国香港", MO:"中国澳门", JP:"日本", KR:"韩国", US:"美国", SG:"新加坡", MY:"马来西亚", TH:"泰国", VN:"越南", PH:"菲律宾", ID:"印度尼西亚", IN:"印度", AU:"澳大利亚", NZ:"新西兰", CA:"加拿大", GB:"英国", DE:"德国", FR:"法国", NL:"荷兰", ES:"西班牙", IT:"意大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄罗斯" },
-  "zh-Hant": { CN:"中國", TW:"台灣", HK:"中國香港", MO:"中國澳門", JP:"日本", KR:"南韓", US:"美國", SG:"新加坡", MY:"馬來西亞", TH:"泰國", VN:"越南", PH:"菲律賓", ID:"印尼", IN:"印度", AU:"澳洲", NZ:"紐西蘭", CA:"加拿大", GB:"英國", DE:"德國", FR:"法國", NL:"荷蘭", ES:"西班牙", IT:"義大利", BR:"巴西", AR:"阿根廷", MX:"墨西哥", RU:"俄羅斯" }
+  "zh-Hans": {
+    CN: "中国", TW: "台湾", HK: "中国香港", MO: "中国澳门", JP: "日本", KR: "韩国", US: "美国",
+    SG: "新加坡", MY: "马来西亚", TH: "泰国", VN: "越南", PH: "菲律宾", ID: "印度尼西亚",
+    IN: "印度", AU: "澳大利亚", NZ: "新西兰", CA: "加拿大", GB: "英国", DE: "德国", FR: "法国",
+    NL: "荷兰", ES: "西班牙", IT: "意大利", BR: "巴西", AR: "阿根廷", MX: "墨西哥", RU: "俄罗斯"
+  },
+  "zh-Hant": {
+    CN: "中國", TW: "台灣", HK: "中國香港", MO: "中國澳門", JP: "日本", KR: "南韓", US: "美國",
+    SG: "新加坡", MY: "馬來西亞", TH: "泰國", VN: "越南", PH: "菲律賓", ID: "印尼",
+    IN: "印度", AU: "澳洲", NZ: "紐西蘭", CA: "加拿大", GB: "英國", DE: "德國", FR: "法國",
+    NL: "荷蘭", ES: "西班牙", IT: "義大利", BR: "巴西", AR: "阿根廷", MX: "墨西哥", RU: "俄羅斯"
+  }
 })[SD_LANG];
+
 function sd_ccPretty(cc) {
   cc = (cc || '').toUpperCase();
   const flag = sd_flagFromCC(cc);
@@ -869,89 +1264,194 @@ function sd_ccPretty(cc) {
   if (flag) return `${flag} ${cc}`;
   return cc;
 }
+
 const isPartial = (tag) => /自制|自製|original/i.test(String(tag || '')) || /部分/i.test(String(tag || ''));
 
-// ====================== 各服务检测 ======================
 const SD_I18N = ({
-  "zh-Hans": { youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web", netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)" },
-  "zh-Hant": { youTube:"YouTube", chatgpt_app:"ChatGPT", chatgpt:"ChatGPT Web", netflix:"Netflix", disney:"Disney+", huluUS:"Hulu(美)", huluJP:"Hulu(日)", hbo:"Max(HBO)" }
+  "zh-Hans": {
+    youTube: "YouTube", chatgpt_app: "ChatGPT", chatgpt: "ChatGPT Web",
+    netflix: "Netflix", disney: "Disney+", huluUS: "Hulu(美)",
+    huluJP: "Hulu(日)", hbo: "Max(HBO)"
+  },
+  "zh-Hant": {
+    youTube: "YouTube", chatgpt_app: "ChatGPT", chatgpt: "ChatGPT Web",
+    netflix: "Netflix", disney: "Disney+", huluUS: "Hulu(美)",
+    huluJP: "Hulu(日)", hbo: "Max(HBO)"
+  }
 })[SD_LANG];
+
 function sd_parseNFRegion(resp) {
   try {
     const xo = resp?.headers?.['x-originating-url'] || resp?.headers?.['X-Origining-URL'] || resp?.headers?.['X-Originating-URL'];
-    if (xo) { const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i); if (m) return m[1].toUpperCase(); }
+    if (xo) {
+      const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
+      if (m) return m[1].toUpperCase();
+    }
     const m2 = String(resp?.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
     if (m2) return m2[1].toUpperCase();
-  } catch (_) {}
+  } catch (_) {
+  }
   return "";
 }
+
 async function sd_testYouTube() {
   log('debug', 'SD YouTube begin');
   const r = await sd_httpGet('https://www.youtube.com/premium?hl=en', {}, true);
-  if (!r.ok) return sd_renderLine({name: SD_I18N.youTube, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
+  if (!r.ok) return sd_renderLine({
+    name: SD_I18N.youTube,
+    ok: false,
+    cc: '',
+    cost: r.cost,
+    status: r.status,
+    tag: t('notReachable')
+  });
   let cc = 'US';
   try {
     let m = r.data.match(/"countryCode":"([A-Z]{2})"/);
     if (!m) m = r.data.match(/["']INNERTUBE_CONTEXT_GL["']\s*:\s*["']([A-Z]{2})["']/);
     if (m) cc = m[1];
-  } catch (_) {}
+  } catch (_) {
+  }
   return sd_renderLine({name: SD_I18N.youTube, ok: true, cc, cost: r.cost, status: r.status, tag: ''});
 }
+
 async function sd_testChatGPTWeb() {
   log('debug', 'SD ChatGPT Web begin');
   const r = await sd_httpGet('https://chatgpt.com/cdn-cgi/trace', {}, true);
-  if (!r.ok) return sd_renderLine({name: SD_I18N.chatgpt, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
-  let cc = ''; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch (_) {}
+  if (!r.ok) return sd_renderLine({
+    name: SD_I18N.chatgpt,
+    ok: false,
+    cc: '',
+    cost: r.cost,
+    status: r.status,
+    tag: t('notReachable')
+  });
+  let cc = '';
+  try {
+    const m = r.data.match(/loc=([A-Z]{2})/);
+    if (m) cc = m[1];
+  } catch (_) {
+  }
   return sd_renderLine({name: SD_I18N.chatgpt, ok: true, cc, cost: r.cost, status: r.status, tag: ''});
 }
+
 async function sd_testChatGPTAppAPI() {
   log('debug', 'SD ChatGPT App begin');
   const r = await sd_httpGet('https://api.openai.com/v1/models', {}, true);
-  if (!r.ok) return sd_renderLine({name: SD_I18N.chatgpt_app, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
-  let cc = ''; try {
+  if (!r.ok) return sd_renderLine({
+    name: SD_I18N.chatgpt_app,
+    ok: false,
+    cc: '',
+    cost: r.cost,
+    status: r.status,
+    tag: t('notReachable')
+  });
+  let cc = '';
+  try {
     const h = r.headers || {};
     cc = (h['cf-ipcountry'] || h['CF-IPCountry'] || h['Cf-IpCountry'] || '').toString().toUpperCase();
     if (!/^[A-Z]{2}$/.test(cc)) cc = '';
-  } catch (_) {}
+  } catch (_) {
+  }
   if (!cc) cc = await sd_queryLandingCCMulti();
   return sd_renderLine({name: SD_I18N.chatgpt_app, ok: true, cc, cost: r.cost, status: r.status, tag: ''});
 }
+
 const SD_NF_ORIGINAL = '80018499';
 const SD_NF_NONORIG = '81280792';
 const sd_nfGet = (id) => sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true);
+
 async function sd_testNetflix() {
   log('debug', 'SD Netflix begin');
   try {
     const r1 = await sd_nfGet(SD_NF_NONORIG);
-    if (!r1.ok) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: t('fail')});
-    if (r1.status === 403) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: t('regionBlocked')});
+    if (!r1.ok) return sd_renderLine({
+      name: SD_I18N.netflix,
+      ok: false,
+      cc: '',
+      cost: r1.cost,
+      status: r1.status,
+      tag: t('fail')
+    });
+    if (r1.status === 403) return sd_renderLine({
+      name: SD_I18N.netflix,
+      ok: false,
+      cc: '',
+      cost: r1.cost,
+      status: r1.status,
+      tag: t('regionBlocked')
+    });
     if (r1.status === 404) {
       const r2 = await sd_nfGet(SD_NF_ORIGINAL);
-      if (!r2.ok) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r2.cost, status: r2.status, tag: t('fail')});
-      if (r2.status === 404) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r2.cost, status: r2.status, tag: t('regionBlocked')});
+      if (!r2.ok) return sd_renderLine({
+        name: SD_I18N.netflix,
+        ok: false,
+        cc: '',
+        cost: r2.cost,
+        status: r2.status,
+        tag: t('fail')
+      });
+      if (r2.status === 404) return sd_renderLine({
+        name: SD_I18N.netflix,
+        ok: false,
+        cc: '',
+        cost: r2.cost,
+        status: r2.status,
+        tag: t('regionBlocked')
+      });
       const cc = sd_parseNFRegion(r2) || '';
-      return sd_renderLine({name: SD_I18N.netflix, ok: true, cc, cost: r2.cost, status: r2.status, tag: t('nfOriginals'), state: 'partial'});
+      return sd_renderLine({
+        name: SD_I18N.netflix,
+        ok: true,
+        cc,
+        cost: r2.cost,
+        status: r2.status,
+        tag: t('nfOriginals'),
+        state: 'partial'
+      });
     }
     if (r1.status === 200) {
       const cc = sd_parseNFRegion(r1) || '';
-      return sd_renderLine({name: SD_I18N.netflix, ok: true, cc, cost: r1.cost, status: r1.status, tag: t('nfFull'), state: 'full'});
+      return sd_renderLine({
+        name: SD_I18N.netflix,
+        ok: true,
+        cc,
+        cost: r1.cost,
+        status: r1.status,
+        tag: t('nfFull'),
+        state: 'full'
+      });
     }
-    return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: `HTTP ${r1.status}`});
+    return sd_renderLine({
+      name: SD_I18N.netflix,
+      ok: false,
+      cc: '',
+      cost: r1.cost,
+      status: r1.status,
+      tag: `HTTP ${r1.status}`
+    });
   } catch (e) {
     return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: null, status: 0, tag: t('fail')});
   }
 }
+
 async function sd_testDisney() {
   log('debug', 'SD Disney+ begin');
+
   async function home() {
     const r = await sd_httpGet('https://www.disneyplus.com/', {'Accept-Language': 'en'}, true);
-    if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.data || '')) throw 'NA';
-    let cc = ''; try {
+    if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.data || '')) {
+      throw 'NA';
+    }
+    let cc = '';
+    try {
       const m = r.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || r.data.match(/data-country=["']([A-Z]{2})["']/i);
       if (m) cc = m[1];
-    } catch (_) {}
+    } catch (_) {
+    }
     return {cc, cost: r.cost, status: r.status};
   }
+
   async function bam() {
     const headers = {
       'Accept-Language': 'en',
@@ -961,7 +1461,21 @@ async function sd_testDisney() {
     };
     const body = JSON.stringify({
       query: 'mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }',
-      variables: { input: { applicationRuntime: 'chrome', attributes: { browserName: 'chrome', browserVersion: '120.0.0.0', manufacturer: 'apple', model: null, operatingSystem: 'macintosh', operatingSystemVersion: '10.15.7', osDeviceIds: [] }, deviceFamily: 'browser', deviceLanguage: 'en', deviceProfile: 'macosx' } }
+      variables: {
+        input: {
+          applicationRuntime: 'chrome',
+          attributes: {
+            browserName: 'chrome',
+            browserVersion: '120.0.0.0',
+            manufacturer: 'apple',
+            model: null,
+            operatingSystem: 'macintosh',
+            operatingSystemVersion: '10.15.7',
+            osDeviceIds: []
+          },
+          deviceFamily: 'browser', deviceLanguage: 'en', deviceProfile: 'macosx'
+        }
+      }
     });
     const r = await sd_httpPost('https://disney.api.edge.bamgrid.com/graph/v1/device/graphql', headers, body);
     if (!r.ok || r.status !== 200) throw 'NA';
@@ -971,63 +1485,151 @@ async function sd_testDisney() {
     const cc = d?.extensions?.sdk?.session?.location?.countryCode;
     return {inLoc, cc, cost: r.cost, status: r.status};
   }
+
   const timeout = (ms, code) => new Promise((_, rej) => setTimeout(() => rej(code), ms));
+
   try {
-    const h = await Promise.race([home(), timeout(Math.min(7000, SD_TIMEOUT_MS + 500), 'TO')]);
-    const b = await Promise.race([bam(), timeout(Math.min(7000, SD_TIMEOUT_MS + 500), 'TO')]).catch(() => ({}));
+    const h = await Promise.race([home(), timeout(7000, 'TO')]);
+    const b = await Promise.race([bam(), timeout(7000, 'TO')]).catch(() => ({}));
     const blocked = (b && b.inLoc === false);
     const cc = blocked ? '' : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || '');
-    return sd_renderLine({name: SD_I18N.disney, ok: !blocked, cc, cost: (b?.cost || h?.cost || 0), status: (b?.status || h?.status || 0), tag: blocked ? t('regionBlocked') : ''});
+    return sd_renderLine({
+      name: SD_I18N.disney,
+      ok: !blocked,
+      cc,
+      cost: (b?.cost || h?.cost || 0),
+      status: (b?.status || h?.status || 0),
+      tag: blocked ? t('regionBlocked') : ''
+    });
   } catch (e) {
     const tag = (e === 'TO') ? t('timeout') : t('fail');
     return sd_renderLine({name: SD_I18N.disney, ok: false, cc: '', cost: null, status: 0, tag});
   }
 }
+
 async function sd_testHuluUS() {
   log('debug', 'SD Hulu US begin');
   const r = await sd_httpGet('https://www.hulu.com/', {}, true);
-  if (!r.ok) return sd_renderLine({name: SD_I18N.huluUS, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
+  if (!r.ok) return sd_renderLine({
+    name: SD_I18N.huluUS,
+    ok: false,
+    cc: '',
+    cost: r.cost,
+    status: r.status,
+    tag: t('notReachable')
+  });
   const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || '');
-  return sd_renderLine({name: SD_I18N.huluUS, ok: !blocked, cc: blocked ? '' : 'US', cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : ''});
+  return sd_renderLine({
+    name: SD_I18N.huluUS,
+    ok: !blocked,
+    cc: blocked ? '' : 'US',
+    cost: r.cost,
+    status: r.status,
+    tag: blocked ? t('regionBlocked') : ''
+  });
 }
+
 async function sd_testHuluJP() {
   log('debug', 'SD Hulu JP begin');
   const r = await sd_httpGet('https://www.hulu.jp/', {'Accept-Language': 'ja'}, true);
-  if (!r.ok) return sd_renderLine({name: SD_I18N.huluJP, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
+  if (!r.ok) return sd_renderLine({
+    name: SD_I18N.huluJP,
+    ok: false,
+    cc: '',
+    cost: r.cost,
+    status: r.status,
+    tag: t('notReachable')
+  });
   const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || '');
-  return sd_renderLine({name: SD_I18N.huluJP, ok: !blocked, cc: blocked ? '' : 'JP', cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : ''});
+  return sd_renderLine({
+    name: SD_I18N.huluJP,
+    ok: !blocked,
+    cc: blocked ? '' : 'JP',
+    cost: r.cost,
+    status: r.status,
+    tag: blocked ? t('regionBlocked') : ''
+  });
 }
+
 async function sd_testHBO() {
   log('debug', 'SD Max(HBO) begin');
   const r = await sd_httpGet('https://www.max.com/', {}, true);
-  if (!r.ok) return sd_renderLine({name: SD_I18N.hbo, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
+  if (!r.ok) return sd_renderLine({
+    name: SD_I18N.hbo,
+    ok: false,
+    cc: '',
+    cost: r.cost,
+    status: r.status,
+    tag: t('notReachable')
+  });
   const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || '');
-  let cc = ''; try { const m = String(r.data || '').match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch (_) {}
+  let cc = '';
+  try {
+    const m = String(r.data || '').match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
+    if (m) cc = m[1].toUpperCase();
+  } catch (_) {
+  }
   if (!cc) cc = await sd_queryLandingCCMulti();
-  return sd_renderLine({name: SD_I18N.hbo, ok: !blocked, cc: blocked ? '' : cc, cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : ''});
+  return sd_renderLine({
+    name: SD_I18N.hbo,
+    ok: !blocked,
+    cc: blocked ? '' : cc,
+    cost: r.cost,
+    status: r.status,
+    tag: blocked ? t('regionBlocked') : ''
+  });
 }
+
 async function sd_queryLandingCC() {
   const r = await sd_httpGet('http://ip-api.com/json', {}, true);
-  if (r.ok && r.status === 200) { try { const j = JSON.parse(r.data || '{}'); return (j.countryCode || '').toUpperCase(); } catch (_) { return ''; } }
+  if (r.ok && r.status === 200) {
+    try {
+      const j = JSON.parse(r.data || '{}');
+      return (j.countryCode || '').toUpperCase();
+    } catch (_) {
+      return '';
+    }
+  }
   return '';
 }
+
 async function sd_queryLandingCCMulti() {
-  let cc = await sd_queryLandingCC(); if (cc) return cc;
+  let cc = await sd_queryLandingCC();
+  if (cc) return cc;
+
   let r = await sd_httpGet('https://api.ip.sb/geoip', {}, true);
-  if (r.ok && r.status === 200) try { const j = JSON.parse(r.data || '{}'); if (j.country_code) return j.country_code.toUpperCase(); } catch (_) {}
+  if (r.ok && r.status === 200) try {
+    const j = JSON.parse(r.data || '{}');
+    if (j.country_code) return j.country_code.toUpperCase();
+  } catch (_) {
+  }
+
   r = await sd_httpGet('https://ipinfo.io/json', {}, true);
-  if (r.ok && r.status === 200) try { const j = JSON.parse(r.data || '{}'); if (j.country) return j.country.toUpperCase(); } catch (_) {}
+  if (r.ok && r.status === 200) try {
+    const j = JSON.parse(r.data || '{}');
+    if (j.country) return j.country.toUpperCase();
+  } catch (_) {
+  }
+
   r = await sd_httpGet('https://ifconfig.co/json', {'Accept-Language': 'en'}, true);
-  if (r.ok && r.status === 200) try { const j = JSON.parse(r.data || '{}'); if (j.country_iso) return j.country_iso.toUpperCase(); } catch (_) {}
+  if (r.ok && r.status === 200) try {
+    const j = JSON.parse(r.data || '{}');
+    if (j.country_iso) return j.country_iso.toUpperCase();
+  } catch (_) {
+  }
+
   return '';
 }
+
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
   const st = state ? state : (ok ? (isPartial(tag) ? 'partial' : 'full') : 'blocked');
   const icon = SD_ICONS[st];
   const regionChunk = cc ? sd_ccPretty(cc) : '';
   const regionText = regionChunk || '-';
+
   const unlockedShort = t('unlocked');
   const blockedText = t('notReachable');
+
   const isNetflix = /netflix/i.test(String(name));
   const stateTextLong = (st === 'full') ? t('nfFull') : (st === 'partial') ? t('nfOriginals') : blockedText;
   const stateTextShort = (st === 'blocked') ? blockedText : unlockedShort;
@@ -1037,47 +1639,31 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     const left = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`;
     const head = `${left}，${t('region')}: ${regionText}`;
     const tail = [showTag, (SD_SHOW_LAT && cost != null) ? `${cost}ms` : '', (SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : '']
-      .filter(Boolean).join(' ｜ ');
+        .filter(Boolean).join(' ｜ ');
     return tail ? `${head} ｜ ${tail}` : head;
   }
+
   if (SD_STYLE === 'text') {
     const left = `${name}: ${st === 'full' ? t('unlocked') : st === 'partial' ? t('partialUnlocked') : t('notReachable')}`;
     const head = SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`;
     const tail = [showTag, (SD_SHOW_LAT && cost != null) ? `${cost}ms` : '', (SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : '']
-      .filter(Boolean).join(' ｜ ');
+        .filter(Boolean).join(' ｜ ');
     return tail ? `${head} ｜ ${tail}` : head;
   }
+
   const head = SD_ARROW ? `${icon} ${name} ➟ ${regionText}` : `${icon} ${name} ｜ ${regionText}`;
   const tail = [showTag, (SD_SHOW_LAT && cost != null) ? `${cost}ms` : '', (SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : '']
-    .filter(Boolean).join(' ｜ ');
+      .filter(Boolean).join(' ｜ ');
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
-// ====================== 并发池 + 按预算的服务检测 ======================
-async function runPool(fns, limit) {
-  const out = new Array(fns.length); let idx = 0;
-  async function worker() {
-    while (true) {
-      const i = idx++; if (i >= fns.length) break;
-      try {
-        // 预算感知：如果已接近截止，则不再执行剩余任务
-        if (Date.now() + 300 >= DEADLINE_AT) { out[i] = null; continue; }
-        out[i] = await fns[i]();
-      } catch (_) { out[i] = null; }
-    }
-  }
-  const n = Math.max(1, Math.min(limit, fns.length));
-  await Promise.all(Array.from({length: n}, () => worker()));
-  return out;
-}
-async function runServiceChecksWithBudget(deadlineAt) {
+async function runServiceChecks() {
   try {
     const order = selectServices();
     if (!order.length) return [];
-    const capped = (CFG.SD_MAX != null) ? order.slice(0, CFG.SD_MAX) : order.slice();
-    log('info', 'Service checks start', {order: capped, conc: CFG.SD_CONC});
-    const tasks = capped.map((k) => () => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
-    const lines = await runPool(tasks, CFG.SD_CONC);
+    log('info', 'Service checks start', order);
+    const tasks = order.map((k) => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
+    const lines = await Promise.all(tasks);
     log('info', 'Service checks done');
     return lines.filter(Boolean);
   } catch (e) {
@@ -1090,7 +1676,7 @@ async function runServiceChecksWithBudget(deadlineAt) {
 function zhHansToHantOnce(s) {
   if (!s) return s;
   const phraseMap = [
-    ['网络', '網路'], ['蜂窝数据', '行動數據'], ['代理策略', '代理策略'],
+    ['网络', '網路'], ['蜂窝网络', '行動服務'], ['代理策略', '代理策略'],
     ['执行时间', '執行時間'], ['落地 IP', '落地 IP'], ['入口', '入口'],
     ['位置', '位置'], ['运营商', '運營商'], ['区域', '區域'],
     ['不可达', '不可達'], ['检测失败', '檢測失敗'], ['超时', '逾時'],
@@ -1101,69 +1687,31 @@ function zhHansToHantOnce(s) {
     ['中国广电', '中國廣電'], ['中国教育网', '中國教育網']
   ];
   for (const [hans, hant] of phraseMap) s = s.replace(new RegExp(hans, 'g'), hant);
-  const charMap = {'网':'網','络':'絡','运':'運','营':'營','达':'達','检':'檢','测':'測','时':'時','区':'區','术':'術','产':'產','广':'廣','电':'電','联':'聯','动':'動','数':'數','汉':'漢','气':'氣','历':'曆','宁':'寧'};
+  const charMap = {
+    '网': '網',
+    '络': '絡',
+    '运': '運',
+    '营': '營',
+    '达': '達',
+    '检': '檢',
+    '测': '測',
+    '时': '時',
+    '区': '區',
+    '术': '術',
+    '产': '產',
+    '广': '廣',
+    '电': '電',
+    '联': '聯',
+    '动': '動',
+    '数': '數',
+    '汉': '漢',
+    '气': '氣',
+    '历': '曆',
+    '宁': '寧'
+  };
   return s.replace(/[\u4E00-\u9FFF]/g, (ch) => charMap[ch] || ch);
 }
-function maybeTify(content) { return SD_LANG === 'zh-Hant' ? zhHansToHantOnce(content) : content; }
 
-// ====================== 渲染面板（支持部分结果） ======================
-function renderPanel(partial, note) {
-  const title = netTypeLine() || t('panelTitle');
-  const parts = [];
-  parts.push(`${t('runAt')}: ${STATE.runAt}`);
-  parts.push(`${t('policy')}: ${STATE.policy || '-'}`);
-
-  // 本地
-  pushGroupTitle(parts, '本地');
-  const directIPv4 = ipLine('IPv4', STATE.cn.ip);
-  const directIPv6 = ipLine('IPv6', STATE.cn6.ip);
-  if (directIPv4) parts.push(directIPv4);
-  if (directIPv6) parts.push(directIPv6);
-  const directLoc = STATE.cn.loc ? (MASK_POS ? onlyFlag(STATE.cn.loc) : flagFirst(STATE.cn.loc)) : '-';
-  parts.push(`${t('location')}: ${directLoc}`);
-  if (STATE.cn.isp) parts.push(`${t('isp')}: ${fmtISP(STATE.cn.isp, STATE.cn.loc)}`);
-
-  // 入口
-  if ((STATE.entB4 && (STATE.entB4.ip || STATE.entB4.loc1 || STATE.entB4.loc2 || STATE.entB4.isp1 || STATE.entB4.isp2)) || (STATE.entB6 && STATE.entB6.ip)) {
-    pushGroupTitle(parts, '入口');
-    const entIPv4 = ipLine('IPv4', STATE.entB4.ip && isIPv4(STATE.entB4.ip) ? STATE.entB4.ip : '');
-    const entIPv6 = ipLine('IPv6', STATE.entB6.ip && isIPv6(STATE.entB6.ip) ? STATE.entB6.ip : '');
-    if (entIPv4) parts.push(entIPv4);
-    if (entIPv6) parts.push(entIPv6);
-    if (STATE.entB4.loc1) parts.push(`${t('location')}¹: ${flagFirst(STATE.entB4.loc1)}`);
-    if (STATE.entB4.isp1) parts.push(`${t('isp')}¹: ${fmtISP(STATE.entB4.isp1, STATE.entB4.loc1)}`);
-    if (STATE.entB4.loc2) parts.push(`${t('location')}²: ${flagFirst(STATE.entB4.loc2)}`);
-    if (STATE.entB4.isp2) parts.push(`${t('isp')}²: ${String(STATE.entB4.isp2).trim()}`);
-  }
-
-  // 落地
-  if (STATE.px.ip || STATE.px6.ip || STATE.px.loc || STATE.px.isp) {
-    pushGroupTitle(parts, '落地');
-    const landIPv4 = ipLine('IPv4', STATE.px.ip);
-    const landIPv6 = ipLine('IPv6', STATE.px6.ip);
-    if (landIPv4) parts.push(landIPv4);
-    if (landIPv6) parts.push(landIPv6);
-    if (STATE.px.loc) parts.push(`${t('location')}: ${flagFirst(STATE.px.loc)}`);
-    if (STATE.px.isp) parts.push(`${t('isp')}: ${fmtISP(STATE.px.isp, STATE.px.loc)}`);
-  }
-
-  // 服务检测
-  if (STATE.sdLines.length) {
-    pushGroupTitle(parts, '服务检测');
-    parts.push(...STATE.sdLines);
-  } else if (STATE.partialNote) {
-    pushGroupTitle(parts, '服务检测');
-    parts.push(STATE.partialNote);
-  }
-
-  // 调试尾巴（可选）
-  if (LOG_TO_PANEL && (DEBUG_LINES.length || partial || note)) {
-    pushGroupTitle(parts, t('debug'));
-    if (note) parts.push(note);
-    const tail = DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES).join('\n');
-    if (tail) parts.push(tail);
-  }
-
-  const content = maybeTify(parts.join('\n'));
-  return {title: maybeTify(title), content};
+function maybeTify(content) {
+  return SD_LANG === 'zh-Hant' ? zhHansToHantOnce(content) : content;
 }
