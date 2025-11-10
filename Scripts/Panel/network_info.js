@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-10R1
+ * 版本：2025-11-10R2
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -96,7 +96,7 @@
  * 变更记录 · 摘要
  *  · 统一：常量/端点/优先级表驱动；Direct/Landing/Entrance 抽象抓取器
  *  · 优化：服务检测工具收口（渲染/HTTP/地区名）与可扩展别名表
- *  · 保持：参数键/行为/日志风格/繁简与旗帜模式完全不变
+ *  · 修复：IPv4/IPv6 串位；直连 IPv4 源偶发回 IPv6 的纠偏(v4-only fallback)；渲染层类型守卫
  * ========================================================= */
 
 // ====================== 常量 & 配置基线 ======================
@@ -407,7 +407,6 @@ const V6_TO = Math.min(
     2500
 );
 
-
 const MASK_IP = !!CFG.MASK_IP;
 const MASK_POS = typeof CFG.MASK_POS === 'boolean' ? CFG.MASK_POS : !!CFG.MASK_IP;
 const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
@@ -547,6 +546,19 @@ const DIRECT_V4_SOURCES = Object.freeze({
     }
 });
 
+// —— v4-only 兜底（直连 IPv4 偶发返回 v6 时使用）——
+const DIRECT_V4_FALLBACK = {
+    url: 'https://api-ipv4.ip.sb/geoip',
+    parse: (r) => {
+        const j = safeJSON(r.body, {});
+        return {
+            ip: j.ip || '',
+            loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], ' ').replace(/\s*中国\s*/, ''),
+            isp: j.isp || j.organization || ''
+        };
+    }
+};
+
 // —— 落地 IPv4 源 ——
 const LANDING_V4_SOURCES = Object.freeze({
     ipapi: {
@@ -596,7 +608,7 @@ const IPV6_IP_ENDPOINTS = Object.freeze({
 // —— 默认尝试顺序（集中管理）——
 const ORDER = Object.freeze({
     directV4: ['cip', '163', '126', 'bilibili', 'pingan', 'ipip'],
-    landingV4: ['ipapi', 'ipwhois', 'ipsb'],
+    landingV4: ['ipwhois', 'ipsb', 'ipapi'], // ← 调整顺序，最后才试 ip-api.com
     directV6: ['ddnspod', 'neu6'],
     landingV6: ['ipsb', 'ident', 'ipify']
 });
@@ -697,21 +709,21 @@ log('info', 'Start', JSON.stringify({
     parts.push(`${t('runAt')}: ${now()}`);
     parts.push(`${t('policy')}: ${policyName || '-'}`);
 
-    // 本地
+    // 本地（类型守卫）
     pushGroupTitle(parts, '本地');
-    const directIPv4 = ipLine('IPv4', cn.ip);
-    const directIPv6 = ipLine('IPv6', cn6.ip);
+    const directIPv4 = (cn.ip && isIPv4(cn.ip)) ? ipLine('IPv4', cn.ip) : null;
+    const directIPv6 = (cn6.ip && isIPv6(cn6.ip)) ? ipLine('IPv6', cn6.ip) : null;
     if (directIPv4) parts.push(directIPv4);
     if (directIPv6) parts.push(directIPv6);
     const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
     parts.push(`${t('location')}: ${directLoc}`);
     if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
-    // 入口
+    // 入口（类型守卫）
     if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && ent6.ip)) {
         pushGroupTitle(parts, '入口');
-        const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
-        const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
+        const entIPv4 = (ent4.ip && isIPv4(ent4.ip)) ? ipLine('IPv4', ent4.ip) : null;
+        const entIPv6 = (ent6.ip && isIPv6(ent6.ip)) ? ipLine('IPv6', ent6.ip) : null;
         if (entIPv4) parts.push(entIPv4);
         if (entIPv6) parts.push(entIPv6);
         if (ent4.loc1) parts.push(`${t('location')}¹: ${flagFirst(ent4.loc1)}`);
@@ -720,11 +732,11 @@ log('info', 'Start', JSON.stringify({
         if (ent4.isp2) parts.push(`${t('isp')}²: ${String(ent4.isp2).trim()}`);
     }
 
-    // 落地
+    // 落地（类型守卫）
     if (px.ip || px6.ip || px.loc || px.isp) {
         pushGroupTitle(parts, '落地');
-        const landIPv4 = ipLine('IPv4', px.ip);
-        const landIPv6 = ipLine('IPv6', px6.ip);
+        const landIPv4 = (px.ip && isIPv4(px.ip)) ? ipLine('IPv4', px.ip) : null;
+        const landIPv6 = (px6.ip && isIPv6(px6.ip)) ? ipLine('IPv6', px6.ip) : null;
         if (landIPv4) parts.push(landIPv4);
         if (landIPv6) parts.push(landIPv6);
         if (px.loc) parts.push(`${t('location')}: ${flagFirst(px.loc)}`);
@@ -926,20 +938,28 @@ function buildNetTitleHard() {
 // ====================== HTTP 基础 ======================
 function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
     return new Promise((resolve, reject) => {
-        const req = {url, headers};
-        if (timeoutMs != null) req.timeout = timeoutMs;
-        if (followRedirect) req.followRedirect = true;
-        const start = Date.now();
-        $httpClient.get(req, (err, resp, body) => {
-            const cost = Date.now() - start;
-            if (err) {
-                log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err));
-                return reject(err);
-            }
-            const status = resp?.status || resp?.statusCode;
-            log('debug', 'HTTP GET', url, 'status', status, 'cost', cost + 'ms');
-            resolve({status, headers: resp?.headers || {}, body});
-        });
+        const doOnce = (attempt) => {
+            const req = {url, headers};
+            if (timeoutMs != null) req.timeout = timeoutMs;
+            if (followRedirect) req.followRedirect = true;
+            const start = Date.now();
+            $httpClient.get(req, (err, resp, body) => {
+                const cost = Date.now() - start;
+                if (err) {
+                    const msg = String(err || '');
+                    if (attempt < 1 && /Read stream EOF|ECONNRESET/i.test(msg)) {
+                        log('warn', 'HTTP GET transient, retrying', url, 'cost', cost + 'ms', msg);
+                        return doOnce(attempt + 1);
+                    }
+                    log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', msg);
+                    return reject(err);
+                }
+                const status = resp?.status || resp?.statusCode;
+                log('debug', 'HTTP GET', url, 'status', status, 'cost', cost + 'ms');
+                resolve({status, headers: resp?.headers || {}, body});
+            });
+        };
+        doOnce(0);
     });
 }
 
@@ -1020,17 +1040,37 @@ async function tryIPv6Ip(order) {
 /* ===== 四个对外接口（签名保持一致） ===== */
 async function getDirectV4(preferKey) {
     const order = makeTryOrder(preferKey, ORDER.directV4);
-    const res = await trySources(order, DIRECT_V4_SOURCES, {
+    let res = await trySources(order, DIRECT_V4_SOURCES, {
         preferLogTag: 'DirectV4', needCityPrefer: true
     });
+
     if (!res || !res.ip) {
         try {
             log('warn', 'DirectV4 all failed, final ipip fallback');
             const r = await httpGet(DIRECT_V4_SOURCES.ipip.url);
-            return DIRECT_V4_SOURCES.ipip.parse(r) || {};
+            res = DIRECT_V4_SOURCES.ipip.parse(r) || {};
         } catch (e2) {
             log('error', 'DirectV4 ipip final fail', String(e2));
             return {};
+        }
+    }
+
+    // 纠偏：若不是 IPv4，再走一次 v4-only 端点
+    if (res.ip && !isIPv4(res.ip)) {
+        log('warn', 'DirectV4 returned non-IPv4, refetch via v4-only fallback', _maskMaybe(res.ip));
+        try {
+            const r = await httpGet(DIRECT_V4_FALLBACK.url);
+            const fix = DIRECT_V4_FALLBACK.parse(r) || {};
+            if (isIPv4(fix.ip)) {
+                res = fix;
+                log('info', 'DirectV4 corrected by v4-only fallback', _maskMaybe(res.ip));
+            } else {
+                log('warn', 'v4-only fallback did not return IPv4');
+                res.ip = ''; // 交给渲染层类型守卫不渲染
+            }
+        } catch (e) {
+            log('warn', 'DirectV4 v4-only fallback fail', String(e));
+            res.ip = '';
         }
     }
     return res;
@@ -1093,13 +1133,15 @@ function extractIP(str) {
 
 async function touchLandingOnceQuick() {
     try {
-        await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true);
-    } catch (_) {
+        // v4：用 ip.sb 触发
+        await httpGet('https://api.ip.sb/geoip', {}, CONSTS.PRETOUCH_TO_MS, true);
+    } catch {
     }
     if (IPV6_EFF) {
         try {
+            // v6：保持 ip.sb v6
             await httpGet('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true);
-        } catch (_) {
+        } catch {
         }
     }
     log('debug', 'Pre-touch landing endpoints done');
@@ -1329,20 +1371,28 @@ const SD_BASE_HEADERS = {"User-Agent": SD_UA, "Accept-Language": "en"};
 
 function sd_httpGet(url, headers = {}, followRedirect = true) {
     return new Promise((resolve) => {
-        const start = sd_now();
-        $httpClient.get({
-            url, headers: {...SD_BASE_HEADERS, ...headers},
-            timeout: SD_TIMEOUT_MS, followRedirect
-        }, (err, resp, data) => {
-            const cost = sd_now() - start;
-            if (err || !resp) {
-                log('warn', 'sd_httpGet FAIL', url, 'cost', cost + 'ms', String(err || ''));
-                return resolve({ok: false, status: 0, cost, headers: {}, data: ""});
-            }
-            const status = resp.status || resp.statusCode || 0;
-            log('debug', 'sd_httpGet OK', url, 'status', status, 'cost', cost + 'ms');
-            resolve({ok: true, status, cost, headers: resp.headers || {}, data: data || ""});
-        });
+        const doOnce = (attempt) => {
+            const start = sd_now();
+            $httpClient.get({
+                url, headers: {...SD_BASE_HEADERS, ...headers},
+                timeout: SD_TIMEOUT_MS, followRedirect
+            }, (err, resp, data) => {
+                const cost = sd_now() - start;
+                if (err || !resp) {
+                    const msg = String(err || '');
+                    if (attempt < 1 && /Read stream EOF|ECONNRESET/i.test(msg)) {
+                        log('warn', 'sd_httpGet transient, retrying', url, 'cost', cost + 'ms', msg);
+                        return doOnce(attempt + 1);
+                    }
+                    log('warn', 'sd_httpGet FAIL', url, 'cost', cost + 'ms', msg);
+                    return resolve({ok: false, status: 0, cost, headers: {}, data: ""});
+                }
+                const status = resp.status || resp.statusCode || 0;
+                log('debug', 'sd_httpGet OK', url, 'status', status, 'cost', cost + 'ms');
+                resolve({ok: true, status, cost, headers: resp.headers || {}, data: data || ""});
+            });
+        };
+        doOnce(0);
     });
 }
 
@@ -1510,7 +1560,7 @@ async function sd_testChatGPTAppAPI() {
         if (!/^[A-Z]{2}$/.test(cc)) cc = '';
     } catch (_) {
     }
-    if (!cc) cc = await sd_queryLandingCCMulti();
+    if (!cc) cc = await sd_queryLandingCCCached();
     return sd_renderLine({name: SD_I18N.chatgpt_app, ok: true, cc, cost: r.cost, status: r.status, tag: ''});
 }
 
@@ -1659,7 +1709,7 @@ async function sd_testDisney() {
         const h = await Promise.race([home(), timeout(7000, 'TO')]);
         const b = await Promise.race([bam(), timeout(7000, 'TO')]).catch(() => ({}));
         const blocked = (b && b.inLoc === false);
-        const cc = blocked ? '' : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || '');
+        const cc = blocked ? '' : (b?.cc || h?.cc || (await sd_queryLandingCCCached()) || '');
         return sd_renderLine({
             name: SD_I18N.disney,
             ok: !blocked,
@@ -1736,7 +1786,7 @@ async function sd_testHBO() {
         if (m) cc = m[1].toUpperCase();
     } catch (_) {
     }
-    if (!cc) cc = await sd_queryLandingCCMulti();
+    if (!cc) cc = await sd_queryLandingCCCached();
     return sd_renderLine({
         name: SD_I18N.hbo,
         ok: !blocked,
@@ -1747,23 +1797,19 @@ async function sd_testHBO() {
     });
 }
 
-async function sd_queryLandingCC() {
-    const r = await sd_httpGet('http://ip-api.com/json', {}, true);
-    if (r.ok && r.status === 200) {
-        try {
-            const j = safeJSON(r.data, {});
-            return (j.countryCode || '').toUpperCase();
-        } catch {
-            return '';
-        }
-    }
-    return '';
+let _sd_cc_cache = {t: 0, cc: ''};
+const SD_CC_TTL_MS = Math.max(5000, Math.min(60000, SD_TIMEOUT_MS * 5));
+
+async function sd_queryLandingCCCached() {
+    const nowT = Date.now();
+    if (_sd_cc_cache.cc && (nowT - _sd_cc_cache.t) < SD_CC_TTL_MS) return _sd_cc_cache.cc;
+    const cc = await sd_queryLandingCCMulti();
+    _sd_cc_cache = {t: nowT, cc};
+    return cc;
 }
 
 async function sd_queryLandingCCMulti() {
-    let cc = await sd_queryLandingCC();
-    if (cc) return cc;
-
+    // 1st: ip.sb（HTTPS，稳定）
     let r = await sd_httpGet('https://api.ip.sb/geoip', {}, true);
     if (r.ok && r.status === 200) try {
         const j = safeJSON(r.data, {});
@@ -1771,6 +1817,7 @@ async function sd_queryLandingCCMulti() {
     } catch {
     }
 
+    // 2nd: ipinfo（HTTPS）
     r = await sd_httpGet('https://ipinfo.io/json', {}, true);
     if (r.ok && r.status === 200) try {
         const j = safeJSON(r.data, {});
@@ -1778,10 +1825,19 @@ async function sd_queryLandingCCMulti() {
     } catch {
     }
 
+    // 3rd: ifconfig.co（HTTPS）
     r = await sd_httpGet('https://ifconfig.co/json', {'Accept-Language': 'en'}, true);
     if (r.ok && r.status === 200) try {
         const j = safeJSON(r.data, {});
         if (j.country_iso) return j.country_iso.toUpperCase();
+    } catch {
+    }
+
+    // 4th（最后才试）：ip-api（HTTP，最不稳）
+    r = await sd_httpGet('http://ip-api.com/json', {}, true);
+    if (r.ok && r.status === 200) try {
+        const j = safeJSON(r.data, {});
+        if (j.countryCode) return j.countryCode.toUpperCase();
     } catch {
     }
 
