@@ -432,7 +432,13 @@ log('info', 'Start', JSON.stringify({
         v4: _maskMaybe(px.ip || ''), v6: _maskMaybe(px6.ip || '')
     });
 
-    const title = netTypeLine() || t('panelTitle');
+log('info', '$network peek', JSON.stringify({
+  wifi: $network?.wifi,
+  cellular: $network?.cellular || $network?.['cellular-data'],
+  v4: $network?.v4,
+  v6: $network?.v6,
+}));
+const title = netTypeLine() || t('panelTitle');
 
     // 组装渲染
     const parts = [];
