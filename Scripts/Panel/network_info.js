@@ -431,7 +431,7 @@ log('info', 'Start', JSON.stringify({
     log('info', 'Landing fetched', (Date.now() - t2) + 'ms', {
         v4: _maskMaybe(px.ip || ''), v6: _maskMaybe(px6.ip || '')
     });
-
+    
 log('info', '$network peek', JSON.stringify({
   wifi: $network?.wifi,
   cellular: $network?.cellular || $network?.['cellular-data'],
@@ -627,24 +627,22 @@ function radioToGen(r) {
 
 function netTypeLine() {
   try {
-    // 1) 优先用 Wi-Fi SSID
-    const ssid = $network?.wifi?.ssid;
+    const n = $network || {};
+    const ssid = n.wifi?.ssid;
+
+    // 先看 Wi-Fi（即使拿不到 SSID，也给出“Wi-Fi | -”的兜底）
     if (ssid) return `${t('wifi')} | ${ssid}`;
 
-    // 2) 兼容多内核的蜂窝字段：Surge/Loon/Egern 用 cellular，QX 用 cellular-data
-    const cell = $network?.cellular || $network?.['cellular-data'] || {};
-    const radio = cell.radio || cell.radiotechnology || cell.radioTech || '';
+    // 兼容：既查 cellular 也查 cellular-data
+    const cell = n.cellular || n['cellular-data'] || {};
+    const radio = cell.radio;
+    if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
 
-    if (radio) {
-      return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
-    }
-
-    // 3) 双保险：根据主接口判断网络类型
-    const ifname = $network?.v4?.primaryInterface || $network?.v6?.primaryInterface || '';
-    if (/^en\d$/.test(ifname)) return `${t('wifi')} | en`;
-    if (/^pdp_ip/.test(ifname)) return `${t('cellular')} | ${t('gen')('', '') || 'Connected'}`;
+    // 接口名兜底（pdp 开头基本可判断为蜂窝；en 开头多为 Wi-Fi）
+    const iface = n.v4?.primaryInterface || n.v6?.primaryInterface || '';
+    if (/^pdp/i.test(iface)) return `${t('cellular')} | 4G/5G`;
+    if (/^en/i.test(iface))  return `${t('wifi')} | -`;
   } catch (_) {}
-
   return t('unknownNet');
 }
 
