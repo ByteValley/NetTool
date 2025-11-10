@@ -390,13 +390,30 @@ const ICON_NAME = (CFG.Icon || '').trim() ||
     ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
-const IPv6_ON = !!CFG.IPv6;
+// 用户是否开启 v6 的“意愿”
+const WANT_V6 = !!CFG.IPv6;
+// —— IPv6 智能开关（仅当配置开启且本机确有 v6 才执行）——
+const HAS_V6 = !!($network?.v6?.primaryAddress);
+// 智能开关：用户开 + 设备真有 v6
+const IPV6_EFF = WANT_V6 && HAS_V6;
+// —— v6 端点更短的单次超时（避免卡住整段流程）——
+const V6_TO = Math.min(
+    Math.max(
+        CONSTS.SD_MIN_TIMEOUT,
+        Number.isFinite(Number(CFG.SD_TIMEOUT_MS))
+            ? Number(CFG.SD_TIMEOUT_MS)
+            : ((Number(CFG.Timeout) || 8) * 1000)
+    ),
+    2500
+);
+
+
 const MASK_IP = !!CFG.MASK_IP;
 const MASK_POS = typeof CFG.MASK_POS === 'boolean' ? CFG.MASK_POS : !!CFG.MASK_IP;
 const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
 
 const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;
-const DOMESTIC_IPv6 = CFG.DOMIC_IPv6 || CFG.DOMESTIC_IPv6; // 兼容旧键
+const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;
 const LANDING_IPv4 = CFG.LANDING_IPv4;
 const LANDING_IPv6 = CFG.LANDING_IPv6;
 
@@ -593,7 +610,9 @@ function makeTryOrder(prefer, fallbackList) {
 log('info', 'Start', JSON.stringify({
     Update: CFG.Update,
     Timeout: CFG.Timeout,
-    IPv6: IPv6_ON,
+    IPv6: IPV6_EFF, // 智能 v6（需本机确有 v6）
+    WANT_V6: WANT_V6,
+    HAS_V6: HAS_V6,
     SD_TIMEOUT_MS,
     SD_STYLE,
     SD_REGION_MODE,
@@ -614,7 +633,7 @@ log('info', 'Start', JSON.stringify({
             log('warn', 'DirectV4', String(e));
             return {};
         }),
-        IPv6_ON ? getDirectV6(DOMESTIC_IPv6).catch((e) => {
+        IPV6_EFF ? getDirectV6(DOMESTIC_IPv6).catch((e) => {
             log('warn', 'DirectV6', String(e));
             return {};
         }) : Promise.resolve({})
@@ -654,7 +673,7 @@ log('info', 'Start', JSON.stringify({
             log('warn', 'LandingV4', String(e));
             return {};
         }),
-        IPv6_ON ? getLandingV6(LANDING_IPv6).catch((e) => {
+        IPV6_EFF ? getLandingV6(LANDING_IPv6).catch((e) => {
             log('warn', 'LandingV6', String(e));
             return {};
         }) : Promise.resolve({})
@@ -988,7 +1007,7 @@ async function tryIPv6Ip(order) {
         const url = IPV6_IP_ENDPOINTS[key];
         if (!url) continue;
         try {
-            const r = await httpGet(url);
+            const r = await httpGet(url, {}, V6_TO /* 短超时 */);
             const ip = String(r.body || '').trim();
             if (ip) return {ip};
         } catch (e) {
@@ -1025,21 +1044,29 @@ async function getDirectV6(preferKey) {
 }
 
 async function getLandingV4(preferKey) {
-    const order = makeTryOrder(preferKey, ORDER.landingV4);
+    const order = makeTryOrder(preferKey, ORDER.landingV4); // 例如 ['ipapi','ipwhois','ipsb']
     const res = await trySources(order, LANDING_V4_SOURCES, {
         preferLogTag: 'LandingV4', needCityPrefer: false
     });
-    if (!res || !res.ip) {
+    if (res && res.ip) return res;
+
+    // 兜底：按“非 prefer”的其余源再跑一轮（避免原地重复）
+    const alt = ORDER.landingV4.filter(k => k !== preferKey);
+    for (const k of alt) {
         try {
-            log('warn', 'LandingV4 fallback ipapi');
-            const r = await httpGet(LANDING_V4_SOURCES.ipapi.url);
-            return LANDING_V4_SOURCES.ipapi.parse(r) || {};
-        } catch (e2) {
-            log('error', 'LandingV4 ipapi fail', String(e2));
-            return {};
+            const def = LANDING_V4_SOURCES[k];
+            if (!def) continue;
+            const r = await httpGet(def.url);
+            const out = def.parse(r) || {};
+            if (out.ip) {
+                log('info', 'LandingV4 final fallback HIT', k);
+                return out;
+            }
+        } catch (_) {
         }
     }
-    return res;
+    log('error', 'LandingV4 all sources failed');
+    return {};
 }
 
 async function getLandingV6(preferKey) {
@@ -1050,7 +1077,7 @@ async function getLandingV6(preferKey) {
 }
 
 // ====================== 入口/策略（稳态获取） ======================
-const ENT_SOURCES_RE = /(ip-api\.com|ipwhois\.app|ip\.sb|ipinfo\.io|ident\.me|ipify\.org)/i;
+const ENT_SOURCES_RE = /(ip-api\.com|ipwhois\.app|ip\.sb|ipinfo\.io|ident\.me|ipify\.org|ifconfig\.co)/i;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function extractIP(str) {
@@ -1069,9 +1096,11 @@ async function touchLandingOnceQuick() {
         await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true);
     } catch (_) {
     }
-    try {
-        await httpGet('https://api-ipv6.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true);
-    } catch (_) {
+    if (IPV6_EFF) {
+        try {
+            await httpGet('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true);
+        } catch (_) {
+        }
     }
     log('debug', 'Pre-touch landing endpoints done');
 }
@@ -1436,6 +1465,7 @@ async function sd_testYouTube() {
     try {
         let m = r.data.match(/"countryCode":"([A-Z]{2})"/);
         if (!m) m = r.data.match(/["']INNERTUBE_CONTEXT_GL["']\s*:\s*["']([A-Z]{2})["']/);
+        if (!m) m = r.data.match(/["']GL["']\s*:\s*["']([A-Z]{2})["']/);
         if (m) cc = m[1];
     } catch (_) {
     }
