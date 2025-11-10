@@ -620,14 +620,26 @@ function radioToGen(r) {
 }
 
 function netTypeLine() {
-    try {
-        const ssid = $network?.wifi?.ssid;
-        const radio = $network?.['cellular-data']?.radio;
-        if (ssid) return `${t('wifi')} | ${ssid}`;
-        if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
-    } catch (_) {
+  try {
+    // 1) 优先用 Wi-Fi SSID
+    const ssid = $network?.wifi?.ssid;
+    if (ssid) return `${t('wifi')} | ${ssid}`;
+
+    // 2) 兼容多内核的蜂窝字段：Surge/Loon/Egern 用 cellular，QX 用 cellular-data
+    const cell = $network?.cellular || $network?.['cellular-data'] || {};
+    const radio = cell.radio || cell.radiotechnology || cell.radioTech || '';
+
+    if (radio) {
+      return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
     }
-    return t('unknownNet');
+
+    // 3) 双保险：根据主接口判断网络类型
+    const ifname = $network?.v4?.primaryInterface || $network?.v6?.primaryInterface || '';
+    if (/^en\d$/.test(ifname)) return `${t('wifi')} | en`;
+    if (/^pdp_ip/.test(ifname)) return `${t('cellular')} | ${t('gen')('', '') || 'Connected'}`;
+  } catch (_) {}
+
+  return t('unknownNet');
 }
 
 // ====================== HTTP 基础 ======================
