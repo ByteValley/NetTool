@@ -606,13 +606,17 @@ function fmtISP(isp, locStr) {
 }
 
 function radioToGen(r) {
-    const MAP = {
-        GPRS: '2.5G', EDGE: '2.75G', CDMA1x: '2.5G', WCDMA: '3G',
-        HSDPA: '3.5G', HSUPA: '3.75G', CDMAEVDORev0: '3.5G',
-        CDMAEVDORevA: '3.5G', CDMAEVDORevB: '3.75G', eHRPD: '3.9G',
-        LTE: '4G', NRNSA: '5G', NR: '5G'
-    };
-    return MAP[r] || '';
+  if (!r) return '';
+  const x = String(r).toUpperCase().replace(/\s+/g, '');
+  const alias = { 'NR5G':'NR', 'NRSA':'NR', 'NRNSA':'NRNSA', 'LTEA':'LTE', 'LTE+':'LTE', 'LTEPLUS':'LTE' };
+  const k = alias[x] || x;
+  const MAP = {
+    GPRS:'2.5G', EDGE:'2.75G', CDMA1X:'2.5G', WCDMA:'3G',
+    HSDPA:'3.5G', HSUPA:'3.75G', CDMAEVD0REV0:'3.5G',
+    CDMAEVD0REVA:'3.5G', CDMAEVD0REVB:'3.75G', EHRPD:'3.9G',
+    LTE:'4G', NRNSA:'5G', NR:'5G'
+  };
+  return MAP[k] || '';
 }
 
 function netTypeLine() {
