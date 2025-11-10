@@ -1,35 +1,103 @@
 /* =========================================================
- * 网络信息 + 服务检测（BoxJS/Surge/Loon/QuanX/Egern 兼容）
- * by ByteValley
- * Version: 2025-11-10R1
+ * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
+ * 作者：ByteValley
+ * 版本：2025-11-10R1
  *
- * - 统一：常量/端点/优先级表驱动；Direct/Landing/Entrance 抽象抓取器
- * - 优化：服务检测工具收口（渲染/HTTP/地区名）与可扩展别名表
- * - 保持：参数键/行为/日志风格/繁简&旗帜模式完全不变
+ * 概述 · 功能边界
+ *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
+ *  · 标题显示网络类型；正文首行显示 执行时间 与 代理策略（紧邻）
+ *  · Netflix 区分“完整/自制剧”；其他服务统一“已解锁/不可达”
+ *  · 台湾旗样式可切换：TW_FLAG_MODE = 0(🇨🇳) / 1(🇹🇼) / 2(🇼🇸)
  *
- * 选择优先级（统一，BoxJS 最高）：
- *   BoxJS 勾选(NetworkInfo_SERVICES) > BoxJS 文本(NetworkInfo_SERVICES_TEXT)
- *   > 模块 #!arguments（SERVICES=...）> 代码默认（全部）
+ * 运行环境 · 依赖接口
+ *  · 兼容：Surge（Panel/Script）、Loon、Quantumult X、Egern、BoxJS
+ *  · 依赖：$httpClient / $httpAPI / $persistentStore|$prefs / $notification / $network
  *
- * - 标题显示网络类型；顶部显示 执行时间 → 代理策略（紧邻）
- * - 分组子标题：本地 / 入口 / 落地 / 服务检测（留白由 GAP_LINES 控制）
- * - IPv4/IPv6 分行显示（仅渲染存在的那个；IP 可按 MASK_IP 脱敏）
- * - 直连/入口/落地 位置展示支持台湾旗模式：TW_FLAG_MODE=0(🇨🇳)/1(🇹🇼)/2(🇼🇸)
- * - 中国境内运营商规范化
- * - 服务检测并发执行；Netflix区分“完整/自制剧”，其它统一“已解锁/不可达”
- * - 入口/策略获取：预触发落地(v4/v6) → 扫描最近请求抓入口IPv4+IPv6 → 任意代理请求兜底
- * - 入口定位缓存 TTL 跟 Update 联动：TTL = max(30, min(Update, 3600)) 秒
- * - 可调：
- *   · SD_ICON_THEME: lock|circle|check（三态图标主题）
- *   · SD_REGION_MODE: full|abbr|flag（地区显示样式）
- *   · SD_ARROW: 是否使用“➟”连接服务名与地区（icon/text 共用）
- *   · ChatGPT App(API) 地区多源回退，优先 Cloudflare 头
- * - 日志相关（可在 BoxJS 或 #!arguments 配置）：
- *   - LOG=1            开启日志（默认 0）
- *   - LOG_LEVEL=info   级别：debug|info|warn|error
- *   - LOG_TO_PANEL=0   是否把末尾附加“—— 调试 ——”区块（默认 0）
- *   - LOG_PUSH=1       运行异常推送系统通知（默认 1）
- * =======================================================*/
+ * 渲染结构 · 版式控制
+ *  · 分组子标题：本地 / 入口 / 落地 / 服务检测；组间留白由 GAP_LINES 控制（0~2）
+ *  · IPv4/IPv6 分行显示，按 MASK_IP 可脱敏；位置按 MASK_POS 可脱敏（未显式设置时随 MASK_IP）
+ *  · 子标题样式由 SUBTITLE_STYLE 控制；SUBTITLE_MINIMAL 可输出极简标题
+ *
+ * 数据源 · 抓取策略
+ *  · 直连 IPv4：按优先级表驱动（cip | 163 | 126 | bilibili | pingan | ipip）
+ *    - 命中“市级”定位即返回；否则继续下一个源；全失败时回落至 ipip
+ *  · 直连 IPv6：ddnspod | neu6
+ *  · 落地 IPv4：ipapi | ipwhois | ipsb（失败逐级回退）
+ *  · 落地 IPv6：ipsb | ipify | ident（失败逐级回退）
+ *
+ * 入口 · 策略名获取（稳态）
+ *  · 预触发一次落地端点（v4/v6），确保代理产生可被记录的外连请求
+ *  · 扫描 /v1/requests/recent 捕获入口 IPv4/IPv6 与 policyName；必要时用任意代理请求兜底
+ *  · 入口定位采用“双源并行 + 回退链”：平安接口 +（ipapi → ipwhois → ipsb）
+ *  · 入口定位缓存 TTL 跟 Update 联动：TTL = max(30, min(Update, 3600)) 秒
+ *
+ * 服务检测 · 显示风格
+ *  · 覆盖：YouTube / Netflix / Disney+ / Hulu(美) / Hulu(日) / Max(HBO) / ChatGPT Web / ChatGPT App(API)
+ *  · 样式：SD_STYLE = icon|text；SD_REGION_MODE = full|abbr|flag；SD_ICON_THEME = check|lock|circle
+ *  · ChatGPT App(API) 地区优先读 Cloudflare 头（CF-IPCountry），无则多源回退
+ *  · 别名映射（示例）：
+ *    - yt|youtube|油管 → youtube
+ *    - nf|netflix|奈飞 → netflix
+ *    - disney|disney+|迪士尼 → disney
+ *    - chatgpt → chatgpt_app；chatgpt_web|chatgpt-web|chatgpt web → chatgpt_web
+ *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
+ *
+ * 服务清单 · 选择优先级
+ *  · BoxJS 勾选（NetworkInfo_SERVICES）
+ *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
+ *  · 模块 #!arguments（SERVICES=...）
+ *  · 默认（全部）
+ *
+ * 参数 · 默认值（BoxJS 键 / #!arguments）
+ *  · Update                 刷新间隔（秒）                 默认 10
+ *  · Timeout                全局超时（秒）                 默认 8
+ *  · IPv6                   启用 IPv6                      默认 0
+ *  · MASK_IP                脱敏 IP                        默认 1
+ *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
+ *  · DOMESTIC_IPv4          直连 IPv4 源                   默认 ipip
+ *  · DOMESTIC_IPv6          直连 IPv6 源                   默认 ddnspod
+ *  · LANDING_IPv4           落地 IPv4 源                   默认 ipapi
+ *  · LANDING_IPv6           落地 IPv6 源                   默认 ipsb
+ *  · TW_FLAG_MODE           台湾旗模式 0/1/2               默认 1
+ *  · IconPreset             图标预设                       默认 globe（globe|wifi|dots|antenna|point）
+ *  · Icon / IconColor       自定义图标/颜色                优先于 IconPreset
+ *  · SUBTITLE_STYLE         子标题样式                     line|cnBracket|cnQuote|square|curly|angle|pipe|bullet|plain（默认 line）
+ *  · SUBTITLE_MINIMAL       极简子标题                     默认 0
+ *  · GAP_LINES              分组留白 0~2                   默认 1
+ *  · SD_STYLE               服务显示样式                    icon|text（默认 icon）
+ *  · SD_REGION_MODE         地区风格                        full|abbr|flag（默认 full）
+ *  · SD_ICON_THEME          图标主题                        check|lock|circle（默认 check）
+ *  · SD_ARROW               使用“➟”连接服务名与地区        默认 1
+ *  · SD_SHOW_LAT            显示耗时(ms)                    默认 1
+ *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
+ *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
+ *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=Timeout*1000，最小 2000
+ *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开
+ *
+ * 日志 · 调试
+ *  · LOG                    开启日志                        默认 0
+ *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
+ *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
+ *  · LOG_PUSH               异常系统通知推送                 默认 1
+ *
+ * 兼容 · 迁移
+ *  · BoxJS 键统一以 NetworkInfo_ 前缀（示例：NetworkInfo_Update）
+ *  · 旧键 DOMIC_* 自动兼容；SUBTITLE_* 取代旧 ST_*（渲染一致）
+ *
+ * 常见问题 · 提示
+ *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
+ *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
+ *  · 台湾旗样式：按 TW_FLAG_MODE 切换（合规/默认/彩蛋）
+ *
+ * 示例 · 组合参数
+ *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
+ *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
+ *
+ * 变更记录 · 摘要
+ *  · 统一：常量/端点/优先级表驱动；Direct/Landing/Entrance 抽象抓取器
+ *  · 优化：服务检测工具收口（渲染/HTTP/地区名）与可扩展别名表
+ *  · 保持：参数键/行为/日志风格/繁简与旗帜模式完全不变
+ * ========================================================= */
 
 // ====================== 常量 & 配置基线 ======================
 const CONSTS = Object.freeze({
