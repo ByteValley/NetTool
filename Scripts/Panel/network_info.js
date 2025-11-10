@@ -438,7 +438,8 @@ log('info', '$network peek', JSON.stringify({
   v4: $network?.v4,
   v6: $network?.v6,
 }));
-const title = netTypeLine() || t('panelTitle');
+const trial = netTypeLine() || '';
+const title = /未知|unknown/i.test(trial) ? buildNetTitleHard() : trial;
 
     // 组装渲染
     const parts = [];
@@ -649,6 +650,27 @@ function netTypeLine() {
   iface4: $network?.v4?.primaryInterface,
   iface6: $network?.v6?.primaryInterface
 }));
+  return t('unknownNet');
+}
+
+function buildNetTitleHard() {
+  const n = $network || {};
+  const ssid  = n.wifi && (n.wifi.ssid || n.wifi.bssid);
+  const radio = (n.cellular && n.cellular.radio) || (n['cellular-data'] && n['cellular-data'].radio) || '';
+  const iface = (n.v4 && n.v4.primaryInterface) || (n.v6 && n.v6.primaryInterface) || '';
+
+  // Wi-Fi 优先（只要有 SSID 或 BSSID 就认 Wi-Fi）
+  if (ssid) return `${t('wifi')} | ${n.wifi.ssid || '-'}`;
+
+  // 有制式就认蜂窝，并带出代际
+  if (radio) return `${t('cellular')} | ${t('gen')(radioToGen(radio), radio)}`;
+
+  // 没拿到 radio，但主接口是 pdp* 也按蜂窝
+  if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
+
+  // 类似 en*/eth*/wlan* 的按 Wi-Fi
+  if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
+
   return t('unknownNet');
 }
 
