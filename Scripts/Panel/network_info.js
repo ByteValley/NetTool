@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-10R2
+ * 版本：2025-11-11R3
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -21,9 +21,9 @@
  * 数据源 · 抓取策略
  *  · 直连 IPv4：按优先级表驱动（cip | 163 | 126 | bilibili | pingan | ipip）
  *    - 命中“市级”定位即返回；否则继续下一个源；全失败时回落至 ipip
- *  · 直连 IPv6：ddnspod | neu6
- *  · 落地 IPv4：ipapi | ipwhois | ipsb（失败逐级回退）
- *  · 落地 IPv6：ipsb | ipify | ident（失败逐级回退）
+ *  · 直连 IPv6：ddnspod | neu6（并行竞速）
+ *  · 落地 IPv4：ipapi | ipwhois | ipsb（失败逐级回退；ip-api 强化重试）
+ *  · 落地 IPv6：ipsb | ident | ipify（并行竞速 + http 降级）
  *
  * 入口 · 策略名获取（稳态）
  *  · 预触发一次落地端点（v4/v6），确保代理产生可被记录的外连请求
@@ -35,68 +35,12 @@
  *  · 覆盖：YouTube / Netflix / Disney+ / Hulu(美) / Hulu(日) / Max(HBO) / ChatGPT Web / ChatGPT App(API)
  *  · 样式：SD_STYLE = icon|text；SD_REGION_MODE = full|abbr|flag；SD_ICON_THEME = check|lock|circle
  *  · ChatGPT App(API) 地区优先读 Cloudflare 头（CF-IPCountry），无则多源回退
- *  · 别名映射（示例）：
- *    - yt|youtube|油管 → youtube
- *    - nf|netflix|奈飞 → netflix
- *    - disney|disney+|迪士尼 → disney
- *    - chatgpt → chatgpt_app；chatgpt_web|chatgpt-web|chatgpt web → chatgpt_web
- *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
- *
- * 服务清单 · 选择优先级
- *  · BoxJS 勾选（NetworkInfo_SERVICES）
- *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
- *  · 模块 #!arguments（SERVICES=...）
- *  · 默认（全部）
- *
- * 参数 · 默认值（BoxJS 键 / #!arguments）
- *  · Update                 刷新间隔（秒）                 默认 10
- *  · Timeout                全局超时（秒）                 默认 8
- *  · IPv6                   启用 IPv6                      默认 0
- *  · MASK_IP                脱敏 IP                        默认 1
- *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
- *  · DOMESTIC_IPv4          直连 IPv4 源                   默认 ipip
- *  · DOMESTIC_IPv6          直连 IPv6 源                   默认 ddnspod
- *  · LANDING_IPv4           落地 IPv4 源                   默认 ipapi
- *  · LANDING_IPv6           落地 IPv6 源                   默认 ipsb
- *  · TW_FLAG_MODE           台湾旗模式 0/1/2               默认 1
- *  · IconPreset             图标预设                       默认 globe（globe|wifi|dots|antenna|point）
- *  · Icon / IconColor       自定义图标/颜色                优先于 IconPreset
- *  · SUBTITLE_STYLE         子标题样式                     line|cnBracket|cnQuote|square|curly|angle|pipe|bullet|plain（默认 line）
- *  · SUBTITLE_MINIMAL       极简子标题                     默认 0
- *  · GAP_LINES              分组留白 0~2                   默认 1
- *  · SD_STYLE               服务显示样式                    icon|text（默认 icon）
- *  · SD_REGION_MODE         地区风格                        full|abbr|flag（默认 full）
- *  · SD_ICON_THEME          图标主题                        check|lock|circle（默认 check）
- *  · SD_ARROW               使用“➟”连接服务名与地区        默认 1
- *  · SD_SHOW_LAT            显示耗时(ms)                    默认 1
- *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
- *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
- *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=Timeout*1000，最小 2000
- *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开
- *
- * 日志 · 调试
- *  · LOG                    开启日志                        默认 0
- *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
- *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
- *  · LOG_PUSH               异常系统通知推送                 默认 1
- *
- * 兼容 · 迁移
- *  · BoxJS 键统一以 NetworkInfo_ 前缀（示例：NetworkInfo_Update）
- *  · 旧键 DOMIC_* 自动兼容；SUBTITLE_* 取代旧 ST_*（渲染一致）
- *
- * 常见问题 · 提示
- *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
- *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
- *  · 台湾旗样式：按 TW_FLAG_MODE 切换（合规/默认/彩蛋）
- *
- * 示例 · 组合参数
- *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
- *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
  *
  * 变更记录 · 摘要
  *  · 统一：常量/端点/优先级表驱动；Direct/Landing/Entrance 抽象抓取器
  *  · 优化：服务检测工具收口（渲染/HTTP/地区名）与可扩展别名表
  *  · 修复：IPv4/IPv6 串位；直连 IPv4 源偶发回 IPv6 的纠偏(v4-only fallback)；渲染层类型守卫
+ *  · 加固：IPv6 多镜像竞速；ip-api 瞬时重试 + Connection: close；落地 CC 短缓存
  * ========================================================= */
 
 // ====================== 常量 & 配置基线 ======================
@@ -396,7 +340,7 @@ const WANT_V6 = !!CFG.IPv6;
 const HAS_V6 = !!($network?.v6?.primaryAddress);
 // 智能开关：用户开 + 设备真有 v6
 const IPV6_EFF = WANT_V6 && HAS_V6;
-// —— v6 端点更短的单次超时（避免卡住整段流程）——
+// —— v6 端点更短的单次超时（弱网放宽到 3500ms）——
 const V6_TO = Math.min(
     Math.max(
         CONSTS.SD_MIN_TIMEOUT,
@@ -404,7 +348,7 @@ const V6_TO = Math.min(
             ? Number(CFG.SD_TIMEOUT_MS)
             : ((Number(CFG.Timeout) || 8) * 1000)
     ),
-    2500
+    3500
 );
 
 const MASK_IP = !!CFG.MASK_IP;
@@ -596,19 +540,19 @@ const LANDING_V4_SOURCES = Object.freeze({
     }
 });
 
-// —— 仅取 IP 的 IPv6 端点（直连/落地复用）——
+// —— 仅取 IP 的 IPv6 端点（直连/落地复用；同组并行竞速 + http 降级）——
 const IPV6_IP_ENDPOINTS = Object.freeze({
-    ddnspod: 'https://ipv6.ddnspod.com',
-    neu6: 'https://speed.neu6.edu.cn/getIP.php',
-    ipsb: 'https://api-ipv6.ip.sb/ip',
-    ident: 'https://v6.ident.me',
-    ipify: 'https://api6.ipify.org'
+    ddnspod: ['https://ipv6.ddnspod.com'],
+    neu6: ['https://speed.neu6.edu.cn/getIP.php'],
+    ipsb: ['https://api-ipv6.ip.sb/ip', 'https://ipv6.ip.sb/ip'],
+    ident: ['https://v6.ident.me', 'http://v6.ident.me'],
+    ipify: ['https://api6.ipify.org', 'http://api6.ipify.org', 'https://6.ipify.org']
 });
 
 // —— 默认尝试顺序（集中管理）——
 const ORDER = Object.freeze({
     directV4: ['cip', '163', '126', 'bilibili', 'pingan', 'ipip'],
-    landingV4: ['ipwhois', 'ipsb', 'ipapi'], // ← 调整顺序，最后才试 ip-api.com
+    landingV4: ['ipwhois', 'ipsb', 'ipapi'], // 最后才试 ip-api.com
     directV6: ['ddnspod', 'neu6'],
     landingV6: ['ipsb', 'ident', 'ipify']
 });
@@ -963,6 +907,26 @@ function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
     });
 }
 
+// —— 额外瞬时重试 + Connection: close 包装（给 ip-api / v6 竞速等用）——
+function isTransientErr(e) {
+    const s = String(e || '').toLowerCase();
+    return /eof|reset|timeout|timed out|network changed|temporar|again/.test(s);
+}
+
+async function httpGetOnce(url, headers = {}, timeoutMs = null, followRedirect = false) {
+    return httpGet(url, headers, timeoutMs, followRedirect);
+}
+
+async function httpGetWithTransient(url, headers = {}, timeoutMs = null, followRedirect = false) {
+    try {
+        return await httpGetOnce(url, {...headers, 'Connection': 'close'}, timeoutMs, followRedirect);
+    } catch (e) {
+        if (!isTransientErr(e)) throw e;
+        log('warn', 'HTTP GET transient+close, retrying', url, '', String(e));
+        return await httpGetOnce(url, {...headers, 'Connection': 'close'}, timeoutMs, followRedirect);
+    }
+}
+
 function httpAPI(path = '/v1/requests/recent') {
     return new Promise((res) => {
         if (typeof $httpAPI === 'function') {
@@ -991,7 +955,10 @@ async function trySources(order, sourceMap, {preferLogTag, needCityPrefer = fals
 
         const t0 = Date.now();
         try {
-            const r = await httpGet(def.url);
+            const useTransient = /ip-api\.com/i.test(def.url);
+            const r = useTransient
+                ? await httpGetWithTransient(def.url, {}, undefined, false)
+                : await httpGet(def.url);
             const res = def.parse(r) || {};
             const ok = !!res.ip;
             const cityOK = ok && hasCityLevel(res.loc);
@@ -1022,16 +989,21 @@ async function trySources(order, sourceMap, {preferLogTag, needCityPrefer = fals
     return {};
 }
 
+// —— IPv6 多镜像并行竞速 + 瞬时重试 + http 降级 ——
 async function tryIPv6Ip(order) {
     for (const key of order) {
-        const url = IPV6_IP_ENDPOINTS[key];
-        if (!url) continue;
+        const urls = IPV6_IP_ENDPOINTS[key] || [];
+        if (!urls.length) continue;
         try {
-            const r = await httpGet(url, {}, V6_TO /* 短超时 */);
-            const ip = String(r.body || '').trim();
-            if (ip) return {ip};
+            const racers = urls.map(u => (async () => {
+                const r = await httpGetWithTransient(u, {}, V6_TO /* 短超时 */);
+                const ip = String(r.body || '').trim();
+                if (!ip) throw new Error('empty');
+                return {ip};
+            })());
+            return await Promise.any(racers);
         } catch (e) {
-            log('warn', 'IPv6 endpoint fail', key, String(e));
+            log('warn', 'IPv6 endpoint group fail', key, String(e));
         }
     }
     return {};
@@ -1084,7 +1056,7 @@ async function getDirectV6(preferKey) {
 }
 
 async function getLandingV4(preferKey) {
-    const order = makeTryOrder(preferKey, ORDER.landingV4); // 例如 ['ipapi','ipwhois','ipsb']
+    const order = makeTryOrder(preferKey, ORDER.landingV4);
     const res = await trySources(order, LANDING_V4_SOURCES, {
         preferLogTag: 'LandingV4', needCityPrefer: false
     });
@@ -1096,7 +1068,8 @@ async function getLandingV4(preferKey) {
         try {
             const def = LANDING_V4_SOURCES[k];
             if (!def) continue;
-            const r = await httpGet(def.url);
+            const useTransient = /ip-api\.com/i.test(def.url);
+            const r = useTransient ? await httpGetWithTransient(def.url) : await httpGet(def.url);
             const out = def.parse(r) || {};
             if (out.ip) {
                 log('info', 'LandingV4 final fallback HIT', k);
@@ -1134,13 +1107,13 @@ function extractIP(str) {
 async function touchLandingOnceQuick() {
     try {
         // v4：用 ip.sb 触发
-        await httpGet('https://api.ip.sb/geoip', {}, CONSTS.PRETOUCH_TO_MS, true);
+        await httpGetWithTransient('https://api.ip.sb/geoip', {}, CONSTS.PRETOUCH_TO_MS, true);
     } catch {
     }
     if (IPV6_EFF) {
         try {
-            // v6：保持 ip.sb v6
-            await httpGet('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true);
+            // v6：ip.sb v6
+            await httpGetWithTransient('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true);
         } catch {
         }
     }
@@ -1212,7 +1185,7 @@ const ENT_LOC_CHAIN = Object.freeze({
         };
     },
     ipapi: async (ip) => {
-        const r = await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, ENT_REQ_TO);
+        const r = await httpGetWithTransient(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, ENT_REQ_TO);
         const j = safeJSON(r.body, {});
         if (j.status && j.status !== 'success') throw 'ipapi-fail';
         return {
@@ -1240,7 +1213,7 @@ const ENT_LOC_CHAIN = Object.freeze({
     }
 });
 
-// 先平安，再链（ipapi -> ipwhois -> ipsb）
+// 先 ipapi，再 ipwhois → ipsb
 async function loc_chain(ip) {
     try {
         return await withRetry(() => ENT_LOC_CHAIN.ipapi(ip), 1);
@@ -1797,6 +1770,7 @@ async function sd_testHBO() {
     });
 }
 
+// —— 落地国家码（短缓存）——
 let _sd_cc_cache = {t: 0, cc: ''};
 const SD_CC_TTL_MS = Math.max(5000, Math.min(60000, SD_TIMEOUT_MS * 5));
 
