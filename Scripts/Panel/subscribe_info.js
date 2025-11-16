@@ -185,9 +185,9 @@ const KVStore = (() => {
  */
 function readBoxSettings() {
     const candidates = [
-        "Panel.SubscribeInfo.Settings",
         "Panel",
-        "SubscribeInfo"
+        "SubscribeInfo",
+        "Panel.SubscribeInfo.Settings"
     ];
 
     for (const key of candidates) {
