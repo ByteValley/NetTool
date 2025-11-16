@@ -80,10 +80,6 @@
  *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
  *  · LOG_PUSH               异常系统通知推送                 默认 1
  *
- * 兼容 · 迁移
- *  · BoxJS 键统一以 NetworkInfo_ 前缀（示例：NetworkInfo_Update）
- *  · 旧键 DOMIC_* 自动兼容；SUBTITLE_* 取代旧 ST_*（渲染一致）
- *
  * 常见问题 · 提示
  *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
  *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
@@ -92,11 +88,6 @@
  * 示例 · 组合参数
  *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
  *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
- *
- * 变更记录 · 摘要
- *  · 统一：常量/端点/优先级表驱动；Direct/Landing/Entrance 抽象抓取器
- *  · 优化：服务检测工具收口（渲染/HTTP/地区名）与可扩展别名表
- *  · 保持：参数键/行为/日志风格/繁简与旗帜模式完全不变
  * ========================================================= */
 
 // ====================== 常量 & 配置基线 ======================

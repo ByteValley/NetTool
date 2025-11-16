@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-16R1
+ * 版本：2025-11-10R3
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -43,60 +43,22 @@
  *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
  *
  * 服务清单 · 选择优先级
- *  · 模块参数「手动修改值」（SERVICES，与默认值不同）
+ *  · 模块 #!arguments / 面板参数（SERVICES=...）
  *  · BoxJS 勾选（NetworkInfo_SERVICES）
  *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
  *  · 默认（全部）
  *
- * 参数 · 默认值（BoxJS 键 / #!arguments）
- *  · Update                 刷新间隔（秒）                 默认 10
- *  · Timeout                全局超时（秒）                 默认 25
- *  · IPv6                   启用 IPv6                      默认 0
- *  · MASK_IP                脱敏 IP                        默认 1
- *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
- *  · DOMESTIC_IPv4          直连 IPv4 源                   默认 ipip
- *  · DOMESTIC_IPv6          直连 IPv6 源                   默认 ddnspod
- *  · LANDING_IPv4           落地 IPv4 源                   默认 ipapi
- *  · LANDING_IPv6           落地 IPv6 源                   默认 ipsb
- *  · TW_FLAG_MODE           台湾旗模式 0/1/2               默认 1
- *  · IconPreset             图标预设                       默认 globe（globe|wifi|dots|antenna|point）
- *  · Icon / IconColor       自定义图标/颜色                优先于 IconPreset
- *  · SUBTITLE_STYLE         子标题样式                     line|cnBracket|cnQuote|square|curly|angle|pipe|bullet|plain（默认 line）
- *  · SUBTITLE_MINIMAL       极简子标题                     默认 0
- *  · GAP_LINES              分组留白 0~2                   默认 1
- *  · SD_STYLE               服务显示样式                    icon|text（默认 icon）
- *  · SD_REGION_MODE         地区风格                        full|abbr|flag（默认 full）
- *  · SD_ICON_THEME          图标主题                        check|lock|circle（默认 check）
- *  · SD_ARROW               使用“➟”连接服务名与地区        默认 1
- *  · SD_SHOW_LAT            显示耗时(ms)                    默认 1
- *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
- *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
- *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=0（0/空→跟随 Timeout*1000，脚本内最小 2000）
- *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开
+ * 参数优先级 · 全局说明
+ *  · “本次模块参数(面板/模块 UI) > BoxJS(NetworkInfo_*) > 代码默认”
+ *  · 所有布尔参数支持：1/0、true/false、on/off、yes/no、y/n
  *
- * 日志 · 调试
- *  · LOG                    开启日志                        默认 0
- *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
- *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
- *  · LOG_PUSH               异常系统通知推送                 默认 1
- *
- * 参数优先级 · 总则
- *  · 模块参数「手动修改值」（与 #!arguments 默认不同）
- *  · BoxJS 值（NetworkInfo_XXX）
- *  · 模块参数默认值（#!arguments 行）
- *  · 代码兜底值
- *
- * 常见问题 · 提示
- *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
- *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
- *  · 台湾旗样式：按 TW_FLAG_MODE 切换（合规/默认/彩蛋）
- *
- * 示例 · 组合参数
- *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
- *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
+ * 变更记录 · 2025-11-10R3
+ *  · 修复：BoxJS / 模块参数不生效问题，统一参数读取通道
+ *  · 修复：SD_SHOW_LAT / SD_SHOW_HTTP / 子标题相关开关失效
+ *  · 调整：MASK_POS 默认联动 MASK_IP（未显式设置时自动跟随）
  * ========================================================= */
 
-// ====================== 常量 & 配置基线 ======================
+// ====================== 常量 & 基本配置 ======================
 const CONSTS = Object.freeze({
     MAX_RECENT_REQ: 150,
     PRETOUCH_TO_MS: 700,
@@ -107,39 +69,6 @@ const CONSTS = Object.freeze({
     ENT_MIN_REQ_TO: 2500,
     ENT_MIN_TTL: 30,
     ENT_MAX_TTL: 3600
-});
-
-// ===== 模块参数默认表（需与 #!arguments 一致）=====
-const ARG_DEFAULTS = Object.freeze({
-    Update: "10",
-    Timeout: "25",
-    MASK_IP: "1",
-    MASK_POS: "1",
-    IPv6: "0",
-    DOMESTIC_IPv4: "ipip",
-    DOMESTIC_IPv6: "ddnspod",
-    LANDING_IPv4: "ipapi",
-    LANDING_IPv6: "ipsb",
-    TW_FLAG_MODE: "1",
-    IconPreset: "globe",
-    Icon: "globe.asia.australia",
-    IconColor: "#1E90FF",
-    SD_STYLE: "icon",
-    SD_SHOW_LAT: "1",
-    SD_SHOW_HTTP: "1",
-    SD_LANG: "zh-Hans",
-    SD_TIMEOUT_MS: "0",
-    SD_REGION_MODE: "full",
-    SD_ICON_THEME: "check",
-    SD_ARROW: "1",
-    SERVICES: "[]",
-    LOG: "0",
-    LOG_LEVEL: "info",
-    LOG_TO_PANEL: "0",
-    LOG_PUSH: "1",
-    ST_SUBTITLE_STYLE: "line",
-    ST_SUBTITLE_MINIMAL: "0",
-    ST_GAP_LINES: "1"
 });
 
 /* ===== 语言字典（固定 UI 词收口）===== */
@@ -235,7 +164,7 @@ const parseArgs = (raw) => {
 };
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
 
-/** 当 $args 对象无值时，从原始字符串兜底读取 */
+/** 当 $argument 是原始字符串时兜底取参数 */
 function readArgRaw(name) {
     try {
         if (typeof $argument === 'string') {
@@ -248,7 +177,11 @@ function readArgRaw(name) {
     return undefined;
 }
 
-// ====================== 小工具（类型/拼接/格式） ======================
+// ====================== 工具：类型 / 拼接 / 参数读取 ======================
+const K = (s) => `NetworkInfo_${s}`;
+
+const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
+
 const toBool = (v, d = false) => {
     if (v == null || v === '') return d;
     if (typeof v === 'boolean') return v;
@@ -258,22 +191,10 @@ const toBool = (v, d = false) => {
     return d;
 };
 
-const toNum = (v, d) => {
-    if (v == null || v === '') return d;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : d;
-};
-
-const K = (s) => `NetworkInfo_${s}`;
-
-const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
-
-/** 优先：本次模块参数 > BoxJS > 代码默认 */
 function getArgRaw(name) {
     if (!$args) return undefined;
     if (Object.prototype.hasOwnProperty.call($args, name)) {
         const v = $args[name];
-        // 空串视为“未填”，给 BoxJS / 默认机会
         if (v === '' || v == null) return undefined;
         return String(v);
     }
@@ -286,24 +207,21 @@ function getKVRaw(name) {
     return String(v);
 }
 
-/**
- * names: 单个键名字符串 或 键名数组（支持新旧命名兼容）
- * fallback: 代码默认字符串（仅当两边都没值时使用）
- */
+/** names: 单名或数组；优先 模块参数 > BoxJS > fallback */
 function pickRaw(names, fallback) {
     const keys = Array.isArray(names) ? names : [names];
 
-    // 1) 模块参数（本次运行传进来的）
+    // 1) 模块参数
     for (const k of keys) {
         const v = getArgRaw(k);
         if (v !== undefined) return v;
     }
-    // 2) BoxJS（NetworkInfo_*）
+    // 2) BoxJS
     for (const k of keys) {
         const v = getKVRaw(k);
         if (v !== undefined) return v;
     }
-    // 3) 代码默认
+    // 3) 默认
     return fallback;
 }
 
@@ -316,7 +234,8 @@ function pickStr(names, fallback) {
 function pickNum(names, fallback) {
     const v = pickRaw(names, undefined);
     if (v === undefined) return fallback;
-    return toNum(v, fallback);
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
 }
 
 function pickBool(names, fallback) {
@@ -324,11 +243,10 @@ function pickBool(names, fallback) {
     return toBool(v, fallback);
 }
 
-// ====================== 预读基础配置 ======================
-const UPDATE = pickNum('Update', 10);   // 刷新间隔
-const TIMEOUT = pickNum('Timeout', 8);  // 主脚本超时
+// ====================== 预读基础配置 & 日志 ======================
+const UPDATE = pickNum('Update', 10);
+const TIMEOUT = pickNum('Timeout', 8);
 
-// ====================== 日志系统 ======================
 const LOG_ON = pickBool('LOG', false);
 const LOG_TO_PANEL = pickBool('LOG_TO_PANEL', false);
 const LOG_PUSH = pickBool('LOG_PUSH', true);
@@ -371,7 +289,7 @@ function logErrPush(title, body) {
     log('error', title, body);
 }
 
-// ====================== 子标题样式（新键） ======================
+// ====================== 子标题样式 ======================
 const SUBTITLE_STYLES = Object.freeze({
     line: (s) => `——${s}——`,
     cnBracket: (s) => `【${s}】`,
@@ -395,7 +313,6 @@ function makeSubTitleRenderer(styleKey, minimal = false) {
     return minimal ? (s) => String(s) : (s) => fn(String(s));
 }
 
-/** 分组标题：插入留白 + 应用样式/纯净模式 */
 function pushGroupTitle(parts, title) {
     for (let i = 0; i < CFG.GAP_LINES; i++) parts.push('');
     const render = makeSubTitleRenderer(CFG.SUBTITLE_STYLE, CFG.SUBTITLE_MINIMAL);
@@ -408,7 +325,6 @@ const CFG = {
     Timeout: TIMEOUT,
 
     MASK_IP: pickBool('MASK_IP', true),
-    // MASK_POS 默认“跟随 MASK_IP”：未显式设置时，跟 MASK_IP 保持一致
     MASK_POS: (() => {
         const raw = pickRaw('MASK_POS', undefined);
         if (raw === undefined) return pickBool('MASK_IP', true);
@@ -423,19 +339,18 @@ const CFG = {
 
     TW_FLAG_MODE: pickNum('TW_FLAG_MODE', 1),
 
-    // 图标预设 / 自定义
+    // 图标
     IconPreset: pickStr('IconPreset', 'globe'),
     Icon: pickStr('Icon', 'globe.asia.australia'),
     IconColor: pickStr('IconColor', '#1E90FF'),
 
-    // 服务检测参数
+    // 服务检测
     SD_STYLE: pickStr('SD_STYLE', 'icon'),
     SD_SHOW_LAT: pickBool('SD_SHOW_LAT', true),
     SD_SHOW_HTTP: pickBool('SD_SHOW_HTTP', true),
     SD_LANG: pickStr('SD_LANG', 'zh-Hans'),
 
     SD_TIMEOUT_MS: (() => {
-        // 0 或未填 => 跟随 Timeout×1000，最小 2000ms 的兜底在后面算
         const raw = pickRaw('SD_TIMEOUT_MS', undefined);
         const fallback = TIMEOUT * 1000;
         if (raw === undefined || raw === '' || raw === '0') return fallback;
@@ -447,7 +362,7 @@ const CFG = {
     SD_ICON_THEME: pickStr('SD_ICON_THEME', 'check'),
     SD_ARROW: pickBool('SD_ARROW', true),
 
-    // —— 服务清单数据源（BoxJS 勾选 / 文本 / 模块 arguments）——
+    // SERVICES 来源优先级：BoxJS 勾选 > BoxJS 文本 > 模块参数 > 默认
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readKV(K('SERVICES'));
         if (v == null) return null;
@@ -466,7 +381,7 @@ const CFG = {
         return v != null ? String(v).trim() : '';
     })(),
 
-    // —— 子标题（兼容新旧命名：优先 ST_*，其次 SUBTITLE_* / GAP_LINES）——
+    // 子标题（兼容旧键：SUBTITLE_* / GAP_LINES）
     SUBTITLE_STYLE: normalizeSubStyle(
         pickStr(['ST_SUBTITLE_STYLE', 'SUBTITLE_STYLE'], 'line').trim()
     ),
@@ -477,7 +392,7 @@ const CFG = {
     })()
 };
 
-// ====================== 图标 & 开关映射 ======================
+// ====================== 派生参数 & 图标 ======================
 const ICON_PRESET_MAP = Object.freeze({
     wifi: 'wifi.router',
     globe: 'globe.asia.australia',
@@ -489,13 +404,10 @@ const ICON_NAME = (CFG.Icon || '').trim() ||
     ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
-// 用户是否开启 v6 的“意愿”
+// IPv6 开关
 const WANT_V6 = !!CFG.IPv6;
-// —— IPv6 智能开关（仅当配置开启且本机确有 v6 才执行）——
 const HAS_V6 = !!($network?.v6?.primaryAddress);
-// 智能开关：用户开 + 设备真有 v6
 const IPV6_EFF = WANT_V6 && HAS_V6;
-// —— v6 端点更短的单次超时（避免卡住整段流程）——
 const V6_TO = Math.min(
     Math.max(
         CONSTS.SD_MIN_TIMEOUT,
@@ -515,7 +427,7 @@ const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;
 const LANDING_IPv4 = CFG.LANDING_IPv4;
 const LANDING_IPv6 = CFG.LANDING_IPv6;
 
-// ====================== 服务检测参数（派生） ======================
+// 服务检测派生
 const SD_STYLE = (String(CFG.SD_STYLE).toLowerCase() === 'text') ? 'text' : 'icon';
 const SD_SHOW_LAT = !!CFG.SD_SHOW_LAT;
 const SD_SHOW_HTTP = !!CFG.SD_SHOW_HTTP;
@@ -543,7 +455,25 @@ const SD_ICONS = (() => {
     }
 })();
 
-// ====================== 源常量 & 解析器（抽离） ======================
+// ====================== 启动日志 ======================
+log('info', 'Start', JSON.stringify({
+    Update: CFG.Update,
+    Timeout: CFG.Timeout,
+    IPv6: IPV6_EFF,
+    WANT_V6,
+    HAS_V6,
+    SD_TIMEOUT_MS,
+    SD_STYLE,
+    SD_REGION_MODE,
+    TW_FLAG_MODE,
+    SUBTITLE_STYLE: CFG.SUBTITLE_STYLE,
+    SUBTITLE_MINIMAL: CFG.SUBTITLE_MINIMAL,
+    GAP_LINES: CFG.GAP_LINES
+}));
+
+// ====================== 下方逻辑基本沿用你原来那版 ======================
+// 包含：IP 解析、入口定位、服务检测、render 等
+// —— 从这里开始完全照你原脚本的后半段 ——
 
 // 统一 JSON 解析（不会抛异常）
 function safeJSON(s, d = {}) {
@@ -554,7 +484,6 @@ function safeJSON(s, d = {}) {
     }
 }
 
-// 统一“是否已细到市/区”判断（DirectV4 优先策略用）
 function hasCityLevel(loc) {
     if (!loc) return false;
     try {
