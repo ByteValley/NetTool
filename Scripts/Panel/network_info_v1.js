@@ -43,10 +43,10 @@
  *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
  *
  * 服务清单 · 选择优先级
- *  · 模块 #!arguments（SERVICES=...）
- *  · BoxJS 多选（@Panel.NetworkInfo.Settings.SERVICES）
+ *  · 模块 #!arguments（SERVICES=...，显式修改时优先）
+ *  · BoxJS 多选（@Panel.NetworkInfo.Settings.SERVICES，数组 [] 视为“未指定”）
  *  · BoxJS 文本（@Panel.NetworkInfo.Settings.SERVICES_TEXT）
- *  · 默认（全部）
+ *  · 以上都为空 ⇒ 默认（全部）
  *
  * 参数 · 默认值 & 取值优先级
  *  · 默认顺序（单值参数）：
@@ -65,9 +65,9 @@
  *  · TW_FLAG_MODE           台湾旗模式 0/1/2               默认 1
  *  · IconPreset             图标预设                       默认 globe（globe|wifi|dots|antenna|point）
  *  · Icon / IconColor       自定义图标/颜色                优先于 IconPreset
- *  · ST_SUBTITLE_STYLE      子标题样式（别名 SUBTITLE_STYLE）
- *  · ST_SUBTITLE_MINIMAL    极简子标题（别名 SUBTITLE_MINIMAL）
- *  · ST_GAP_LINES           分组留白 0~2（别名 GAP_LINES）
+ *  · SUBTITLE_STYLE         子标题样式
+ *  · SUBTITLE_MINIMAL       极简子标题（1=仅文字，无任何装饰）
+ *  · GAP_LINES              分组留白 0~2
  *  · SD_STYLE               服务显示样式                    icon|text（默认 icon）
  *  · SD_REGION_MODE         地区风格                        full|abbr|flag（默认 full）
  *  · SD_ICON_THEME          图标主题                        check|lock|circle（默认 check）
@@ -233,10 +233,8 @@ function bootLog(...args) {
  *    ...
  *  }
  */
-const SETTINGS_ROOT_KEY = '@Panel.NetworkInfo.Settings';
 // BoxJS 面板配置可能的根 key（按顺序尝试）
 const SETTINGS_ROOT_KEYS = [
-    SETTINGS_ROOT_KEY,           // 原设计：独立 key
     'Panel',                     // 你现在持久层里看到的这个
     'Panel.NetworkInfo.Settings',
     'NetworkInfo'                // 兜底：有些环境可能直接把 NetworkInfo 当根
@@ -476,68 +474,63 @@ function ENV(key, defVal, opt = {}) {
 
 // ====================== 统一配置对象（CFG.*） ======================
 const CFG = {
-    // —— 基本 —— //
+    /* —— 基本 —— */
     Update: toNum(ENV('Update', 10), 10),
     Timeout: toNum(ENV('Timeout', 12), 12),
 
-    // —— 开关类（0/1 / true/false 都支持）—— //
+    /* —— 开关类（0/1 / true/false 都支持）—— */
     MASK_IP: toBool(ENV('MASK_IP', true), true),
 
     /**
      * MASK_POS：
-     *  · 如果模块参数显式设置           ⇒ 优先用模块参数
-     *  · 否则如果 BoxJS 有值            ⇒ 使用 BoxJS 配置
-     *  · 如果两者都没有显式设置         ⇒ 默认跟随 MASK_IP
+     *  · 模块参数显式修改（!== 默认值 "auto"） ⇒ 优先使用模块参数
+     *  · 否则若 BoxJS 有值                     ⇒ 使用 BoxJS
+     *  · 若两者都未配置或配置为 "auto"         ⇒ 跟随 MASK_IP
+     *
+     * 说明：
+     *  · 默认值使用字符串 "auto" 表示“跟随 MASK_IP”
+     *  · 建议在模块 #!arguments 中将 MASK_POS 默认设为 auto
+     *
+     * 优先级依旧遵从通用规则：
+     *  · 模块“改后的”参数 > BoxJS > 模块默认参数 ≡ 脚本默认参数
      */
-    MASK_POS: (() => {
-        // 用一个特殊默认值作为“哨兵”，表示“未显式设置，应该跟随 MASK_IP”
-        const SENTINEL = '__FOLLOW_MASK_IP__';
-
-        // 这里的 defVal 就是“脚本默认值”，即：未显式设置时应该 follow
-        const raw = ENV('MASK_POS', SENTINEL, {skipArgDiff: false});
-
-        // raw 还是哨兵 ⇒ 说明没有 arguments / BoxJS 显式覆盖
-        if (raw === SENTINEL) {
-            // 跟随 MASK_IP（同样走 ENV 优先级，这样 MASK_IP 本身还能被 BoxJS/arguments 控制）
-            const follow = ENV('MASK_IP', true);
-            return toBool(follow, true);
-        }
-
-        // 否则 raw 是一个真实的值（来自 arguments / BoxJS / arguments=默认值）
-        return toBool(raw, true);
-    })(),
+    MASK_POS_MODE: ENV('MASK_POS', 'auto'),
 
     IPv6: toBool(ENV('IPv6', true), true),
 
-    // —— 数据源 —— //
+    /* —— 数据源 —— */
     DOMESTIC_IPv4: (() => {
         const v = ENV('DOMESTIC_IPv4', 'ipip');
         if (v !== '' && v != null) return v;
+        // 兼容早期误写 DOMIC_IPv4
         return $args.DOMIC_IPv4 || 'ipip';
     })(),
     DOMESTIC_IPv6: (() => {
         const v = ENV('DOMESTIC_IPv6', 'ddnspod');
         if (v !== '' && v != null) return v;
+        // 兼容早期误写 DOMIC_IPv6
         return $args.DOMIC_IPv6 || 'ddnspod';
     })(),
     LANDING_IPv4: ENV('LANDING_IPv4', 'ipapi'),
     LANDING_IPv6: ENV('LANDING_IPv6', 'ipsb'),
 
-    // —— 台湾旗模式 —— //
+    /* —— 台湾旗模式 —— */
     TW_FLAG_MODE: toNum(ENV('TW_FLAG_MODE', 1), 1),
 
-    // —— 图标接管 —— //
+    /* —— 图标接管 —— */
     IconPreset: ENV('IconPreset', 'globe'),
-    Icon: ENV('Icon', ''),
+    // 这里把脚本默认值设成与模块默认一致：globe.asia.australia
+    // 这样“未改过”的模块参数不会锁死，BoxJS 仍能覆盖
+    Icon: ENV('Icon', 'globe.asia.australia'),
     IconColor: ENV('IconColor', '#1E90FF'),
 
-    // —— 服务检测基本样式 —— //
+    /* —— 服务检测基本样式 —— */
     SD_STYLE: ENV('SD_STYLE', 'icon'),
     SD_SHOW_LAT: toBool(ENV('SD_SHOW_LAT', true), true),
     SD_SHOW_HTTP: toBool(ENV('SD_SHOW_HTTP', true), true),
     SD_LANG: ENV('SD_LANG', 'zh-Hans'),
 
-    // SD_TIMEOUT_MS: 0 或空 = 跟随 Timeout*1000；后面会统一做 >= SD_MIN_TIMEOUT 兜底
+    /* SD_TIMEOUT_MS: 0 或空 = 跟随 Timeout*1000；后面会统一做 >= SD_MIN_TIMEOUT 兜底 */
     SD_TIMEOUT_RAW: ENV('SD_TIMEOUT_MS', 0),
 
     SD_REGION_MODE: ENV('SD_REGION_MODE', 'full'),
@@ -546,15 +539,18 @@ const CFG = {
 
     /**
      * Services 配置来源与优先级：
-     *  · 模块 arguments：SERVICES（显式改动时优先于 BoxJS）
-     *  · BoxJS 多选（checkboxes）：SERVICES（数组 [] 视为“未指定”）
-     *  · BoxJS 文本备选：SERVICES_TEXT（逗号分隔 / JSON 数组均可）
+     *  · 模块 arguments：SERVICES（解析后非空 ⇒ 视为“显式修改”，优先于 BoxJS）
+     *  · BoxJS 多选：SERVICES（checkboxes，数组 [] 视为“未指定”）
+     *  · BoxJS 文本：SERVICES_TEXT（逗号/空白/JSON 数组均可）
      *
-     * 解析顺序（实际逻辑）：
-     *  1）优先使用模块 arguments 中的 SERVICES（若解析后非空）
-     *  2）否则使用 BoxJS 复选框 SERVICES
-     *  3）否则使用 BoxJS 文本 SERVICES_TEXT
-     *  4）以上都为空时，回退为脚本内置默认全量服务列表
+     * 解析顺序：
+     *  1）若模块 SERVICES 解析后非空 ⇒ 使用模块 SERVICES
+     *  2）否则若 BoxJS 多选非空     ⇒ 使用 BoxJS 多选
+     *  3）否则若 BoxJS 文本非空     ⇒ 使用 BoxJS 文本
+     *  4）以上都为空                ⇒ 使用脚本默认全量服务列表
+     *
+     * 总体优先级：
+     *  · 模块“改后的”参数 > BoxJS（多选 > 文本）> 模块默认参数 ≡ 脚本默认参数
      */
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readBoxKey('SERVICES');
@@ -578,23 +574,12 @@ const CFG = {
         return v != null ? String(v).trim() : '';
     })(),
 
-    // —— 子标题（支持新老命名：SUBTITLE_* 与 ST_*）—— //
-    SUBTITLE_STYLE: (() => {
-        const v = ENV('SUBTITLE_STYLE', '');
-        if (v !== '' && v != null) return v;
-        return ENV('ST_SUBTITLE_STYLE', 'line');
-    })(),
-    SUBTITLE_MINIMAL: (() => {
-        const v = ENV('SUBTITLE_MINIMAL', '');
-        if (v !== '' && v != null) return v;
-        return ENV('ST_SUBTITLE_MINIMAL', 0);
-    })(),
-    GAP_LINES: (() => {
-        const v = ENV('GAP_LINES', '');
-        return (v !== '' && v != null) ? v : ENV('ST_GAP_LINES', 1);
-    })(),
+    /* —— 子标题 —— */
+    SUBTITLE_STYLE: ENV('SUBTITLE_STYLE', 'line'),
+    SUBTITLE_MINIMAL: ENV('SUBTITLE_MINIMAL', false),
+    GAP_LINES: ENV('GAP_LINES', 1),
 
-    // —— 日志 —— //
+    /* —— 日志 —— */
     LOG: toBool(ENV('LOG', true), true),
     LOG_LEVEL: (ENV('LOG_LEVEL', 'info') + '').toLowerCase(),
     LOG_TO_PANEL: toBool(ENV('LOG_TO_PANEL', false), false),
@@ -671,9 +656,22 @@ const V6_TO = Math.min(
     Math.max(CONSTS.SD_MIN_TIMEOUT, SD_TIMEOUT_MS),
     2500
 );
-
 const MASK_IP = !!CFG.MASK_IP;
+
+/**
+ * MASK_POS 生效值：
+ *  · CFG.MASK_POS_MODE 为 "auto"/"follow"/"same"/空 ⇒ 跟随 MASK_IP
+ *  · 其他值按布尔解析（1/0/true/false）
+ */
+const _maskPosMode = String(CFG.MASK_POS_MODE ?? 'auto').trim().toLowerCase();
+CFG.MASK_POS = (_maskPosMode === '' ||
+    _maskPosMode === 'auto' ||
+    _maskPosMode === 'follow' ||
+    _maskPosMode === 'same')
+    ? MASK_IP
+    : toBool(_maskPosMode, true);
 const MASK_POS = !!CFG.MASK_POS;
+
 const TW_FLAG_MODE = Number(CFG.TW_FLAG_MODE) || 0;
 
 const DOMESTIC_IPv4 = CFG.DOMESTIC_IPv4;
