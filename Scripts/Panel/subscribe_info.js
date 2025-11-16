@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：订阅信息面板（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2025-11-16R3
+ * 版本：2025-11-16R4
  *
  * 概述 · 功能边界
  *  · 支持最多 10 组订阅链接，按顺序展示总量 / 已用 / 剩余 / 到期时间
@@ -13,14 +13,15 @@
  *  · 依赖：$httpClient / $persistentStore | $prefs / $done
  *
  * 参数源 · BoxJS 结构
- *  · BoxJS 存储根：key = "Panel"
+ *  · BoxJS 存储根推荐结构：key = "Panel"
  *    {
- *      "NetworkInfo": { "Settings": {...}, "Caches": ... },
- *      "SubscribeInfo":   { "Settings": {...}, "Caches": ... }   // 推荐
- *      // 兼容旧结构：
- *      // "SubscribeInfo": { "Settings": {...}, "Caches": ... }
+ *      "NetworkInfo":  { "Settings": {...}, "Caches": ... },
+ *      "SubscribeInfo":{ "Settings": {...}, "Caches": ... }
  *    }
- *  · 本脚本只在存在 SubscribeInfo 时读取
+ *  · 本脚本优先读取 Panel.SubscribeInfo.Settings
+ *  · 兼容：
+ *      - 直接 key = "Panel.SubscribeInfo.Settings"
+ *      - 直接 key = "@Panel.SubscribeInfo.Settings"
  *
  * 参数 · 命名 & 取值优先级
  *  · 所有参数均支持「小写 + 大写」两种键名：
@@ -29,18 +30,17 @@
  *    - url1 / URL1, url2 / URL2, ... url10 / URL10
  *    - title1 / Title1, resetDay1 / ResetDay1, ...（以此类推）
  *
- *  · 单值参数优先级：
- *      1）模块 #!arguments 中该参数「与脚本默认 defVal 不同」
- *          ⇒ 视为“显式修改”，最高优先级
- *      2）否则，如果 BoxJS（SubscribeInfo.Settings.*）有值
- *          ⇒ 使用 BoxJS 值（覆盖默认）
- *      3）否则，如果模块 #!arguments 中存在该参数（但与 defVal 相同）
+ *  · 单值参数优先级（最终逻辑）：
+ *      1）若 BoxJS（SubscribeInfo.Settings.*）有值
+ *          ⇒ 使用 BoxJS
+ *      2）否则，若模块 #!arguments 中有值
  *          ⇒ 使用模块参数
- *      4）否则 ⇒ 使用脚本默认 defVal
+ *      3）否则 ⇒ 使用脚本默认 defVal
  *
  *  · URL 特性：
  *      - 支持原始 http(s) 链接
- *      - 也支持整串 encodeURIComponent 之后的值（会自动解码一次）
+ *      - 支持 encodeURIComponent 后的整串值（会自动解码一次）
+ *      - 以下视为占位符，等价“未配置”：订阅链接 / 机场名称 / 重置日期
  *
  * 显示规则 · 面板格式
  *  · 每个机场四行：
@@ -55,6 +55,7 @@
  * 日志说明
  *  · 默认输出基础日志（控制台 console.log）
  *  · 标记前缀统一为：[SubscribeInfo]
+ *  · 每次 log 只打印一行完整文本，防止刷屏
  * ========================================================= */
 
 // ===== 日志工具 =====
@@ -62,9 +63,22 @@ const TAG = "SubscribeInfo";
 
 function log() {
     if (typeof console === "undefined" || !console.log) return;
-    const args = Array.prototype.slice.call(arguments);
-    args.unshift("[" + TAG + "]");
-    console.log.apply(console, args);
+    const parts = [];
+    for (let i = 0; i < arguments.length; i++) {
+        const v = arguments[i];
+        if (v === null || v === undefined) {
+            parts.push("");
+        } else if (typeof v === "string") {
+            parts.push(v);
+        } else {
+            try {
+                parts.push(JSON.stringify(v));
+            } catch (_) {
+                parts.push(String(v));
+            }
+        }
+    }
+    console.log("[" + TAG + "] " + parts.join(" "));
 }
 
 // ===== 工具函数 =====
@@ -115,28 +129,53 @@ function isHttpUrl(s) {
     return /^https?:\/\//i.test(String(s || ""));
 }
 
+// 占位符文本（等价为空）
+const PLACEHOLDER_STRINGS = [
+    "订阅链接",
+    "机场名称",
+    "重置日期"
+];
+
+function isPlaceholderString(s) {
+    const t = String(s || "").trim();
+    if (!t) return false;
+    if (/^{{{[^}]+}}}$/.test(t)) return true;
+    if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
+    const low = t.toLowerCase();
+    return low === "null" || low === "undefined";
+
+}
+
+function cleanArg(val) {
+    if (val === null || val === undefined) return null;
+    const s = String(val).trim();
+    if (!s) return null;
+    if (isPlaceholderString(s)) return null;
+    return s;
+}
+
 // 尝试处理 URL：原样 / decodeURIComponent 一次
 function normalizeUrl(src, label) {
     const s = cleanArg(src);
     if (!s) {
-        log("normalizeUrl", label, "empty or placeholder, skip");
+        log("normalizeUrl", label, "=> empty/placeholder, skip");
         return null;
     }
     if (isHttpUrl(s)) {
-        log("normalizeUrl", label, "raw is http(s) url:", s);
+        log("normalizeUrl", label, "use raw http(s):", s);
         return s;
     }
     try {
         const decoded = decodeURIComponent(s);
         if (isHttpUrl(decoded)) {
-            log("normalizeUrl", label, "decoded to http(s) url:", decoded);
+            log("normalizeUrl", label, "decoded to http(s):", decoded);
             return decoded;
         }
         log("normalizeUrl", label, "decoded but still not http(s):", decoded);
     } catch (e) {
         log("normalizeUrl", label, "decodeURIComponent error:", String(e), "raw:", s);
     }
-    log("normalizeUrl", label, "not a valid http(s) url:", s);
+    log("normalizeUrl", label, "invalid http(s):", s);
     return null;
 }
 
@@ -154,26 +193,12 @@ const args = {};
 log("raw $argument:", ($argument || "") + "");
 
 function getArg(lower, upper) {
-    return Object.prototype.hasOwnProperty.call(args, lower)
-        ? args[lower]
-        : (Object.prototype.hasOwnProperty.call(args, upper) ? args[upper] : null);
+    if (Object.prototype.hasOwnProperty.call(args, lower)) return args[lower];
+    if (Object.prototype.hasOwnProperty.call(args, upper)) return args[upper];
+    return null;
 }
 
-function isPlaceholder(val) {
-    const s = String(val || "").trim();
-    return /^{{{[^}]+}}}$/.test(s);
-}
-
-function cleanArg(val) {
-    if (val === null || val === undefined) return null;
-    const s = String(val).trim();
-    if (!s) return null;
-    const low = s.toLowerCase();
-    if (isPlaceholder(s) || low === "null" || low === "undefined") return null;
-    return s;
-}
-
-// ===== BoxJS & 参数优先级（只读 key="Panel"） =====
+// ===== BoxJS & 参数优先级 =====
 const KVStore = (() => {
     if (typeof $prefs !== "undefined" && $prefs.valueForKey) {
         return {
@@ -205,62 +230,80 @@ const KVStore = (() => {
 
 /**
  * 读取 BoxJS 订阅信息设置：
- *  · 只读 key = "Panel"
- *  · 优先 Panel.SubscribeInfo.Settings
- *  · 若 Panel 不存在 / 无 Subscribe*，则返回 {}
+ *  · 优先读取 key="Panel" 且含 SubscribeInfo.Settings
+ *  · 兼容：
+ *      - key="Panel.SubscribeInfo.Settings"
+ *      - key="@Panel.SubscribeInfo.Settings"
  */
 function readBoxSettings() {
-    let raw;
+    // 1. Panel 聚合
     try {
-        raw = KVStore.read("Panel");
-    } catch (e) {
-        log("readBoxSettings read Panel error:", String(e));
-        return {};
-    }
-
-    if (raw === null || raw === undefined || raw === "") {
-        log("readBoxSettings Panel empty");
-        return {};
-    }
-
-    let panel;
-    if (typeof raw === "string") {
-        try {
-            panel = JSON.parse(raw);
-        } catch (e) {
-            log("readBoxSettings Panel JSON.parse error:", String(e));
-            log("readBoxSettings Panel raw:", raw);
-            return {};
+        const rawPanel = KVStore.read("Panel");
+        if (rawPanel) {
+            let panel = rawPanel;
+            if (typeof rawPanel === "string") {
+                try {
+                    panel = JSON.parse(rawPanel);
+                } catch (e) {
+                    log("readBoxSettings Panel JSON.parse error:", String(e));
+                }
+            }
+            if (panel && typeof panel === "object") {
+                if (panel.SubscribeInfo && panel.SubscribeInfo.Settings && typeof panel.SubscribeInfo.Settings === "object") {
+                    log("readBoxSettings hit Panel.SubscribeInfo.Settings");
+                    return panel.SubscribeInfo.Settings;
+                }
+            }
+        } else {
+            log("readBoxSettings key 'Panel' empty");
         }
-    } else {
-        panel = raw;
+    } catch (e) {
+        log("readBoxSettings read 'Panel' error:", String(e));
     }
 
-    if (!panel || typeof panel !== "object") {
-        log("readBoxSettings Panel is not object:", panel);
-        return {};
+    // 2. 直接 SubscribeInfo.Settings
+    const candidates = [
+        "Panel.SubscribeInfo.Settings",
+        "@Panel.SubscribeInfo.Settings"
+    ];
+    for (const key of candidates) {
+        try {
+            const raw = KVStore.read(key);
+            if (!raw) {
+                log("readBoxSettings", key, "empty");
+                continue;
+            }
+            let val = raw;
+            if (typeof raw === "string") {
+                try {
+                    val = JSON.parse(raw);
+                } catch (e) {
+                    log("readBoxSettings", key, "JSON.parse error:", String(e));
+                    continue;
+                }
+            }
+            if (val && typeof val === "object") {
+                if (val.Settings && typeof val.Settings === "object") {
+                    log("readBoxSettings hit", key, "Settings");
+                    return val.Settings;
+                }
+                log("readBoxSettings hit", key, "direct object");
+                return val;
+            }
+        } catch (e) {
+            log("readBoxSettings read", key, "error:", String(e));
+        }
     }
 
-    try {
-        log("readBoxSettings Panel keys:", Object.keys(panel));
-    } catch (_) {
-    }
-
-    // Panel.SubscribeInfo.Settings
-    if (panel.SubscribeInfo && panel.SubscribeInfo.Settings && typeof panel.SubscribeInfo.Settings === "object") {
-        log("readBoxSettings hit Panel.SubscribeInfo.Settings");
-        return panel.SubscribeInfo.Settings;
-    }
-
-    log("readBoxSettings Panel has no SubscribeInfo Settings");
+    log("readBoxSettings no SubscribeInfo settings found, use {}");
     return {};
 }
 
 const BOX = readBoxSettings();
 try {
-    log("BOX settings snapshot:", JSON.stringify(BOX));
+    log("BOX snapshot:", JSON.stringify(BOX));
 } catch (e) {
-    log("BOX settings snapshot stringify error:", String(e));
+    log("BOX snapshot stringify error:", String(e));
 }
 
 function readBoxMulti(keys) {
@@ -276,55 +319,66 @@ function readBoxMulti(keys) {
 }
 
 /**
- * 统一字符串参数优先级：
- *   1）模块参数（与 defVal 不同） ⇒ 最高优先级
- *   2）否则若 BoxJS 有值          ⇒ 使用 BoxJS
- *   3）否则若 模块参数存在        ⇒ 使用模块参数（与 defVal 相同）
- *   4）否则 ⇒ 使用 defVal
+ * 字符串参数读取，优先级：
+ *   1）BoxJS (SubscribeInfo.Settings.*)
+ *   2）#!arguments
+ *   3）defVal
  */
 function pickStr(lowerKey, upperKey, defVal) {
-    const canon = v => (v == null ? "" : String(v).trim());
+    const boxRaw = readBoxMulti([upperKey, lowerKey]);
+    const boxClean = cleanArg(boxRaw);
+    const hasBox = boxClean != null;
 
     const argRaw = getArg(lowerKey, upperKey);
     const argClean = cleanArg(argRaw);
     const hasArg = argClean != null;
 
-    const boxRaw = readBoxMulti([upperKey, lowerKey]);
-    const boxClean = cleanArg(boxRaw);
-    const hasBox = boxClean != null;
-
-    const defCanon = canon(defVal);
-    const argChanged = hasArg && canon(argClean) !== defCanon;
-
-    const chosen = argChanged
-        ? argClean
-        : (hasBox ? boxClean : (hasArg ? argClean : defVal));
+    const chosen = hasBox ? boxClean : (hasArg ? argClean : defVal);
 
     log(
-        "pickStr",
-        lowerKey + "/" + upperKey,
+        "pickStr", `${lowerKey}/${upperKey}`,
         "| defVal:", defVal,
-        "| arg:", argClean,
         "| box:", boxClean,
+        "| arg:", argClean,
         "| chosen:", chosen
     );
     return chosen;
 }
 
+// ===== HTTP 请求（带最多 3 次重试） =====
+const MAX_RETRY = 3;
+
+function httpGetWithRetry(options, attempt, cb) {
+    $httpClient.get(options, (err, resp) => {
+        if (err || !resp) {
+            log("httpGet error attempt", attempt, "err:", err && String(err), "status:", resp && resp.status);
+            if (attempt < MAX_RETRY) {
+                httpGetWithRetry(options, attempt + 1, cb);
+            } else {
+                cb(err || new Error("request error"), resp);
+            }
+            return;
+        }
+        cb(null, resp);
+    });
+}
+
 // ===== 拉取机场信息（返回文本块） =====
 function fetchInfo(url, resetDayRaw, title, index) {
     return new Promise(resolve => {
-        log("fetchInfo start", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
+        log("fetchInfo start", "slot", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
 
-        $httpClient.get(
+        httpGetWithRetry(
             {url, headers: {"User-Agent": "Quantumult%20X/1.5.2"}},
+            1,
             (err, resp) => {
                 if (err || !resp) {
-                    log("fetchInfo error", index, "err:", err, "resp:", resp && resp.status);
+                    log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
                     resolve(`机场：${title}\n订阅请求失败，状态码：${resp ? resp.status : "请求错误"}`);
                     return;
                 }
-                log("fetchInfo resp", index, "status:", resp.status);
+
+                log("fetchInfo resp", "slot", index, "status:", resp.status);
 
                 if (resp.status !== 200) {
                     resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
@@ -334,7 +388,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
                 const headerKey = Object.keys(resp.headers || {}).find(
                     k => k.toLowerCase() === "subscription-userinfo"
                 );
-                log("fetchInfo headerKey", index, "=>", headerKey);
+                log("fetchInfo headerKey slot", index, "=>", headerKey || "none");
 
                 const data = {};
                 if (headerKey && resp.headers[headerKey]) {
@@ -350,7 +404,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
                 }
 
                 try {
-                    log("fetchInfo parsed userinfo", index, JSON.stringify(data));
+                    log("fetchInfo userinfo slot", index, JSON.stringify(data));
                 } catch (_) {
                 }
 
@@ -397,7 +451,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
                 if (resetLinePart) tailLine = `${resetLinePart} | 到期：${expireStr}`;
 
                 const block = [titleLine, usedLine, remainLine, tailLine].join("\n");
-                log("fetchInfo done", index, "block:\n" + block);
+                log("fetchInfo done", "slot", index, "\n" + block);
                 resolve(block);
             }
         );
@@ -427,10 +481,17 @@ function fetchInfo(url, resetDayRaw, title, index) {
         const title = pickStr(`title${i}`, `Title${i}`, null) || `机场${i}`;
         const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null);
 
-        log(`slot ${i}:`, "rawUrl=", rawUrl, "normalized url=", url, "title=", title, "reset=", reset);
+        log(
+            "slot", i,
+            "| rawUrl:", rawUrl,
+            "| url:", url,
+            "| title:", title,
+            "| reset:", reset
+        );
 
+        // 没有 URL/无效 URL：不发请求
         if (!url || !isHttpUrl(url)) {
-            log(`slot ${i}: invalid or empty url, skip`);
+            log("slot", i, "no valid url, skip request");
             continue;
         }
 
