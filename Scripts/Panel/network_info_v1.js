@@ -165,22 +165,82 @@ function t(key, ...args) {
 }
 
 // ====================== 运行环境适配层 ======================
-const readKV = (k) => {
-    if (typeof $persistentStore !== 'undefined' && $persistentStore.read) {
-        return $persistentStore.read(k);
-    }
+/**
+ * 统一 KV 存储抽象：
+ *  · Surge / Loon：$persistentStore / $prefs
+ *  · QuanX：$prefs
+ *  · 其他环境：localStorage（若存在）
+ */
+const KVStore = (() => {
     if (typeof $prefs !== 'undefined' && $prefs.valueForKey) {
-        return $prefs.valueForKey(k);
+        return {
+            read: (k) => $prefs.valueForKey(k),
+            write: (v, k) => $prefs.setValueForKey(v, k)
+        };
+    }
+    if (typeof $persistentStore !== 'undefined' && $persistentStore.read) {
+        return {
+            read: (k) => $persistentStore.read(k),
+            write: (v, k) => $persistentStore.write(v, k)
+        };
     }
     try {
-        return (typeof localStorage !== 'undefined') ? localStorage.getItem(k) : null;
+        if (typeof localStorage !== 'undefined') {
+            return {
+                read: (k) => localStorage.getItem(k),
+                write: (v, k) => localStorage.setItem(k, v)
+            };
+        }
     } catch (_) {
-        return null;
     }
-};
+    return {
+        read: () => null, write: () => {
+        }
+    };
+})();
+
+/** BoxJS 根对象（新写法）：@NetworkInfo.Settings */
+const SETTINGS_ROOT_KEY = '@NetworkInfo.Settings';
+
+/** 读取 BoxJS 设置对象，无则返回 {} */
+function readBoxSettings() {
+    let val = KVStore.read(SETTINGS_ROOT_KEY);
+    if (!val) return {};
+    if (typeof val === 'string') {
+        try {
+            val = JSON.parse(val);
+        } catch (e) {
+            try {
+                console.log('[NetworkInfo] Settings JSON parse fail', e);
+            } catch (_) {
+            }
+            return {};
+        }
+    }
+    return val && typeof val === 'object' ? val : {};
+}
+
+const BOX = readBoxSettings();
+
+/** 兼容旧版逐键存储：NetworkInfo_XXX */
+function readLegacyKey(key) {
+    const name = `NetworkInfo_${key}`;
+    return KVStore.read(name);
+}
+
+/** 统一读取 BoxJS 某个字段（优先新对象，其次旧 key），空字符串视为“未设置” */
+function readBoxKey(key) {
+    if (BOX && Object.prototype.hasOwnProperty.call(BOX, key)) {
+        const v = BOX[key];
+        if (v !== undefined && v !== null && v !== '') return v;
+    }
+    const legacy = readLegacyKey(key);
+    if (legacy !== undefined && legacy !== null && legacy !== '') return legacy;
+    return undefined;
+}
 
 /** 解析 $argument（支持字符串或对象） */
-const parseArgs = (raw) => {
+function parseArgs(raw) {
     if (!raw) return {};
     if (typeof raw === 'object') return raw;
     if (typeof raw === 'string') {
@@ -193,10 +253,11 @@ const parseArgs = (raw) => {
         }, {});
     }
     return {};
-};
+}
+
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
 
-/** 当 $args 对象无值时，从原始字符串兜底读取 */
+/** 当 $argument 为原始字符串时，兜底读取指定字段（主要给 SERVICES 用） */
 function readArgRaw(name) {
     try {
         if (typeof $argument === 'string') {
@@ -218,26 +279,80 @@ const toBool = (v, d = false) => {
     if (['0', 'false', 'off', 'no', 'n'].includes(s)) return false;
     return d;
 };
+
 const toNum = (v, d) => {
     if (v == null || v === '') return d;
     const n = Number(v);
     return Number.isFinite(n) ? n : d;
 };
-const K = (s) => `NetworkInfo_${s}`;
+
 const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
-// ====================== 统一取值：模块参数 > BoxJS > 默认 ======================
-function ENV(key, defVal) {
-    // 1) 模块参数（#!arguments / 面板实例上填的）
-    if ($args && Object.prototype.hasOwnProperty.call($args, key)) {
-        const v = $args[key];
-        if (v !== undefined && v !== null && v !== '') return v;
+/**
+ * 统一取值（核心优先级逻辑）：
+ *
+ *  目标语义：
+ *    1. 脚本代码有一个“默认值”：defVal
+ *    2. 模块参数如果“被修改过”（和 defVal 不同），则：
+ *          模块参数 > BoxJS > 代码默认
+ *    3. 模块参数仍是默认值 / 没填，则：
+ *          BoxJS > 模块参数(默认) > 代码默认
+ *    4. 没有 BoxJS、也没模块参数：
+ *          使用 defVal
+ *
+ *  同时支持：
+ *    · argAlias  ：模块参数别名（数组）
+ *    · boxAlias  ：BoxJS 字段别名（数组）
+ */
+function ENV(key, defVal, opt = {}) {
+    const typeHint = typeof defVal;
+    const argKeys = [key].concat(opt.argAlias || []);
+    let argRaw;
+    for (const k of argKeys) {
+        if ($args && Object.prototype.hasOwnProperty.call($args, k)) {
+            const v = $args[k];
+            if (v !== undefined && v !== null && v !== '') {
+                argRaw = v;
+                break;
+            }
+        }
     }
-    // 2) BoxJS
-    const box = readKV(K(key));
-    if (box !== undefined && box !== null && box !== '') return box;
 
-    // 3) 代码默认
+    const boxKeys = [key].concat(opt.boxAlias || []);
+    let boxRaw;
+    for (const bk of boxKeys) {
+        const v = readBoxKey(bk);
+        if (v !== undefined && v !== null && v !== '') {
+            boxRaw = v;
+            break;
+        }
+    }
+
+    const convert = (val) => {
+        if (typeHint === 'number') return toNum(val, defVal);
+        if (typeHint === 'boolean') return toBool(val, defVal);
+        return val;
+    };
+
+    const canon = (val) => {
+        if (typeHint === 'number') return String(toNum(val, defVal));
+        if (typeHint === 'boolean') return toBool(val, defVal) ? 'true' : 'false';
+        return String(val);
+    };
+
+    const hasArg = argRaw !== undefined;
+    const argChanged = hasArg && !opt.skipArgDiff && canon(argRaw) !== canon(defVal);
+
+    // 1) 模块参数“被修改”：优先级最高（不看 BoxJS）
+    if (hasArg && argChanged) return convert(argRaw);
+
+    // 2) 模块参数仍为默认值 / 未填，若 BoxJS 有值，则 BoxJS 覆盖默认
+    if (boxRaw !== undefined) return convert(boxRaw);
+
+    // 3) 没有 BoxJS，但模块传了值（不管是否等于默认）则用模块值
+    if (hasArg) return convert(argRaw);
+
+    // 4) 双双缺省：脚本默认
     return defVal;
 }
 
@@ -262,17 +377,14 @@ const CFG = {
     IPv6: toBool(ENV('IPv6', 0), false),
 
     // —— 数据源 —— //
-    DOMESTIC_IPv4: (() => {
-        // 兼容历史键 DOMIC_IPv4
-        const v = ENV('DOMESTIC_IPv4', '');
-        if (v !== '' && v != null) return v;
-        return $args.DOMIC_IPv4 || 'ipip';
-    })(),
-    DOMESTIC_IPv6: (() => {
-        const v = ENV('DOMESTIC_IPv6', '');
-        if (v !== '' && v != null) return v;
-        return $args.DOMIC_IPv6 || 'ddnspod';
-    })(),
+    DOMESTIC_IPv4: ENV('DOMESTIC_IPv4', 'ipip', {
+        argAlias: ['DOMIC_IPv4'],
+        boxAlias: ['DOMIC_IPv4']
+    }),
+    DOMESTIC_IPv6: ENV('DOMESTIC_IPv6', 'ddnspod', {
+        argAlias: ['DOMIC_IPv6'],
+        boxAlias: ['DOMIC_IPv6']
+    }),
     LANDING_IPv4: ENV('LANDING_IPv4', 'ipapi'),
     LANDING_IPv6: ENV('LANDING_IPv6', 'ipsb'),
 
@@ -299,14 +411,18 @@ const CFG = {
 
     // —— Services（保持原有优先级：BoxJS 勾选 > BoxJS 文本 > arguments > 默认）—— //
     SERVICES_BOX_CHECKED_RAW: (() => {
-        const v = readKV(K('SERVICES'));
+        const v = readBoxKey('SERVICES');
         if (v == null) return null; // null 表示“无此键”
+        if (Array.isArray(v)) {
+            if (!v.length) return null; // 空数组视为“未指定”
+            return JSON.stringify(v);
+        }
         const s = String(v).trim();
         if (!s || s === '[]' || /^null$/i.test(s)) return null;
         return s;
     })(),
     SERVICES_BOX_TEXT: (() => {
-        const v = readKV(K('SERVICES_TEXT'));
+        const v = readBoxKey('SERVICES_TEXT');
         return v != null ? String(v).trim() : '';
     })(),
     SERVICES_ARG_TEXT: (() => {
@@ -317,21 +433,18 @@ const CFG = {
     })(),
 
     // —— 子标题（支持新老命名：SUBTITLE_* 与 ST_*）—— //
-    SUBTITLE_STYLE: (() => {
-        const v = ENV('SUBTITLE_STYLE', '');
-        if (v !== '' && v != null) return v;
-        // 兼容 ST_SUBTITLE_STYLE
-        return ENV('ST_SUBTITLE_STYLE', 'line');
-    })(),
-    SUBTITLE_MINIMAL: (() => {
-        const v = ENV('SUBTITLE_MINIMAL', '');
-        if (v !== '' && v != null) return v;
-        return ENV('ST_SUBTITLE_MINIMAL', 0);
-    })(),
-    GAP_LINES: (() => {
-        const v = ENV('GAP_LINES', '');
-        return (v !== '' && v != null) ? v : ENV('ST_GAP_LINES', 1);
-    })(),
+    SUBTITLE_STYLE: ENV('SUBTITLE_STYLE', 'line', {
+        argAlias: ['ST_SUBTITLE_STYLE'],
+        boxAlias: ['ST_SUBTITLE_STYLE']
+    }),
+    SUBTITLE_MINIMAL: ENV('SUBTITLE_MINIMAL', 0, {
+        argAlias: ['ST_SUBTITLE_MINIMAL'],
+        boxAlias: ['ST_SUBTITLE_MINIMAL']
+    }),
+    GAP_LINES: ENV('GAP_LINES', 1, {
+        argAlias: ['ST_GAP_LINES'],
+        boxAlias: ['ST_GAP_LINES']
+    }),
 
     // —— 日志 —— //
     LOG: toBool(ENV('LOG', 0), false),
