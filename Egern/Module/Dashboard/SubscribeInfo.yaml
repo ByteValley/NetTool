@@ -1,0 +1,63 @@
+name: 订阅面板
+description: 机场订阅信息展示,流量使用及剩余信息&到期日期。
+compat_arguments:
+  Update: '21600'
+  Title1: 机场名称
+  URL1: 订阅链接
+  ResetDay1: 重置日期
+  Title2: 机场名称
+  URL2: 订阅链接
+  ResetDay2: 重置日期
+  Title3: 机场名称
+  URL3: 订阅链接
+  ResetDay3: 重置日期
+  Title4: 机场名称
+  URL4: 订阅链接
+  ResetDay4: 重置日期
+  Title5: 机场名称
+  URL5: 订阅链接
+  ResetDay5: 重置日期
+  Title6: 机场名称
+  URL6: 订阅链接
+  ResetDay6: 重置日期
+  Title7: 机场名称
+  URL7: 订阅链接
+  ResetDay7: 重置日期
+  Title8: 机场名称
+  URL8: 订阅链接
+  ResetDay8: 重置日期
+  Title9: 机场名称
+  URL9: 订阅链接
+  ResetDay9: 重置日期
+  Title10: 机场名称
+  URL10: 订阅链接
+  ResetDay10: 重置日期
+compat_arguments_desc: |-
+  模块来源：基于 https://raw.githubusercontent.com/z-jinke/Panel/refs/heads/main/Js/Flowquery.js 改写，由 ByteValley 优化。
+
+  模块分类 · 基本参数
+  - Update：面板刷新间隔（秒），建议：2 小时=7200，6 小时=21600，12 小时=43200
+  - TitleN：面板显示名称（支持中文）
+  - URLN：订阅链接（可直接填写无需编码；若含空格/中文/自拼特殊字符建议 URL 编码）
+  - ResetDayN：重置日（1~31），或中文提示（如“工单重置”“手动重置”“不限”等）
+  - DefaultIcon / DefaultIconColor：面板图标与颜色（可选，SF Symbols / 十六进制色值）
+
+  其他说明
+  - 最多支持 10 个订阅；无需 Rewrite 或 MITM
+  - 未返回到期时间时显示：到期：2099.12.31
+  - ResetDay 支持中文文本
+  - 同一面板仅一个图标：通过 DefaultIcon / DefaultIconColor 调整
+  - Update 为空时，部分版本可能视为 0；建议填写一个值（如 7200）
+author: ByteValley
+dns: {}
+scriptings:
+  - generic:
+      name: 机场订阅查询
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscribe_info.js
+      arguments:
+        _compat.$argument: "title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}&title66={{{Title6}}}&url6={{{URL6}}}&resetDay6={{{ResetDay6}}}&title7={{{Title7}}}&url7={{{URL7}}}&resetDay7={{{ResetDay7}}}&title8={{{Title8}}}&url8={{{URL8}}}&resetDay8={{{ResetDay8}}}&title9={{{Title9}}}&url9={{{URL9}}}&resetDay9={{{ResetDay9}}}&title10={{{Title10}}}&url10={{{URL10}}}&resetDay10={{{ResetDay10}}}"
+      timeout: 15
+panels:
+  - name: 订阅查询
+    script_name: 机场订阅查询
+    update_interval: {{{Update}}}
