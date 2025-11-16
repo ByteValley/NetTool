@@ -390,74 +390,87 @@ const toNum = (v, d) => {
 const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
 /**
- * 统一取值（核心优先级逻辑）：
+ * ENV：统一参数优先级
  *
- *  1. 模块 arguments 与脚本默认 defVal 比较：
- *       - 若 arguments “存在且与 defVal 不同” ⇒ 视为用户显式修改 ⇒ 直接用 arguments（BoxJS 不再插手）
- *       - 若 arguments 未提供 / 与 defVal 等价 ⇒ 视为“没改动默认”，此时允许 BoxJS 覆盖
- *  2. 在“没改动默认”的情况下：
- *       - 若 BoxJS 有值 ⇒ 用 BoxJS
- *       - 否则 ⇒ 用 arguments（若有）或 defVal
- *  3. 都没有 ⇒ defVal
+ * 优先级：
+ *   1）模块参数（arguments）如果“含义上”不同于脚本默认 ⇒ 视为显式修改 ⇒ 最高优先
+ *   2）否则，如果 BoxJS 有值 ⇒ 用 BoxJS
+ *   3）否则 ⇒ 用脚本默认（= 模块默认）
  *
  *  支持：
  *    · argAlias  ：模块参数别名（数组）
  *    · boxAlias  ：BoxJS 字段别名（数组）
+ *
+ * 含义相同的判断（canonical）：
+ *   · number: 10, "10", "010" 都视为 10
+ *   · boolean: true, "true", "1", "on" 都视为 true；false, "false", "0", "off" 都视为 false
+ *   · string: 直接按字符串比较
  */
 function ENV(key, defVal, opt = {}) {
     const typeHint = typeof defVal;
 
-    // 读取模块 arguments
     const argKeys = [key].concat(opt.argAlias || []);
+    const boxKeys = [key].concat(opt.boxAlias || []);
+
+    // ---- 读取模块 arguments ----
     let argRaw;
+    let hasArg = false;
     for (const k of argKeys) {
         if ($args && Object.prototype.hasOwnProperty.call($args, k)) {
             const v = $args[k];
             if (v !== undefined && v !== null && v !== '') {
                 argRaw = v;
+                hasArg = true;
                 break;
             }
         }
     }
 
-    // 读取 BoxJS
-    const boxKeys = [key].concat(opt.boxAlias || []);
+    // ---- 读取 BoxJS ----
     let boxRaw;
+    let hasBox = false;
     for (const bk of boxKeys) {
         const v = readBoxKey(bk);
         if (v !== undefined && v !== null && v !== '') {
             boxRaw = v;
+            hasBox = true;
             break;
         }
     }
 
-    // 类型转换
+    // ---- 类型转换函数 ----
     const convert = (val) => {
         if (typeHint === 'number') return toNum(val, defVal);
         if (typeHint === 'boolean') return toBool(val, defVal);
         return val;
     };
 
-    // 统一比较用的“规范化字符串”
+    // ---- “含义相同”比较用规范化函数 ----
     const canon = (val) => {
         if (typeHint === 'number') return String(toNum(val, defVal));
         if (typeHint === 'boolean') return toBool(val, defVal) ? 'true' : 'false';
         return String(val);
     };
 
-    const hasArg = argRaw !== undefined;
+    // ---- 1）判断模块参数是否“改过默认” ----
     const argChanged = hasArg && !opt.skipArgDiff && canon(argRaw) !== canon(defVal);
 
-    // 1）arguments 明显“改过默认” ⇒ 优先级最高，直接用它，BoxJS 不再插手
-    if (argChanged) return convert(argRaw);
+    if (argChanged) {
+        // 模块参数显式改动 ⇒ 最高优先
+        return convert(argRaw);
+    }
 
-    // 2）arguments 与默认相同 / 未填 ⇒ 若 BoxJS 有值，则 BoxJS 覆盖
-    if (boxRaw !== undefined) return convert(boxRaw);
+    // ---- 2）模块参数没改默认 / 没有模块参数 ⇒ 看 BoxJS ----
+    if (hasBox) {
+        return convert(boxRaw);
+    }
 
-    // 3）BoxJS 无值 ⇒ 若有 arguments（即便等价于默认），仍优先 arguments，再退回 defVal
-    if (hasArg) return convert(argRaw);
+    // ---- 3）BoxJS 也没值 ⇒ 如果有 arguments（但没改默认），就按 arguments；否则退回默认 ----
+    if (hasArg) {
+        return convert(argRaw);
+    }
 
-    // 4）都没有 ⇒ defVal
+    // ---- 4）都没有 ⇒ defVal
     return defVal;
 }
 
@@ -470,12 +483,25 @@ const CFG = {
     // —— 开关类（0/1 / true/false 都支持）—— //
     MASK_IP: toBool(ENV('MASK_IP', true), true),
 
-    // MASK_POS：未显式设置时，自动跟随 MASK_IP
+// MASK_POS：
+//   · 如果模块参数显式设置 ⇒ 优先用模块参数
+//   · 否则如果 BoxJS 有值       ⇒ 用 BoxJS
+//   · 如果都没有 ⇒ 跟随 MASK_IP
     MASK_POS: (() => {
-        const raw = ENV('MASK_POS', '');
-        if (raw === '' || raw === undefined || raw === null) {
-            return toBool(ENV('MASK_IP', true), true);
+        // 用一个特殊默认值作为“哨兵”，表示“未显式设置，应该跟随 MASK_IP”
+        const SENTINEL = '__FOLLOW_MASK_IP__';
+
+        // 这里的 defVal 就是“脚本默认值”，即：未显式设置时应该 follow
+        const raw = ENV('MASK_POS', SENTINEL, {skipArgDiff: false});
+
+        // raw 还是哨兵 ⇒ 说明没有 arguments / BoxJS 显式覆盖
+        if (raw === SENTINEL) {
+            // 跟随 MASK_IP（同样走 ENV 优先级，这样 MASK_IP 本身还能被 BoxJS/arguments 控制）
+            const follow = ENV('MASK_IP', true);
+            return toBool(follow, true);
         }
+
+        // 否则 raw 是一个真实的值（来自 arguments / BoxJS / arguments=默认值）
         return toBool(raw, true);
     })(),
 
