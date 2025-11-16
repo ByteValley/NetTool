@@ -40,7 +40,7 @@ dns: {}
 scriptings:
 - generic:
     name: 机场订阅查询
-    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/subscription_inquiry.js
+    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/subscribe_info.js
     arguments:
       _compat.$argument: defaultIcon=cellularbars&defaultIconColor=#1E90FF&title1=机场名称&url1=订阅链接&resetDay1=重置日期&title2=机场名称&url2=订阅链接&resetDay2=重置日期&title3=机场名称&url3=订阅链接&resetDay3=重置日期&title4=机场名称&url4=订阅链接&resetDay4=重置日期&title5=机场名称&url5=订阅链接&resetDay5=重置日期&title6=机场名称&url6=订阅链接&resetDay6=重置日期&title7=机场名称&url7=订阅链接&resetDay7=重置日期&title8=机场名称&url8=订阅链接&resetDay8=重置日期&title9=机场名称&url9=订阅链接&resetDay9=重置日期&title10=机场名称&url10=订阅链接&resetDay10=重置日期
     timeout: 15
