@@ -363,28 +363,32 @@ const CFG = {
     Timeout: toNum(ENV('Timeout', 8), 8),
 
     // —— 开关类（0/1 / true/false 都支持）—— //
-    MASK_IP: toBool(ENV('MASK_IP', 1), true),
+    // 这里默认值一律用 true/false，配合 ENV 的布尔比较逻辑
+    MASK_IP: toBool(ENV('MASK_IP', true), true),
 
     // MASK_POS：未显式设置时，自动跟随 MASK_IP
     MASK_POS: (() => {
-        const raw = ENV('MASK_POS', '');
+        const raw = ENV('MASK_POS', ''); // 空串 = 未显式设置
         if (raw === '' || raw === undefined || raw === null) {
-            return toBool(ENV('MASK_IP', 1), true);
+            return toBool(ENV('MASK_IP', true), true);
         }
         return toBool(raw, true);
     })(),
 
-    IPv6: toBool(ENV('IPv6', 0), false),
+    IPv6: toBool(ENV('IPv6', false), false),
 
     // —— 数据源 —— //
-    DOMESTIC_IPv4: ENV('DOMESTIC_IPv4', 'ipip', {
-        argAlias: ['DOMIC_IPv4'],
-        boxAlias: ['DOMIC_IPv4']
-    }),
-    DOMESTIC_IPv6: ENV('DOMESTIC_IPv6', 'ddnspod', {
-        argAlias: ['DOMIC_IPv6'],
-        boxAlias: ['DOMIC_IPv6']
-    }),
+    DOMESTIC_IPv4: (() => {
+        // 兼容历史键 DOMIC_IPv4
+        const v = ENV('DOMESTIC_IPv4', 'ipip');
+        if (v !== '' && v != null) return v;
+        return $args.DOMIC_IPv4 || 'ipip';
+    })(),
+    DOMESTIC_IPv6: (() => {
+        const v = ENV('DOMESTIC_IPv6', 'ddnspod');
+        if (v !== '' && v != null) return v;
+        return $args.DOMIC_IPv6 || 'ddnspod';
+    })(),
     LANDING_IPv4: ENV('LANDING_IPv4', 'ipapi'),
     LANDING_IPv6: ENV('LANDING_IPv6', 'ipsb'),
 
@@ -398,8 +402,8 @@ const CFG = {
 
     // —— 服务检测基本样式 —— //
     SD_STYLE: ENV('SD_STYLE', 'icon'),
-    SD_SHOW_LAT: toBool(ENV('SD_SHOW_LAT', 1), true),
-    SD_SHOW_HTTP: toBool(ENV('SD_SHOW_HTTP', 1), true),
+    SD_SHOW_LAT: toBool(ENV('SD_SHOW_LAT', true), true),
+    SD_SHOW_HTTP: toBool(ENV('SD_SHOW_HTTP', true), true),
     SD_LANG: ENV('SD_LANG', 'zh-Hans'),
 
     // SD_TIMEOUT_MS: 0 或空 = 跟随 Timeout*1000；后面会统一做 >= SD_MIN_TIMEOUT 兜底
@@ -407,7 +411,7 @@ const CFG = {
 
     SD_REGION_MODE: ENV('SD_REGION_MODE', 'full'),
     SD_ICON_THEME: ENV('SD_ICON_THEME', 'check'),
-    SD_ARROW: toBool(ENV('SD_ARROW', 1), true),
+    SD_ARROW: toBool(ENV('SD_ARROW', true), true),
 
     // —— Services（保持原有优先级：BoxJS 勾选 > BoxJS 文本 > arguments > 默认）—— //
     SERVICES_BOX_CHECKED_RAW: (() => {
@@ -433,24 +437,27 @@ const CFG = {
     })(),
 
     // —— 子标题（支持新老命名：SUBTITLE_* 与 ST_*）—— //
-    SUBTITLE_STYLE: ENV('SUBTITLE_STYLE', 'line', {
-        argAlias: ['ST_SUBTITLE_STYLE'],
-        boxAlias: ['ST_SUBTITLE_STYLE']
-    }),
-    SUBTITLE_MINIMAL: ENV('SUBTITLE_MINIMAL', 0, {
-        argAlias: ['ST_SUBTITLE_MINIMAL'],
-        boxAlias: ['ST_SUBTITLE_MINIMAL']
-    }),
-    GAP_LINES: ENV('GAP_LINES', 1, {
-        argAlias: ['ST_GAP_LINES'],
-        boxAlias: ['ST_GAP_LINES']
-    }),
+    SUBTITLE_STYLE: (() => {
+        const v = ENV('SUBTITLE_STYLE', '');
+        if (v !== '' && v != null) return v;
+        // 兼容 ST_SUBTITLE_STYLE
+        return ENV('ST_SUBTITLE_STYLE', 'line');
+    })(),
+    SUBTITLE_MINIMAL: (() => {
+        const v = ENV('SUBTITLE_MINIMAL', '');
+        if (v !== '' && v != null) return v;
+        return ENV('ST_SUBTITLE_MINIMAL', 0);
+    })(),
+    GAP_LINES: (() => {
+        const v = ENV('GAP_LINES', '');
+        return (v !== '' && v != null) ? v : ENV('ST_GAP_LINES', 1);
+    })(),
 
     // —— 日志 —— //
-    LOG: toBool(ENV('LOG', 0), false),
+    LOG: toBool(ENV('LOG', false), false),
     LOG_LEVEL: (ENV('LOG_LEVEL', 'info') + '').toLowerCase(),
-    LOG_TO_PANEL: toBool(ENV('LOG_TO_PANEL', 0), false),
-    LOG_PUSH: toBool(ENV('LOG_PUSH', 1), true)
+    LOG_TO_PANEL: toBool(ENV('LOG_TO_PANEL', false), false),
+    LOG_PUSH: toBool(ENV('LOG_PUSH', true), true)
 };
 
 // ====================== 子标题样式（与 CFG 联动） ======================
