@@ -26,7 +26,7 @@
  *    - url1 / URL1, url2 / URL2, ... url10 / URL10
  *    - title1 / Title1, resetDay1 / ResetDay1, ...（以此类推）
  *
- *  · 单值参数优先级（与《网络信息》一致）：
+ *  · 单值参数优先级：
  *      1）模块 #!arguments 中该参数「与脚本默认 defVal 不同」
  *          ⇒ 视为“显式修改”，最高优先级
  *      2）否则，如果 BoxJS（SubscribeInfo.Settings.*）有值
