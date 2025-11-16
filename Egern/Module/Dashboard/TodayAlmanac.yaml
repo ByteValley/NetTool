@@ -1,0 +1,27 @@
+name: 今日黄历
+description: 四行展示：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次提醒；每日09:00推送今日宜忌/节日播报
+compat_arguments:
+  TITLES_URL: ''
+  BLESS_URL: ''
+compat_arguments_desc: |-
+  参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象: 键=节日名, 值=祝词)
+  外链JSON示例：
+  TITLES_URL: ["摸鱼使我快乐～","{lunar}","{solar}","下一站：{next}"]
+  BLESS_URL: {"春节":"愿新岁顺遂无虞，家人皆安！","中秋节":"人月两团圆，心上皆明朗。","腊八节":"粥香暖岁末。"}
+  传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json
+author: ByteValley
+dns: {}
+scriptings:
+  - generic:
+      name: 今日黄历·面板
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/today_almanac.js
+      timeout: 10
+  - schedule:
+      name: 今日黄历·播报
+      cron: 0 9 * * *
+      script_url: https://raw.githubusercontent.com/zqzess/rule_for_quantumultX/master/js/Mine/wnCalendar/wnCalendar.js
+      timeout: 12
+panels:
+  - name: 今日黄历
+    script_name: 今日黄历·面板
+    update_interval: 1800
