@@ -41,7 +41,7 @@
           "id": "@Panel.NetworkInfo.Settings.Timeout",
           "name": "脚本超时（秒）",
           "type": "number",
-          "val": 8
+          "val": 12
         },
         {
           "id": "@Panel.NetworkInfo.Settings.MASK_IP",
@@ -61,7 +61,7 @@
           "id": "@Panel.NetworkInfo.Settings.IPv6",
           "name": "启用 IPv6",
           "type": "boolean",
-          "val": false
+          "val": true
         },
         {
           "id": "@Panel.NetworkInfo.Settings.DOMESTIC_IPv4",
@@ -370,7 +370,7 @@
           "id": "@Panel.NetworkInfo.Settings.LOG",
           "name": "开启日志（LOG）",
           "type": "boolean",
-          "val": false,
+          "val": true,
           "desc": "输出关键行为/缓存命中等"
         },
         {
