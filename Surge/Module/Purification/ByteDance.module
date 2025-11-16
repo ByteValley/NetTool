@@ -1,6 +1,6 @@
 #!name=字节系净化
 #!author=ByteValley
-#!desc=整合拦截字节跳动系广告（蛋花小说/番茄小说/今日头条/抖音内嵌），重点移除开屏/激励/前贴片及埋点，兼容短剧播放。默认保守策略，可通过 arguments 调整激励视频拦截力度。
+#!desc=按域名精细拦截字节系广告（蛋花/番茄/头条/抖音内嵌），屏蔽开屏/激励/前贴片及埋点，兼容短剧播放，可通过「激励视频」参数调节拦截强度。
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
 #!arguments=激励视频:REJECT-DROP
@@ -11,74 +11,125 @@ hostname = %APPEND% *.toutiao.com
 
 [Rule]
 # =====================================================================
-# 全局 | 分发控制与广告配置下发
+# ByteDance 主控接口域 | zijieapi.com / ugsdk.cn
 # =====================================================================
+# —— 广告 / 分发 / normal 线路 ——
 DOMAIN,ad.zijieapi.com,REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,ad)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lq)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),{{{激励视频}}}    # 统一广告/活动下发线（normal-lf）
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT                # Video Ad Server
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT               # 开屏/前贴片控制
-
-# =====================================================================
-# 全局 | 素材与播放器组件 / 曝光监控
-# =====================================================================
-# —— 激励/前贴片媒体素材 ——
-AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT
-
-# —— 曝光/监控与计费链路 ——
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,mon)),REJECT                   # 曝光/监控
-DOMAIN-SUFFIX,mon.toutiao.com,REJECT-DROP
-
-# =====================================================================
-# 今日头条 / 抖音 | 开屏与信息流广告
-# =====================================================================
-# —— 开屏/启动广告接口（头条/抖音/番茄） ——
-URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT-DROP
-URL-REGEX,^https?:\/\/[^\/]+\.toutiaoapi\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT-DROP
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT-DROP
-DOMAIN,webcast5-open-lf.douyin.com,REJECT-DROP
-
-# —— 今日头条广告平台与巨量引擎 ——
-DOMAIN,ad.toutiao.com,REJECT
-DOMAIN-SUFFIX,ads.toutiao.com,REJECT
-DOMAIN-SUFFIX,adbyte.bytedance.com,REJECT
-DOMAIN-SUFFIX,pangolin.snssdk.com,REJECT
-
-# —— 今日头条信息流广告接口（保守） ——
-# URL-REGEX,^https?:\/\/[^\/]+\.toutiao\.com\/api\/news\/recommend\/v\d+\/?.*,REJECT   # 可能清空信息流，默认注释
-URL-REGEX,^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*,REJECT
-
-# =====================================================================
-# fqnovel / 番茄 | 广告卡 / 实验 / 监控线路
-# =====================================================================
-# —— fqnovel：广告卡/实验/监控线路（域名级） ——
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lq)),REJECT
-DOMAIN,api3-normal-lf.fqnovel.com,REJECT-DROP
-DOMAIN,api5-normal-lq.fqnovel.com,REJECT-DROP
-DOMAIN,mon11-misc-lq.fqnovel.com,REJECT-DROP
 
 # —— ABTest / 实验策略下发 ——
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,abtest)),REJECT
 DOMAIN,abtest3-misc.zijieapi.com,REJECT-DROP
 DOMAIN,abtest3-misc-lf.zijieapi.com,REJECT-DROP
 
+# —— 其他控制节点（如风控 / Trace 等） ——
+DOMAIN,tnc0-alisc1.zijieapi.com,REJECT-DROP
+
+# —— UGSDK 激励 / 好评弹窗 ——
+DOMAIN,praisewindow-sinfonlinea.ugsdk.cn,{{{激励视频}}}                         # 好评/激励弹窗链路（可随激励视频开关）
+
 # =====================================================================
-# 通用 | 埋点 / 分析与性能监控
+# 抖音 / 今日头条公共接口域 | snssdk.com
 # =====================================================================
+# —— 视频广告 / 开屏控制 ——
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT-DROP           # Video Ad Server
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT-DROP          # 开屏/前贴片控制
+
+# —— 曝光 / 监控 / 计费链路 ——
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,mon)),REJECT                   # 曝光/监控
+
+# —— 开屏 & 信息流广告接口（snssdk） ——
+URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT-DROP
+URL-REGEX,^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*,REJECT
+
+# —— 抖音 Aweme 广告 / 策略接口（frontier） ——
+DOMAIN,frontier-aweme.snssdk.com,REJECT
+DOMAIN-SUFFIX,pangolin.snssdk.com,REJECT                                       # 巨量引擎 / 广告 SDK
+
+# =====================================================================
+# 今日头条系接口域 | toutiao.com / toutiaoapi.com / toutiaocloud.com / va.toutiao.com
+# =====================================================================
+# —— 广告平台 / 巨量引擎 ——
+DOMAIN,ad.toutiao.com,REJECT
+DOMAIN-SUFFIX,ads.toutiao.com,REJECT
+DOMAIN-SUFFIX,adbyte.bytedance.com,REJECT
+
+# —— 开屏 / 启动广告接口（toutiaoapi） ——
+URL-REGEX,^https?:\/\/[^\/]+\.toutiaoapi\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT-DROP
+
+# —— 埋点 / 分析 / 其他 ——
 DOMAIN-SUFFIX,log.toutiao.com,REJECT-DROP
+DOMAIN-SUFFIX,toutiaocloud.com,REJECT-DROP
+DOMAIN-SUFFIX,va.toutiao.com,REJECT-DROP
+
+# —— 图像 & 标记资源（misc-lq） ——
+DOMAIN,mon11-misc-lq.toutiaoapi.com,REJECT-DROP
+AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
+
+# —— 今日头条相关第三方广告入口 ——
+DOMAIN-SUFFIX,partner.toutiao.com,REJECT
+
+# =====================================================================
+# 番茄小说相关域 | fqnovel.com / fqnovelpic.com
+# =====================================================================
+# —— 广告卡 / 实验 / 监控线路（域名级） ——
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lq)),REJECT
+
+DOMAIN,api3-normal-lf.fqnovel.com,REJECT-DROP
+DOMAIN,api5-normal-lq.fqnovel.com,REJECT-DROP
+DOMAIN,mon11-misc-lq.fqnovel.com,REJECT-DROP
+
+# —— frontier100（头条广告接口映射到番茄） ——
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT-DROP
+
+# —— 激励广告链路（可通过激励视频开关） ——
+DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinea)),DIRECT
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlineb)),{{{激励视频}}}   # 覆盖激励链路时启用
+
+# —— 番茄图像 / 标记资源域 ——
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+
+# =====================================================================
+# 抖音直播 / 多媒体域 | douyin.com / amemv.com / douyinstatic.com / douyinpic.com / bytegecko.com
+# =====================================================================
+# —— 直播控制 / 拉流入口（谨慎：会影响抖音直播） ——
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lq)),REJECT
+DOMAIN,webcast5-open-lf.douyin.com,REJECT-DROP
+# DOMAIN,webcast.amemv.com,REJECT   # 如确认仅章节直播使用可开启
+
+# —— 直播视频 / 音频流 CDN ——
+DOMAIN-SUFFIX,webcastcdn-tos.douyinstatic.com,REJECT
+DOMAIN-SUFFIX,webcastcdn-tos-sign.douyinstatic.com,REJECT
+DOMAIN-SUFFIX,webcast-sourcecdn-tos.bytegecko.com,REJECT
+DOMAIN-SUFFIX,webcast-gr-sourcecdn-tos.bytegecko.com,REJECT
+
+# —— 直播封面 / 贴图等资源 ——
+DOMAIN-SUFFIX,webcast.douyinpic.com,REJECT
+
+# =====================================================================
+# 媒体素材 CDN 域 | bytedcdn.com 等
+# =====================================================================
+# —— 激励 / 前贴片媒体素材 ——
+AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT
+
+# =====================================================================
+# 通用埋点 / 分析域 | log.snssdk.com / rtlog.snssdk.com / data.bytedance.com / ibytedapm.com
+# =====================================================================
 DOMAIN-SUFFIX,log.snssdk.com,REJECT-DROP
 DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT-DROP
 DOMAIN-SUFFIX,data.bytedance.com,REJECT-DROP
 DOMAIN-SUFFIX,ibytedapm.com,REJECT-DROP
-DOMAIN-SUFFIX,toutiaocloud.com,REJECT-DROP
-DOMAIN-SUFFIX,va.toutiao.com,REJECT-DROP
 
 # =====================================================================
-# 通用 | CDN 素材与第三方广告域
+# 通用第三方广告 / 追踪域
 # =====================================================================
-DOMAIN-SUFFIX,partner.toutiao.com,REJECT
 DOMAIN-SUFFIX,syzagk.com,REJECT
 DOMAIN,api.dler.io,REJECT
 DOMAIN,jr-ad.ctrip.com,REJECT-DROP
@@ -86,21 +137,7 @@ DOMAIN,readapi.zziot.life,REJECT-DROP
 DOMAIN,tracking.ad-survey.com,REJECT-DROP
 
 # =====================================================================
-# 番茄 / 抖音 | 图像与标记资源
-# =====================================================================
-DOMAIN,mon11-misc-lq.toutiaoapi.com,REJECT-DROP
-AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
-DOMAIN,tnc0-alisc1.zijieapi.com,REJECT-DROP
-
-# =====================================================================
-# 番茄 | 激励广告接口与组件资源（可开关）
-# =====================================================================
-DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
-# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinea)),DIRECT
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlineb)),{{{激励视频}}}   # 需要更广覆盖时启用
-
-# =====================================================================
-# 通用 | 跳转短链追踪（部分与奖励领取相关）
+# 短链 / 跳转追踪域 | bdurl / zjurl / byteurl
 # =====================================================================
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
