@@ -483,10 +483,12 @@ const CFG = {
     // —— 开关类（0/1 / true/false 都支持）—— //
     MASK_IP: toBool(ENV('MASK_IP', true), true),
 
-// MASK_POS：
-//   · 如果模块参数显式设置 ⇒ 优先用模块参数
-//   · 否则如果 BoxJS 有值       ⇒ 用 BoxJS
-//   · 如果都没有 ⇒ 跟随 MASK_IP
+    /**
+     * MASK_POS：
+     *  · 如果模块参数显式设置           ⇒ 优先用模块参数
+     *  · 否则如果 BoxJS 有值            ⇒ 使用 BoxJS 配置
+     *  · 如果两者都没有显式设置         ⇒ 默认跟随 MASK_IP
+     */
     MASK_POS: (() => {
         // 用一个特殊默认值作为“哨兵”，表示“未显式设置，应该跟随 MASK_IP”
         const SENTINEL = '__FOLLOW_MASK_IP__';
@@ -542,11 +544,18 @@ const CFG = {
     SD_ICON_THEME: ENV('SD_ICON_THEME', 'check'),
     SD_ARROW: toBool(ENV('SD_ARROW', true), true),
 
-    // —— Services —— //
-    // BoxJS 多选（checkboxes）：SERVICES
-    //   · 数组 [] 视为“未指定”
-    // BoxJS 文本备选：SERVICES_TEXT
-    // 模块 arguments：SERVICES
+    /**
+     * Services 配置来源与优先级：
+     *  · 模块 arguments：SERVICES（显式改动时优先于 BoxJS）
+     *  · BoxJS 多选（checkboxes）：SERVICES（数组 [] 视为“未指定”）
+     *  · BoxJS 文本备选：SERVICES_TEXT（逗号分隔 / JSON 数组均可）
+     *
+     * 解析顺序（实际逻辑）：
+     *  1）优先使用模块 arguments 中的 SERVICES（若解析后非空）
+     *  2）否则使用 BoxJS 复选框 SERVICES
+     *  3）否则使用 BoxJS 文本 SERVICES_TEXT
+     *  4）以上都为空时，回退为脚本内置默认全量服务列表
+     */
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readBoxKey('SERVICES');
         if (v == null) return null; // null 表示“无此键”
