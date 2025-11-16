@@ -54,8 +54,8 @@
  *     2）否则若 BoxJS（@Panel.NetworkInfo.Settings.*）有值 ⇒ BoxJS 覆盖默认
  *     3）否则退回模块 arguments / 脚本默认 defVal
  *  · Update                 刷新间隔（秒）                 默认 10
- *  · Timeout                全局超时（秒）                 默认 8
- *  · IPv6                   启用 IPv6                      默认 0
+ *  · Timeout                全局超时（秒）                 默认 12
+ *  · IPv6                   启用 IPv6                      默认 1
  *  · MASK_IP                脱敏 IP                        默认 1
  *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
  *  · DOMESTIC_IPv4          直连 IPv4 源                   默认 ipip
@@ -79,7 +79,7 @@
  *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开（顺序按输入）
  *
  * 日志 · 调试
- *  · LOG                    开启日志                        默认 0
+ *  · LOG                    开启日志                        默认 1
  *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
  *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
  *  · LOG_PUSH               异常系统通知推送                 默认 1
@@ -223,33 +223,72 @@ function bootLog(...args) {
  *  典型存储结构：
  *  {
  *    "NetworkInfo": {
- *      "Settings": { "Update": "10", "Timeout": "8", ... }
+ *      "Settings": { "Update": "10", "Timeout": "12", ... }
  *    }
  *  }
  *  或直接：
  *  {
  *    "Update": "10",
- *    "Timeout": "8",
+ *    "Timeout": "12",
  *    ...
  *  }
  */
 const SETTINGS_ROOT_KEY = '@Panel.NetworkInfo.Settings';
+// BoxJS 面板配置可能的根 key（按顺序尝试）
+const SETTINGS_ROOT_KEYS = [
+    SETTINGS_ROOT_KEY,           // 原设计：独立 key
+    'Panel',                     // 你现在持久层里看到的这个
+    'Panel.NetworkInfo.Settings',
+    'NetworkInfo'                // 兜底：有些环境可能直接把 NetworkInfo 当根
+];
 
 /** 读取 BoxJS 设置对象：
  *  兼容三种形态：
  *   1) { NetworkInfo: { Settings: { ... } } }
  *   2) { Settings: { ... } }
  *   3) 直接就是 { Update:..., MASK_IP:... }
+ *
+ *  另外兼容多种根 key：
+ *   - @Panel.NetworkInfo.Settings（独立 key）
+ *   - Panel（Surge 面板统一存一个 JSON）
+ *   - Panel.NetworkInfo.Settings / NetworkInfo 等
  */
 function readBoxSettings() {
-    let val = KVStore.read(SETTINGS_ROOT_KEY);
-    bootLog('KV.read', SETTINGS_ROOT_KEY, '=> type:', typeof val, 'raw:', val);
+    let val = null;
+    let usedKey = '';
 
-    if (!val) {
+    // 依次尝试几个可能的 root key
+    for (const k of SETTINGS_ROOT_KEYS) {
+        try {
+            val = KVStore.read(k);
+        } catch (_) {
+            val = null;
+        }
+
+        // 为了避免把整段 JSON 打爆 log，这里 raw 简单收敛一下
+        let rawTag;
+        if (val === null || val === undefined) {
+            rawTag = 'null';
+        } else if (typeof val === 'string') {
+            rawTag = val.length > 120 ? val.slice(0, 120) + '…' : val;
+        } else {
+            rawTag = '[object]';
+        }
+
+        bootLog('KV.read', k, '=> type:', typeof val, 'raw:', rawTag);
+
+        if (val !== null && val !== undefined && val !== '') {
+            usedKey = k;
+            break;
+        }
+    }
+
+    if (!usedKey) {
         bootLog('BoxSettings.empty', 'no value, use defaults');
         return {};
     }
 
+    // 字符串 => JSON
     if (typeof val === 'string') {
         try {
             const parsed = JSON.parse(val);
@@ -266,20 +305,26 @@ function readBoxSettings() {
         return {};
     }
 
+    // 三种结构兼容：
+    // 1) { NetworkInfo: { Settings: { ... } } }
     if (val.NetworkInfo && typeof val.NetworkInfo.Settings === 'object') {
         bootLog('BoxSettings.path', 'NetworkInfo.Settings');
+        bootLog('BoxSettings.final', val.NetworkInfo.Settings);
         return val.NetworkInfo.Settings;
     }
 
+    // 2) { Settings: { ... } }
     if (val.Settings && typeof val.Settings === 'object') {
         bootLog('BoxSettings.path', 'Settings');
+        bootLog('BoxSettings.final', val.Settings);
         return val.Settings;
     }
 
+    // 3) 直接就是 { Update:..., MASK_IP:... }
     bootLog('BoxSettings.path', 'rootObject', val);
+    bootLog('BoxSettings.final', val);
     return val;
 }
-
 
 const BOX = readBoxSettings();
 
@@ -420,7 +465,7 @@ function ENV(key, defVal, opt = {}) {
 const CFG = {
     // —— 基本 —— //
     Update: toNum(ENV('Update', 10), 10),
-    Timeout: toNum(ENV('Timeout', 8), 8),
+    Timeout: toNum(ENV('Timeout', 12), 12),
 
     // —— 开关类（0/1 / true/false 都支持）—— //
     MASK_IP: toBool(ENV('MASK_IP', true), true),
@@ -434,7 +479,7 @@ const CFG = {
         return toBool(raw, true);
     })(),
 
-    IPv6: toBool(ENV('IPv6', false), false),
+    IPv6: toBool(ENV('IPv6', true), true),
 
     // —— 数据源 —— //
     DOMESTIC_IPv4: (() => {
@@ -515,7 +560,7 @@ const CFG = {
     })(),
 
     // —— 日志 —— //
-    LOG: toBool(ENV('LOG', false), false),
+    LOG: toBool(ENV('LOG', true), true),
     LOG_LEVEL: (ENV('LOG_LEVEL', 'info') + '').toLowerCase(),
     LOG_TO_PANEL: toBool(ENV('LOG_TO_PANEL', false), false),
     LOG_PUSH: toBool(ENV('LOG_PUSH', true), true)
