@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-10R2
+ * 版本：2025-11-16R1
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -43,11 +43,12 @@
  *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
  *
  * 服务清单 · 选择优先级
+ *  · 模块 #!arguments（SERVICES=...）
  *  · BoxJS 勾选（NetworkInfo_SERVICES）
  *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
- *  · 模块 #!arguments（SERVICES=...）
  *  · 默认（全部）
- *
+ *  ·
+ * 参数优先级：模块 #!arguments > BoxJS > 默认值
  * 参数 · 默认值（BoxJS 键 / #!arguments）
  *  · Update                 刷新间隔（秒）                 默认 10
  *  · Timeout                全局超时（秒）                 默认 8
@@ -80,10 +81,6 @@
  *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
  *  · LOG_PUSH               异常系统通知推送                 默认 1
  *
- * 兼容 · 迁移
- *  · BoxJS 键统一以 NetworkInfo_ 前缀（示例：NetworkInfo_Update）
- *  · 旧键 DOMIC_* 自动兼容；SUBTITLE_* 取代旧 ST_*（渲染一致）
- *
  * 常见问题 · 提示
  *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
  *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
@@ -92,11 +89,6 @@
  * 示例 · 组合参数
  *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
  *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
- *
- * 变更记录 · 摘要
- *  · 统一：常量/端点/优先级表驱动；Direct/Landing/Entrance 抽象抓取器
- *  · 优化：服务检测工具收口（渲染/HTTP/地区名）与可扩展别名表
- *  · 修复：IPv4/IPv6 串位；直连 IPv4 源偶发回 IPv6 的纠偏(v4-only fallback)；渲染层类型守卫
  * ========================================================= */
 
 // ====================== 常量 & 配置基线 ======================
@@ -236,14 +228,14 @@ const K = (s) => `NetworkInfo_${s}`;
 const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
 // ====================== 预读基础配置 ======================
-const UPDATE = toNum(readKV(K('Update')) ?? $args.Update ?? 10, 10);
-const TIMEOUT = toNum(readKV(K('Timeout')) ?? $args.Timeout ?? 8, 8);
+const UPDATE = toNum($args.Update ?? readKV(K('Update')) ?? 10, 10);
+const TIMEOUT = toNum($args.Timeout ?? readKV(K('Timeout')) ?? 8, 8);
 
 // ====================== 日志系统 ======================
-const LOG_ON = toBool(readKV(K('LOG')) ?? $args.LOG, false);
-const LOG_TO_PANEL = toBool(readKV(K('LOG_TO_PANEL')) ?? $args.LOG_TO_PANEL, false);
-const LOG_PUSH = toBool(readKV(K('LOG_PUSH')) ?? $args.LOG_PUSH, true);
-const LOG_LEVEL = (readKV(K('LOG_LEVEL')) ?? $args.LOG_LEVEL ?? 'info').toString().toLowerCase();
+const LOG_ON = toBool($args.LOG ?? readKV(K('LOG')), false);
+const LOG_TO_PANEL = toBool($args.LOG_TO_PANEL ?? readKV(K('LOG_TO_PANEL')), false);
+const LOG_PUSH = toBool($args.LOG_PUSH ?? readKV(K('LOG_PUSH')), true);
+const LOG_LEVEL = ($args.LOG_LEVEL ?? readKV(K('LOG_LEVEL')) ?? 'info').toString().toLowerCase();
 
 const LOG_LEVELS = {debug: 10, info: 20, warn: 30, error: 40};
 const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
@@ -318,39 +310,40 @@ const CFG = {
     Update: UPDATE,
     Timeout: TIMEOUT,
 
-    MASK_IP: toBool(readKV(K('MASK_IP')) ?? $args.MASK_IP, true),
-    MASK_POS: toBool(readKV(K('MASK_POS')) ?? $args.MASK_POS, true),
-    IPv6: toBool(readKV(K('IPv6')) ?? $args.IPv6, false),
+    MASK_IP: toBool($args.MASK_IP ?? readKV(K('MASK_IP')), true),
+    MASK_POS: toBool($args.MASK_POS ?? readKV(K('MASK_POS')), true),
+    IPv6: toBool($args.IPv6 ?? readKV(K('IPv6')), false),
 
-    DOMESTIC_IPv4: readKV(K('DOMESTIC_IPv4')) ?? $args.DOMESTIC_IPv4
+    DOMESTIC_IPv4: $args.DOMESTIC_IPv4
+        ?? readKV(K('DOMESTIC_IPv4'))
         ?? $args.DOMIC_IPv4 /* legacy */ ?? 'ipip',
-    DOMESTIC_IPv6: readKV(K('DOMESTIC_IPv6')) ?? $args.DOMESTIC_IPv6
+    DOMESTIC_IPv6: $args.DOMESTIC_IPv6
+        ?? readKV(K('DOMESTIC_IPv6'))
         ?? $args.DOMIC_IPv6 /* legacy */ ?? 'ddnspod',
-    LANDING_IPv4: readKV(K('LANDING_IPv4')) ?? $args.LANDING_IPv4 ?? 'ipapi',
-    LANDING_IPv6: readKV(K('LANDING_IPv6')) ?? $args.LANDING_IPv6 ?? 'ipsb',
+    LANDING_IPv4: $args.LANDING_IPv4 ?? readKV(K('LANDING_IPv4')) ?? 'ipapi',
+    LANDING_IPv6: $args.LANDING_IPv6 ?? readKV(K('LANDING_IPv6')) ?? 'ipsb',
 
-    TW_FLAG_MODE: toNum(readKV(K('TW_FLAG_MODE')) ?? $args.TW_FLAG_MODE ?? 1, 1),
+    TW_FLAG_MODE: toNum($args.TW_FLAG_MODE ?? readKV(K('TW_FLAG_MODE')) ?? 1, 1),
 
     // 图标预设 / 自定义（默认值用“预设键”，不是最终成品名）
-    IconPreset: readKV(K('IconPreset')) ?? $args.IconPreset ?? 'globe',
-    Icon: readKV(K('Icon')) ?? $args.Icon ?? '',
-    IconColor: readKV(K('IconColor')) ?? $args.IconColor ?? '#1E90FF',
+    IconPreset: $args.IconPreset ?? readKV(K('IconPreset')) ?? 'globe',
+    Icon: $args.Icon ?? readKV(K('Icon')) ?? '',
+    IconColor: $args.IconColor ?? readKV(K('IconColor')) ?? '#1E90FF',
 
-    SD_STYLE: readKV(K('SD_STYLE')) ?? $args.SD_STYLE ?? 'icon',
-    SD_SHOW_LAT: toBool(readKV(K('SD_SHOW_LAT')) ?? $args.SD_SHOW_LAT, true),
-    SD_SHOW_HTTP: toBool(readKV(K('SD_SHOW_HTTP')) ?? $args.SD_SHOW_HTTP, true),
-    SD_LANG: readKV(K('SD_LANG')) ?? $args.SD_LANG ?? 'zh-Hans',
+    SD_STYLE: $args.SD_STYLE ?? readKV(K('SD_STYLE')) ?? 'icon',
+    SD_SHOW_LAT: toBool($args.SD_SHOW_LAT ?? readKV(K('SD_SHOW_LAT')), true),
+    SD_SHOW_HTTP: toBool($args.SD_SHOW_HTTP ?? readKV(K('SD_SHOW_HTTP')), true),
+    SD_LANG: $args.SD_LANG ?? readKV(K('SD_LANG')) ?? 'zh-Hans',
 
     SD_TIMEOUT_MS: (() => {
-        const raw = readKV(K('SD_TIMEOUT_MS')) ?? $args.SD_TIMEOUT_MS;
+        const raw = $args.SD_TIMEOUT_MS ?? readKV(K('SD_TIMEOUT_MS'));
         const fallback = TIMEOUT * 1000;
         if (raw == null || raw === '') return fallback;
-        return toNum(raw, fallback);
     })(),
 
-    SD_REGION_MODE: readKV(K('SD_REGION_MODE')) ?? $args.SD_REGION_MODE ?? 'full',
-    SD_ICON_THEME: readKV(K('SD_ICON_THEME')) ?? $args.SD_ICON_THEME ?? 'check',
-    SD_ARROW: toBool(readKV(K('SD_ARROW')) ?? $args.SD_ARROW, true),
+    SD_REGION_MODE: $args.SD_REGION_MODE ?? readKV(K('SD_REGION_MODE')) ?? 'full',
+    SD_ICON_THEME: $args.SD_ICON_THEME ?? readKV(K('SD_ICON_THEME')) ?? 'check',
+    SD_ARROW: toBool($args.SD_ARROW ?? readKV(K('SD_ARROW')), true),
 
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readKV(K('SERVICES'));
@@ -372,10 +365,10 @@ const CFG = {
 
     // —— 子标题新键（与 BoxJS 对齐）——
     SUBTITLE_STYLE: normalizeSubStyle(
-        (readKV(K('SUBTITLE_STYLE')) ?? $args.SUBTITLE_STYLE ?? 'line').toString().trim()
+        ($args.SUBTITLE_STYLE ?? readKV(K('SUBTITLE_STYLE')) ?? 'line').toString().trim()
     ),
-    SUBTITLE_MINIMAL: toBool(readKV(K('SUBTITLE_MINIMAL')) ?? $args.SUBTITLE_MINIMAL, false),
-    GAP_LINES: Math.max(0, Math.min(2, toNum(readKV(K('GAP_LINES')) ?? $args.GAP_LINES, 1)))
+    SUBTITLE_MINIMAL: toBool($args.SUBTITLE_MINIMAL ?? readKV(K('SUBTITLE_MINIMAL')), false),
+    GAP_LINES: Math.max(0, Math.min(2, toNum($args.GAP_LINES ?? readKV(K('GAP_LINES')) ?? 1, 1)))
 };
 
 // ====================== 图标 & 开关映射 ======================
@@ -1341,8 +1334,16 @@ function normSvcList(list) {
 function selectServices() {
     const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
     const candidates = hasCheckboxKey
-        ? [["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW], ["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]]
-        : [["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]];
+        ? [
+            ["arguments", CFG.SERVICES_ARG_TEXT],
+            ["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW],
+            ["BoxJS text", CFG.SERVICES_BOX_TEXT]
+        ]
+        : [
+            ["arguments", CFG.SERVICES_ARG_TEXT],
+            ["BoxJS text", CFG.SERVICES_BOX_TEXT]
+        ];
+
     for (const [label, raw] of candidates) {
         const list = parseServices(raw);
         if (list.length > 0) {
