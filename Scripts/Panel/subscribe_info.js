@@ -320,28 +320,76 @@ function readBoxMulti(keys) {
 
 /**
  * 字符串参数读取，优先级：
- *   1）BoxJS (SubscribeInfo.Settings.*)
- *   2）#!arguments
- *   3）defVal
+ *   1）「已修改」的 #!arguments（与默认 arguments 不同）
+ *   2）BoxJS (SubscribeInfo.Settings.*)
+ *   3）「未修改」的 #!arguments（与默认 arguments 相同）
+ *   4）defVal（脚本默认值）
+ *
+ * 说明：
+ *  · 对于 url/title/reset 这类参数：
+ *      - 默认 arguments（如“订阅链接/机场名称/重置日期”）只用于判断“是否修改”，本身不当作有效值返回
+ *  · 对于 defaultIcon/defaultIconColor：
+ *      - 默认 arguments = 脚本 defVal
+ *      - 若没改过且无 BoxJS，则返回 defVal
  */
-function pickStr(lowerKey, upperKey, defVal) {
+function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
+    const canon = v => (v == null ? "" : String(v).trim());
+
+    // 1. 原始 arguments 值（未清洗，用来和默认 arguments 比较）
+    const argRaw =
+        Object.prototype.hasOwnProperty.call(args, lowerKey)
+            ? args[lowerKey]
+            : (Object.prototype.hasOwnProperty.call(args, upperKey)
+                ? args[upperKey]
+                : null);
+
+    const argClean = cleanArg(argRaw);
+    const hasArg = argClean != null;
+
+    // 2. 默认 arguments（模块里写死的例如“订阅链接/机场名称/重置日期”等）
+    const defArgCanon = canon(defArgRaw);
+
+    // 3. BoxJS
     const boxRaw = readBoxMulti([upperKey, lowerKey]);
     const boxClean = cleanArg(boxRaw);
     const hasBox = boxClean != null;
 
-    const argRaw = getArg(lowerKey, upperKey);
-    const argClean = cleanArg(argRaw);
-    const hasArg = argClean != null;
+    // 4. 判断 arguments 是否“被修改过”
+    //   - argRaw 不为 null/undefined，且和默认 arguments 文本不同 ⇒ 视为“修改过”
+    let argChanged = false;
+    if (argRaw !== null && argRaw !== undefined) {
+        if (canon(argRaw) !== defArgCanon) {
+            argChanged = true;
+        }
+    }
 
-    const chosen = hasBox ? boxClean : (hasArg ? argClean : defVal);
+    let chosen;
+    if (argChanged && hasArg) {
+        // ① 修改后的 arguments 最高优先级
+        chosen = argClean;
+    } else if (hasBox) {
+        // ② 没有被修改 ⇒ BoxJS 优先
+        chosen = boxClean;
+    } else if (hasArg) {
+        // ③ 有 arguments 且与默认值相同（比较少见，但保底）
+        chosen = argClean;
+    } else {
+        // ④ 完全没配置 ⇒ 用脚本默认 defVal
+        chosen = defVal;
+    }
 
     log(
-        "pickStr", `${lowerKey}/${upperKey}`,
+        "pickStr",
+        `${lowerKey}/${upperKey}`,
         "| defVal:", defVal,
+        "| defArgRaw:", defArgRaw,
+        "| argRaw:", argRaw,
+        "| argClean:", argClean,
         "| box:", boxClean,
-        "| arg:", argClean,
+        "| argChanged:", argChanged,
         "| chosen:", chosen
     );
+
     return chosen;
 }
 
@@ -465,21 +513,28 @@ function fetchInfo(url, resetDayRaw, title, index) {
     const defaultIcon = pickStr(
         "defaultIcon",
         "DefaultIcon",
+        "antenna.radiowaves.left.and.right.circle.fill",   // 脚本默认值 = 模块默认 arguments
         "antenna.radiowaves.left.and.right.circle.fill"
     );
     const defaultColor = pickStr(
         "defaultIconColor",
         "DefaultIconColor",
+        "#00E28F",   // 脚本默认值 = 模块默认 arguments
         "#00E28F"
     );
 
     const blocks = [];
     for (let i = 1; i <= 10; i++) {
-        const rawUrl = pickStr(`url${i}`, `URL${i}`, null);
+        // URL：默认 arguments=“订阅链接”，逻辑默认值=null
+        const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
         const url = normalizeUrl(rawUrl, "url" + i);
 
-        const title = pickStr(`title${i}`, `Title${i}`, null) || `机场${i}`;
-        const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null);
+        // 标题：默认 arguments=“机场名称”，逻辑默认值=null，再用“机场N”兜底
+        const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
+        const title = rawTitle || `机场${i}`;
+
+        // 重置：默认 arguments=“重置日期”，逻辑默认值=null
+        const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
 
         log(
             "slot", i,
