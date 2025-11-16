@@ -14,9 +14,12 @@ hostname = %APPEND% *.toutiao.com
 # 全局 | 分发控制与广告配置下发
 # =====================================================================
 DOMAIN,ad.zijieapi.com,REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,ad)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lq)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),{{{激励视频}}}    # 统一广告/活动下发线（normal-lf）
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT                # Video Ad Server
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT               # 开屏/前贴片控制
+
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT-DROP                # Video Ad Server
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT-DROP               # 开屏/前贴片控制
 
 # =====================================================================
 # 全局 | 素材与播放器组件 / 曝光监控
@@ -46,6 +49,30 @@ DOMAIN-SUFFIX,pangolin.snssdk.com,REJECT
 # —— 今日头条信息流广告接口（保守） ——
 # URL-REGEX,^https?:\/\/[^\/]+\.toutiao\.com\/api\/news\/recommend\/v\d+\/?.*,REJECT   # 可能清空信息流，默认注释
 URL-REGEX,^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*,REJECT
+
+# —— 抖音 Aweme 广告 / 策略接口（frontier） ——
+DOMAIN,frontier-aweme.snssdk.com,REJECT
+
+# =====================================================================
+# 抖音 | 直播链路（章节直播/内嵌直播，激进，可通过「章节直播」参数控制）
+# 说明：
+# - 命中后，番茄章节内嵌直播大概率无法正常播放
+# - 同时会影响抖音 App 正常直播，请按需开启
+# =====================================================================
+
+# —— 直播控制 / 拉流入口 ——
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lq)),REJECT
+# DOMAIN,webcast.amemv.com,REJECT
+
+# —— 直播视频 / 音频流 CDN ——
+DOMAIN-SUFFIX,webcastcdn-tos.douyinstatic.com,REJECT
+DOMAIN-SUFFIX,webcastcdn-tos-sign.douyinstatic.com,REJECT
+DOMAIN-SUFFIX,webcast-sourcecdn-tos.bytegecko.com,REJECT
+DOMAIN-SUFFIX,webcast-gr-sourcecdn-tos.bytegecko.com,REJECT
+
+# —— 直播封面 / 贴图等资源 ——
+DOMAIN-SUFFIX,webcast.douyinpic.com,REJECT
 
 # =====================================================================
 # fqnovel / 番茄 | 广告卡 / 实验 / 监控线路
@@ -89,6 +116,7 @@ DOMAIN,tracking.ad-survey.com,REJECT-DROP
 # 番茄 / 抖音 | 图像与标记资源
 # =====================================================================
 DOMAIN,mon11-misc-lq.toutiaoapi.com,REJECT-DROP
+AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
 DOMAIN,tnc0-alisc1.zijieapi.com,REJECT-DROP
 
