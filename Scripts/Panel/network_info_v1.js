@@ -465,7 +465,7 @@ const CFG = {
     SD_LANG: ENV('SD_LANG', 'zh-Hans'),
 
     // SD_TIMEOUT_MS: 0 或空 = 跟随 Timeout*1000；后面会统一做 >= SD_MIN_TIMEOUT 兜底
-    SD_TIMEOUT_RAW: ENV('SD_TIMEOUT_MS', ''),
+    SD_TIMEOUT_RAW: ENV('SD_TIMEOUT_MS', 0),
 
     SD_REGION_MODE: ENV('SD_REGION_MODE', 'full'),
     SD_ICON_THEME: ENV('SD_ICON_THEME', 'check'),
