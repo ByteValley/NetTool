@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：订阅信息面板（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2025-11-16R2
+ * 版本：2025-11-16R3
  *
  * 概述 · 功能边界
  *  · 支持最多 10 组订阅链接，按顺序展示总量 / 已用 / 剩余 / 到期时间
@@ -13,11 +13,14 @@
  *  · 依赖：$httpClient / $persistentStore | $prefs / $done
  *
  * 参数源 · BoxJS 结构
- *  · BoxJS 存储根：@Panel
- *    - Panel: { SubscribeInfo: { Settings: { ... } }, ... }
- *    - 或 @Panel.SubscribeInfo.Settings 直接为 { ... }
- *    - 或 @SubscribeInfo / @SubscribeInfo.Settings
- *  · 脚本内部统一视为：SubscribeInfo.Settings 对象
+ *  · BoxJS 存储根：key = "Panel"
+ *    {
+ *      "NetworkInfo": { "Settings": {...}, "Caches": ... },
+ *      "SubscribeInfo":   { "Settings": {...}, "Caches": ... }   // 推荐
+ *      // 兼容旧结构：
+ *      // "SubscribeInfo": { "Settings": {...}, "Caches": ... }
+ *    }
+ *  · 本脚本只在存在 SubscribeInfo 时读取
  *
  * 参数 · 命名 & 取值优先级
  *  · 所有参数均支持「小写 + 大写」两种键名：
@@ -35,29 +38,9 @@
  *          ⇒ 使用模块参数
  *      4）否则 ⇒ 使用脚本默认 defVal
  *
- *  · 关键参数说明：
- *      - defaultIcon / DefaultIcon
- *          · 面板图标 SF Symbols 名称
- *          · 默认：antenna.radiowaves.left.and.right.circle.fill
- *
- *      - defaultIconColor / DefaultIconColor
- *          · 面板图标颜色（HEX）
- *          · 默认：#00E28F
- *
- *      - urlN / URLN（N=1..10）
- *          · 第 N 个机场订阅链接（http / https）
- *          · 可为原始 URL，或 encodeURIComponent 之后的整串
- *          · 为空 / 占位符 / 无法解出 http(s) 链接 ⇒ 跳过
- *
- *      - titleN / TitleN（N=1..10）
- *          · 第 N 个机场显示名称
- *          · 为空时 ⇒ 自动用 “机场N”
- *
- *      - resetDayN / ResetDayN（N=1..10）
- *          · 重置规则：
- *              · 纯数字（1~31）：按“每月 N 日重置”，面板显示“重置：X天”
- *              · 其他文本：原样展示，例如 “次月 1 日重置”
- *              · 未配置：不显示重置行，只显示“到期：xxxx.xx.xx”
+ *  · URL 特性：
+ *      - 支持原始 http(s) 链接
+ *      - 也支持整串 encodeURIComponent 之后的值（会自动解码一次）
  *
  * 显示规则 · 面板格式
  *  · 每个机场四行：
@@ -70,7 +53,7 @@
  *      · 面板内容：'未配置订阅参数'
  *
  * 日志说明
- *  · 默认开启基础日志（控制台 console.log）
+ *  · 默认输出基础日志（控制台 console.log）
  *  · 标记前缀统一为：[SubscribeInfo]
  * ========================================================= */
 
@@ -143,7 +126,6 @@ function normalizeUrl(src, label) {
         log("normalizeUrl", label, "raw is http(s) url:", s);
         return s;
     }
-    // 尝试 decode 一次
     try {
         const decoded = decodeURIComponent(s);
         if (isHttpUrl(decoded)) {
@@ -191,7 +173,7 @@ function cleanArg(val) {
     return s;
 }
 
-// ===== BoxJS & 参数优先级（@Panel.SubscribeInfo.Settings） =====
+// ===== BoxJS & 参数优先级（只读 key="Panel"） =====
 const KVStore = (() => {
     if (typeof $prefs !== "undefined" && $prefs.valueForKey) {
         return {
@@ -223,58 +205,54 @@ const KVStore = (() => {
 
 /**
  * 读取 BoxJS 订阅信息设置：
- *  支持三种位置：
- *   1) @Panel.SubscribeInfo.Settings       => { ... }
- *   2) @Panel                             => { SubscribeInfo: { Settings: { ... } }, ... }
- *   3) @SubscribeInfo / @SubscribeInfo.Settings
+ *  · 只读 key = "Panel"
+ *  · 优先 Panel.SubscribeInfo.Settings
+ *  · 若 Panel 不存在 / 无 Subscribe*，则返回 {}
  */
 function readBoxSettings() {
-    const candidates = [
-        "Panel",
-        "SubscribeInfo",
-        "Panel.SubscribeInfo.Settings"
-    ];
-
-    for (const key of candidates) {
-        let raw;
-        try {
-            raw = KVStore.read(key);
-        } catch (e) {
-            log("readBoxSettings read error:", key, String(e));
-            raw = null;
-        }
-        if (raw === null || raw === undefined || raw === "") {
-            log("readBoxSettings skip empty key:", key);
-            continue;
-        }
-
-        let val = raw;
-        if (typeof raw === "string") {
-            try {
-                val = JSON.parse(raw);
-            } catch (e) {
-                log("readBoxSettings JSON.parse error for key:", key, "raw:", raw);
-                continue;
-            }
-        }
-        if (!val || typeof val !== "object") {
-            log("readBoxSettings non-object for key:", key, "val:", val);
-            continue;
-        }
-
-        if (key === "Panel" && val.SubscribeInfo && typeof val.SubscribeInfo.Settings === "object") {
-            log("readBoxSettings hit Panel.SubscribeInfo.Settings");
-            return val.SubscribeInfo.Settings;
-        }
-        if (val.Settings && typeof val.Settings === "object") {
-            log("readBoxSettings hit", key, ".Settings");
-            return val.Settings;
-        }
-        log("readBoxSettings hit direct object from key:", key);
-        return val;
+    let raw;
+    try {
+        raw = KVStore.read("Panel");
+    } catch (e) {
+        log("readBoxSettings read Panel error:", String(e));
+        return {};
     }
 
-    log("readBoxSettings no settings found, use empty object");
+    if (raw === null || raw === undefined || raw === "") {
+        log("readBoxSettings Panel empty");
+        return {};
+    }
+
+    let panel;
+    if (typeof raw === "string") {
+        try {
+            panel = JSON.parse(raw);
+        } catch (e) {
+            log("readBoxSettings Panel JSON.parse error:", String(e));
+            log("readBoxSettings Panel raw:", raw);
+            return {};
+        }
+    } else {
+        panel = raw;
+    }
+
+    if (!panel || typeof panel !== "object") {
+        log("readBoxSettings Panel is not object:", panel);
+        return {};
+    }
+
+    try {
+        log("readBoxSettings Panel keys:", Object.keys(panel));
+    } catch (_) {
+    }
+
+    // Panel.SubscribeInfo.Settings
+    if (panel.SubscribeInfo && panel.SubscribeInfo.Settings && typeof panel.SubscribeInfo.Settings === "object") {
+        log("readBoxSettings hit Panel.SubscribeInfo.Settings");
+        return panel.SubscribeInfo.Settings;
+    }
+
+    log("readBoxSettings Panel has no SubscribeInfo Settings");
     return {};
 }
 
@@ -371,7 +349,10 @@ function fetchInfo(url, resetDayRaw, title, index) {
                     });
                 }
 
-                log("fetchInfo parsed userinfo", index, JSON.stringify(data));
+                try {
+                    log("fetchInfo parsed userinfo", index, JSON.stringify(data));
+                } catch (_) {
+                }
 
                 const upload = data.upload || 0;
                 const download = data.download || 0;
