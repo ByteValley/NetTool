@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-10R2
+ * 版本：2025-11-16R1（Panel.BoxJS 重构版）
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -16,7 +16,7 @@
  * 渲染结构 · 版式控制
  *  · 分组子标题：本地 / 入口 / 落地 / 服务检测；组间留白由 GAP_LINES 控制（0~2）
  *  · IPv4/IPv6 分行显示，按 MASK_IP 可脱敏；位置按 MASK_POS 可脱敏（未显式设置时随 MASK_IP）
- *  · 子标题样式由 SUBTITLE_STYLE 控制；SUBTITLE_MINIMAL 可输出极简标题
+ *  · 子标题样式由 SUBTITLE_STYLE 控制；SUB式_MINIMAL 可输出极简标题
  *
  * 数据源 · 抓取策略
  *  · 直连 IPv4：按优先级表驱动（cip | 163 | 126 | bilibili | pingan | ipip）
@@ -43,12 +43,16 @@
  *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
  *
  * 服务清单 · 选择优先级
- *  · BoxJS 勾选（NetworkInfo_SERVICES）
- *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
  *  · 模块 #!arguments（SERVICES=...）
+ *  · BoxJS 多选（@Panel.NetworkInfo.Settings.SERVICES）
+ *  · BoxJS 文本（@Panel.NetworkInfo.Settings.SERVICES_TEXT）
  *  · 默认（全部）
  *
- * 参数 · 默认值（BoxJS 键 / #!arguments）
+ * 参数 · 默认值 & 取值优先级
+ *  · 默认顺序（单值参数）：
+ *     1）模块 arguments 若与脚本默认 defVal 不同 ⇒ 视为“显式修改”，优先级最高
+ *     2）否则若 BoxJS（@Panel.NetworkInfo.Settings.*）有值 ⇒ BoxJS 覆盖默认
+ *     3）否则退回模块 arguments / 脚本默认 defVal
  *  · Update                 刷新间隔（秒）                 默认 10
  *  · Timeout                全局超时（秒）                 默认 8
  *  · IPv6                   启用 IPv6                      默认 0
@@ -72,7 +76,7 @@
  *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
  *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
  *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=Timeout*1000，最小 2000，0=跟随 Timeout
- *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开
+ *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开（顺序按输入）
  *
  * 日志 · 调试
  *  · LOG                    开启日志                        默认 0
@@ -194,15 +198,35 @@ const KVStore = (() => {
     } catch (_) {
     }
     return {
-        read: () => null, write: () => {
+        read: () => null,
+        write: () => {
         }
     };
 })();
 
-/** BoxJS 根对象（新写法）：@NetworkInfo.Settings */
-const SETTINGS_ROOT_KEY = '@NetworkInfo.Settings';
+/** BoxJS 根对象（Panel 版）：@Panel.NetworkInfo.Settings
+ *
+ *  典型存储结构：
+ *  {
+ *    "NetworkInfo": {
+ *      "Settings": { "Update": "10", "Timeout": "8", ... }
+ *    }
+ *  }
+ *  或直接：
+ *  {
+ *    "Update": "10",
+ *    "Timeout": "8",
+ *    ...
+ *  }
+ */
+const SETTINGS_ROOT_KEY = '@Panel.NetworkInfo.Settings';
 
-/** 读取 BoxJS 设置对象，无则返回 {} */
+/** 读取 BoxJS 设置对象：
+ *  兼容三种形态：
+ *   1) { NetworkInfo: { Settings: { ... } } }
+ *   2) { Settings: { ... } }
+ *   3) 直接就是 { Update:..., MASK_IP:... }
+ */
 function readBoxSettings() {
     let val = KVStore.read(SETTINGS_ROOT_KEY);
     if (!val) return {};
@@ -211,32 +235,34 @@ function readBoxSettings() {
             val = JSON.parse(val);
         } catch (e) {
             try {
-                console.log('[NetworkInfo] Settings JSON parse fail', e);
+                console.log('[NetworkInfo] Panel Settings JSON parse fail', e);
             } catch (_) {
             }
             return {};
         }
     }
-    return val && typeof val === 'object' ? val : {};
+    if (!val || typeof val !== 'object') return {};
+    if (val.NetworkInfo && typeof val.NetworkInfo.Settings === 'object') {
+        return val.NetworkInfo.Settings;
+    }
+    if (val.Settings && typeof val.Settings === 'object') {
+        return val.Settings;
+    }
+    return val;
 }
 
 const BOX = readBoxSettings();
 
-/** 兼容旧版逐键存储：NetworkInfo_XXX */
-function readLegacyKey(key) {
-    const name = `NetworkInfo_${key}`;
-    return KVStore.read(name);
-}
-
-/** 统一读取 BoxJS 某个字段（优先新对象，其次旧 key），空字符串视为“未设置” */
+/** 统一读取 BoxJS 某个字段
+ *  · 空字符串 / null / undefined 视为“未设置”
+ *  · true/false 或 "true"/"false" 原样返回，后续交给 toBool / toNum 处理
+ */
 function readBoxKey(key) {
-    if (BOX && Object.prototype.hasOwnProperty.call(BOX, key)) {
-        const v = BOX[key];
-        if (v !== undefined && v !== null && v !== '') return v;
-    }
-    const legacy = readLegacyKey(key);
-    if (legacy !== undefined && legacy !== null && legacy !== '') return legacy;
-    return undefined;
+    if (!BOX || typeof BOX !== 'object') return undefined;
+    if (!Object.prototype.hasOwnProperty.call(BOX, key)) return undefined;
+    const v = BOX[key];
+    if (v === '' || v === null || v === undefined) return undefined;
+    return v;
 }
 
 /** 解析 $argument（支持字符串或对象） */
@@ -291,21 +317,22 @@ const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 /**
  * 统一取值（核心优先级逻辑）：
  *
- *  目标语义：
- *    1. 脚本代码有一个“默认值”：defVal
- *    2. 模块参数如果“被修改过”（和 defVal 不同），则：
- *          模块参数 > BoxJS > 代码默认
- *    3. 模块参数仍是默认值 / 没填，则：
- *          BoxJS > 模块参数(默认) > 代码默认
- *    4. 没有 BoxJS、也没模块参数：
- *          使用 defVal
+ *  1. 模块 arguments 与脚本默认 defVal 比较：
+ *       - 若 arguments “存在且与 defVal 不同” ⇒ 视为用户显式修改 ⇒ 直接用 arguments（BoxJS 不再插手）
+ *       - 若 arguments 未提供 / 与 defVal 等价 ⇒ 视为“没改动默认”，此时允许 BoxJS 覆盖
+ *  2. 在“没改动默认”的情况下：
+ *       - 若 BoxJS 有值 ⇒ 用 BoxJS
+ *       - 否则 ⇒ 用 arguments（若有）或 defVal
+ *  3. 都没有 ⇒ defVal
  *
- *  同时支持：
+ *  支持：
  *    · argAlias  ：模块参数别名（数组）
  *    · boxAlias  ：BoxJS 字段别名（数组）
  */
 function ENV(key, defVal, opt = {}) {
     const typeHint = typeof defVal;
+
+    // 读取模块 arguments
     const argKeys = [key].concat(opt.argAlias || []);
     let argRaw;
     for (const k of argKeys) {
@@ -318,6 +345,7 @@ function ENV(key, defVal, opt = {}) {
         }
     }
 
+    // 读取 BoxJS
     const boxKeys = [key].concat(opt.boxAlias || []);
     let boxRaw;
     for (const bk of boxKeys) {
@@ -328,12 +356,14 @@ function ENV(key, defVal, opt = {}) {
         }
     }
 
+    // 类型转换
     const convert = (val) => {
         if (typeHint === 'number') return toNum(val, defVal);
         if (typeHint === 'boolean') return toBool(val, defVal);
         return val;
     };
 
+    // 统一比较用的“规范化字符串”
     const canon = (val) => {
         if (typeHint === 'number') return String(toNum(val, defVal));
         if (typeHint === 'boolean') return toBool(val, defVal) ? 'true' : 'false';
@@ -343,16 +373,16 @@ function ENV(key, defVal, opt = {}) {
     const hasArg = argRaw !== undefined;
     const argChanged = hasArg && !opt.skipArgDiff && canon(argRaw) !== canon(defVal);
 
-    // 1) 模块参数“被修改”：优先级最高（不看 BoxJS）
-    if (hasArg && argChanged) return convert(argRaw);
+    // 1）arguments 明显“改过默认” ⇒ 优先级最高，直接用它，BoxJS 不再插手
+    if (argChanged) return convert(argRaw);
 
-    // 2) 模块参数仍为默认值 / 未填，若 BoxJS 有值，则 BoxJS 覆盖默认
+    // 2）arguments 与默认相同 / 未填 ⇒ 若 BoxJS 有值，则 BoxJS 覆盖
     if (boxRaw !== undefined) return convert(boxRaw);
 
-    // 3) 没有 BoxJS，但模块传了值（不管是否等于默认）则用模块值
+    // 3）BoxJS 无值 ⇒ 若有 arguments（即便等价于默认），仍优先 arguments，再退回 defVal
     if (hasArg) return convert(argRaw);
 
-    // 4) 双双缺省：脚本默认
+    // 4）都没有 ⇒ defVal
     return defVal;
 }
 
@@ -363,12 +393,11 @@ const CFG = {
     Timeout: toNum(ENV('Timeout', 8), 8),
 
     // —— 开关类（0/1 / true/false 都支持）—— //
-    // 这里默认值一律用 true/false，配合 ENV 的布尔比较逻辑
     MASK_IP: toBool(ENV('MASK_IP', true), true),
 
     // MASK_POS：未显式设置时，自动跟随 MASK_IP
     MASK_POS: (() => {
-        const raw = ENV('MASK_POS', ''); // 空串 = 未显式设置
+        const raw = ENV('MASK_POS', '');
         if (raw === '' || raw === undefined || raw === null) {
             return toBool(ENV('MASK_IP', true), true);
         }
@@ -379,7 +408,6 @@ const CFG = {
 
     // —— 数据源 —— //
     DOMESTIC_IPv4: (() => {
-        // 兼容历史键 DOMIC_IPv4
         const v = ENV('DOMESTIC_IPv4', 'ipip');
         if (v !== '' && v != null) return v;
         return $args.DOMIC_IPv4 || 'ipip';
@@ -413,7 +441,11 @@ const CFG = {
     SD_ICON_THEME: ENV('SD_ICON_THEME', 'check'),
     SD_ARROW: toBool(ENV('SD_ARROW', true), true),
 
-    // —— Services（保持原有优先级：BoxJS 勾选 > BoxJS 文本 > arguments > 默认）—— //
+    // —— Services —— //
+    // BoxJS 多选（checkboxes）：SERVICES
+    //   · 数组 [] 视为“未指定”
+    // BoxJS 文本备选：SERVICES_TEXT
+    // 模块 arguments：SERVICES
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readBoxKey('SERVICES');
         if (v == null) return null; // null 表示“无此键”
@@ -440,7 +472,6 @@ const CFG = {
     SUBTITLE_STYLE: (() => {
         const v = ENV('SUBTITLE_STYLE', '');
         if (v !== '' && v != null) return v;
-        // 兼容 ST_SUBTITLE_STYLE
         return ENV('ST_SUBTITLE_STYLE', 'line');
     })(),
     SUBTITLE_MINIMAL: (() => {
@@ -469,7 +500,7 @@ const SUBTITLE_STYLES = Object.freeze({
     curly: (s) => `{${s}}`,
     angle: (s) => `《${s}》`,
     pipe: (s) => `║${s}║`,
-    bullet: (s) => `·${s} ·`,
+    bullet: (s) => `·${s}·`,
     plain: (s) => `${s}`,
 });
 
@@ -1390,7 +1421,10 @@ async function getEntranceBundle(ip) {
     }
 
     const t = Date.now();
-    const [a, b] = await Promise.allSettled([withRetry(() => ENT_LOC_CHAIN.pingan(ip), 1), withRetry(() => loc_chain(ip), 1)]);
+    const [a, b] = await Promise.allSettled([
+        withRetry(() => ENT_LOC_CHAIN.pingan(ip), 1),
+        withRetry(() => loc_chain(ip), 1)
+    ]);
     log('debug', 'Entrance locate results', {pingan: a.status, chain: b.status, cost: (Date.now() - t) + 'ms'});
 
     const res = {
@@ -1466,18 +1500,36 @@ function normSvcList(list) {
     return out;
 }
 
+/**
+ * 服务清单优先级：
+ *   1）模块 arguments（SERVICES）若非空 ⇒ 最高优先级
+ *   2）BoxJS 多选（SERVICES，checkboxes）
+ *   3）BoxJS 文本（SERVICES_TEXT）
+ *   4）以上都为空 ⇒ 使用脚本默认全量 SD_DEFAULT_ORDER
+ */
 function selectServices() {
-    const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
-    const candidates = hasCheckboxKey
-        ? [["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW], ["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]]
-        : [["BoxJS text", CFG.SERVICES_BOX_TEXT], ["arguments", CFG.SERVICES_ARG_TEXT]];
-    for (const [label, raw] of candidates) {
-        const list = parseServices(raw);
-        if (list.length > 0) {
-            log("info", `Services: ${label}`, list);
-            return list;
-        }
+    // 1) 模块 arguments（SERVICES 参数）
+    const argList = parseServices(CFG.SERVICES_ARG_TEXT);
+    if (argList.length > 0) {
+        log("info", "Services: arguments", argList);
+        return argList;
     }
+
+    // 2) BoxJS 复选框多选（checkboxes）
+    const boxCheckedList = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
+    if (boxCheckedList.length > 0) {
+        log("info", "Services: BoxJS checkbox", boxCheckedList);
+        return boxCheckedList;
+    }
+
+    // 3) BoxJS 文本备选（SERVICES_TEXT）
+    const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
+    if (boxTextList.length > 0) {
+        log("info", "Services: BoxJS text", boxTextList);
+        return boxTextList;
+    }
+
+    // 4) 全都没配 ⇒ 使用脚本内置默认全量顺序
     log("info", "Services: default(all)");
     return SD_DEFAULT_ORDER.slice();
 }
