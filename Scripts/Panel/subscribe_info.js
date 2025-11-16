@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：订阅信息面板（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2025-11-16R1
+ * 版本：2025-11-16R2
  *
  * 概述 · 功能边界
  *  · 支持最多 10 组订阅链接，按顺序展示总量 / 已用 / 剩余 / 到期时间
@@ -46,7 +46,8 @@
  *
  *      - urlN / URLN（N=1..10）
  *          · 第 N 个机场订阅链接（http / https）
- *          · 为空 / 占位符 / 非 http(s) 链接 ⇒ 跳过
+ *          · 可为原始 URL，或 encodeURIComponent 之后的整串
+ *          · 为空 / 占位符 / 无法解出 http(s) 链接 ⇒ 跳过
  *
  *      - titleN / TitleN（N=1..10）
  *          · 第 N 个机场显示名称
@@ -65,9 +66,23 @@
  *      3）「剩余：xx.xx% ➟ xx.xx GB」
  *      4）「重置：X天 | 到期：YYYY.MM.DD」或仅「到期：YYYY.MM.DD」
  *
- *  · 无任何有效订阅（全部 urlN 无效）时：
+ *  · 无任何有效订阅（全部 urlN 无法解析为 http(s) 链接）时：
  *      · 面板内容：'未配置订阅参数'
+ *
+ * 日志说明
+ *  · 默认开启基础日志（控制台 console.log）
+ *  · 标记前缀统一为：[SubscribeInfo]
  * ========================================================= */
+
+// ===== 日志工具 =====
+const TAG = "SubscribeInfo";
+
+function log() {
+    if (typeof console === "undefined" || !console.log) return;
+    const args = Array.prototype.slice.call(arguments);
+    args.unshift("[" + TAG + "]");
+    console.log.apply(console, args);
+}
 
 // ===== 工具函数 =====
 function bytesToSize(bytes) {
@@ -109,6 +124,40 @@ function getResetDaysLeft(resetDayNum) {
     return diff > 0 ? diff : 0;
 }
 
+function isPureNumber(s) {
+    return typeof s === "number" || (/^\d+$/.test(String(s || "").trim()));
+}
+
+function isHttpUrl(s) {
+    return /^https?:\/\//i.test(String(s || ""));
+}
+
+// 尝试处理 URL：原样 / decodeURIComponent 一次
+function normalizeUrl(src, label) {
+    const s = cleanArg(src);
+    if (!s) {
+        log("normalizeUrl", label, "empty or placeholder, skip");
+        return null;
+    }
+    if (isHttpUrl(s)) {
+        log("normalizeUrl", label, "raw is http(s) url:", s);
+        return s;
+    }
+    // 尝试 decode 一次
+    try {
+        const decoded = decodeURIComponent(s);
+        if (isHttpUrl(decoded)) {
+            log("normalizeUrl", label, "decoded to http(s) url:", decoded);
+            return decoded;
+        }
+        log("normalizeUrl", label, "decoded but still not http(s):", decoded);
+    } catch (e) {
+        log("normalizeUrl", label, "decodeURIComponent error:", String(e), "raw:", s);
+    }
+    log("normalizeUrl", label, "not a valid http(s) url:", s);
+    return null;
+}
+
 // ===== 参数解析 & 清洗（$argument） =====
 const args = {};
 (($argument || "") + "").split("&").forEach(p => {
@@ -120,8 +169,12 @@ const args = {};
     args[key] = decodeURIComponent(value || "");
 });
 
+log("raw $argument:", ($argument || "") + "");
+
 function getArg(lower, upper) {
-    return args[lower] ?? args[upper] ?? null;
+    return Object.prototype.hasOwnProperty.call(args, lower)
+        ? args[lower]
+        : (Object.prototype.hasOwnProperty.call(args, upper) ? args[upper] : null);
 }
 
 function isPlaceholder(val) {
@@ -136,14 +189,6 @@ function cleanArg(val) {
     const low = s.toLowerCase();
     if (isPlaceholder(s) || low === "null" || low === "undefined") return null;
     return s;
-}
-
-function isPureNumber(s) {
-    return typeof s === "number" || (/^\d+$/.test(String(s || "").trim()));
-}
-
-function isHttpUrl(s) {
-    return /^https?:\/\//i.test(String(s || ""));
 }
 
 // ===== BoxJS & 参数优先级（@Panel.SubscribeInfo.Settings） =====
@@ -167,7 +212,7 @@ const KVStore = (() => {
                 write: (v, k) => localStorage.setItem(k, v)
             };
         }
-    } catch (_) {
+    } catch (e) {
     }
     return {
         read: () => null,
@@ -194,37 +239,51 @@ function readBoxSettings() {
         let raw;
         try {
             raw = KVStore.read(key);
-        } catch (_) {
+        } catch (e) {
+            log("readBoxSettings read error:", key, String(e));
             raw = null;
         }
-        if (raw === null || raw === undefined || raw === "") continue;
+        if (raw === null || raw === undefined || raw === "") {
+            log("readBoxSettings skip empty key:", key);
+            continue;
+        }
 
         let val = raw;
         if (typeof raw === "string") {
             try {
                 val = JSON.parse(raw);
-            } catch (_) {
+            } catch (e) {
+                log("readBoxSettings JSON.parse error for key:", key, "raw:", raw);
                 continue;
             }
         }
-        if (!val || typeof val !== "object") continue;
+        if (!val || typeof val !== "object") {
+            log("readBoxSettings non-object for key:", key, "val:", val);
+            continue;
+        }
 
-        // Panel 根：{ SubscribeInfo: { Settings: { ... } } }
         if (key === "Panel" && val.SubscribeInfo && typeof val.SubscribeInfo.Settings === "object") {
+            log("readBoxSettings hit Panel.SubscribeInfo.Settings");
             return val.SubscribeInfo.Settings;
         }
-        // { Settings: { ... } }
         if (val.Settings && typeof val.Settings === "object") {
+            log("readBoxSettings hit", key, ".Settings");
             return val.Settings;
         }
-        // 直接就是 { url1:..., ... }
+        log("readBoxSettings hit direct object from key:", key);
         return val;
     }
 
+    log("readBoxSettings no settings found, use empty object");
     return {};
 }
 
 const BOX = readBoxSettings();
+try {
+    log("BOX settings snapshot:", JSON.stringify(BOX));
+} catch (e) {
+    log("BOX settings snapshot stringify error:", String(e));
+}
 
 function readBoxMulti(keys) {
     if (!BOX || typeof BOX !== "object") return undefined;
@@ -244,23 +303,14 @@ function readBoxMulti(keys) {
  *   2）否则若 BoxJS 有值          ⇒ 使用 BoxJS
  *   3）否则若 模块参数存在        ⇒ 使用模块参数（与 defVal 相同）
  *   4）否则 ⇒ 使用 defVal
- *
- * lower / upper 例子：
- *   · defaultIcon / DefaultIcon
- *   · url1 / URL1
- *   · resetDay1 / ResetDay1
- *
- * defVal 为脚本默认值，应与模块 #!arguments 默认保持一致。
  */
 function pickStr(lowerKey, upperKey, defVal) {
     const canon = v => (v == null ? "" : String(v).trim());
 
-    // 模块参数（支持小写/大写两种形式）
     const argRaw = getArg(lowerKey, upperKey);
     const argClean = cleanArg(argRaw);
     const hasArg = argClean != null;
 
-    // BoxJS（优先大写，再小写）
     const boxRaw = readBoxMulti([upperKey, lowerKey]);
     const boxClean = cleanArg(boxRaw);
     const hasBox = boxClean != null;
@@ -268,37 +318,60 @@ function pickStr(lowerKey, upperKey, defVal) {
     const defCanon = canon(defVal);
     const argChanged = hasArg && canon(argClean) !== defCanon;
 
-    if (argChanged) return argClean;
-    if (hasBox) return boxClean;
-    if (hasArg) return argClean;
-    return defVal;
+    const chosen = argChanged
+        ? argClean
+        : (hasBox ? boxClean : (hasArg ? argClean : defVal));
+
+    log(
+        "pickStr",
+        lowerKey + "/" + upperKey,
+        "| defVal:", defVal,
+        "| arg:", argClean,
+        "| box:", boxClean,
+        "| chosen:", chosen
+    );
+    return chosen;
 }
 
 // ===== 拉取机场信息（返回文本块） =====
-function fetchInfo(url, resetDayRaw, title) {
+function fetchInfo(url, resetDayRaw, title, index) {
     return new Promise(resolve => {
+        log("fetchInfo start", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
+
         $httpClient.get(
             {url, headers: {"User-Agent": "Quantumult%20X/1.5.2"}},
             (err, resp) => {
                 if (err || !resp) {
+                    log("fetchInfo error", index, "err:", err, "resp:", resp && resp.status);
                     resolve(`机场：${title}\n订阅请求失败，状态码：${resp ? resp.status : "请求错误"}`);
                     return;
                 }
+                log("fetchInfo resp", index, "status:", resp.status);
+
                 if (resp.status !== 200) {
                     resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
                     return;
                 }
 
-                const headerKey = Object.keys(resp.headers).find(
+                const headerKey = Object.keys(resp.headers || {}).find(
                     k => k.toLowerCase() === "subscription-userinfo"
                 );
+                log("fetchInfo headerKey", index, "=>", headerKey);
+
                 const data = {};
                 if (headerKey && resp.headers[headerKey]) {
                     resp.headers[headerKey].split(";").forEach(p => {
-                        const [k, v] = p.trim().split("=");
-                        if (k && v) data[k] = parseInt(v);
+                        const kv = p.trim().split("=");
+                        if (kv.length !== 2) return;
+                        const k = kv[0];
+                        const v = kv[1];
+                        if (!k || !v) return;
+                        const num = parseInt(v, 10);
+                        if (!isNaN(num)) data[k] = num;
                     });
                 }
+
+                log("fetchInfo parsed userinfo", index, JSON.stringify(data));
 
                 const upload = data.upload || 0;
                 const download = data.download || 0;
@@ -311,7 +384,7 @@ function fetchInfo(url, resetDayRaw, title) {
                 if (data.expire) {
                     let exp = Number(data.expire);
                     if (/^\d+$/.test(String(data.expire))) {
-                        if (exp < 10_000_000_000) exp *= 1000; // 秒→毫秒
+                        if (exp < 10000000000) exp *= 1000; // 秒→毫秒
                     }
                     expireMs = exp;
                 } else {
@@ -331,7 +404,6 @@ function fetchInfo(url, resetDayRaw, title) {
                     }
                 }
 
-                // 构建内容
                 const now = new Date();
                 const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now
                     .getMinutes()
@@ -343,7 +415,9 @@ function fetchInfo(url, resetDayRaw, title) {
                 let tailLine = `到期：${expireStr}`;
                 if (resetLinePart) tailLine = `${resetLinePart} | 到期：${expireStr}`;
 
-                resolve([titleLine, usedLine, remainLine, tailLine].join("\n"));
+                const block = [titleLine, usedLine, remainLine, tailLine].join("\n");
+                log("fetchInfo done", index, "block:\n" + block);
+                resolve(block);
             }
         );
     });
@@ -351,7 +425,8 @@ function fetchInfo(url, resetDayRaw, title) {
 
 // ===== 主流程 =====
 (async () => {
-    // 同一面板使用一个默认图标（模块参数 > BoxJS > 默认）
+    log("script start");
+
     const defaultIcon = pickStr(
         "defaultIcon",
         "DefaultIcon",
@@ -365,19 +440,27 @@ function fetchInfo(url, resetDayRaw, title) {
 
     const blocks = [];
     for (let i = 1; i <= 10; i++) {
-        const url = pickStr(`url${i}`, `URL${i}`, null);
-        const title = pickStr(`title${i}`, `Title${i}`, null);
+        const rawUrl = pickStr(`url${i}`, `URL${i}`, null);
+        const url = normalizeUrl(rawUrl, "url" + i);
+
+        const title = pickStr(`title${i}`, `Title${i}`, null) || `机场${i}`;
         const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null);
 
-        // 未填写 / 占位符 / 非 http(s) URL → 跳过该项
-        if (!url || !isHttpUrl(url)) continue;
+        log(`slot ${i}:`, "rawUrl=", rawUrl, "normalized url=", url, "title=", title, "reset=", reset);
 
-        const name = title || `机场${i}`;
-        const block = await fetchInfo(url, reset, name);
+        if (!url || !isHttpUrl(url)) {
+            log(`slot ${i}: invalid or empty url, skip`);
+            continue;
+        }
+
+        const block = await fetchInfo(url, reset, title, i);
         blocks.push(block);
     }
 
     const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
+    log("final blocks count:", blocks.length);
+    log("final content:\n" + contentAll);
+
     $done({
         title: "订阅信息",
         content: contentAll,
