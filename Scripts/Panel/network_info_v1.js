@@ -204,6 +204,20 @@ const KVStore = (() => {
     };
 })();
 
+// ====================== 启动阶段临时日志（专门抓 BoxJS 读写） ======================
+const BOOT_DEBUG = [];
+
+function bootLog(...args) {
+    const line = '[NI][BOOT] ' + args.map((x) =>
+        typeof x === 'string' ? x : JSON.stringify(x)
+    ).join(' ');
+    BOOT_DEBUG.push(line);
+    try {
+        console.log(line);
+    } catch (_) {
+    }
+}
+
 /** BoxJS 根对象（Panel 版）：@Panel.NetworkInfo.Settings
  *
  *  典型存储结构：
@@ -229,27 +243,43 @@ const SETTINGS_ROOT_KEY = '@Panel.NetworkInfo.Settings';
  */
 function readBoxSettings() {
     let val = KVStore.read(SETTINGS_ROOT_KEY);
-    if (!val) return {};
+    bootLog('KV.read', SETTINGS_ROOT_KEY, '=> type:', typeof val, 'raw:', val);
+
+    if (!val) {
+        bootLog('BoxSettings.empty', 'no value, use defaults');
+        return {};
+    }
+
     if (typeof val === 'string') {
         try {
-            val = JSON.parse(val);
+            const parsed = JSON.parse(val);
+            bootLog('BoxSettings.parse.ok', parsed);
+            val = parsed;
         } catch (e) {
-            try {
-                console.log('[NetworkInfo] Panel Settings JSON parse fail', e);
-            } catch (_) {
-            }
+            bootLog('BoxSettings.parse.fail', String(e));
             return {};
         }
     }
-    if (!val || typeof val !== 'object') return {};
+
+    if (!val || typeof val !== 'object') {
+        bootLog('BoxSettings.invalid', 'typeof=', typeof val);
+        return {};
+    }
+
     if (val.NetworkInfo && typeof val.NetworkInfo.Settings === 'object') {
+        bootLog('BoxSettings.path', 'NetworkInfo.Settings');
         return val.NetworkInfo.Settings;
     }
+
     if (val.Settings && typeof val.Settings === 'object') {
+        bootLog('BoxSettings.path', 'Settings');
         return val.Settings;
     }
+
+    bootLog('BoxSettings.path', 'rootObject', val);
     return val;
 }
+
 
 const BOX = readBoxSettings();
 
@@ -602,7 +632,7 @@ const LOG_LEVEL = CFG.LOG_LEVEL || 'info';
 
 const LOG_LEVELS = {debug: 10, info: 20, warn: 30, error: 40};
 const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
-const DEBUG_LINES = [];
+const DEBUG_LINES = BOOT_DEBUG.slice();   // 把启动阶段的 BootLog 接进来
 
 function _maskMaybe(ip) {
     if (!ip) return '';
@@ -813,6 +843,27 @@ log('info', 'Start', JSON.stringify({
     SUBTITLE_MINIMAL: CFG.SUBTITLE_MINIMAL,
     GAP_LINES: CFG.GAP_LINES
 }));
+
+// 追加：BoxJS & CFG 快照
+log('info', 'BoxSettings(BOX)', BOX);
+log('info', 'CFG snapshot', {
+    Update: CFG.Update,
+    Timeout: CFG.Timeout,
+    MASK_IP: CFG.MASK_IP,
+    MASK_POS: CFG.MASK_POS,
+    IPv6: CFG.IPv6,
+    DOMESTIC_IPv4: CFG.DOMESTIC_IPv4,
+    DOMESTIC_IPv6: CFG.DOMESTIC_IPv6,
+    LANDING_IPv4: CFG.LANDING_IPv4,
+    LANDING_IPv6: CFG.LANDING_IPv6,
+    SD_STYLE: CFG.SD_STYLE,
+    SD_REGION_MODE: CFG.SD_REGION_MODE,
+    SD_ICON_THEME: CFG.SD_ICON_THEME,
+    SD_LANG: CFG.SD_LANG,
+    SERVICES_ARG_TEXT: CFG.SERVICES_ARG_TEXT,
+    SERVICES_BOX_CHECKED_RAW: CFG.SERVICES_BOX_CHECKED_RAW,
+    SERVICES_BOX_TEXT: CFG.SERVICES_BOX_TEXT
+});
 
 // ====================== 主流程（IIFE） ======================
 ;(async () => {
