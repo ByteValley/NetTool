@@ -483,6 +483,285 @@
           ]
         }
       ]
+    },
+    {
+      "id": "Panel.SubscribeInfo",
+      "name": "订阅信息",
+      "descs_html": [
+        "展示多个机场订阅的总量 / 已用 / 剩余 / 到期时间；支持按月重置日或自定义重置说明，面板内一目了然当前流量使用情况。",
+        "<b>优先级说明：</b>单值参数读取顺序为 <b>模块 arguments（当值≠脚本默认）</b> → <b>BoxJS</b>（@Panel.SubscribeInfo.Settings.*） → <code>#!arguments</code>（与默认相同） → 代码默认值。",
+        "<b>BoxJS 结构：</b>默认使用 <code>@Panel.SubscribeInfo.Settings</code> 作为根对象，字段名与脚本内参数一致，例如 <code>defaultIcon</code>、<code>url1</code>、<code>title1</code>、<code>resetDay1</code> 等。",
+        "<hr/>",
+        "<h3>使用说明与参数</h3>",
+        "<b>— 基本显示 —</b><br/>每个订阅按四行显示：<br/>1）名称 | 总量 | 当前时间<br/>2）已用百分比与已用流量<br/>3）剩余百分比与剩余流量<br/>4）重置信息（如“重置：12天”）与到期日期（YYYY.MM.DD）。",
+        "<b>— 图标与颜色 —</b><br/>• <code>defaultIcon</code> / <code>DefaultIcon</code>：面板图标（SF Symbols 名称），默认 <code>antenna.radiowaves.left.and.right.circle.fill</code><br/>• <code>defaultIconColor</code> / <code>DefaultIconColor</code>：图标 HEX 颜色，默认 <code>#00E28F</code>。",
+        "<b>— 订阅字段（最多 10 组）—</b><br/>• <code>urlN</code> / <code>URLN</code>：第 N 个订阅链接，必须为 http/https，留空或占位符将被忽略。<br/>• <code>titleN</code> / <code>TitleN</code>：第 N 个订阅展示名称，留空则显示为“机场N”。<br/>• <code>resetDayN</code> / <code>ResetDayN</code>：重置规则：<br/>　- 纯数字：按“每月 N 日重置”，面板显示“重置：X天”；<br/>　- 其他文本：原样显示，例如“次月 1 日重置”；<br/>　- 留空：不显示“重置”行，仅显示到期时间。",
+        "<b>— HTTP 头说明 —</b><br/>脚本自动解析订阅响应中的 <code>subscription-userinfo</code> 头：<code>upload</code> / <code>download</code> / <code>total</code> / <code>expire</code>。若无 <code>expire</code> 字段，则默认到期时间为 2099-12-31。",
+        "<b>— BoxJS —</b><br/>• 本面板只读取 <code>@Panel.SubscribeInfo.Settings</code> 中的字段，不使用缓存键；文本留空、<code>null</code>、<code>undefined</code> 或 <code>{{{...}}}</code> 占位符都会视为“未配置”。<br/>• 该面板与「网络信息」共用同一份 BoxJS Dashboard 文件（<code>panel.boxjs.json</code>），仅应用 ID 与设置键不同。",
+        "<b>— 备注 —</b><br/>• 当所有订阅链接均为空或无效时，面板内容为“未配置订阅参数”。<br/>• 本面板仅拉取订阅流量信息，不修改任何订阅内容。"
+      ],
+      "keys": [
+        "@Panel.SubscribeInfo.Settings",
+        "@Panel.SubscribeInfo.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@Panel.SubscribeInfo.Settings.defaultIcon",
+          "name": "面板图标（defaultIcon）",
+          "type": "text",
+          "val": "",
+          "placeholder": "antenna.radiowaves.left.and.right.circle.fill",
+          "desc": "留空=使用脚本默认；SF Symbols 名称"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.defaultIconColor",
+          "name": "面板图标颜色（defaultIconColor）",
+          "type": "text",
+          "val": "",
+          "placeholder": "#00E28F",
+          "desc": "留空=使用脚本默认；HEX 颜色，例如 #00E28F"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url1",
+          "name": "订阅 1 链接（url1）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub1?token=...",
+          "desc": "第 1 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title1",
+          "name": "订阅 1 名称（title1）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 1",
+          "desc": "留空则显示为“机场1”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay1",
+          "name": "订阅 1 重置规则（resetDay1）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：1 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url2",
+          "name": "订阅 2 链接（url2）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub2?token=...",
+          "desc": "第 2 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title2",
+          "name": "订阅 2 名称（title2）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 2",
+          "desc": "留空则显示为“机场2”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay2",
+          "name": "订阅 2 重置规则（resetDay2）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：5 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url3",
+          "name": "订阅 3 链接（url3）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub3?token=...",
+          "desc": "第 3 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title3",
+          "name": "订阅 3 名称（title3）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 3",
+          "desc": "留空则显示为“机场3”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay3",
+          "name": "订阅 3 重置规则（resetDay3）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：10 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url4",
+          "name": "订阅 4 链接（url4）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub4?token=...",
+          "desc": "第 4 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title4",
+          "name": "订阅 4 名称（title4）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 4",
+          "desc": "留空则显示为“机场4”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay4",
+          "name": "订阅 4 重置规则（resetDay4）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：15 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url5",
+          "name": "订阅 5 链接（url5）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub5?token=...",
+          "desc": "第 5 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title5",
+          "name": "订阅 5 名称（title5）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 5",
+          "desc": "留空则显示为“机场5”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay5",
+          "name": "订阅 5 重置规则（resetDay5）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：20 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url6",
+          "name": "订阅 6 链接（url6）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub6?token=...",
+          "desc": "第 6 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title6",
+          "name": "订阅 6 名称（title6）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 6",
+          "desc": "留空则显示为“机场6”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay6",
+          "name": "订阅 6 重置规则（resetDay6）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：25 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url7",
+          "name": "订阅 7 链接（url7）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub7?token=...",
+          "desc": "第 7 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title7",
+          "name": "订阅 7 名称（title7）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 7",
+          "desc": "留空则显示为“机场7”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay7",
+          "name": "订阅 7 重置规则（resetDay7）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：28 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url8",
+          "name": "订阅 8 链接（url8）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub8?token=...",
+          "desc": "第 8 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title8",
+          "name": "订阅 8 名称（title8）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 8",
+          "desc": "留空则显示为“机场8”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay8",
+          "name": "订阅 8 重置规则（resetDay8）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：30 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url9",
+          "name": "订阅 9 链接（url9）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub9?token=...",
+          "desc": "第 9 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title9",
+          "name": "订阅 9 名称（title9）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 9",
+          "desc": "留空则显示为“机场9”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay9",
+          "name": "订阅 9 重置规则（resetDay9）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：3 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url10",
+          "name": "订阅 10 链接（url10）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub10?token=...",
+          "desc": "第 10 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title10",
+          "name": "订阅 10 名称（title10）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 10",
+          "desc": "留空则显示为“机场10”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay10",
+          "name": "订阅 10 重置规则（resetDay10）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：7 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        }
+      ]
     }
   ]
 }
