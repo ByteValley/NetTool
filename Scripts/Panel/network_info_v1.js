@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-16R1
+ * 版本：2025-11-16R2
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -43,15 +43,14 @@
  *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
  *
  * 服务清单 · 选择优先级
- *  · 模块 #!arguments（SERVICES=...）
+ *  · 模块参数「手动修改值」（SERVICES，与默认值不同）
  *  · BoxJS 勾选（NetworkInfo_SERVICES）
  *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
  *  · 默认（全部）
- *  ·
- * 参数优先级：模块 #!arguments > BoxJS > 默认值
+ *
  * 参数 · 默认值（BoxJS 键 / #!arguments）
  *  · Update                 刷新间隔（秒）                 默认 10
- *  · Timeout                全局超时（秒）                 默认 8
+ *  · Timeout                全局超时（秒）                 默认 25
  *  · IPv6                   启用 IPv6                      默认 0
  *  · MASK_IP                脱敏 IP                        默认 1
  *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
@@ -72,7 +71,7 @@
  *  · SD_SHOW_LAT            显示耗时(ms)                    默认 1
  *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
  *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
- *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=Timeout*1000，最小 2000
+ *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=0（0/空→跟随 Timeout*1000，脚本内最小 2000）
  *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开
  *
  * 日志 · 调试
@@ -80,6 +79,12 @@
  *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
  *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
  *  · LOG_PUSH               异常系统通知推送                 默认 1
+ *
+ * 参数优先级 · 总则
+ *  · 模块参数「手动修改值」（与 #!arguments 默认不同）
+ *  · BoxJS 值（NetworkInfo_XXX）
+ *  · 模块参数默认值（#!arguments 行）
+ *  · 代码兜底值
  *
  * 常见问题 · 提示
  *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
@@ -102,6 +107,39 @@ const CONSTS = Object.freeze({
     ENT_MIN_REQ_TO: 2500,
     ENT_MIN_TTL: 30,
     ENT_MAX_TTL: 3600
+});
+
+// ===== 模块参数默认表（需与 #!arguments 一致）=====
+const ARG_DEFAULTS = Object.freeze({
+    Update: "10",
+    Timeout: "25",
+    MASK_IP: "1",
+    MASK_POS: "1",
+    IPv6: "0",
+    DOMESTIC_IPv4: "ipip",
+    DOMESTIC_IPv6: "ddnspod",
+    LANDING_IPv4: "ipapi",
+    LANDING_IPv6: "ipsb",
+    TW_FLAG_MODE: "1",
+    IconPreset: "globe",
+    Icon: "globe.asia.australia",
+    IconColor: "#1E90FF",
+    SD_STYLE: "icon",
+    SD_SHOW_LAT: "1",
+    SD_SHOW_HTTP: "1",
+    SD_LANG: "zh-Hans",
+    SD_TIMEOUT_MS: "0",
+    SD_REGION_MODE: "full",
+    SD_ICON_THEME: "check",
+    SD_ARROW: "1",
+    SERVICES: "[]",
+    LOG: "0",
+    LOG_LEVEL: "info",
+    LOG_TO_PANEL: "0",
+    LOG_PUSH: "1",
+    ST_SUBTITLE_STYLE: "line",
+    ST_SUBTITLE_MINIMAL: "0",
+    ST_GAP_LINES: "1"
 });
 
 /* ===== 语言字典（固定 UI 词收口）===== */
@@ -227,15 +265,53 @@ const toNum = (v, d) => {
 const K = (s) => `NetworkInfo_${s}`;
 const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
+// ===== 统一读取配置：参数显式修改 > BoxJS > 模块默认值 > 代码兜底 =====
+function pickRaw(name, codeFallback = "") {
+    const defStr = ARG_DEFAULTS[name];          // 模块默认
+    const argRaw = $args[name];                 // 本次运行的模块参数
+    const boxRaw = readKV(K(name));             // BoxJS
+
+    // ① 模块参数“显式改过”的情况：有值且 != 默认值
+    if (argRaw !== undefined && argRaw !== "" && argRaw !== defStr) {
+        return String(argRaw);
+    }
+
+    // ② BoxJS 有值
+    if (boxRaw != null && boxRaw !== "") {
+        return String(boxRaw);
+    }
+
+    // ③ 使用模块默认值
+    if (defStr != null && defStr !== "") {
+        return String(defStr);
+    }
+
+    // ④ 代码兜底
+    return String(codeFallback);
+}
+
+function pickNum(name, codeFallback) {
+    return toNum(pickRaw(name, String(codeFallback)), codeFallback);
+}
+
+function pickBool(name, codeFallback) {
+    const v = pickRaw(name, codeFallback ? "1" : "0");
+    return toBool(v, codeFallback);
+}
+
+function pickStr(name, codeFallback) {
+    return pickRaw(name, codeFallback);
+}
+
 // ====================== 预读基础配置 ======================
-const UPDATE = toNum($args.Update ?? readKV(K('Update')) ?? 10, 10);
-const TIMEOUT = toNum($args.Timeout ?? readKV(K('Timeout')) ?? 8, 8);
+const UPDATE = pickNum("Update", 10);
+const TIMEOUT = pickNum("Timeout", 25);
 
 // ====================== 日志系统 ======================
-const LOG_ON = toBool($args.LOG ?? readKV(K('LOG')), false);
-const LOG_TO_PANEL = toBool($args.LOG_TO_PANEL ?? readKV(K('LOG_TO_PANEL')), false);
-const LOG_PUSH = toBool($args.LOG_PUSH ?? readKV(K('LOG_PUSH')), true);
-const LOG_LEVEL = ($args.LOG_LEVEL ?? readKV(K('LOG_LEVEL')) ?? 'info').toString().toLowerCase();
+const LOG_ON = pickBool("LOG", false);
+const LOG_TO_PANEL = pickBool("LOG_TO_PANEL", false);
+const LOG_PUSH = pickBool("LOG_PUSH", true);
+const LOG_LEVEL = pickStr("LOG_LEVEL", "info").toLowerCase();
 
 const LOG_LEVELS = {debug: 10, info: 20, warn: 30, error: 40};
 const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
@@ -274,7 +350,7 @@ function logErrPush(title, body) {
     log('error', title, body);
 }
 
-// ====================== 子标题样式（新键） ======================
+// ====================== 子标题样式 ======================
 const SUBTITLE_STYLES = Object.freeze({
     line: (s) => `——${s}——`,
     cnBracket: (s) => `【${s}】`,
@@ -310,40 +386,38 @@ const CFG = {
     Update: UPDATE,
     Timeout: TIMEOUT,
 
-    MASK_IP: toBool($args.MASK_IP ?? readKV(K('MASK_IP')), true),
-    MASK_POS: toBool($args.MASK_POS ?? readKV(K('MASK_POS')), true),
-    IPv6: toBool($args.IPv6 ?? readKV(K('IPv6')), false),
+    MASK_IP: pickBool("MASK_IP", true),
+    MASK_POS: pickBool("MASK_POS", true),
+    IPv6: pickBool("IPv6", false),
 
-    DOMESTIC_IPv4: $args.DOMESTIC_IPv4
-        ?? readKV(K('DOMESTIC_IPv4'))
-        ?? $args.DOMIC_IPv4 /* legacy */ ?? 'ipip',
-    DOMESTIC_IPv6: $args.DOMESTIC_IPv6
-        ?? readKV(K('DOMESTIC_IPv6'))
-        ?? $args.DOMIC_IPv6 /* legacy */ ?? 'ddnspod',
-    LANDING_IPv4: $args.LANDING_IPv4 ?? readKV(K('LANDING_IPv4')) ?? 'ipapi',
-    LANDING_IPv6: $args.LANDING_IPv6 ?? readKV(K('LANDING_IPv6')) ?? 'ipsb',
+    DOMESTIC_IPv4: pickStr("DOMESTIC_IPv4", "ipip"),
+    DOMESTIC_IPv6: pickStr("DOMESTIC_IPv6", "ddnspod"),
+    LANDING_IPv4: pickStr("LANDING_IPv4", "ipapi"),
+    LANDING_IPv6: pickStr("LANDING_IPv6", "ipsb"),
 
-    TW_FLAG_MODE: toNum($args.TW_FLAG_MODE ?? readKV(K('TW_FLAG_MODE')) ?? 1, 1),
+    TW_FLAG_MODE: pickNum("TW_FLAG_MODE", 1),
 
-    // 图标预设 / 自定义（默认值用“预设键”，不是最终成品名）
-    IconPreset: $args.IconPreset ?? readKV(K('IconPreset')) ?? 'globe',
-    Icon: $args.Icon ?? readKV(K('Icon')) ?? '',
-    IconColor: $args.IconColor ?? readKV(K('IconColor')) ?? '#1E90FF',
+    // 图标预设 / 自定义
+    IconPreset: pickStr("IconPreset", "globe"),
+    Icon: pickStr("Icon", "globe.asia.australia"),
+    IconColor: pickStr("IconColor", "#1E90FF"),
 
-    SD_STYLE: $args.SD_STYLE ?? readKV(K('SD_STYLE')) ?? 'icon',
-    SD_SHOW_LAT: toBool($args.SD_SHOW_LAT ?? readKV(K('SD_SHOW_LAT')), true),
-    SD_SHOW_HTTP: toBool($args.SD_SHOW_HTTP ?? readKV(K('SD_SHOW_HTTP')), true),
-    SD_LANG: $args.SD_LANG ?? readKV(K('SD_LANG')) ?? 'zh-Hans',
+    SD_STYLE: pickStr("SD_STYLE", "icon"),
+    SD_SHOW_LAT: pickBool("SD_SHOW_LAT", true),
+    SD_SHOW_HTTP: pickBool("SD_SHOW_HTTP", true),
+    SD_LANG: pickStr("SD_LANG", "zh-Hans"),
 
     SD_TIMEOUT_MS: (() => {
-        const raw = $args.SD_TIMEOUT_MS ?? readKV(K('SD_TIMEOUT_MS'));
+        const raw = pickRaw("SD_TIMEOUT_MS", "0"); // 0 / 空 = 跟随 Timeout×1000
+        const n = Number(raw);
         const fallback = TIMEOUT * 1000;
-        if (raw == null || raw === '') return fallback;
+        if (!Number.isFinite(n) || n <= 0) return fallback;
+        return n;
     })(),
 
-    SD_REGION_MODE: $args.SD_REGION_MODE ?? readKV(K('SD_REGION_MODE')) ?? 'full',
-    SD_ICON_THEME: $args.SD_ICON_THEME ?? readKV(K('SD_ICON_THEME')) ?? 'check',
-    SD_ARROW: toBool($args.SD_ARROW ?? readKV(K('SD_ARROW')), true),
+    SD_REGION_MODE: pickStr("SD_REGION_MODE", "full"),
+    SD_ICON_THEME: pickStr("SD_ICON_THEME", "check"),
+    SD_ARROW: pickBool("SD_ARROW", true),
 
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readKV(K('SERVICES'));
@@ -363,12 +437,12 @@ const CFG = {
         return v != null ? String(v).trim() : '';
     })(),
 
-    // —— 子标题新键（与 BoxJS 对齐）——
+    // 子标题（使用 ST_* 作为参数/BoxJS 名，内部映射为 SUBTITLE_*）
     SUBTITLE_STYLE: normalizeSubStyle(
-        ($args.SUBTITLE_STYLE ?? readKV(K('SUBTITLE_STYLE')) ?? 'line').toString().trim()
+        pickStr("ST_SUBTITLE_STYLE", "line").trim()
     ),
-    SUBTITLE_MINIMAL: toBool($args.SUBTITLE_MINIMAL ?? readKV(K('SUBTITLE_MINIMAL')), false),
-    GAP_LINES: Math.max(0, Math.min(2, toNum($args.GAP_LINES ?? readKV(K('GAP_LINES')) ?? 1, 1)))
+    SUBTITLE_MINIMAL: pickBool("ST_SUBTITLE_MINIMAL", false),
+    GAP_LINES: Math.max(0, Math.min(2, pickNum("ST_GAP_LINES", 1)))
 };
 
 // ====================== 图标 & 开关映射 ======================
@@ -615,7 +689,7 @@ function makeTryOrder(prefer, fallbackList) {
 log('info', 'Start', JSON.stringify({
     Update: CFG.Update,
     Timeout: CFG.Timeout,
-    IPv6: IPV6_EFF, // 智能 v6（需本机确有 v6）
+    IPv6: IPV6_EFF,
     WANT_V6: WANT_V6,
     HAS_V6: HAS_V6,
     SD_TIMEOUT_MS,
@@ -1069,7 +1143,7 @@ async function getDirectV6(preferKey) {
 }
 
 async function getLandingV4(preferKey) {
-    const order = makeTryOrder(preferKey, ORDER.landingV4); // 例如 ['ipapi','ipwhois','ipsb']
+    const order = makeTryOrder(preferKey, ORDER.landingV4);
     const res = await trySources(order, LANDING_V4_SOURCES, {
         preferLogTag: 'LandingV4', needCityPrefer: false
     });
@@ -1332,15 +1406,27 @@ function normSvcList(list) {
 }
 
 function selectServices() {
+    const defArg = ARG_DEFAULTS.SERVICES || "[]";
+    const argRaw = CFG.SERVICES_ARG_TEXT;
+    const hasArgOverride = argRaw && argRaw !== defArg && !/^(\[\s*]|null)$/i.test(argRaw);
+
+    // ① 模块参数显式改过（且非“空数组 []”）
+    if (hasArgOverride) {
+        const list = parseServices(argRaw);
+        if (list.length > 0) {
+            log("info", "Services: arguments", list);
+            return list;
+        }
+    }
+
+    // ② BoxJS 勾选 / 文本
     const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
     const candidates = hasCheckboxKey
         ? [
-            ["arguments", CFG.SERVICES_ARG_TEXT],
             ["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW],
             ["BoxJS text", CFG.SERVICES_BOX_TEXT]
         ]
         : [
-            ["arguments", CFG.SERVICES_ARG_TEXT],
             ["BoxJS text", CFG.SERVICES_BOX_TEXT]
         ];
 
@@ -1351,6 +1437,8 @@ function selectServices() {
             return list;
         }
     }
+
+    // ③ 默认全部
     log("info", "Services: default(all)");
     return SD_DEFAULT_ORDER.slice();
 }
