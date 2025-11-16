@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-10R3
+ * 版本：2025-11-10R2
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -48,17 +48,54 @@
  *  · BoxJS 文本（NetworkInfo_SERVICES_TEXT）
  *  · 默认（全部）
  *
- * 参数优先级 · 全局说明
- *  · “本次模块参数(面板/模块 UI) > BoxJS(NetworkInfo_*) > 代码默认”
- *  · 所有布尔参数支持：1/0、true/false、on/off、yes/no、y/n
+ * 参数优先级 · 全局
+ *  · 本次调用的模块参数（$argument / 面板 Arguments）
+ *  · BoxJS 中 NetworkInfo_* 键值
+ *  · 脚本内置默认值（≈ #!arguments 默认）
  *
- * 变更记录 · 2025-11-10R3
- *  · 修复：BoxJS / 模块参数不生效问题，统一参数读取通道
- *  · 修复：SD_SHOW_LAT / SD_SHOW_HTTP / 子标题相关开关失效
- *  · 调整：MASK_POS 默认联动 MASK_IP（未显式设置时自动跟随）
+ * 参数 · 默认值（BoxJS 键 / #!arguments）
+ *  · Update                 刷新间隔（秒）                 默认 10
+ *  · Timeout                全局超时（秒）                 默认 8
+ *  · IPv6                   启用 IPv6                      默认 0
+ *  · MASK_IP                脱敏 IP                        默认 1
+ *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
+ *  · DOMESTIC_IPv4          直连 IPv4 源                   默认 ipip
+ *  · DOMESTIC_IPv6          直连 IPv6 源                   默认 ddnspod
+ *  · LANDING_IPv4           落地 IPv4 源                   默认 ipapi
+ *  · LANDING_IPv6           落地 IPv6 源                   默认 ipsb
+ *  · TW_FLAG_MODE           台湾旗模式 0/1/2               默认 1
+ *  · IconPreset             图标预设                       默认 globe（globe|wifi|dots|antenna|point）
+ *  · Icon / IconColor       自定义图标/颜色                优先于 IconPreset
+ *  · SUBTITLE_STYLE         子标题样式                     line|cnBracket|cnQuote|square|curly|angle|pipe|bullet|plain（默认 line）
+ *  · SUBTITLE_MINIMAL       极简子标题                     默认 0
+ *  · GAP_LINES              分组留白 0~2                   默认 1
+ *  · SD_STYLE               服务显示样式                    icon|text（默认 icon）
+ *  · SD_REGION_MODE         地区风格                        full|abbr|flag（默认 full）
+ *  · SD_ICON_THEME          图标主题                        check|lock|circle（默认 check）
+ *  · SD_ARROW               使用“➟”连接服务名与地区        默认 1
+ *  · SD_SHOW_LAT            显示耗时(ms)                    默认 1
+ *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
+ *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
+ *  · SD_TIMEOUT_MS          单项检测超时(ms)                默认=Timeout*1000，最小 2000
+ *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开
+ *
+ * 日志 · 调试
+ *  · LOG                    开启日志                        默认 0
+ *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
+ *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
+ *  · LOG_PUSH               异常系统通知推送                 默认 1
+ *
+ * 常见问题 · 提示
+ *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
+ *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
+ *  · 台湾旗样式：按 TW_FLAG_MODE 切换（合规/默认/彩蛋）
+ *
+ * 示例 · 组合参数
+ *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
+ *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
  * ========================================================= */
 
-// ====================== 常量 & 基本配置 ======================
+// ====================== 常量 & 配置基线 ======================
 const CONSTS = Object.freeze({
     MAX_RECENT_REQ: 150,
     PRETOUCH_TO_MS: 700,
@@ -164,7 +201,7 @@ const parseArgs = (raw) => {
 };
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
 
-/** 当 $argument 是原始字符串时兜底取参数 */
+/** 当 $args 对象无值时，从原始字符串兜底读取 */
 function readArgRaw(name) {
     try {
         if (typeof $argument === 'string') {
@@ -177,11 +214,7 @@ function readArgRaw(name) {
     return undefined;
 }
 
-// ====================== 工具：类型 / 拼接 / 参数读取 ======================
-const K = (s) => `NetworkInfo_${s}`;
-
-const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
-
+// ====================== 小工具（类型/拼接/格式） ======================
 const toBool = (v, d = false) => {
     if (v == null || v === '') return d;
     if (typeof v === 'boolean') return v;
@@ -190,63 +223,61 @@ const toBool = (v, d = false) => {
     if (['0', 'false', 'off', 'no', 'n'].includes(s)) return false;
     return d;
 };
+const toNum = (v, d) => {
+    if (v == null || v === '') return d;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : d;
+};
+const K = (s) => `NetworkInfo_${s}`;
+const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
-function getArgRaw(name) {
-    if (!$args) return undefined;
-    if (Object.prototype.hasOwnProperty.call($args, name)) {
+/** —— 参数优先级工具：模块参数 > BoxJS > 默认 —— */
+function getArgFirst(name) {
+    if ($args && Object.prototype.hasOwnProperty.call($args, name)) {
         const v = $args[name];
         if (v === '' || v == null) return undefined;
-        return String(v);
+        return v;
     }
-    return undefined;
+    const v = readArgRaw(name);
+    if (v === undefined || v === null || v === '') return undefined;
+    return v;
 }
 
-function getKVRaw(name) {
+function getKVFirst(name) {
     const v = readKV(K(name));
     if (v === undefined || v === null || v === '') return undefined;
-    return String(v);
+    return v;
 }
 
-/** names: 单名或数组；优先 模块参数 > BoxJS > fallback */
-function pickRaw(names, fallback) {
-    const keys = Array.isArray(names) ? names : [names];
-
-    // 1) 模块参数
-    for (const k of keys) {
-        const v = getArgRaw(k);
-        if (v !== undefined) return v;
-    }
-    // 2) BoxJS
-    for (const k of keys) {
-        const v = getKVRaw(k);
-        if (v !== undefined) return v;
-    }
-    // 3) 默认
+function pickRaw(name, fallback) {
+    const a = getArgFirst(name);
+    if (a !== undefined) return a;
+    const k = getKVFirst(name);
+    if (k !== undefined) return k;
     return fallback;
 }
 
-function pickStr(names, fallback) {
-    const v = pickRaw(names, undefined);
+function pickStr(name, fallback) {
+    const v = pickRaw(name, undefined);
     if (v === undefined) return fallback;
     return String(v);
 }
 
-function pickNum(names, fallback) {
-    const v = pickRaw(names, undefined);
-    if (v === undefined) return fallback;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : fallback;
+function pickNum(name, fallback) {
+    const v = pickRaw(name, undefined);
+    return toNum(v, fallback);
 }
 
-function pickBool(names, fallback) {
-    const v = pickRaw(names, undefined);
+function pickBool(name, fallback) {
+    const v = pickRaw(name, undefined);
     return toBool(v, fallback);
 }
 
-// ====================== 预读基础配置 & 日志 ======================
+// ====================== 预读基础配置 ======================
 const UPDATE = pickNum('Update', 10);
 const TIMEOUT = pickNum('Timeout', 8);
 
+// ====================== 日志系统 ======================
 const LOG_ON = pickBool('LOG', false);
 const LOG_TO_PANEL = pickBool('LOG_TO_PANEL', false);
 const LOG_PUSH = pickBool('LOG_PUSH', true);
@@ -289,7 +320,7 @@ function logErrPush(title, body) {
     log('error', title, body);
 }
 
-// ====================== 子标题样式 ======================
+// ====================== 子标题样式（新键） ======================
 const SUBTITLE_STYLES = Object.freeze({
     line: (s) => `——${s}——`,
     cnBracket: (s) => `【${s}】`,
@@ -313,6 +344,7 @@ function makeSubTitleRenderer(styleKey, minimal = false) {
     return minimal ? (s) => String(s) : (s) => fn(String(s));
 }
 
+/** 分组标题：插入留白 + 应用样式/纯净模式 */
 function pushGroupTitle(parts, title) {
     for (let i = 0; i < CFG.GAP_LINES; i++) parts.push('');
     const render = makeSubTitleRenderer(CFG.SUBTITLE_STYLE, CFG.SUBTITLE_MINIMAL);
@@ -332,19 +364,30 @@ const CFG = {
     })(),
     IPv6: pickBool('IPv6', false),
 
-    DOMESTIC_IPv4: pickStr('DOMESTIC_IPv4', 'ipip'),
-    DOMESTIC_IPv6: pickStr('DOMESTIC_IPv6', 'ddnspod'),
+    DOMESTIC_IPv4: (() => {
+        const arg = getArgFirst('DOMESTIC_IPv4') ?? getArgFirst('DOMIC_IPv4'); // legacy
+        if (arg !== undefined) return String(arg);
+        const kv = getKVFirst('DOMESTIC_IPv4');
+        if (kv !== undefined) return String(kv);
+        return 'ipip';
+    })(),
+    DOMESTIC_IPv6: (() => {
+        const arg = getArgFirst('DOMESTIC_IPv6') ?? getArgFirst('DOMIC_IPv6'); // legacy
+        if (arg !== undefined) return String(arg);
+        const kv = getKVFirst('DOMESTIC_IPv6');
+        if (kv !== undefined) return String(kv);
+        return 'ddnspod';
+    })(),
     LANDING_IPv4: pickStr('LANDING_IPv4', 'ipapi'),
     LANDING_IPv6: pickStr('LANDING_IPv6', 'ipsb'),
 
     TW_FLAG_MODE: pickNum('TW_FLAG_MODE', 1),
 
-    // 图标
+    // 图标预设 / 自定义（默认值用“预设键”，不是最终成品名）
     IconPreset: pickStr('IconPreset', 'globe'),
-    Icon: pickStr('Icon', 'globe.asia.australia'),
+    Icon: pickStr('Icon', ''),
     IconColor: pickStr('IconColor', '#1E90FF'),
 
-    // 服务检测
     SD_STYLE: pickStr('SD_STYLE', 'icon'),
     SD_SHOW_LAT: pickBool('SD_SHOW_LAT', true),
     SD_SHOW_HTTP: pickBool('SD_SHOW_HTTP', true),
@@ -353,16 +396,14 @@ const CFG = {
     SD_TIMEOUT_MS: (() => {
         const raw = pickRaw('SD_TIMEOUT_MS', undefined);
         const fallback = TIMEOUT * 1000;
-        if (raw === undefined || raw === '' || raw === '0') return fallback;
-        const n = Number(raw);
-        return Number.isFinite(n) && n > 0 ? n : fallback;
+        if (raw == null || raw === '' || raw === '0') return fallback;
+        return toNum(raw, fallback);
     })(),
 
     SD_REGION_MODE: pickStr('SD_REGION_MODE', 'full'),
     SD_ICON_THEME: pickStr('SD_ICON_THEME', 'check'),
     SD_ARROW: pickBool('SD_ARROW', true),
 
-    // SERVICES 来源优先级：BoxJS 勾选 > BoxJS 文本 > 模块参数 > 默认
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readKV(K('SERVICES'));
         if (v == null) return null;
@@ -375,24 +416,18 @@ const CFG = {
         return v != null ? String(v).trim() : '';
     })(),
     SERVICES_ARG_TEXT: (() => {
-        let v = $args.SERVICES;
+        let v = getArgFirst('SERVICES');
         if (Array.isArray(v)) return JSON.stringify(v);
-        if (v == null || v === '') v = readArgRaw('SERVICES');
         return v != null ? String(v).trim() : '';
     })(),
 
-    // 子标题（兼容旧键：SUBTITLE_* / GAP_LINES）
-    SUBTITLE_STYLE: normalizeSubStyle(
-        pickStr(['ST_SUBTITLE_STYLE', 'SUBTITLE_STYLE'], 'line').trim()
-    ),
-    SUBTITLE_MINIMAL: pickBool(['ST_SUBTITLE_MINIMAL', 'SUBTITLE_MINIMAL'], false),
-    GAP_LINES: (() => {
-        const n = pickNum(['ST_GAP_LINES', 'GAP_LINES'], 1);
-        return Math.max(0, Math.min(2, n));
-    })()
+    // —— 子标题新键（与 BoxJS 对齐）——
+    SUBTITLE_STYLE: normalizeSubStyle(pickStr('SUBTITLE_STYLE', 'line').trim()),
+    SUBTITLE_MINIMAL: pickBool('SUBTITLE_MINIMAL', false),
+    GAP_LINES: Math.max(0, Math.min(2, pickNum('GAP_LINES', 1)))
 };
 
-// ====================== 派生参数 & 图标 ======================
+// ====================== 图标 & 开关映射 ======================
 const ICON_PRESET_MAP = Object.freeze({
     wifi: 'wifi.router',
     globe: 'globe.asia.australia',
@@ -404,19 +439,23 @@ const ICON_NAME = (CFG.Icon || '').trim() ||
     ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
-// IPv6 开关
+// 用户是否开启 v6 的“意愿”
 const WANT_V6 = !!CFG.IPv6;
+// —— IPv6 智能开关（仅当配置开启且本机确有 v6 才执行）——
 const HAS_V6 = !!($network?.v6?.primaryAddress);
+// 智能开关：用户开 + 设备真有 v6
 const IPV6_EFF = WANT_V6 && HAS_V6;
+// —— v6 端点更短的单次超时（避免卡住整段流程）——
 const V6_TO = Math.min(
     Math.max(
         CONSTS.SD_MIN_TIMEOUT,
         Number.isFinite(Number(CFG.SD_TIMEOUT_MS))
             ? Number(CFG.SD_TIMEOUT_MS)
-            : (TIMEOUT * 1000)
+            : ((Number(CFG.Timeout) || 8) * 1000)
     ),
     2500
 );
+
 
 const MASK_IP = !!CFG.MASK_IP;
 const MASK_POS = typeof CFG.MASK_POS === 'boolean' ? CFG.MASK_POS : !!CFG.MASK_IP;
@@ -427,7 +466,7 @@ const DOMESTIC_IPv6 = CFG.DOMESTIC_IPv6;
 const LANDING_IPv4 = CFG.LANDING_IPv4;
 const LANDING_IPv6 = CFG.LANDING_IPv6;
 
-// 服务检测派生
+// ====================== 服务检测参数 ======================
 const SD_STYLE = (String(CFG.SD_STYLE).toLowerCase() === 'text') ? 'text' : 'icon';
 const SD_SHOW_LAT = !!CFG.SD_SHOW_LAT;
 const SD_SHOW_HTTP = !!CFG.SD_SHOW_HTTP;
@@ -435,7 +474,7 @@ const SD_LANG = (String(CFG.SD_LANG).toLowerCase() === 'zh-hant') ? 'zh-Hant' : 
 
 const SD_TIMEOUT_MS = (() => {
     const v = Number(CFG.SD_TIMEOUT_MS);
-    const fallback = TIMEOUT * 1000;
+    const fallback = (Number(CFG.Timeout) || 8) * 1000;
     const ms = Number.isFinite(v) ? v : fallback;
     return Math.max(CONSTS.SD_MIN_TIMEOUT, ms);
 })();
@@ -455,25 +494,7 @@ const SD_ICONS = (() => {
     }
 })();
 
-// ====================== 启动日志 ======================
-log('info', 'Start', JSON.stringify({
-    Update: CFG.Update,
-    Timeout: CFG.Timeout,
-    IPv6: IPV6_EFF,
-    WANT_V6,
-    HAS_V6,
-    SD_TIMEOUT_MS,
-    SD_STYLE,
-    SD_REGION_MODE,
-    TW_FLAG_MODE,
-    SUBTITLE_STYLE: CFG.SUBTITLE_STYLE,
-    SUBTITLE_MINIMAL: CFG.SUBTITLE_MINIMAL,
-    GAP_LINES: CFG.GAP_LINES
-}));
-
-// ====================== 下方逻辑基本沿用你原来那版 ======================
-// 包含：IP 解析、入口定位、服务检测、render 等
-// —— 从这里开始完全照你原脚本的后半段 ——
+// ====================== 源常量 & 解析器（抽离） ======================
 
 // 统一 JSON 解析（不会抛异常）
 function safeJSON(s, d = {}) {
@@ -484,6 +505,7 @@ function safeJSON(s, d = {}) {
     }
 }
 
+// 统一“是否已细到市/区”判断（DirectV4 优先策略用）
 function hasCityLevel(loc) {
     if (!loc) return false;
     try {
@@ -574,19 +596,6 @@ const DIRECT_V4_SOURCES = Object.freeze({
     }
 });
 
-// —— v4-only 兜底（直连 IPv4 偶发返回 v6 时使用）——
-const DIRECT_V4_FALLBACK = {
-    url: 'https://api-ipv4.ip.sb/geoip',
-    parse: (r) => {
-        const j = safeJSON(r.body, {});
-        return {
-            ip: j.ip || '',
-            loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], ' ').replace(/\s*中国\s*/, ''),
-            isp: j.isp || j.organization || ''
-        };
-    }
-};
-
 // —— 落地 IPv4 源 ——
 const LANDING_V4_SOURCES = Object.freeze({
     ipapi: {
@@ -650,7 +659,7 @@ function makeTryOrder(prefer, fallbackList) {
 log('info', 'Start', JSON.stringify({
     Update: CFG.Update,
     Timeout: CFG.Timeout,
-    IPv6: IPV6_EFF,
+    IPv6: IPV6_EFF, // 智能 v6（需本机确有 v6）
     WANT_V6: WANT_V6,
     HAS_V6: HAS_V6,
     SD_TIMEOUT_MS,
@@ -737,21 +746,21 @@ log('info', 'Start', JSON.stringify({
     parts.push(`${t('runAt')}: ${now()}`);
     parts.push(`${t('policy')}: ${policyName || '-'}`);
 
-    // 本地（类型守卫）
+    // 本地
     pushGroupTitle(parts, '本地');
-    const directIPv4 = (cn.ip && isIPv4(cn.ip)) ? ipLine('IPv4', cn.ip) : null;
-    const directIPv6 = (cn6.ip && isIPv6(cn6.ip)) ? ipLine('IPv6', cn6.ip) : null;
+    const directIPv4 = ipLine('IPv4', cn.ip);
+    const directIPv6 = ipLine('IPv6', cn6.ip);
     if (directIPv4) parts.push(directIPv4);
     if (directIPv6) parts.push(directIPv6);
     const directLoc = cn.loc ? (MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : '-';
     parts.push(`${t('location')}: ${directLoc}`);
     if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
-    // 入口（类型守卫）
+    // 入口
     if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && ent6.ip)) {
         pushGroupTitle(parts, '入口');
-        const entIPv4 = (ent4.ip && isIPv4(ent4.ip)) ? ipLine('IPv4', ent4.ip) : null;
-        const entIPv6 = (ent6.ip && isIPv6(ent6.ip)) ? ipLine('IPv6', ent6.ip) : null;
+        const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
+        const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
         if (entIPv4) parts.push(entIPv4);
         if (entIPv6) parts.push(entIPv6);
         if (ent4.loc1) parts.push(`${t('location')}¹: ${flagFirst(ent4.loc1)}`);
@@ -760,11 +769,11 @@ log('info', 'Start', JSON.stringify({
         if (ent4.isp2) parts.push(`${t('isp')}²: ${String(ent4.isp2).trim()}`);
     }
 
-    // 落地（类型守卫）
+    // 落地
     if (px.ip || px6.ip || px.loc || px.isp) {
         pushGroupTitle(parts, '落地');
-        const landIPv4 = (px.ip && isIPv4(px.ip)) ? ipLine('IPv4', px.ip) : null;
-        const landIPv6 = (px6.ip && isIPv6(px6.ip)) ? ipLine('IPv6', px6.ip) : null;
+        const landIPv4 = ipLine('IPv4', px.ip);
+        const landIPv6 = ipLine('IPv6', px6.ip);
         if (landIPv4) parts.push(landIPv4);
         if (landIPv6) parts.push(landIPv6);
         if (px.loc) parts.push(`${t('location')}: ${flagFirst(px.loc)}`);
@@ -878,9 +887,13 @@ function flagOf(code) {
             if (TW_FLAG_MODE === 0) return '🇨🇳';
             if (TW_FLAG_MODE === 2) return '🇼🇸';
         }
-        return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 127397 + ch.charCodeAt()));
+        return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 127397 + ch.charCodeOf(0)));
     } catch (_) {
-        return '';
+        try {
+            return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 127397 + ch.charCodeAt(0)));
+        } catch (_) {
+            return '';
+        }
     }
 }
 
@@ -1060,37 +1073,17 @@ async function tryIPv6Ip(order) {
 /* ===== 四个对外接口（签名保持一致） ===== */
 async function getDirectV4(preferKey) {
     const order = makeTryOrder(preferKey, ORDER.directV4);
-    let res = await trySources(order, DIRECT_V4_SOURCES, {
+    const res = await trySources(order, DIRECT_V4_SOURCES, {
         preferLogTag: 'DirectV4', needCityPrefer: true
     });
-
     if (!res || !res.ip) {
         try {
             log('warn', 'DirectV4 all failed, final ipip fallback');
             const r = await httpGet(DIRECT_V4_SOURCES.ipip.url);
-            res = DIRECT_V4_SOURCES.ipip.parse(r) || {};
+            return DIRECT_V4_SOURCES.ipip.parse(r) || {};
         } catch (e2) {
             log('error', 'DirectV4 ipip final fail', String(e2));
             return {};
-        }
-    }
-
-    // 纠偏：若不是 IPv4，再走一次 v4-only 端点
-    if (res.ip && !isIPv4(res.ip)) {
-        log('warn', 'DirectV4 returned non-IPv4, refetch via v4-only fallback', _maskMaybe(res.ip));
-        try {
-            const r = await httpGet(DIRECT_V4_FALLBACK.url);
-            const fix = DIRECT_V4_FALLBACK.parse(r) || {};
-            if (isIPv4(fix.ip)) {
-                res = fix;
-                log('info', 'DirectV4 corrected by v4-only fallback', _maskMaybe(res.ip));
-            } else {
-                log('warn', 'v4-only fallback did not return IPv4');
-                res.ip = ''; // 交给渲染层类型守卫不渲染
-            }
-        } catch (e) {
-            log('warn', 'DirectV4 v4-only fallback fail', String(e));
-            res.ip = '';
         }
     }
     return res;
@@ -1104,7 +1097,7 @@ async function getDirectV6(preferKey) {
 }
 
 async function getLandingV4(preferKey) {
-    const order = makeTryOrder(preferKey, ORDER.landingV4);
+    const order = makeTryOrder(preferKey, ORDER.landingV4); // 例如 ['ipapi','ipwhois','ipsb']
     const res = await trySources(order, LANDING_V4_SOURCES, {
         preferLogTag: 'LandingV4', needCityPrefer: false
     });
@@ -1367,30 +1360,12 @@ function normSvcList(list) {
 }
 
 function selectServices() {
-    const defArg = ARG_DEFAULTS.SERVICES || "[]";
-    const argRaw = CFG.SERVICES_ARG_TEXT;
-    const hasArgOverride = argRaw && argRaw !== defArg && !/^(\[\s*]|null)$/i.test(argRaw);
-
-    // ① 模块参数显式改过（且非“空数组 []”）
-    if (hasArgOverride) {
-        const list = parseServices(argRaw);
-        if (list.length > 0) {
-            log("info", "Services: arguments", list);
-            return list;
-        }
-    }
-
-    // ② BoxJS 勾选 / 文本
-    const hasCheckboxKey = CFG.SERVICES_BOX_CHECKED_RAW !== null;
-    const candidates = hasCheckboxKey
-        ? [
-            ["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW],
-            ["BoxJS text", CFG.SERVICES_BOX_TEXT]
-        ]
-        : [
-            ["BoxJS text", CFG.SERVICES_BOX_TEXT]
-        ];
-
+    // 参数优先级：模块参数 > BoxJS 勾选 > BoxJS 文本 > 默认
+    const candidates = [
+        ["arguments", CFG.SERVICES_ARG_TEXT],
+        ["BoxJS checkbox", CFG.SERVICES_BOX_CHECKED_RAW],
+        ["BoxJS text", CFG.SERVICES_BOX_TEXT]
+    ];
     for (const [label, raw] of candidates) {
         const list = parseServices(raw);
         if (list.length > 0) {
@@ -1398,8 +1373,6 @@ function selectServices() {
             return list;
         }
     }
-
-    // ③ 默认全部
     log("info", "Services: default(all)");
     return SD_DEFAULT_ORDER.slice();
 }
