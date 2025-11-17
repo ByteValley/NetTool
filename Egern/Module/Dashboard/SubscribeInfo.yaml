@@ -1,9 +1,9 @@
 name: 订阅信息
-description: 机场订阅信息展示,流量使用及剩余信息与到期日期
+description: 机场订阅流量看板，展示总量/已用/剩余及到期日期，支持最多 10 个订阅
 compat_arguments:
   Update: '21600'
-  DefaultIcon: cellularbars
-  DefaultIconColor: '#1E90FF'
+  DefaultIcon: antenna.radiowaves.left.and.right.circle.fill
+  DefaultIconColor: 00E28F
   Title1: 机场名称
   URL1: 订阅链接
   ResetDay1: 重置日期
@@ -34,17 +34,17 @@ compat_arguments:
   Title10: 机场名称
   URL10: 订阅链接
   ResetDay10: 重置日期
-compat_arguments_desc: Update=刷新间隔(秒);TitleN=机场名称;URLN=订阅链接;ResetDayN=重置日期(1~31或中文提示);DefaultIcon=SF Symbols 名称;DefaultIconColor=十六进制色值
+compat_arguments_desc: Update=刷新间隔(秒);TitleN=机场名称;URLN=订阅链接(http/https);ResetDayN=重置规则(1~31=每月N日重置,中文=原样显示);DefaultIcon=面板图标(SF Symbols 名称);DefaultIconColor=图标颜色(十六进制色值)
 author: ByteValley
-dns: {}
+dns: { }
 scriptings:
-- generic:
-    name: 机场订阅查询
-    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/subscribe_info.js
-    arguments:
-      _compat.$argument: defaultIcon=cellularbars&defaultIconColor=#1E90FF&title1=机场名称&url1=订阅链接&resetDay1=重置日期&title2=机场名称&url2=订阅链接&resetDay2=重置日期&title3=机场名称&url3=订阅链接&resetDay3=重置日期&title4=机场名称&url4=订阅链接&resetDay4=重置日期&title5=机场名称&url5=订阅链接&resetDay5=重置日期&title6=机场名称&url6=订阅链接&resetDay6=重置日期&title7=机场名称&url7=订阅链接&resetDay7=重置日期&title8=机场名称&url8=订阅链接&resetDay8=重置日期&title9=机场名称&url9=订阅链接&resetDay9=重置日期&title10=机场名称&url10=订阅链接&resetDay10=重置日期
-    timeout: 15
+  - generic:
+      name: 机场订阅查询
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/subscribe_info.js
+      arguments:
+        _compat.$argument: defaultIcon=antenna.radiowaves.left.and.right.circle.fill&defaultIconColor=00E28F&title1=机场名称&url1=订阅链接&resetDay1=重置日期&title2=机场名称&url2=订阅链接&resetDay2=重置日期&title3=机场名称&url3=订阅链接&resetDay3=重置日期&title4=机场名称&url4=订阅链接&resetDay4=重置日期&title5=机场名称&url5=订阅链接&resetDay5=重置日期&title6=机场名称&url6=订阅链接&resetDay6=重置日期&title7=机场名称&url7=订阅链接&resetDay7=重置日期&title8=机场名称&url8=订阅链接&resetDay8=重置日期&title9=机场名称&url9=订阅链接&resetDay9=重置日期&title10=机场名称&url10=订阅链接&resetDay10=重置日期
+      timeout: 15
 panels:
-- name: 订阅查询
-  script_name: 机场订阅查询
-  update_interval: 21600
+  - name: 订阅信息
+    script_name: 机场订阅查询
+    update_interval: 21600
