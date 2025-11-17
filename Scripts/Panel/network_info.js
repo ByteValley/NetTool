@@ -233,7 +233,6 @@ function bootLog(...args) {
  *    ...
  *  }
  */
-// BoxJS 面板配置可能的根 key（按顺序尝试）
 const SETTINGS_ROOT_KEYS = [
     'Panel',                     // 你现在持久层里看到的这个
     'Panel.NetworkInfo.Settings',

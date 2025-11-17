@@ -218,110 +218,82 @@ function bootLog(...args) {
     }
 }
 
-/** BoxJS 根对象（Panel 版）：@Panel.NetworkInfo.Settings
+/**
+ * 读取 BoxJS 设置对象（NetworkInfo）
  *
- *  典型存储结构：
+ * 约定存储结构：
+ *  KVStore.read("Panel") =>
  *  {
  *    "NetworkInfo": {
- *      "Settings": { "Update": "10", "Timeout": "12", ... }
+ *      "Settings": { "Update": "10", "Timeout": "12", ... },
+ *      "Caches":   "..."
+ *    },
+ *    "SubscribeInfo": {
+ *      "Settings": { ... },
+ *      "Caches":   "..."
  *    }
  *  }
- *  或直接：
- *  {
- *    "Update": "10",
- *    "Timeout": "12",
- *    ...
- *  }
- */
-// BoxJS 面板配置可能的根 key（按顺序尝试）
-const SETTINGS_ROOT_KEYS = [
-    'Panel',                     // 你现在持久层里看到的这个
-    'Panel.NetworkInfo.Settings',
-    'NetworkInfo'                // 兜底：有些环境可能直接把 NetworkInfo 当根
-];
-
-/** 读取 BoxJS 设置对象：
- *  兼容三种形态：
- *   1) { NetworkInfo: { Settings: { ... } } }
- *   2) { Settings: { ... } }
- *   3) 直接就是 { Update:..., MASK_IP:... }
  *
- *  另外兼容多种根 key：
- *   - @Panel.NetworkInfo.Settings（独立 key）
- *   - Panel（Surge 面板统一存一个 JSON）
- *   - Panel.NetworkInfo.Settings / NetworkInfo 等
+ *  本脚本只关心：Panel.NetworkInfo.Settings
+ *  若不存在 NetworkInfo 或 Settings，则返回 {}（视为“无 BoxJS 覆盖”）
  */
 function readBoxSettings() {
-    let val = null;
-    let usedKey = '';
-
-    // 依次尝试几个可能的 root key
-    for (const k of SETTINGS_ROOT_KEYS) {
-        try {
-            val = KVStore.read(k);
-        } catch (_) {
-            val = null;
-        }
-
-        // 为了避免把整段 JSON 打爆 log，这里 raw 简单收敛一下
-        let rawTag;
-        if (val === null || val === undefined) {
-            rawTag = 'null';
-        } else if (typeof val === 'string') {
-            rawTag = val.length > 120 ? val.slice(0, 120) + '…' : val;
-        } else {
-            rawTag = '[object]';
-        }
-
-        bootLog('KV.read', k, '=> type:', typeof val, 'raw:', rawTag);
-
-        if (val !== null && val !== undefined && val !== '') {
-            usedKey = k;
-            break;
-        }
-    }
-
-    if (!usedKey) {
-        bootLog('BoxSettings.empty', 'no value, use defaults');
+    let raw;
+    try {
+        raw = KVStore.read('Panel');
+    } catch (e) {
+        bootLog('BoxSettings.read Panel error:', String(e));
         return {};
     }
 
-    // 字符串 => JSON
-    if (typeof val === 'string') {
+    // Panel 根不存在：无 BoxJS 配置
+    if (raw === null || raw === undefined || raw === '') {
+        bootLog('BoxSettings.Panel.empty');
+        return {};
+    }
+
+    let panel = raw;
+    if (typeof raw === 'string') {
+        // 字符串 => JSON
         try {
-            const parsed = JSON.parse(val);
-            bootLog('BoxSettings.parse.ok', parsed);
-            val = parsed;
+            panel = JSON.parse(raw);
         } catch (e) {
-            bootLog('BoxSettings.parse.fail', String(e));
+            const tag =
+                raw.length > 120 ? raw.slice(0, 120) + '…' : raw;
+            bootLog('BoxSettings.Panel.parse.fail:', String(e));
+            bootLog('BoxSettings.Panel.raw.snip:', tag);
             return {};
         }
     }
 
-    if (!val || typeof val !== 'object') {
-        bootLog('BoxSettings.invalid', 'typeof=', typeof val);
+    if (!panel || typeof panel !== 'object') {
+        bootLog('BoxSettings.Panel.invalid type:', typeof panel);
         return {};
     }
 
-    // 三种结构兼容：
-    // 1) { NetworkInfo: { Settings: { ... } } }
-    if (val.NetworkInfo && typeof val.NetworkInfo.Settings === 'object') {
-        bootLog('BoxSettings.path', 'NetworkInfo.Settings');
-        bootLog('BoxSettings.final', val.NetworkInfo.Settings);
-        return val.NetworkInfo.Settings;
+    try {
+        bootLog('BoxSettings.Panel.keys:', Object.keys(panel));
+    } catch (_) {
     }
 
-    // 2) { Settings: { ... } }
-    if (val.Settings && typeof val.Settings === 'object') {
-        bootLog('BoxSettings.path', 'Settings');
-        bootLog('BoxSettings.final', val.Settings);
-        return val.Settings;
+    // 标准结构：{ NetworkInfo: { Settings: {...} } }
+    if (
+        panel.NetworkInfo &&
+        panel.NetworkInfo.Settings &&
+        typeof panel.NetworkInfo.Settings === 'object'
+    ) {
+        bootLog('BoxSettings.path: Panel.NetworkInfo.Settings');
+        return panel.NetworkInfo.Settings;
     }
 
-    // 3) 直接就是 { Update:..., MASK_IP:... }
-    bootLog('BoxSettings.path', 'rootObject', val);
-    bootLog('BoxSettings.final', val);
-    return val;
+    // （可选兜底：Panel 根本身就是 Settings；视情况保留/删除）
+    if (panel.Settings && typeof panel.Settings === 'object') {
+        bootLog('BoxSettings.path: Panel.Settings (fallback)');
+        return panel.Settings;
+    }
+
+    bootLog('BoxSettings.no NetworkInfo.Settings, use {}');
+    return {};
 }
 
 const BOX = readBoxSettings();
