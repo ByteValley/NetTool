@@ -2,10 +2,10 @@ name: 网络信息
 description: 直连/入口/落地信息 + 服务检测；接管图标与网络类型；中国 ISP 规范化；多源定位与回退；三态图标/地区样式；台湾旗模式；支持 BoxJS/arguments 覆盖
 compat_arguments:
   Update: '10'
-  Timeout: '8'
+  Timeout: '12'
   MASK_IP: '1'
-  MASK_POS: '1'
-  IPv6: '0'
+  MASK_POS: auto
+  IPv6: '1'
   DOMESTIC_IPv4: ipip
   DOMESTIC_IPv6: ddnspod
   LANDING_IPv4: ipapi
@@ -23,13 +23,13 @@ compat_arguments:
   SD_ICON_THEME: check
   SD_ARROW: '1'
   SERVICES: '[]'
-  LOG: '0'
+  LOG: '1'
   LOG_LEVEL: info
   LOG_TO_PANEL: '0'
   LOG_PUSH: '1'
-  ST_SUBTITLE_STYLE: line
-  ST_SUBTITLE_MINIMAL: '0'
-  ST_GAP_LINES: '1'
+  SUBTITLE_STYLE: line
+  SUBTITLE_MINIMAL: '0'
+  GAP_LINES: '1'
 compat_arguments_desc: |-
   使用说明与参数（优先级：BoxJS > 模块 #!arguments > 代码默认）
 
@@ -63,7 +63,7 @@ compat_arguments_desc: |-
   • IconColor: HEX 颜色（如 #1E90FF）
 
   — 版式（子标题与留白）
-  • ST_SUBTITLE_STYLE: 子标题样式
+  • SUBTITLE_STYLE: 子标题样式
     - line: —— 本地 ——（连线样式）
     - cnBracket: 【 本地 】（中文方头括）
     - cnQuote: 「 本地 」 （中文引号）
@@ -73,8 +73,8 @@ compat_arguments_desc: |-
     - pipe: ║ 本地 ║（竖线框）
     - bullet: · 本地 ·（居中圆点）
     - plain: 本地（纯文本）
-  • ST_SUBTITLE_MINIMAL: 纯净子标题(1=仅文字，无任何装饰；0=按 ST_SUBTITLE_STYLE 渲染)
-  • ST_GAP_LINES: 分组前留白行数(0/1/2；默认 1)
+  • SUBTITLE_MINIMAL: 纯净子标题(1=仅文字，无任何装饰；0=按 SUBTITLE_STYLE 渲染)
+  • GAP_LINES: 分组前留白行数(0/1/2；默认 1)
 
   — 服务与别名 —
   • SERVICES: 支持英文/中文逗号(,，)、分号(;)、竖线(|)、斜杠(/)、空白/换行，或 JSON 数组；大小写不敏感；渲染顺序按输入顺序。
@@ -99,21 +99,21 @@ compat_arguments_desc: |-
   • 标题显示网络类型；第一行显示“代理策略”；入口/落地多源定位与回退。
 
   — 常见问题排查 —
-  • 若加载失败：先去掉特殊字符(如 面板标题里的 𝕏)、或把 {{...}} 改为 {{{...}}}；逐项恢复定位问题。
+  • 若加载失败：先去掉特殊字符(如 面板标题里的 𝕏)；逐项恢复定位问题。
   • 若 update-interval 不生效：检查 BoxJS 中 NetworkInfo_Update 是否覆盖；脚本会以 BoxJS 优先。
   • 若 SERVICES 为空又想显示默认：将 SERVICES 留空或设为 [] 即可（脚本会回退到默认全量）。
 author: ByteValley
 homepage: https://github.com/ByteValley/NetTool
-dns: {}
+dns: { }
 scriptings:
   - generic:
       name: 网络信息·面板
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/network_info.js
       arguments:
-        _compat.$argument: Update=10&Timeout=60&IPv6={{IPv6}}&MASK_IP={{MASK_IP}}&MASK_POS={{MASK_POS}}&DOMESTIC_IPv4=ipip&DOMESTIC_IPv6=ddnspod&LANDING_IPv4=ipapi&LANDING_IPv6=ipsb&TW_FLAG_MODE=1&IconPreset=globe&Icon=globe.asia.australia&IconColor=#1E90FF&SD_STYLE=icon&SD_SHOW_LAT={{SD_SHOW_LAT}}&SD_SHOW_HTTP={{SD_SHOW_HTTP}}&SD_LANG=zh-Hans&SD_TIMEOUT_MS=0&SD_REGION_MODE=full&SD_ICON_THEME=check&SD_ARROW={{SD_ARROW}}&SERVICES=[]&LOG={{LOG}}&LOG_LEVEL=info&LOG_TO_PANEL={{LOG_TO_PANEL}}&LOG_PUSH={{LOG_PUSH}}&ST_SUBTITLE_STYLE=line&ST_SUBTITLE_MINIMAL={{ST_SUBTITLE_MINIMAL}}&ST_GAP_LINES=1
-      update_interval: 43200
-      timeout: 60
+        _compat.$argument: Update=10&Timeout=12&IPv6=1&MASK_IP=1&MASK_POS=auto&DOMESTIC_IPv4=ipip&DOMESTIC_IPv6=ddnspod&LANDING_IPv4=ipapi&LANDING_IPv6=ipsb&TW_FLAG_MODE=1&IconPreset=globe&Icon=globe.asia.australia&IconColor=#1E90FF&SD_STYLE=icon&SD_SHOW_LAT=1&SD_SHOW_HTTP=1&SD_LANG=zh-Hans&SD_TIMEOUT_MS=0&SD_REGION_MODE=full&SD_ICON_THEME=check&SD_ARROW=1&SERVICES=[]&LOG=1&LOG_LEVEL=info&LOG_TO_PANEL=0&LOG_PUSH=1&SUBTITLE_STYLE=line&SUBTITLE_MINIMAL=0&GAP_LINES=1
+      update_interval: 21600
+      timeout: 12
 panels:
   - name: 网络信息 𝕏
     script_name: 网络信息·面板
-    update_interval: 1800
+    update_interval: 10
