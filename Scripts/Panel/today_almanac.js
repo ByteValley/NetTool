@@ -560,7 +560,7 @@
                 ["万圣节", fmtYMD(year, 10, 31)],
                 ["平安夜", fmtYMD(year, 12, 24)],
                 ["圣诞节", fmtYMD(year, 12, 25)],
-                ["感恩节(美)", nthWeekdayOfMonth(year, 11, 4, 4)]
+                ["感恩节", nthWeekdayOfMonth(year, 11, 4, 4)]
             ].sort((a, b) => new Date(a[1]) - new Date(b[1]));
         }
 
