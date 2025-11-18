@@ -459,69 +459,81 @@
         const titlesPromise = fetchJson(args.TITLES_URL, defaultTitles);
         const blessPromise = fetchJson(args.BLESS_URL, defaultBless);
 
-        async function fetchAlmanacDetail(now) {
-            try {
-                const year = now.getFullYear();
-                const m = now.getMonth() + 1;
-                const d = now.getDate();
-                const monthStr = m < 10 ? "0" + m : String(m);
-                const base = "https://raw.githubusercontent.com/zqzess/openApiData/main/calendar/";
-                const path = `${year}/${year}${monthStr}.json`;
-                const apiUrl = base + encodeURIComponent(path);
+        // 今日黄历详情：本地干支 + 远程宜忌（远程失败则用占位）
+async function fetchAlmanacDetail(now, lunarBase) {
+    const year = lunarBase.cYear;
+    const m = lunarBase.cMonth;
+    const d = lunarBase.cDay;
+    const monthStr = m < 10 ? "0" + m : String(m);
 
-                log("almanac api url:", apiUrl);
-                const raw = await httpGet(apiUrl, 3000);
-                if (!raw) {
-                    log("almanac http empty");
-                    return null;
-                }
+    // 基础 header（完全本地可得）
+    let header = `干支纪法：${lunarBase.gzYear}年 ${lunarBase.gzMonth}月 ${lunarBase.gzDay}日`;
 
-                let json;
-                try {
-                    json = JSON.parse(raw);
-                } catch (e) {
-                    log("almanac parse error:", String(e));
-                    return null;
-                }
-                if (!json || !json.data || !json.data[0] || !Array.isArray(json.data[0].almanac)) {
-                    log("almanac structure unexpected");
-                    return null;
-                }
+    const tags = [];
+    if (lunarBase.lunarFestival) tags.push(lunarBase.lunarFestival);
+    if (lunarBase.festival) tags.push(lunarBase.festival);
+    if (lunarBase.Term) tags.push(lunarBase.Term);
+    if (tags.length) header += " " + tags.join(" ");
 
-                const arr = json.data[0].almanac;
-                const target = arr.find(i =>
+    // 默认宜忌占位（远程失败时使用）
+    let ji = "——";
+    let yi = "——";
+
+    try {
+        const base = "https://raw.githubusercontent.com/zqzess/openApiData/main/calendar/";
+        const path = `${year}/${year}${monthStr}.json`;
+        const apiUrl = base + encodeURIComponent(path);
+
+        log("almanac api url:", apiUrl);
+        const raw = await httpGet(apiUrl, 3000);
+        if (!raw) {
+            log("almanac http empty");
+        } else {
+            const json = JSON.parse(raw);
+            const arr = json && json.data && json.data[0] && Array.isArray(json.data[0].almanac)
+                ? json.data[0].almanac
+                : null;
+            if (!arr) {
+                log("almanac structure unexpected");
+            } else {
+                const item = arr.find(i =>
                     Number(i.year) === year &&
                     Number(i.month) === m &&
                     Number(i.day) === d
                 );
-
-                if (!target) {
+                if (!item) {
                     log("almanac no item for today");
-                    return null;
+                } else {
+                    // 优先用远程返回的干支和描述
+                    const extra = [];
+                    if (item.desc) extra.push(item.desc);
+                    if (item.term) extra.push(item.term);
+                    if (item.value) extra.push(item.value);
+
+                    header =
+                        `干支纪法：${item.gzYear}年 ${item.gzMonth}月 ${item.gzDate}日` +
+                        (extra.length ? " " + extra.join(" ") : "");
+
+                    if (item.avoid) ji = item.avoid;
+                    if (item.suit) yi = item.suit;
                 }
-
-                let desc = "";
-                if (target.desc) desc += target.desc;
-                if (target.term) desc += (desc ? " " : "") + target.term;
-                if (target.value) desc += (desc ? " " : "") + target.value;
-
-                const header =
-                    `干支纪法：${target.gzYear}年 ${target.gzMonth}月 ` +
-                    `${target.gzDate}日` +
-                    (desc ? " " + desc : "");
-                const lineJi = `🈲 忌：${target.avoid || "——"}`;
-                const lineYi = `✅ 宜：${target.suit || "——"}`;
-
-                const block = `${header}\n${lineJi}\n${lineYi}`;
-                log("almanac block:", block.replace(/\n/g, "\\n"));
-                return block;
-            } catch (e) {
-                log("fetchAlmanacDetail error:", String(e));
-                return null;
             }
         }
+    } catch (e) {
+        log("fetchAlmanacDetail error:", String(e));
+    }
 
-        const almanacPromise = showAlmanac ? fetchAlmanacDetail(tnow) : Promise.resolve(null);
+    const lineJi = `🈲 忌：${ji}`;
+    const lineYi = `✅ 宜：${yi}`;
+    const block = `${header}\n${lineJi}\n${lineYi}`;
+    log("almanac block:", block.replace(/\n/g, "\\n"));
+    return block;
+}
+
+// 注意这里要把 lunarNow 传进去
+const almanacPromise = showAlmanac
+    ? fetchAlmanacDetail(tnow, lunarNow)
+    : Promise.resolve(null);
 
         /* ========== 构造节日集合 ========== */
 
