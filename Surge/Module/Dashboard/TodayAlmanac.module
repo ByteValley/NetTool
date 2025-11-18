@@ -1,21 +1,27 @@
 #!name=今日黄历
-#!desc=四行展示：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次提醒；每日09:00推送今日宜忌/节日播报
+#!desc=面板顶部可选展示「今日黄历详情」（干支纪法+宜忌），下方四行节日倒数：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次祝词提醒；脚本无参数调用时自动通过系统通知播报今日黄历详情。
 #!category=功能看板
 #!author=ByteValley
-#!version=2025.11.06
-#!arguments=TITLES_URL:'', BLESS_URL:''
-#!arguments-desc=参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象: 键=节日名, 值=祝词)\n外链JSON示例：\nTITLES_URL: [\"摸鱼使我快乐～\",\"{lunar}\",\"{solar}\",\"下一站：{next}\"]\nBLESS_URL: {\"春节\":\"愿新岁顺遂无虞，家人皆安！\",\"中秋节\":\"人月两团圆，心上皆明朗。\",\"腊八节\":\"粥香暖岁末。\"}\n传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json
+#!version=2025-11-18R1
 
-# ========== 面板 ==========
+#!arguments=TITLES_URL:'',BLESS_URL:'',SHOW_ALMANAC:true,GAP_LINES:1
+
+#!arguments-desc=参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象, 键=节日名, 值=祝词)；SHOW_ALMANAC 是否在顶部附加今日黄历详情(true/false)；GAP_LINES 节日行与行之间的空行数(0=无空行,1=一行,2=两行…)\n外链 JSON 示例：\nTITLES_URL: [\"摸鱼使我快乐～\",\"{lunar}\",\"{solar}\",\"下一站：{next}\"]\nBLESS_URL: {\"春节\":\"愿新岁顺遂无虞，家人皆安！\",\"中秋节\":\"人月两团圆，心上皆明朗。\",\"腊八节\":\"粥香暖岁末。\"}\n传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json&SHOW_ALMANAC=true&GAP_LINES=1
+
 [Panel]
-# 模块分类：功能看板  |  细项：四行节日/节气倒数
+# 模块分类：功能看板  |  细项：四行节日/节气倒数 + 可选今日黄历详情
 今日黄历 = script-name=今日黄历·面板, update-interval=1800
 
-# ========== 脚本 ==========
 [Script]
-# 面板脚本（四行）：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节
-今日黄历·面板 = type=generic, timeout=12, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/Panel/today_almanac.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}
+# 模块分类：功能看板  |  细项：面板展示（传入参数时启用）
+# 功能说明：可选「今日黄历详情」（干支纪法/宜忌） + 法定节假日 | 二十四节气 | 传统民俗 | 国际洋节 四行倒数
+今日黄历·面板 = type=generic, timeout=60, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/today_almanac.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}&SHOW_ALMANAC={{{SHOW_ALMANAC}}}&GAP_LINES={{{GAP_LINES}}}
 
-# ========== 定时播报 ==========
-# 每日09:00 推送“今日黄历/宜忌/节日”信息（独立脚本，互不影响面板；如无需要可删除此行）
-今日黄历·播报 = type=cron, cronexp="0 9 * * *", script-path=https://raw.githubusercontent.com/zqzess/rule_for_quantumultX/master/js/Mine/wnCalendar/wnCalendar.js, timeout=12
+# 模块分类：功能看板  |  细项：定时播报（无参数时自动进入播报模式）
+# 功能说明：
+#   · 每日固定时间通过系统通知播报「今日黄历详情」（干支纪法+宜忌），不依赖面板；
+#   · 同一脚本：有参数时走面板模式，无参数时走播报模式（已在 JS 内自动兼容，无需配置 argument）。
+今日黄历·播报 = type=cron, cronexp="0 9 * * *", timeout=20, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/today_almanac.js
+# 使用提示：
+#   · 如启用上方 Cron，请确保已在 Surge / Egern 中开启脚本通知权限；
+#   · cronexp 可按需调整，例如 "0 7 * * *"（每天 07:00 播报）或 "0 9 * * *"（每天 09:00 播报）。
