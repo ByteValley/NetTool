@@ -7,12 +7,12 @@
  * 参数（模块 argument）：
  *   TITLES_URL   标题库外链(JSON 数组，支持 {lunar} {solar} {next})
  *   BLESS_URL    祝词库外链(JSON 对象: 键=节日名, 值=祝词)
- *   SHOW_ALMANAC 是否附加今日黄历详情(true/false)
+ *   SHOW_ALMANAC 是否附加今日黄历详情(true/false/1/0/yes/no/on/off)
  *   GAP_LINES    节日行之间空行数(0=无空行,1=一行,2=两行…)
  *
  * 适配：Surge / Loon / Quantumult X / Stash / Egern
  *
- * 作者：ByteValley  |  版本：2025-11-18R2
+ * 作者：ByteValley  |  版本：2025-11-18R3
  */
 
 ;(async () => {
@@ -45,12 +45,37 @@
             return `${y}-${m}-${d}`;
         }
 
+        // 兼容：1) a=b&c=d  2) A:B,C:D  两种形式
         function parseArgs() {
             try {
                 if (typeof $argument === "undefined" || !$argument) return {};
-                const usp = new URLSearchParams($argument);
+                const raw = String($argument).trim();
                 const obj = {};
-                for (const [k, v] of usp.entries()) obj[k] = v;
+
+                // 优先按 a=b&c=d 解析
+                if (raw.includes("=")) {
+                    const usp = new URLSearchParams(raw);
+                    for (const [k, v] of usp.entries()) {
+                        obj[k] = v;
+                    }
+                    return obj;
+                }
+
+                // 兼容 Egern / 模块编辑器里看到的 key:value,key2:value2
+                raw.split(",").forEach(pair => {
+                    const seg = pair.trim();
+                    if (!seg) return;
+                    const idx = seg.indexOf(":");
+                    if (idx < 0) return;
+                    const k = seg.slice(0, idx).trim();
+                    let v = seg.slice(idx + 1).trim();
+                    // 去掉包裹引号
+                    if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
+                        v = v.slice(1, -1);
+                    }
+                    obj[k] = v;
+                });
+
                 return obj;
             } catch (e) {
                 log("parseArgs error:", String(e));
@@ -85,6 +110,15 @@
                 log("fetchJson parse error:", String(e));
                 return fallback;
             }
+        }
+
+        // 字符串 -> 布尔（带默认值）
+        function toBool(v, defVal) {
+            if (v === undefined || v === null || v === "") return defVal;
+            const s = String(v).trim().toLowerCase();
+            if (["1", "true", "yes", "on"].includes(s)) return true;
+            if (["0", "false", "no", "off"].includes(s)) return false;
+            return defVal;
         }
 
         /* ========== 农历 / 节气算法（原版） ========== */
@@ -369,14 +403,17 @@
 
         const args = parseArgs();
 
-        const showAlmanac = String(
-            args.SHOW_ALMANAC || args.show_almanac || "false"
-        ).toLowerCase() === "true";
+        const showAlmanac = toBool(
+            (args.SHOW_ALMANAC !== undefined ? args.SHOW_ALMANAC : args.show_almanac),
+            false // 默认不展示，需要你在参数里显式开启
+        );
 
         let gapLinesVal = parseInt(args.GAP_LINES || args.gap_lines || "1", 10);
         if (isNaN(gapLinesVal) || gapLinesVal < 0) gapLinesVal = 0;
         if (gapLinesVal > 3) gapLinesVal = 3;
         const gapBetween = "\n".repeat(gapLinesVal + 1); // 0 => "\n"; 1 => "\n\n"; 2 => "\n\n\n"
+
+        log("parsed args =", JSON.stringify(args), "showAlmanac =", showAlmanac, "gapLines =", gapLinesVal);
 
         /* ========== 默认标题/祝词库 ========== */
 
@@ -639,7 +676,6 @@
         /* ========== 四行内容 ========== */
 
         function render3(a0, a1, a2, d0, d1, d2) {
-            // 今天正逢第一个节日 ⇒ 特别标记
             if (d0 === 0) {
                 return `今天：${a0[0]} | ${a1[0]}${d1}天 | ${a2[0]}${d2}天`;
             }
@@ -654,11 +690,14 @@
         const blockFest = `${lineLegal}${gapBetween}${lineTerm}${gapBetween}${lineFolk}${gapBetween}${lineIntl}`;
 
         // 今日黄历详情优先显示在上方
-        const content = almanacDetail
+        const content = (showAlmanac && almanacDetail)
             ? `${almanacDetail}\n\n${blockFest}`
             : blockFest;
 
-        log("script done, SHOW_ALMANAC =", showAlmanac, "content preview =", content.split("\n").slice(0, 5).join("\\n"));
+        log(
+            "script done, SHOW_ALMANAC =", showAlmanac,
+            "content preview =", content.split("\n").slice(0, 5).join("\\n")
+        );
 
         $done({
             title: pickTitle(nearest[0][0], nearest[1]),
