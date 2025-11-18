@@ -1,12 +1,11 @@
 /**
- * 今日黄历 · 面板 / 播报脚本（集成 wnCalendar 黄历接口）
+ * 今日黄历 · 面板脚本（集成 wnCalendar 黄历接口）
  *
  * 功能：
  *   · 面板顶部可选显示「今日黄历详情」（干支纪法 + 宜忌）
  *   · 4 行节日倒数：法定 / 二十四节气 / 传统民俗 / 国际洋节
  *   · 法定 + 民俗 正日 06:00 之后单次祝词通知
- *   · 如脚本运行时未传入任何参数（无 $argument），视为「播报模式」：
- *       - 自动弹出系统通知，播报今日黄历详情（干支 + 宜忌）
+ *   · 若脚本“无参数调用”（通常为 Cron），则直接用系统通知播报今日黄历详情
  *
  * 参数（模块 argument）：
  *   TITLES_URL   标题库外链(JSON 数组，支持 {lunar} {solar} {next})
@@ -14,32 +13,20 @@
  *   SHOW_ALMANAC 是否在顶部附加今日黄历详情(true/false)
  *   GAP_LINES    节日行之间空行数(0=无空行,1=一行,2=两行…)
  *
- * 适配：Surge / Loon / Quantumult X / Stash / Egern
+ * 适配：Surge / Loon / Quantumult X / Stash / Egern（面板）
  *
- * 作者：ByteValley  |  版本：2025-11-18R1
+ * 作者：ByteValley  |  版本：2025-11-18R1B1
  */
 
 "use strict";
 
 ;(async () => {
-  /* ───────────────── 环境与基础常量 ───────────────── */
+  /* ───────────────── 基本常量 / 日时 ───────────────── */
 
   const TAG   = "today_almanac";
   const NAME  = "今日黄历";
   const ICON  = "calendar";
   const COLOR = "#FF9800";
-
-  // 原始参数字符串，用于判断是否「无参数」
-  const RAW_ARG =
-    (typeof $argument !== "undefined" && String($argument).trim()) || "";
-
-  // 认为「无参数」 => Cron 播报模式（模块里的面板已显式传参）
-  const IS_NO_ARGUMENT = RAW_ARG === "";
-
-  // Surge 可通过 $script.type 判断；其它平台可能没有，做兼容
-  const IS_CRON =
-    (typeof $script !== "undefined" && $script.type === "cron") ||
-    IS_NO_ARGUMENT;
 
   const now      = new Date();
   const year     = now.getFullYear();
@@ -47,13 +34,26 @@
 
   const todayStr = `${year}-${now.getMonth() + 1}-${now.getDate()}`;
 
-  const log = (...args) => {
+  // 判断是否有参数传入（Panel 会传，Cron 那条通常不会）
+  const RAW_ARG =
+    typeof $argument === "string"
+      ? $argument.trim()
+      : (typeof $argument === "undefined" ? "" : String($argument).trim());
+
+  const IS_NO_ARGUMENT = !RAW_ARG;
+  const IS_SURGE_CRON =
+    typeof $script !== "undefined" && $script.type === "cron";
+  // 只要是 Surge Cron 或者完全没参数，就视为“播报模式”
+  const IS_CRON = IS_SURGE_CRON || IS_NO_ARGUMENT;
+
+  function log(...args) {
     if (typeof console === "undefined" || !console.log) return;
     console.log(`[${TAG}]`, ...args);
-  };
+  }
 
   /* ───────────────── 通用工具函数 ───────────────── */
 
+  // 日期差：end - start（按天）
   const dateDiff = (start, end) => {
     const s  = start.split("-");
     const e  = end.split("-");
@@ -67,9 +67,10 @@
   // 参数解析：兼容
   //   · Surge 模块 arguments: k:v,k:v
   //   · querystring: a=1&b=2 或用逗号分隔的 k=v
-  const parseArgs = (raw, defaults = {}) => {
-    if (!raw) return { ...defaults };
+  const parseArgs = (defaults = {}) => {
+    if (typeof $argument === "undefined" || !$argument) return { ...defaults };
 
+    const raw = String($argument).trim();
     const out = { ...defaults };
 
     // 优先按 querystring 解析（Egern / argument=a=1&b=2）
@@ -118,11 +119,13 @@
     return defVal;
   };
 
+  // 通用 GET（带超时，仅面板环境：Surge/Egern 等支持 $httpClient）
   const httpGet = (url, timeoutMs) => {
     return new Promise(resolve => {
       if (!url) return resolve(null);
       const req = { url };
       if (timeoutMs) req.timeout = timeoutMs;
+
       $httpClient.get(req, (err, resp, data) => {
         if (err || !resp || resp.status !== 200) {
           log("httpGet fail:", url, "err:", err, "status:", resp && resp.status);
@@ -191,11 +194,251 @@
     nStr1: ["日","一","二","三","四","五","六","七","八","九","十"],
     nStr2: ["初","十","廿","卅"],
     nStr3: ["正","二","三","四","五","六","七","八","九","十","冬","腊"],
-    // …… 下方 solar2lunar / lunar2solar 等函数与上一版 R2 相同，完整保留 ……
-    // 为避免回复超长，此处省略中间函数体，但你实际使用时请粘贴完整版本。
-    // 由于你已经看过 R2 完整脚本，如果你需要我可以单独再发一次“完整版”纯粘贴稿。
-    // ---------------------- 这里在你本地请保持原样 ----------------------
-    // （从 lYearDays 开始一直到 lunar2solar 的部分全部不动）
+
+    lYearDays(y) {
+      let i, sum = 348;
+      for (i = 0x8000; i > 0x8; i >>= 1) {
+        sum += (this.lunarInfo[y - 1900] & i) ? 1 : 0;
+      }
+      return sum + this.leapDays(y);
+    },
+
+    leapMonth(y) {
+      return this.lunarInfo[y - 1900] & 0xf;
+    },
+
+    leapDays(y) {
+      if (this.leapMonth(y)) {
+        return (this.lunarInfo[y - 1900] & 0x10000) ? 30 : 29;
+      }
+      return 0;
+    },
+
+    monthDays(y, m) {
+      if (m > 12 || m < 1) return -1;
+      return (this.lunarInfo[y - 1900] & (0x10000 >> m)) ? 30 : 29;
+    },
+
+    solarDays(y, m) {
+      if (m > 12 || m < 1) return -1;
+      const ms = m - 1;
+      if (ms === 1) {
+        return ((y % 4 === 0) && (y % 100 !== 0) || (y % 400 === 0)) ? 29 : 28;
+      }
+      return this.solarMonth[ms];
+    },
+
+    GanZhi(o) {
+      return this.Gan[o % 10] + this.Zhi[o % 12];
+    },
+
+    toGanZhiYear(y) {
+      let g = (y - 3) % 10;
+      let z = (y - 3) % 12;
+      if (g === 0) g = 10;
+      if (z === 0) z = 12;
+      return this.Gan[g - 1] + this.Zhi[z - 1];
+    },
+
+    getTerm(y, n) {
+      if (y < 1900 || y > 2100 || n < 1 || n > 24) return -1;
+      const t = this.sTermInfo[y - 1900];
+      const d = [];
+      for (let i = 0; i < t.length; i += 5) {
+        const chunk = parseInt("0x" + t.substr(i, 5)).toString();
+        d.push(chunk[0], chunk.substr(1, 2), chunk[3], chunk.substr(4, 2));
+      }
+      return parseInt(d[n - 1]);
+    },
+
+    toChinaMonth(m) {
+      if (m > 12 || m < 1) return -1;
+      return this.nStr3[m - 1] + "月";
+    },
+
+    toChinaDay(d) {
+      let s;
+      switch (d) {
+        case 10: s = "初十"; break;
+        case 20: s = "二十"; break;
+        case 30: s = "三十"; break;
+        default:
+          s = this.nStr2[Math.floor(d / 10)] + this.nStr1[d % 10];
+      }
+      return s;
+    },
+
+    getAnimal(y) {
+      return this.Animals[(y - 4) % 12];
+    },
+
+    toAstro(m, d) {
+      const s   = "摩羯水瓶双鱼白羊金牛双子巨蟹狮子处女天秤天蝎射手摩羯";
+      const arr = [20,19,21,21,21,22,23,23,23,23,22,22];
+      return s.substr(m * 2 - (d < arr[m - 1] ? 2 : 0), 2) + "座";
+    },
+
+    solar2lunar(Y, M, D) {
+      let y = parseInt(Y);
+      let m = parseInt(M);
+      let d = parseInt(D);
+      if (y < 1900 || y > 2100) return -1;
+      if (y === 1900 && m === 1 && d < 31) return -1;
+
+      let obj = Y ? new Date(y, m - 1, d) : new Date();
+      y = obj.getFullYear();
+      m = obj.getMonth() + 1;
+      d = obj.getDate();
+
+      let offset = (Date.UTC(y, m - 1, d) - Date.UTC(1900, 0, 31)) / 86400000;
+      let i, temp;
+
+      for (i = 1900; i < 2101 && offset > 0; i++) {
+        temp   = this.lYearDays(i);
+        offset -= temp;
+      }
+      if (offset < 0) {
+        offset += temp;
+        i--;
+      }
+
+      const isTodayObj = new Date();
+      const isToday =
+        isTodayObj.getFullYear() === y &&
+        isTodayObj.getMonth() + 1 === m &&
+        isTodayObj.getDate() === d;
+
+      let nWeek = obj.getDay();
+      let cWeek = this.nStr1[nWeek];
+      if (nWeek === 0) nWeek = 7;
+
+      const year = i;
+      let leap   = this.leapMonth(i);
+      let isLeap = false;
+
+      for (i = 1; i < 13 && offset > 0; i++) {
+        if (leap > 0 && i === (leap + 1) && isLeap === false) {
+          --i;
+          isLeap = true;
+          temp   = this.leapDays(year);
+        } else {
+          temp = this.monthDays(year, i);
+        }
+        if (isLeap === true && i === (leap + 1)) isLeap = false;
+        offset -= temp;
+      }
+
+      if (offset === 0 && leap > 0 && i === leap + 1) {
+        if (isLeap) {
+          isLeap = false;
+        } else {
+          isLeap = true;
+          --i;
+        }
+      }
+      if (offset < 0) {
+        offset += temp;
+        --i;
+      }
+
+      const month = i;
+      const day   = offset + 1;
+      const sm    = m - 1;
+
+      const gzY = this.toGanZhiYear(year);
+      const firstNode  = this.getTerm(y, m * 2 - 1);
+      const secondNode = this.getTerm(y, m * 2);
+
+      let gzM = this.GanZhi((y - 1900) * 12 + m + 11);
+      if (d >= firstNode) gzM = this.GanZhi((y - 1900) * 12 + m + 12);
+
+      let isTerm = false;
+      let Term   = null;
+      if (firstNode === d) {
+        isTerm = true;
+        Term   = this.solarTerm[m * 2 - 2];
+      }
+      if (secondNode === d) {
+        isTerm = true;
+        Term   = this.solarTerm[m * 2 - 1];
+      }
+
+      const dayCyc = Date.UTC(y, sm, 1) / 86400000 + 25567 + 10;
+      const gzD    = this.GanZhi(dayCyc + d - 1);
+      const astro  = this.toAstro(m, d);
+
+      const solarDate = `${y}-${m}-${d}`;
+      const lunarDate = `${year}-${month}-${day}`;
+
+      const fest   = this.festival;
+      const lfest  = this.lFestival;
+      const festKey  = `${m}-${d}`;
+      let   lfestKey = `${month}-${day}`;
+
+      if (month === 12 && day === 29 && this.monthDays(year, month) === 29) {
+        lfestKey = "12-30";
+      }
+
+      return {
+        date:      solarDate,
+        lunarDate: lunarDate,
+        festival:       fest[festKey]  ? fest[festKey].title  : null,
+        lunarFestival:  lfest[lfestKey]? lfest[lfestKey].title: null,
+        lYear:  year, lMonth: month, lDay:   day,
+        Animal: this.getAnimal(year),
+        IMonthCn: (isLeap ? "闰" : "") + this.toChinaMonth(month),
+        IDayCn:   this.toChinaDay(day),
+        cYear: y, cMonth: m, cDay: d,
+        gzYear: gzY, gzMonth: gzM, gzDay: gzD,
+        isToday, isLeap,
+        nWeek, ncWeek: "星期" + cWeek,
+        isTerm, Term,
+        astro
+      };
+    },
+
+    lunar2solar(y, m, d, isLeap) {
+      y      = parseInt(y);
+      m      = parseInt(m);
+      d      = parseInt(d);
+      isLeap = !!isLeap;
+
+      const leapMonth = this.leapMonth(y);
+      if (isLeap && leapMonth !== m) return -1;
+
+      const day = this.monthDays(y, m);
+      const _day = isLeap ? this.leapDays(y, m) : day;
+
+      if ((y === 2100 && m === 12 && d > 1) || (y === 1900 && m === 1 && d < 31)) return -1;
+      if (y < 1900 || y > 2100 || d > _day) return -1;
+
+      let offset = 0;
+      for (let i = 1900; i < y; i++) {
+        offset += this.lYearDays(i);
+      }
+
+      let leap = 0;
+      let isAdd = false;
+      for (let i = 1; i < m; i++) {
+        leap = this.leapMonth(y);
+        if (!isAdd) {
+          if (leap <= i && leap > 0) {
+            offset += this.leapDays(y);
+            isAdd = true;
+          }
+        }
+        offset += this.monthDays(y, i);
+      }
+      if (isLeap) offset += day;
+
+      const strap = Date.UTC(1900, 1, 30, 0, 0, 0);
+      const cal   = new Date((offset + d - 31) * 86400000 + strap);
+      const cY    = cal.getUTCFullYear();
+      const cM    = cal.getUTCMonth() + 1;
+      const cD    = cal.getUTCDate();
+
+      return this.solar2lunar(cY, cM, cD);
+    }
   };
 
   /* ───────────────── 今日农历信息（标题占位 / 黄历回退） ───────────────── */
@@ -215,7 +458,7 @@
     GAP_LINES:    "1"
   };
 
-  const args = parseArgs(RAW_ARG, ARG_DEFAULTS);
+  const args = parseArgs(ARG_DEFAULTS);
 
   const showAlmanac = toBool(
     args.SHOW_ALMANAC ?? args.show_almanac,
@@ -229,6 +472,7 @@
   if (isNaN(gapLinesVal) || gapLinesVal < 0) gapLinesVal = 0;
   if (gapLinesVal > 3) gapLinesVal = 3;
 
+  // 0 => "\n"；1 => "\n\n"；2 => "\n\n\n"
   const gapBetween = "\n".repeat(gapLinesVal + 1);
 
   /* ───────────────── 默认标题 / 祝词库 ───────────────── */
@@ -288,6 +532,7 @@
     const path    = `${y}/${y}${mm}.json`;
     const pathEnc = encodeURIComponent(path);
 
+    // 本地可得的回退 header
     let header = `干支纪法：${lunarBase.gzYear}年 ${lunarBase.gzMonth}月 ${lunarBase.gzDay}日`;
     const tags = [];
     if (lunarBase.lunarFestival) tags.push(lunarBase.lunarFestival);
@@ -299,6 +544,7 @@
     let yi = "——";
 
     try {
+      // 先查 IP，判断是否在中国，决定是否走 ghproxy
       let apiUrl = ALMANAC_BASE + pathEnc;
       const ipData = await httpGet("http://ip-api.com/json/", 3000);
       if (ipData) {
@@ -363,23 +609,115 @@
     return block;
   };
 
-  // Cron 播报模式下，无论 SHOW_ALMANAC 设置如何，都强制获取黄历详情
+  // Cron 播报模式下，无论 SHOW_ALMANAC 设置如何，都要强制获取黄历详情
   const needAlmanac = showAlmanac || IS_CRON;
-
   const almanacPromise = needAlmanac
     ? fetchAlmanacDetail(now, lunarNow)
     : Promise.resolve(null);
 
-  /* ───────────────── 构造节日集合 / 正日提醒 ───────────────── */
-  // ……（此处沿用 R2 版的 solarTerms / legalFest / folkFest / intlFest / nextTrip / 正日通知 等逻辑）
-  // ……（同样为避免回复过长不逐行展开，你本地保持原有 R2 版本即可）
+  /* ───────────────── 构造节日集合 ───────────────── */
 
-  // ------- 假设这里已经得到：
-  //   - blockFest（四行节日/节气倒数）
-  //   - nearest（最近节日 + 剩余天数）
-  //   - notifyIfToday 已执行完毕
-  //   - titlesArr 已准备好
-  // ----------------------------------------------------------------
+  const nthWeekdayOfMonth = (y, m, weekday, n) => {
+    const first = new Date(y, m - 1, 1);
+    const firstW = first.getDay();
+    const add = ((weekday - firstW + 7) % 7) + (n - 1) * 7;
+    return fmtYMD(y, m, 1 + add);
+  };
+
+  const lunarNewYearEveSolar = y => {
+    const days12 = calendar.monthDays(y, 12);
+    const lday   = days12 === 29 ? 29 : 30;
+    return calendar.lunar2solar(y, 12, lday).date;
+  };
+
+  const solarTerms = y => {
+    const names = calendar.solarTerm;
+    const out   = [];
+    for (let i = 1; i <= 24; i++) {
+      const m =
+        i <= 2  ? 1  :
+        i <= 4  ? 2  :
+        i <= 6  ? 3  :
+        i <= 8  ? 4  :
+        i <= 10 ? 5  :
+        i <= 12 ? 6  :
+        i <= 14 ? 7  :
+        i <= 16 ? 8  :
+        i <= 18 ? 9  :
+        i <= 20 ? 10 :
+        i <= 22 ? 11 : 12;
+      const d = calendar.getTerm(y, i);
+      out.push([names[i - 1], fmtYMD(y, m, d)]);
+    }
+    out.sort((a, b) => new Date(a[1]) - new Date(b[1]));
+    return out;
+  };
+
+  const legalFest = y => {
+    return [
+      ["元旦",   fmtYMD(y, 1, 1)],
+      ["春节",   calendar.lunar2solar(y, 1, 1).date],
+      ["清明节", fmtYMD(y, 4, calendar.getTerm(y, 7))],
+      ["劳动节", fmtYMD(y, 5, 1)],
+      ["端午节", calendar.lunar2solar(y, 5, 5).date],
+      ["中秋节", calendar.lunar2solar(y, 8, 15).date],
+      ["国庆节", fmtYMD(y, 10, 1)]
+    ].sort((a, b) => new Date(a[1]) - new Date(b[1]));
+  };
+
+  const folkFest = y => {
+    const base = [
+      ["除夕",     lunarNewYearEveSolar(y)],
+      ["元宵节",   calendar.lunar2solar(y, 1, 15).date],
+      ["龙抬头",   calendar.lunar2solar(y, 2, 2).date],
+      ["七夕节",   calendar.lunar2solar(y, 7, 7).date],
+      ["中元节",   calendar.lunar2solar(y, 7, 15).date],
+      ["重阳节",   calendar.lunar2solar(y, 9, 9).date],
+      ["寒衣节",   calendar.lunar2solar(y, 10, 1).date],
+      ["下元节",   calendar.lunar2solar(y, 10, 15).date],
+      ["腊八节",   calendar.lunar2solar(y, 12, 8).date],
+      ["小年(北)", calendar.lunar2solar(y, 12, 23).date],
+      ["小年(南)", calendar.lunar2solar(y, 12, 24).date]
+    ];
+    return base.sort((a, b) => new Date(a[1]) - new Date(b[1]));
+  };
+
+  const intlFest = y => {
+    return [
+      ["情人节", fmtYMD(y, 2, 14)],
+      ["母亲节", nthWeekdayOfMonth(y, 5, 0, 2)],
+      ["父亲节", nthWeekdayOfMonth(y, 6, 0, 3)],
+      ["万圣节", fmtYMD(y, 10, 31)],
+      ["平安夜", fmtYMD(y, 12, 24)],
+      ["圣诞节", fmtYMD(y, 12, 25)],
+      ["感恩节", nthWeekdayOfMonth(y, 11, 4, 4)]
+    ].sort((a, b) => new Date(a[1]) - new Date(b[1]));
+  };
+
+  const nextTrip = list => {
+    const arr = list.filter(([, d]) => dateDiff(todayStr, d) >= 0);
+    if (arr.length === 0) return list.slice(0, 3);
+    const take = arr.slice(0, 3);
+    if (take.length < 3) take.push(...list.slice(0, 3 - take.length));
+    return take;
+  };
+
+  const TERMS = [...solarTerms(year),     ...solarTerms(nextYear)];
+  const LEGAL = [...legalFest(year),      ...legalFest(nextYear)];
+  const FOLK  = [...folkFest(year),       ...folkFest(nextYear)];
+  const INTL  = [...intlFest(year),       ...intlFest(nextYear)];
+
+  const T3 = nextTrip(TERMS);
+  const L3 = nextTrip(LEGAL);
+  const F3 = nextTrip(FOLK);
+  const I3 = nextTrip(INTL);
+
+  const [dT0, dT1, dT2] = T3.map(([, d]) => dateDiff(todayStr, d));
+  const [dL0, dL1, dL2] = L3.map(([, d]) => dateDiff(todayStr, d));
+  const [dF0, dF1, dF2] = F3.map(([, d]) => dateDiff(todayStr, d));
+  const [dI0, dI1, dI2] = I3.map(([, d]) => dateDiff(todayStr, d));
+
+  /* ───────────────── 等待外链标题 / 祝词 / 黄历详情 ───────────────── */
 
   const [titlesRaw, blessRaw, almanacDetail] = await Promise.all([
     titlesPromise,
@@ -390,38 +728,27 @@
   const titlesArr = Array.isArray(titlesRaw) && titlesRaw.length ? titlesRaw : defaultTitles;
   const blessMap  = blessRaw && typeof blessRaw === "object" ? blessRaw : defaultBless;
 
-  // 这里省略了节日集合计算 / render3 / blockFest 构造，你可以直接用上一版 R2 中的相同代码
+  /* ───────────────── 正日提醒（法定 + 民俗） ───────────────── */
 
-  /* ───────────────── 播报模式（Cron，无参数） ───────────────── */
+  const hasStore  = typeof $persistentStore !== "undefined" && $persistentStore;
+  const hasNotify = typeof $notification    !== "undefined" && $notification;
 
-  if (IS_CRON) {
-    if (typeof $notification !== "undefined") {
-      if (almanacDetail) {
-        const lines  = almanacDetail.split("\n");
-        const header = lines[0] || "";
-        const yiLine = lines.find(l => l.startsWith("✅")) || "";
-        const jiLine = lines.find(l => l.startsWith("🈲")) || "";
-
-        const body = [yiLine, jiLine].filter(Boolean).join("\n") || almanacDetail;
-
-        $notification.post(
-          "📅 今日黄历",
-          header.replace(/^干支纪法：?/, ""),
-          body
-        );
-      } else {
-        $notification.post(
-          "📅 今日黄历",
-          "",
-          "黄历详情获取失败，请稍后再试。"
-        );
+  const notifyIfToday = (name, date) => {
+    if (!hasStore || !hasNotify) return;
+    if (dateDiff(todayStr, date) === 0 && now.getHours() >= 6) {
+      const key = "timecardpushed_" + date;
+      if ($persistentStore.read(key) !== "1") {
+        $persistentStore.write("1", key);
+        const words = blessMap[name] || "节日快乐！";
+        $notification.post(`🎉 今天是 ${date} ${name}`, "", words);
       }
     }
-    $done();
-    return;
-  }
+  };
 
-  /* ───────────────── 面板模式 ───────────────── */
+  notifyIfToday(L3[0][0], L3[0][1]);
+  notifyIfToday(F3[0][0], F3[0][1]);
+
+  /* ───────────────── 面板标题 ───────────────── */
 
   const pickTitle = (nextName, daysToNext) => {
     if (daysToNext === 0) return `今天是 ${nextName}，休息一下吧～`;
@@ -436,15 +763,67 @@
       .replaceAll("{next}", nextName ? `下一个：${nextName}` : "");
   };
 
-  // ……这里同样直接沿用 R2 中的：
-  //   - nearest 计算
-  //   - lineLegal / lineTerm / lineFolk / lineIntl
-  //   - blockFest 拼接
-  // ----------------------------------------------------------------
+  // 最近节日（法定 + 民俗 + 国际，不含节气）
+  let nearest = [L3[0], dL0];
+  if (dF0 < nearest[1]) nearest = [F3[0], dF0];
+  if (dI0 < nearest[1]) nearest = [I3[0], dI0];
+
+  /* ───────────────── 四行内容 ───────────────── */
+
+  const render3 = (a0, a1, a2, d0, d1, d2) => {
+    if (d0 === 0) {
+      return `今天：${a0[0]} | ${a1[0]}${d1}天 | ${a2[0]}${d2}天`;
+    }
+    return `${a0[0]}${d0}天 | ${a1[0]}${d1}天 | ${a2[0]}${d2}天`;
+  };
+
+  const lineLegal = render3(L3[0], L3[1], L3[2], dL0, dL1, dL2);
+  const lineTerm  = render3(T3[0], T3[1], T3[2], dT0, dT1, dT2);
+  const lineFolk  = render3(F3[0], F3[1], F3[2], dF0, dF1, dF2);
+  const lineIntl  = render3(I3[0], I3[1], I3[2], dI0, dI1, dI2);
+
+  const blockFest = [
+    lineLegal,
+    lineTerm,
+    lineFolk,
+    lineIntl
+  ].join(gapBetween);
 
   const content = almanacDetail
     ? `${almanacDetail}\n\n${blockFest}`
     : blockFest;
+
+  /* ───────────────── 播报模式（Cron / 无参数） ───────────────── */
+
+  if (IS_CRON) {
+    if (typeof $notification !== "undefined") {
+      if (almanacDetail) {
+        const lines      = almanacDetail.split("\n");
+        const headerLine = lines[0] || "";
+        const yiLine     = lines.find(l => l.startsWith("✅")) || "";
+        const jiLine     = lines.find(l => l.startsWith("🈲")) || "";
+
+        const body =
+          [yiLine, jiLine].filter(Boolean).join("\n") || almanacDetail;
+
+        $notification.post(
+          "📅 今日黄历",
+          headerLine.replace(/^干支纪法[:：]?\s*/, ""),
+          body
+        );
+      } else {
+        $notification.post(
+          "📅 今日黄历",
+          "",
+          "黄历详情获取失败，请稍后再试。"
+        );
+      }
+    }
+    $done();
+    return;
+  }
+
+  /* ───────────────── 面板模式（有参数） ───────────────── */
 
   log(
     "done SHOW_ALMANAC =", showAlmanac,
@@ -459,6 +838,7 @@
   });
 
 })().catch(e => {
+  // 兜底异常处理，面板不至于挂掉
   const msg = e && e.stack || String(e);
   if (typeof console !== "undefined" && console.log) {
     console.log("[today_almanac] fatal error:", msg);
