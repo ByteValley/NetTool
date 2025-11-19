@@ -606,7 +606,7 @@
             log("fetchAlmanacDetail error:", String(e));
         }
 
-        const lineJi = `🈲 忌：${ji}`;
+        const lineJi = `❎ 忌：${ji}`;
         const lineYi = `✅ 宜：${yi}`;
         const block = `${header}\n${lineJi}\n${lineYi}`;
 
