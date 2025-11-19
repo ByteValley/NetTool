@@ -1,490 +1,480 @@
 name: 字节系净化
 description: 按域名精细拦截字节系广告（蛋花/番茄/头条/抖音内嵌），屏蔽开屏/激励/前贴片及埋点，兼容短剧播放，可通过「激励视频」参数调节拦截强度。
 compat_arguments:
-    激励视频: REJECT-DROP
+  激励视频: REJECT-DROP
 author: ByteValley
 icon: https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 dns: {}
 rules:
-    - domain:
-          match: ad.zijieapi.com
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: zijieapi.com
-              - domain_keyword:
-                    match: ad
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: zijieapi.com
-              - domain_keyword:
-                    match: normal-lq
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: zijieapi.com
-              - domain_keyword:
-                    match: normal-lf
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: zijieapi.com
-              - domain_keyword:
-                    match: abtest
-          policy: REJECT
-    - domain:
-          match: abtest3-misc.zijieapi.com
-          policy: REJECT-DROP
-    - domain:
-          match: abtest3-misc-lf.zijieapi.com
-          policy: REJECT-DROP
-    - domain:
-          match: tnc0-alisc1.zijieapi.com
-          policy: REJECT-DROP
-    - domain:
-          match: praisewindow-sinfonlinea.ugsdk.cn
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: snssdk.com
-              - domain_keyword:
-                    match: vas-lf
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: snssdk.com
-              - domain_keyword:
-                    match: open_ad
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: snssdk.com
-              - domain_keyword:
-                    match: mon
-          policy: REJECT
-    - url_regex:
-          match: ^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b
-          policy: REJECT-DROP
-    - url_regex:
-          match: ^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*
-          policy: REJECT
-    - domain:
-          match: frontier-aweme.snssdk.com
-          policy: REJECT
+- domain:
+    match: ad.zijieapi.com
+    policy: REJECT
+- and:
+    match:
     - domain_suffix:
-          match: pangolin.snssdk.com
-          policy: REJECT
-    - domain:
-          match: ad.toutiao.com
-          policy: REJECT
-    - domain_suffix:
-          match: ads.toutiao.com
-          policy: REJECT
-    - domain_suffix:
-          match: adbyte.bytedance.com
-          policy: REJECT
-    - url_regex:
-          match: ^https?:\/\/[^\/]+\.toutiaoapi\.com\/api\/(launch|startup)\/(open_ad|ad)\b
-          policy: REJECT-DROP
-    - domain_suffix:
-          match: log.toutiao.com
-          policy: REJECT-DROP
-    - domain_suffix:
-          match: toutiaocloud.com
-          policy: REJECT-DROP
-    - domain_suffix:
-          match: va.toutiao.com
-          policy: REJECT-DROP
-    - domain:
-          match: mon11-misc-lq.toutiaoapi.com
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: toutiaoapi.com
-              - domain_keyword:
-                    match: misc-lq
-          policy: REJECT-DROP
-    - domain_suffix:
-          match: partner.toutiao.com
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovel.com
-              - domain_keyword:
-                    match: misc-lf
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovel.com
-              - domain_keyword:
-                    match: misc-lq
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovel.com
-              - domain_keyword:
-                    match: normal-lf
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovel.com
-              - domain_keyword:
-                    match: normal-lq
-          policy: REJECT
-    - domain:
-          match: api3-normal-lf.fqnovel.com
-          policy: REJECT-DROP
-    - domain:
-          match: api5-normal-lq.fqnovel.com
-          policy: REJECT-DROP
-    - domain:
-          match: mon11-misc-lq.fqnovel.com
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovel.com
-              - domain_keyword:
-                    match: frontier100
-          policy: REJECT-DROP
+        match: zijieapi.com
     - domain_keyword:
-          match: pangolin-sdk-toutiao
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovel.com
-              - domain_keyword:
-                    match: sinfonlineb
-          policy: REJECT-DROP
-    - and:
-          match:
-              - domain_suffix:
-                    match: fqnovelpic.com
-              - domain_keyword:
-                    match: ad-sign
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: douyin.com
-              - domain_keyword:
-                    match: open-lf
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: douyin.com
-              - domain_keyword:
-                    match: open-lq
-          policy: REJECT
-    - domain:
-          match: webcast5-open-lf.douyin.com
-          policy: REJECT-DROP
+        match: ad
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: webcastcdn-tos.douyinstatic.com
-          policy: REJECT
+        match: zijieapi.com
+    - domain_keyword:
+        match: normal-lq
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: webcastcdn-tos-sign.douyinstatic.com
-          policy: REJECT
+        match: zijieapi.com
+    - domain_keyword:
+        match: normal-lf
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: webcast-sourcecdn-tos.bytegecko.com
-          policy: REJECT
+        match: zijieapi.com
+    - domain_keyword:
+        match: abtest
+    policy: REJECT
+- domain:
+    match: abtest3-misc.zijieapi.com
+    policy: REJECT-DROP
+- domain:
+    match: abtest3-misc-lf.zijieapi.com
+    policy: REJECT-DROP
+- domain:
+    match: tnc0-alisc1.zijieapi.com
+    policy: REJECT-DROP
+- domain:
+    match: praisewindow-sinfonlinea.ugsdk.cn
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: webcast-gr-sourcecdn-tos.bytegecko.com
-          policy: REJECT
+        match: snssdk.com
+    - domain_keyword:
+        match: vas-lf
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: webcast.douyinpic.com
-          policy: REJECT
-    - and:
-          match:
-              - domain_suffix:
-                    match: bytedcdn.com
-              - domain_keyword:
-                    match: reward-video
-          policy: REJECT
+        match: snssdk.com
+    - domain_keyword:
+        match: open_ad
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: log.snssdk.com
-          policy: REJECT-DROP
+        match: snssdk.com
+    - domain_keyword:
+        match: mon
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b
+    policy: REJECT-DROP
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*
+    policy: REJECT
+- domain:
+    match: frontier-aweme.snssdk.com
+    policy: REJECT
+- domain_suffix:
+    match: pangolin.snssdk.com
+    policy: REJECT
+- domain:
+    match: ad.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: ads.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: adbyte.bytedance.com
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.toutiaoapi\.com\/api\/(launch|startup)\/(open_ad|ad)\b
+    policy: REJECT-DROP
+- domain_suffix:
+    match: log.toutiao.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: toutiaocloud.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: va.toutiao.com
+    policy: REJECT-DROP
+- domain:
+    match: mon11-misc-lq.toutiaoapi.com
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: rtlog.snssdk.com
-          policy: REJECT-DROP
+        match: toutiaoapi.com
+    - domain_keyword:
+        match: misc-lq
+    policy: REJECT-DROP
+- domain_suffix:
+    match: partner.toutiao.com
+    policy: REJECT
+- and:
+    match:
     - domain_suffix:
-          match: data.bytedance.com
-          policy: REJECT-DROP
+        match: fqnovel.com
+    - domain_keyword:
+        match: misc-lf
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: ibytedapm.com
-          policy: REJECT-DROP
+        match: fqnovel.com
+    - domain_keyword:
+        match: misc-lq
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: syzagk.com
-          policy: REJECT
-    - domain:
-          match: api.dler.io
-          policy: REJECT
-    - domain:
-          match: jr-ad.ctrip.com
-          policy: REJECT-DROP
-    - domain:
-          match: readapi.zziot.life
-          policy: REJECT-DROP
-    - domain:
-          match: tracking.ad-survey.com
-          policy: REJECT-DROP
+        match: fqnovel.com
+    - domain_keyword:
+        match: normal-lf
+    policy: REJECT
+- and:
+    match:
     - domain_suffix:
-          match: bdurl.net
-          policy: REJECT
+        match: fqnovel.com
+    - domain_keyword:
+        match: normal-lq
+    policy: REJECT
+- domain:
+    match: api3-normal-lf.fqnovel.com
+    policy: REJECT-DROP
+- domain:
+    match: api5-normal-lq.fqnovel.com
+    policy: REJECT-DROP
+- domain:
+    match: mon11-misc-lq.fqnovel.com
+    policy: REJECT-DROP
+- and:
+    match:
     - domain_suffix:
-          match: zjurl.cn
-          policy: REJECT
-    - domain:
-          match: tr.byteurl.cn
-          policy: REJECT
-    - ip_cidr:
-          match: 101.36.166.16/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 122.225.215.222/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 121.12.126.251/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 58.216.16.146/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 119.96.140.81/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 115.238.171.187/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 220.180.244.200/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 59.42.240.90/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 115.231.182.14/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 121.12.126.218/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 61.164.158.98/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 58.216.106.211/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 49.7.47.93/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 49.7.47.89/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 115.223.59.89/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 60.163.131.56/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 183.136.203.179/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 122.14.229.147/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 122.228.79.51/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 222.186.177.145/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 112.13.108.15/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 60.163.131.60/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 112.123.37.139/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 183.36.24.208/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 139.224.82.203/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 47.119.215.141/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 117.147.219.239/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 183.246.207.185/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr:
-          match: 150.138.251.58/32
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:203:50:60::15/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:203:50:60::16/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:203:50:60::17/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:203:50:60::3c/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2408:8744:d03:1004:70::4/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:f7:c010:808::54/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:f7:a070:361:38::2c/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:f7:a070:362:38::1/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:2808:42:3::10/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:2808:42:3::11/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:2808:3:3::3fb/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:2808:43:3::1e/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:f7:8013:407:3::7f5/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c02:240:1100:fea0::101/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:6c07:3:8000:0:b00:114/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c28:2808:41:3::22/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:971:2000:5001:3::32/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2408:8740:91fe:112:8000:0:b00:54/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:96c:200:5500:8000:0:b00:111/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:978:1208:0:8000:0:b00:135/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:96c:6000:d80::b00:101/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:f7:e010:110f:8000:0:b00:69/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:f7:a060:9205:8000:0:b00:37/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c04:1004:a::16a/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c04:1004:a::16b/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2409:8c04:1004:a::163/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 2408:8726:2000:6::138/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:83:200::14c/128
-          policy: REJECT-DROP
-          no_resolve: true
-    - ip_cidr6:
-          match: 240e:83:200::151/128
-          policy: REJECT-DROP
-          no_resolve: true
+        match: fqnovel.com
+    - domain_keyword:
+        match: frontier100
+    policy: REJECT-DROP
+- domain_keyword:
+    match: pangolin-sdk-toutiao
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovelpic.com
+    - domain_keyword:
+        match: ad-sign
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: douyin.com
+    - domain_keyword:
+        match: open-lf
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: douyin.com
+    - domain_keyword:
+        match: open-lq
+    policy: REJECT
+- domain:
+    match: webcast5-open-lf.douyin.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: webcastcdn-tos.douyinstatic.com
+    policy: REJECT
+- domain_suffix:
+    match: webcastcdn-tos-sign.douyinstatic.com
+    policy: REJECT
+- domain_suffix:
+    match: webcast-sourcecdn-tos.bytegecko.com
+    policy: REJECT
+- domain_suffix:
+    match: webcast-gr-sourcecdn-tos.bytegecko.com
+    policy: REJECT
+- domain_suffix:
+    match: webcast.douyinpic.com
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: bytedcdn.com
+    - domain_keyword:
+        match: reward-video
+    policy: REJECT
+- domain_suffix:
+    match: log.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: rtlog.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: data.bytedance.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: ibytedapm.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: syzagk.com
+    policy: REJECT
+- domain:
+    match: api.dler.io
+    policy: REJECT
+- domain:
+    match: jr-ad.ctrip.com
+    policy: REJECT-DROP
+- domain:
+    match: tracking.ad-survey.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: bdurl.net
+    policy: REJECT
+- domain_suffix:
+    match: zjurl.cn
+    policy: REJECT
+- domain:
+    match: tr.byteurl.cn
+    policy: REJECT
+- ip_cidr:
+    match: 101.36.166.16/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 122.225.215.222/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 121.12.126.251/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 58.216.16.146/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 119.96.140.81/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 115.238.171.187/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 220.180.244.200/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 59.42.240.90/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 115.231.182.14/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 121.12.126.218/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 61.164.158.98/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 58.216.106.211/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 49.7.47.93/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 49.7.47.89/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 115.223.59.89/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 60.163.131.56/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 183.136.203.179/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 122.14.229.147/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 122.228.79.51/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 222.186.177.145/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 112.13.108.15/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 60.163.131.60/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 112.123.37.139/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 183.36.24.208/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 139.224.82.203/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 47.119.215.141/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 117.147.219.239/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 183.246.207.185/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr:
+    match: 150.138.251.58/32
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:203:50:60::15/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:203:50:60::16/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:203:50:60::17/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:203:50:60::3c/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2408:8744:d03:1004:70::4/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:f7:c010:808::54/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:f7:a070:361:38::2c/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:f7:a070:362:38::1/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:2808:42:3::10/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:2808:42:3::11/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:2808:3:3::3fb/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:2808:43:3::1e/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:f7:8013:407:3::7f5/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c02:240:1100:fea0::101/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:6c07:3:8000:0:b00:114/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c28:2808:41:3::22/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:971:2000:5001:3::32/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2408:8740:91fe:112:8000:0:b00:54/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:96c:200:5500:8000:0:b00:111/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:978:1208:0:8000:0:b00:135/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:96c:6000:d80::b00:101/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:f7:e010:110f:8000:0:b00:69/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:f7:a060:9205:8000:0:b00:37/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c04:1004:a::16a/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c04:1004:a::16b/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2409:8c04:1004:a::163/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 2408:8726:2000:6::138/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:83:200::14c/128
+    policy: REJECT-DROP
+    no_resolve: true
+- ip_cidr6:
+    match: 240e:83:200::151/128
+    policy: REJECT-DROP
+    no_resolve: true
 mitm:
-    hostnames:
-        includes:
-            - '*.toutiao.com'
+  hostnames:
+    includes:
+    - '*.toutiao.com'
