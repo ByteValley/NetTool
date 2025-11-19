@@ -25,7 +25,10 @@
         "<b>— 备注 —</b><br/>• Netflix 在 <code>text</code> + 无箭头模式下：完整=“已完整解锁”，自制=“仅解锁自制剧”；其他服务统一“已解锁/不可达”。<br/>• 中国境内运营商自动规范化显示（移动/电信/联通/广电/教育网）。<br/>• 标题显示网络类型；第一行显示“代理策略”；入口/落地多源定位与回退。",
         "<b>— 常见问题排查 —</b><br/>• 若加载失败：先去掉特殊字符（如面板标题里的 𝕏）、或把 <code>{{...}}</code> 改为 <code>{{{...}}}</code>；逐项恢复定位问题。<br/>• 若 <code>update-interval</code> 不生效：检查 BoxJS 中 <code>@Panel.NetworkInfo.Settings.Update</code> 是否覆盖；脚本以 BoxJS 优先。<br/>• 若 <code>SERVICES</code> 为空又想显示默认：将其留空或设为 <code>[]</code> 即可（脚本回退到默认全量）。"
       ],
-      "icon": "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png",
+      "icons": [
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png",
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png"
+      ],
       "keys": [
         "@Panel.NetworkInfo.Settings",
         "@Panel.NetworkInfo.Caches"
@@ -501,7 +504,10 @@
         "<b>— BoxJS —</b><br/>• 本面板只读取 <code>@Panel.SubscribeInfo.Settings</code> 中的字段，不使用缓存键；文本留空、<code>null</code>、<code>undefined</code> 或 <code>{{{...}}}</code> 占位符都会视为“未配置”。<br/>• 该面板与「网络信息」共用同一份 BoxJS Dashboard 文件（<code>panel.boxjs.json</code>），仅应用 ID 与设置键不同。",
         "<b>— 备注 —</b><br/>• 当所有订阅链接均为空或无效时，面板内容为“未配置订阅参数”。<br/>• 本面板仅拉取订阅流量信息，不修改任何订阅内容。"
       ],
-      "icon": "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png",
+      "icons": [
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png",
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png"
+      ],
       "keys": [
         "@Panel.SubscribeInfo.Settings",
         "@Panel.SubscribeInfo.Caches"
