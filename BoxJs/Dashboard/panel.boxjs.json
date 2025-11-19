@@ -501,7 +501,7 @@
         "<b>— BoxJS —</b><br/>• 本面板只读取 <code>@Panel.SubscribeInfo.Settings</code> 中的字段，不使用缓存键；文本留空、<code>null</code>、<code>undefined</code> 或 <code>{{{...}}}</code> 占位符都会视为“未配置”。<br/>• 该面板与「网络信息」共用同一份 BoxJS Dashboard 文件（<code>panel.boxjs.json</code>），仅应用 ID 与设置键不同。",
         "<b>— 备注 —</b><br/>• 当所有订阅链接均为空或无效时，面板内容为“未配置订阅参数”。<br/>• 本面板仅拉取订阅流量信息，不修改任何订阅内容。"
       ],
-      "icons": "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png",
+      "icons": ["https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png", "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png"],
       "keys": [
         "@Panel.SubscribeInfo.Settings",
         "@Panel.SubscribeInfo.Caches"
