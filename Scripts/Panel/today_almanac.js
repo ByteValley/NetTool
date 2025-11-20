@@ -16,7 +16,7 @@
  *
  * 适配：Surge / Loon / Quantumult X / Stash / Egern（面板）
  *
- * 作者：ByteValley  |  版本：2025-11-18R2
+ * 作者：ByteValley  |  版本：2025-11-20R1
  */
 
 "use strict";

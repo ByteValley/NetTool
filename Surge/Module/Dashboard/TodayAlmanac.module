@@ -2,7 +2,7 @@
 #!desc=面板顶部可选展示「今日黄历详情」（干支纪法+宜忌），下方四行节日倒数：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次祝词提醒；脚本无参数调用时自动通过系统通知播报今日黄历详情。
 #!category=功能看板
 #!author=ByteValley
-#!version=2025-11-18R2
+#!version=2025-11-20R1
 
 #!arguments=Update:3600,TITLES_URL:'',BLESS_URL:'',SHOW_ALMANAC:true,GAP_LINES:1,TITLE_MODE:'day',cronexp:'0 9 * * *'
 
