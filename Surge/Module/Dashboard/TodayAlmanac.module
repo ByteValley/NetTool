@@ -4,13 +4,13 @@
 #!author=ByteValley
 #!version=2025-11-18R1
 
-#!arguments=TITLES_URL:'',BLESS_URL:'',SHOW_ALMANAC:true,GAP_LINES:1
+#!arguments=Update:21600,TITLES_URL:'',BLESS_URL:'',SHOW_ALMANAC:true,GAP_LINES:1
 
-#!arguments-desc=参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象, 键=节日名, 值=祝词)；SHOW_ALMANAC 是否在顶部附加今日黄历详情(true/false)；GAP_LINES 节日行与行之间的空行数(0=无空行,1=一行,2=两行…)\n外链 JSON 示例：\nTITLES_URL: [\"摸鱼使我快乐～\",\"{lunar}\",\"{solar}\",\"下一站：{next}\"]\nBLESS_URL: {\"春节\":\"愿新岁顺遂无虞，家人皆安！\",\"中秋节\":\"人月两团圆，心上皆明朗。\",\"腊八节\":\"粥香暖岁末。\"}\n传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json&SHOW_ALMANAC=true&GAP_LINES=1
+#!arguments-desc=— 参数说明 —\n• Update=面板刷新间隔(秒)\n• TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})\n• BLESS_URL 祝词库外链(JSON对象, 键=节日名, 值=祝词)\n• SHOW_ALMANAC 是否在顶部附加今日黄历详情(true/false)\n• GAP_LINES 节日行与行之间的空行数(0=无空行,1=一行,2=两行…)\n\n— 外链 JSON 示例 —\n• TITLES_URL: [\"摸鱼使我快乐～\",\"{lunar}\",\"{solar}\",\"下一站：{next}\"]\n• BLESS_URL: {\"春节\":\"愿新岁顺遂无虞，家人皆安！\",\"中秋节\":\"人月两团圆，心上皆明朗。\",\"腊八节\":\"粥香暖岁末。\"}\n\n— 传参示例(argument) —\n• TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json&SHOW_ALMANAC=true&GAP_LINES=1
 
 [Panel]
 # 模块分类：功能看板  |  细项：四行节日/节气倒数 + 可选今日黄历详情
-今日黄历 = script-name=今日黄历·面板, update-interval=1800
+今日黄历 = script-name=今日黄历·面板, update-interval={{{Update}}}
 
 [Script]
 # 模块分类：功能看板  |  细项：面板展示（传入参数时启用）

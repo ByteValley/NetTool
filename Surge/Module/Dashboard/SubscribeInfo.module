@@ -3,7 +3,7 @@
 #!author=ByteValley
 #!category=功能看板
 #!arguments=Update:21600,DefaultIcon:antenna.radiowaves.left.and.right.circle.fill,DefaultIconColor:00E28F,Title1:'机场名称',URL1:'订阅链接',ResetDay1:'重置日期',Title2:'机场名称',URL2:'订阅链接',ResetDay2:'重置日期',Title3:'机场名称',URL3:'订阅链接',ResetDay3:'重置日期',Title4:'机场名称',URL4:'订阅链接',ResetDay4:'重置日期',Title5:'机场名称',URL5:'订阅链接',ResetDay5:'重置日期',Title6:'机场名称',URL6:'订阅链接',ResetDay6:'重置日期',Title7:'机场名称',URL7:'订阅链接',ResetDay7:'重置日期',Title8:'机场名称',URL8:'订阅链接',ResetDay8:'重置日期',Title9:'机场名称',URL9:'订阅链接',ResetDay9:'重置日期',Title10:'机场名称',URL10:'订阅链接',ResetDay10:'重置日期'
-#!arguments-desc=Update=刷新间隔(秒);TitleN=机场名称;URLN=订阅链接(http/https);ResetDayN=重置规则(1~31=每月N日重置,中文=原样显示);DefaultIcon=面板图标(SF Symbols 名称);DefaultIconColor=图标颜色(十六进制色值)\n\n— BoxJS —\n• 托管订阅: https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json
+#!arguments-desc=— 参数说明 —\n• Update=刷新间隔(秒)\n• TitleN=机场名称\n• URLN=订阅链接(http/https)\n• ResetDayN=重置规则(1~31=每月N日重置,中文=原样显示)\n• DefaultIcon=面板图标(SF Symbols 名称)\n• DefaultIconColor=图标颜色(十六进制色值)\n\n— BoxJS —\n• 托管订阅: https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json
 
 [Panel]
 订阅信息=script-name=机场订阅查询,update-interval={{{Update}}}
