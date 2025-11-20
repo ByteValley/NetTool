@@ -8,14 +8,15 @@
  *   · 若脚本“无参数调用”（通常为 Cron），则直接用系统通知播报今日黄历详情
  *
  * 参数（模块 argument）：
- *   TITLES_URL   标题库外链(JSON 数组，支持 {lunar} {solar} {next})
- *   BLESS_URL    祝词库外链(JSON 对象: 键=节日名, 值=祝词)
- *   SHOW_ALMANAC 是否在顶部附加今日黄历详情(true/false)
- *   GAP_LINES    节日行之间空行数(0=无空行,1=一行,2=两行…)
+ *   TITLES_URL    标题库外链(JSON 数组，支持 {lunar} {solar} {next})
+ *   BLESS_URL     祝词库外链(JSON 对象: 键=节日名, 值=祝词)
+ *   SHOW_ALMANAC  是否在顶部附加今日黄历详情(true/false)
+ *   GAP_LINES     节日行之间空行数(0=无空行,1=一行,2=两行…)
+ *   TITLE_MODE    标题模式(day=当天固定, random=每次随机)
  *
  * 适配：Surge / Loon / Quantumult X / Stash / Egern（面板）
  *
- * 作者：ByteValley  |  版本：2025-11-18R1
+ * 作者：ByteValley  |  版本：2025-11-18R2
  */
 
 "use strict";
@@ -49,6 +50,9 @@
         if (typeof console === "undefined" || !console.log) return;
         console.log(`[${TAG}]`, ...args);
     }
+
+    const hasStore = typeof $persistentStore !== "undefined" && $persistentStore;
+    const hasNotify = typeof $notification !== "undefined" && $notification;
 
     /* ───────────────── 通用工具函数 ───────────────── */
 
@@ -460,7 +464,8 @@
         TITLES_URL: "",
         BLESS_URL: "",
         SHOW_ALMANAC: "true",
-        GAP_LINES: "1"
+        GAP_LINES: "1",
+        TITLE_MODE: "day"
     };
 
     const args = parseArgs(ARG_DEFAULTS);
@@ -476,6 +481,10 @@
     );
     if (isNaN(gapLinesVal) || gapLinesVal < 0) gapLinesVal = 0;
     if (gapLinesVal > 3) gapLinesVal = 3;
+
+    const titleModeRaw =
+        (args.TITLE_MODE ?? args.title_mode ?? "day").toString().trim().toLowerCase();
+    const titleMode = (titleModeRaw === "random") ? "random" : "day";
 
     // 0 => "\n"；1 => "\n\n"；2 => "\n\n\n"
     const gapBetween = "\n".repeat(gapLinesVal + 1);
@@ -735,9 +744,6 @@
 
     /* ───────────────── 正日提醒（法定 + 民俗） ───────────────── */
 
-    const hasStore = typeof $persistentStore !== "undefined" && $persistentStore;
-    const hasNotify = typeof $notification !== "undefined" && $notification;
-
     const notifyIfToday = (name, date) => {
         if (!hasStore || !hasNotify) return;
         if (dateDiff(todayStr, date) === 0 && now.getHours() >= 6) {
@@ -756,11 +762,31 @@
     /* ───────────────── 面板标题 ───────────────── */
 
     const pickTitle = (nextName, daysToNext) => {
-        if (daysToNext === 0) return `今天是 ${nextName}，休息一下吧～`;
+        // 节日本日：除非强制 random，否则固定提示语
+        if (daysToNext === 0 && titleMode !== "random") {
+            return `今天是 ${nextName}，休息一下吧～`;
+        }
 
         const pool = titlesArr.length ? titlesArr : defaultTitles;
-        const r = Math.floor(Math.random() * pool.length);
-        const raw = String(pool[r] || "");
+        if (!pool.length) return "今日黄历";
+
+        let idx;
+
+        if (titleMode === "random" || !hasStore) {
+            idx = Math.floor(Math.random() * pool.length);
+        } else {
+            const key = `${TAG}_title_index_${todayStr}`;
+            const saved = $persistentStore.read(key);
+            const num = saved != null ? parseInt(saved, 10) : NaN;
+            if (!isNaN(num) && num >= 0 && num < pool.length) {
+                idx = num;
+            } else {
+                idx = Math.floor(Math.random() * pool.length);
+                $persistentStore.write(String(idx), key);
+            }
+        }
+
+        const raw = String(pool[idx] || "");
 
         return raw
             .replaceAll("{lunar}", titleLunar)
@@ -806,7 +832,7 @@
                 const lines = almanacDetail.split("\n");
                 const headerLine = lines[0] || "";
                 const yiLine = lines.find(l => l.startsWith("✅")) || "";
-                const jiLine = lines.find(l => l.startsWith("❎")) || "";
+                const jiLine = lines.find(l => l.startsWith("❎") || l.startsWith("🈲")) || "";
 
                 const body =
                     [yiLine, jiLine].filter(Boolean).join("\n") || almanacDetail;
@@ -832,6 +858,7 @@
 
     log(
         "done SHOW_ALMANAC =", showAlmanac,
+        "TITLE_MODE =", titleMode,
         "content head =", content.split("\n").slice(0, 3).join("\\n")
     );
 
