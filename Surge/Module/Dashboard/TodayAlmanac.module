@@ -15,7 +15,7 @@
 [Script]
 # 模块分类：功能看板  |  细项：面板展示（传入参数时启用）
 # 功能说明：可选「今日黄历详情」（干支纪法/宜忌） + 法定节假日 | 二十四节气 | 传统民俗 | 国际洋节 四行倒数
-今日黄历·面板 = type=generic, timeout=60, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/today_almanac.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}&SHOW_ALMANAC={{{SHOW_ALMANAC}}}&GAP_LINES={{{GAP_LINES}}}&TITLE_MODE={{{TITLE_MODE}}}
+今日黄历·面板 = type=generic, timeout=60, script-update-interval=21600, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/today_almanac.js, argument=TITLES_URL={{{TITLES_URL}}}&BLESS_URL={{{BLESS_URL}}}&SHOW_ALMANAC={{{SHOW_ALMANAC}}}&GAP_LINES={{{GAP_LINES}}}&TITLE_MODE={{{TITLE_MODE}}}
 
 # 模块分类：功能看板  |  细项：定时播报（无参数时自动进入播报模式）
 # 功能说明：
