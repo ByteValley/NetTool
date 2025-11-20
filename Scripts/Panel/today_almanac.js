@@ -806,7 +806,7 @@
                 const lines = almanacDetail.split("\n");
                 const headerLine = lines[0] || "";
                 const yiLine = lines.find(l => l.startsWith("✅")) || "";
-                const jiLine = lines.find(l => l.startsWith("🈲")) || "";
+                const jiLine = lines.find(l => l.startsWith("❎")) || "";
 
                 const body =
                     [yiLine, jiLine].filter(Boolean).join("\n") || almanacDetail;
