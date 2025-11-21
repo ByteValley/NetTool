@@ -615,9 +615,9 @@
             log("fetchAlmanacDetail error:", String(e));
         }
 
-        const lineJi = `❎ 忌：${ji}`;
         const lineYi = `✅ 宜：${yi}`;
-        const block = `${header}\n${lineJi}\n${lineYi}`;
+        const lineJi = `❎ 忌：${ji}`;
+        const block = `${header}\n${lineYi}\n${lineJi}`;
 
         log("almanac block:", block.replace(/\n/g, "\\n"));
         return block;
@@ -832,7 +832,7 @@
                 const lines = almanacDetail.split("\n");
                 const headerLine = lines[0] || "";
                 const yiLine = lines.find(l => l.startsWith("✅")) || "";
-                const jiLine = lines.find(l => l.startsWith("❎") || l.startsWith("🈲")) || "";
+                const jiLine = lines.find(l => l.startsWith("❎")) || "";
 
                 const body =
                     [yiLine, jiLine].filter(Boolean).join("\n") || almanacDetail;
