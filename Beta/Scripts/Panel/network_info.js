@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-27R1
+ * 版本：2025-11-27R2
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -99,17 +99,19 @@
 const CONSTS = Object.freeze({
     MAX_RECENT_REQ: 150,
     PRETOUCH_TO_MS: 700,
-    RETRY_DELAY_MS: 260,
+
     SD_MIN_TIMEOUT: 2000,
+
     LOG_RING_MAX: 120,
     DEBUG_TAIL_LINES: 18,
-    ENT_MIN_REQ_TO: 2500,
+
     ENT_MIN_TTL: 30,
     ENT_MAX_TTL: 3600,
 
     // IPv6 快速探测：每次运行先确认是否支持 v6，再决定是否跑 v6 链路
     V6_PROBE_TO_MS: 1200
 });
+
 
 /* ===== 语言字典（固定 UI 词收口）===== */
 const SD_STR = {
@@ -890,8 +892,8 @@ log('info', 'Start', JSON.stringify({
 }));
 
 // 追加：BoxJS & CFG 快照
-log('info', 'BoxSettings(BOX)', BOX);
-log('info', 'CFG snapshot', {
+log('debug', 'BoxSettings(BOX)', BOX);
+log('debug', 'CFG snapshot', {
     Update: CFG.Update,
     Timeout: CFG.Timeout,
     MASK_IP: CFG.MASK_IP,
@@ -1017,8 +1019,7 @@ log('info', 'CFG snapshot', {
         v4: $network?.v4,
         v6: $network?.v6
     }));
-    const trial = netTypeLine() || '';
-    const title = /未知|unknown/i.test(trial) ? buildNetTitleHard() : trial;
+    const title = netTypeLine() || t('unknownNet');
 
     // 组装渲染
     const parts = [];
@@ -1251,59 +1252,58 @@ function netTypeLine() {
     return t('unknownNet');
 }
 
-function buildNetTitleHard() {
-    const n = $network || {};
-    const ssid = n.wifi && (n.wifi.ssid || n.wifi.bssid);
-    const radio = (n.cellular && n.cellular.radio) || (n['cellular-data'] && n['cellular-data'].radio) || '';
-    const iface = (n.v4 && n.v4.primaryInterface) || (n.v6 && n.v6.primaryInterface) || '';
-
-    if (ssid) return `${t('wifi')} | ${n.wifi.ssid || '-'}`;
-    if (radio) return `${t('cellular')} | ${t('gen', radioToGen(radio), radio)}`;
-    if (/^pdp/i.test(iface)) return `${t('cellular')} | -`;
-    if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
-    return t('unknownNet');
-}
-
 // ====================== HTTP 基础 ======================
-function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
+function httpCall(method, req, timeoutMs = null, capMs = null, logTag = 'HTTP') {
     return new Promise((resolve, reject) => {
         const base = (Number(CFG.Timeout) || 8) * 1000;
 
-        // 默认超时用 Timeout，但为避免面板整体超时，这里强制封顶（非常重要）
         let to = (timeoutMs == null) ? base : Number(timeoutMs);
         if (!Number.isFinite(to) || to <= 0) to = base;
-        to = Math.min(to, 3500); // <= 3.5s：宁可快速失败走回退，也别卡死整段脚本
-
-        const req = { url, headers, timeout: to };
-        if (followRedirect) req.followRedirect = true;
+        if (Number.isFinite(capMs) && capMs > 0) to = Math.min(to, capMs);
 
         const start = Date.now();
         let done = false;
 
-        // watchdog：就算底层不回调，也保证 Promise 会结束
         const wd = setTimeout(() => {
             if (done) return;
             done = true;
             const cost = Date.now() - start;
-            log('warn', 'HTTP GET watchdog', url, 'cost', cost + 'ms');
+            log('warn', `${logTag} watchdog`, req.url, 'cost', cost + 'ms');
             reject(new Error('watchdog-timeout'));
         }, to + 200);
 
-        $httpClient.get(req, (err, resp, body) => {
-            if (done) return; // 忽略迟到回调
+        const payload = Object.assign({}, req, {timeout: to});
+        const fn = (String(method).toUpperCase() === 'POST') ? $httpClient.post : $httpClient.get;
+
+        fn(payload, (err, resp, body) => {
+            if (done) return;
             done = true;
             clearTimeout(wd);
 
             const cost = Date.now() - start;
             if (err || !resp) {
-                log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err || 'no-resp'));
+                log('warn', `${logTag} fail`, req.url, 'cost', cost + 'ms', String(err || 'no-resp'));
                 return reject(err || new Error('no-resp'));
             }
             const status = resp.status || resp.statusCode || 0;
-            log('debug', 'HTTP GET', url, 'status', status, 'cost', cost + 'ms');
-            resolve({ status, headers: resp.headers || {}, body });
+            log('debug', logTag, req.url, 'status', status, 'cost', cost + 'ms');
+            resolve({status, headers: resp.headers || {}, body, cost});
         });
     });
+}
+
+function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
+    // 面板关键链路：强制封顶，宁可快速失败走回退，也别卡死整段脚本
+    const cap = 3500;
+    const req = {url, headers};
+    if (followRedirect) req.followRedirect = true;
+    return httpCall('GET', req, timeoutMs, cap, 'HTTP GET');
+}
+
+function httpPost(url, headers = {}, body = "", timeoutMs = null) {
+    const cap = 3500;
+    const req = {url, headers, body};
+    return httpCall('POST', req, timeoutMs, cap, 'HTTP POST');
 }
 
 function httpAPI(path = '/v1/requests/recent') {
@@ -1518,19 +1518,6 @@ const ENT_REQ_TO = Math.min(2200, Math.max(1200, SD_TIMEOUT_MS || 0));
 const ENT_TTL_SEC = Math.max(CONSTS.ENT_MIN_TTL, Math.min(Number(CFG.Update) || 10, CONSTS.ENT_MAX_TTL));
 let ENT_CACHE = {ip: "", t: 0, data: null};
 
-async function withRetry(fn, retry = 1, delay = CONSTS.RETRY_DELAY_MS) {
-    try {
-        return await fn();
-    } catch (_) {}
-    for (let i = 0; i < retry; i++) {
-        await sleep(delay * (i + 1));
-        try {
-            return await fn();
-        } catch (_) {}
-    }
-    throw 'retry-fail';
-}
-
 /* ===== 入口定位：表驱动链（平安 + 链） ===== */
 const ENT_LOC_CHAIN = Object.freeze({
     pingan: async (ip) => {
@@ -1570,17 +1557,6 @@ const ENT_LOC_CHAIN = Object.freeze({
         };
     }
 });
-
-// 先平安，再链（ipapi -> ipwhois -> ipsb）
-async function loc_chain(ip) {
-    try {
-        return await withRetry(() => ENT_LOC_CHAIN.ipapi(ip), 1);
-    } catch {}
-    try {
-        return await withRetry(() => ENT_LOC_CHAIN.ipwhois(ip), 1);
-    } catch {}
-    return await withRetry(() => ENT_LOC_CHAIN.ipsb(ip), 0);
-}
 
 async function getEntranceBundle(ip) {
     const nowT = Date.now();
