@@ -1267,24 +1267,41 @@ function buildNetTitleHard() {
 // ====================== HTTP 基础 ======================
 function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
     return new Promise((resolve, reject) => {
-        const req = {url, headers};
+        const base = (Number(CFG.Timeout) || 8) * 1000;
 
-        // 统一默认超时：没显式传，就用全局 Timeout（秒→ms）
-        if (timeoutMs == null) timeoutMs = (Number(CFG.Timeout) || 8) * 1000;
-        req.timeout = timeoutMs;
+        // 默认超时用 Timeout，但为避免面板整体超时，这里强制封顶（非常重要）
+        let to = (timeoutMs == null) ? base : Number(timeoutMs);
+        if (!Number.isFinite(to) || to <= 0) to = base;
+        to = Math.min(to, 3500); // <= 3.5s：宁可快速失败走回退，也别卡死整段脚本
 
+        const req = { url, headers, timeout: to };
         if (followRedirect) req.followRedirect = true;
 
         const start = Date.now();
-        $httpClient.get(req, (err, resp, body) => {
+        let done = false;
+
+        // watchdog：就算底层不回调，也保证 Promise 会结束
+        const wd = setTimeout(() => {
+            if (done) return;
+            done = true;
             const cost = Date.now() - start;
-            if (err) {
-                log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err));
-                return reject(err);
+            log('warn', 'HTTP GET watchdog', url, 'cost', cost + 'ms');
+            reject(new Error('watchdog-timeout'));
+        }, to + 200);
+
+        $httpClient.get(req, (err, resp, body) => {
+            if (done) return; // 忽略迟到回调
+            done = true;
+            clearTimeout(wd);
+
+            const cost = Date.now() - start;
+            if (err || !resp) {
+                log('warn', 'HTTP GET fail', url, 'cost', cost + 'ms', String(err || 'no-resp'));
+                return reject(err || new Error('no-resp'));
             }
-            const status = resp?.status || resp?.statusCode;
+            const status = resp.status || resp.statusCode || 0;
             log('debug', 'HTTP GET', url, 'status', status, 'cost', cost + 'ms');
-            resolve({status, headers: resp?.headers || {}, body});
+            resolve({ status, headers: resp.headers || {}, body });
         });
     });
 }
@@ -1421,7 +1438,10 @@ async function getLandingV6(preferKey) {
 /** 每次运行：快速探测“是否支持代理 IPv6 出口”（支持才跑 v6 链路） */
 async function probeLandingV6(preferKey) {
     const order = makeTryOrder(preferKey, ORDER.landingV6);
-    const r = await tryIPv6Ip(order, {timeoutMs: CONSTS.V6_PROBE_TO_MS, maxTries: 2});
+    const r = await tryIPv6Ip(order, {
+        timeoutMs: Math.min(CONSTS.V6_PROBE_TO_MS, 900),
+        maxTries: 2
+    });
     return {ok: !!r.ip, ip: r.ip || ''};
 }
 
@@ -1493,7 +1513,8 @@ async function getPolicyAndEntranceBoth() {
 }
 
 // —— 入口位置缓存（跟 Update 联动） ——
-const ENT_REQ_TO = Math.max(CONSTS.ENT_MIN_REQ_TO, SD_TIMEOUT_MS || ((Number(CFG.Timeout) || 8) * 1000));
+// 入口定位强制快速：避免慢节点把面板整体拖死
+const ENT_REQ_TO = Math.min(2200, Math.max(1200, SD_TIMEOUT_MS || 0));
 const ENT_TTL_SEC = Math.max(CONSTS.ENT_MIN_TTL, Math.min(Number(CFG.Update) || 10, CONSTS.ENT_MAX_TTL));
 let ENT_CACHE = {ip: "", t: 0, data: null};
 
@@ -1564,35 +1585,50 @@ async function loc_chain(ip) {
 async function getEntranceBundle(ip) {
     const nowT = Date.now();
     const fresh = (nowT - ENT_CACHE.t) < ENT_TTL_SEC * 1000;
+
     if (ENT_CACHE.ip === ip && fresh && ENT_CACHE.data) {
         const left = Math.max(0, ENT_TTL_SEC * 1000 - (nowT - ENT_CACHE.t));
         log('info', 'Entrance cache HIT', {ip: _maskMaybe(ip), ttl_ms_left: left});
         return ENT_CACHE.data;
     }
-    if (ENT_CACHE.ip === ip && ENT_CACHE.data) {
-        log('info', 'Entrance cache EXPIRED', {
-            ip: _maskMaybe(ip),
-            age_ms: (nowT - ENT_CACHE.t),
-            ttl_ms: ENT_TTL_SEC * 1000
-        });
-    } else {
-        log('info', 'Entrance cache MISS', {ip: _maskMaybe(ip)});
-    }
+
+    log('info', (ENT_CACHE.ip === ip && ENT_CACHE.data) ? 'Entrance cache EXPIRED' : 'Entrance cache MISS', {
+        ip: _maskMaybe(ip),
+        age_ms: ENT_CACHE.t ? (nowT - ENT_CACHE.t) : 0
+    });
 
     const t0 = Date.now();
-    const [a, b] = await Promise.allSettled([
-        withRetry(() => ENT_LOC_CHAIN.pingan(ip), 1),
-        withRetry(() => loc_chain(ip), 1)
+
+    // 关键：并发打 4 个源，2s 左右收工；按优先级挑选结果
+    const [p, a, w, s] = await Promise.allSettled([
+        ENT_LOC_CHAIN.pingan(ip),
+        ENT_LOC_CHAIN.ipapi(ip),
+        ENT_LOC_CHAIN.ipwhois(ip),
+        ENT_LOC_CHAIN.ipsb(ip)
     ]);
-    log('debug', 'Entrance locate results', {pingan: a.status, chain: b.status, cost: (Date.now() - t0) + 'ms'});
+
+    const pick = (arr) => {
+        for (const x of arr) if (x.status === 'fulfilled') return x.value || {};
+        return {};
+    };
+
+    const p1 = (p.status === 'fulfilled') ? (p.value || {}) : {};
+    const c2 = pick([a, w, s]);  // ipapi -> ipwhois -> ipsb
+
+    log('debug', 'Entrance locate results(fast)', {
+        pingan: p.status,
+        chain: [a.status, w.status, s.status].join('/'),
+        cost: (Date.now() - t0) + 'ms'
+    });
 
     const res = {
         ip,
-        loc1: a.status === 'fulfilled' ? (a.value.loc || '') : '',
-        isp1: a.status === 'fulfilled' ? (a.value.isp || '') : '',
-        loc2: b.status === 'fulfilled' ? (b.value.loc || '') : '',
-        isp2: b.status === 'fulfilled' ? (b.value.isp || '') : ''
+        loc1: p1.loc || '',
+        isp1: p1.isp || '',
+        loc2: c2.loc || '',
+        isp2: c2.isp || ''
     };
+
     ENT_CACHE = {ip, t: nowT, data: res};
     return res;
 }
