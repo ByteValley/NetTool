@@ -937,6 +937,25 @@ log('info', 'CFG snapshot', {
         cost: (Date.now() - t1) + 'ms'
     });
 
+    // 如果只抓到 v6（或啥都没抓到），补一次 IPv4-only 触发并二扫 recent
+    if (!entrance4) {
+        await httpGet('https://api-ipv4.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true).catch(() => {});
+        await new Promise((r) => setTimeout(r, 80)); // 给 recent 一点时间落记录
+
+        const t1a = Date.now();
+        const r1a = await getPolicyAndEntranceBoth();
+        policyName = policyName || r1a.policyName;
+        entrance4 = entrance4 || r1a.entrance4;
+        entrance6 = entrance6 || r1a.entrance6;
+
+        log('info', 'EntranceBoth#1b(v4补齐)', {
+            policy: policyName || '-',
+            v4: _maskMaybe(entrance4 || ''),
+            v6: _maskMaybe(entrance6 || ''),
+            cost: (Date.now() - t1a) + 'ms'
+        });
+    }
+
     // 每次运行：快速探测“是否支持代理 IPv6 出口”；支持才跑 v6 链路
     const probe = await probeLandingV6(LANDING_IPv6);
     const V6_READY = probe.ok;
@@ -1017,16 +1036,23 @@ log('info', 'CFG snapshot', {
     if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
     // 入口
-    if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && ent6.ip)) {
+    if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) ||
+        (ent6 && (ent6.ip || ent6.loc1 || ent6.loc2 || ent6.isp1 || ent6.isp2))) {
+
         pushGroupTitle(parts, '入口');
+
         const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
         const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
         if (entIPv4) parts.push(entIPv4);
         if (entIPv6) parts.push(entIPv6);
-        if (ent4.loc1) parts.push(`${t('location')}¹: ${flagFirst(ent4.loc1)}`);
-        if (ent4.isp1) parts.push(`${t('isp')}¹: ${fmtISP(ent4.isp1, ent4.loc1)}`);
-        if (ent4.loc2) parts.push(`${t('location')}²: ${flagFirst(ent4.loc2)}`);
-        if (ent4.isp2) parts.push(`${t('isp')}²: ${String(ent4.isp2).trim()}`);
+
+        // v4 有定位就优先展示 v4；否则展示 v6（修复“仅 IPv6 时没位置/运营商”）
+        const entShow = (ent4 && (ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) ? ent4 : ent6;
+
+        if (entShow?.loc1) parts.push(`${t('location')}¹: ${flagFirst(entShow.loc1)}`);
+        if (entShow?.isp1) parts.push(`${t('isp')}¹: ${fmtISP(entShow.isp1, entShow.loc1)}`);
+        if (entShow?.loc2) parts.push(`${t('location')}²: ${flagFirst(entShow.loc2)}`);
+        if (entShow?.isp2) parts.push(`${t('isp')}²: ${String(entShow.isp2).trim()}`);
     }
 
     // 落地
@@ -1417,15 +1443,19 @@ function extractIP(str) {
 /** 预触发：v4 必跑；v6 仅在确认 v6 ready 后才跑 */
 async function touchLandingOnceQuick(opt = {}) {
     const doV6 = !!opt.v6;
-    try {
-        await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true);
-    } catch (_) {}
+
+    // v4：同时打一个“可能走 v6”的常用接口 + 一个“明确 IPv4-only”的接口
+    await Promise.allSettled([
+        httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true),
+        httpGet('https://api-ipv4.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true)
+    ]);
 
     if (doV6) {
-        try {
-            await httpGet('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true);
-        } catch (_) {}
+        await Promise.allSettled([
+            httpGet('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true)
+        ]);
     }
+
     log('debug', 'Pre-touch landing endpoints done', {v6: doV6});
 }
 
