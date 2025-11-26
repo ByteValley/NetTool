@@ -1,0 +1,234 @@
+#!name=字节系净化
+#!desc=按域名精细拦截字节系广告（蛋花/番茄/头条/抖音内嵌），屏蔽开屏/激励/前贴片及埋点，兼容短剧播放，可通过「激励视频」参数调节拦截强度。
+#!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
+#!category=功能净化
+#!author=ByteValley
+#!version=2025-11-26R1
+#!arguments=激励视频:REJECT-DROP
+
+[MITM]
+# 仅当你启用重写/脚本时才需 MITM；纯规则拦截无需 MITM
+hostname = %APPEND% *.toutiao.com
+
+[Rule]
+# =====================================================================
+# ByteDance 主控接口域 | zijieapi.com / ugsdk.cn
+# =====================================================================
+# —— 广告 / 分发 / normal 线路 ——
+DOMAIN,ad.zijieapi.com,REJECT
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,ad)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lq)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),{{{激励视频}}}    # 统一广告/活动下发线（normal-lf）
+
+# —— ABTest / 实验策略下发 ——
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,abtest)),REJECT
+DOMAIN,abtest3-misc.zijieapi.com,REJECT-DROP
+DOMAIN,abtest3-misc-lf.zijieapi.com,REJECT-DROP
+
+# —— 其他控制节点（如风控 / Trace 等） ——
+DOMAIN,tnc0-alisc1.zijieapi.com,REJECT-DROP
+
+# —— UGSDK 激励 / 好评弹窗 ——
+DOMAIN,praisewindow-sinfonlinea.ugsdk.cn,{{{激励视频}}}                         # 好评/激励弹窗链路（可随激励视频开关）
+
+# =====================================================================
+# 抖音 / 今日头条公共接口域 | snssdk.com
+# =====================================================================
+# —— 视频广告 / 开屏控制 ——
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,vas-lf)),REJECT-DROP           # Video Ad Server
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,open_ad)),REJECT-DROP          # 开屏/前贴片控制
+
+# —— 曝光 / 监控 / 计费链路 ——
+AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,mon)),REJECT                   # 曝光/监控
+
+# —— 开屏 & 信息流广告接口（snssdk） ——
+URL-REGEX,^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT-DROP
+URL-REGEX,^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*,REJECT
+
+# —— 抖音 Aweme 广告 / 策略接口（frontier） ——
+DOMAIN,frontier-aweme.snssdk.com,REJECT
+DOMAIN-SUFFIX,pangolin.snssdk.com,REJECT                                       # 巨量引擎 / 广告 SDK
+
+# =====================================================================
+# 今日头条系接口域 | toutiao.com / toutiaoapi.com / toutiaocloud.com / va.toutiao.com
+# =====================================================================
+# —— 广告平台 / 巨量引擎 ——
+DOMAIN,ad.toutiao.com,REJECT
+DOMAIN-SUFFIX,ads.toutiao.com,REJECT
+DOMAIN-SUFFIX,adbyte.bytedance.com,REJECT
+
+# —— 开屏 / 启动广告接口（toutiaoapi） ——
+URL-REGEX,^https?:\/\/[^\/]+\.toutiaoapi\.com\/api\/(launch|startup)\/(open_ad|ad)\b,REJECT-DROP
+
+# —— 埋点 / 分析 / 其他 ——
+DOMAIN-SUFFIX,log.toutiao.com,REJECT-DROP
+DOMAIN-SUFFIX,toutiaocloud.com,REJECT-DROP
+DOMAIN-SUFFIX,va.toutiao.com,REJECT-DROP
+
+# —— 图像 & 标记资源（misc-lq） ——
+DOMAIN,mon11-misc-lq.toutiaoapi.com,REJECT-DROP
+AND,((DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
+
+# —— 今日头条相关第三方广告入口 ——
+DOMAIN-SUFFIX,partner.toutiao.com,REJECT
+
+# =====================================================================
+# 番茄小说相关域 | fqnovel.com / fqnovelpic.com
+# =====================================================================
+# —— 广告卡 / 实验 / 监控线路（域名级） ——
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon11-misc)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lq)),REJECT
+
+DOMAIN,api3-normal-lf.fqnovel.com,REJECT-DROP
+DOMAIN,api5-normal-lq.fqnovel.com,REJECT-DROP
+DOMAIN,mon11-misc-lq.fqnovel.com,REJECT-DROP
+
+# —— frontier100（头条广告接口映射到番茄） ——
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT-DROP
+
+# —— 激励广告链路（可通过激励视频开关） ——
+DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinea)),DIRECT
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlineb)),{{{激励视频}}}   # 覆盖激励链路时启用
+
+# —— 番茄图像 / 标记资源域 ——
+AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
+
+# =====================================================================
+# 抖音直播 / 多媒体域 | douyin.com / amemv.com / douyinstatic.com / douyinpic.com / bytegecko.com
+# =====================================================================
+# —— 直播控制 / 拉流入口（谨慎：会影响抖音直播） ——
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lf)),REJECT
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,open-lq)),REJECT
+DOMAIN,webcast5-open-lf.douyin.com,REJECT-DROP
+# DOMAIN,webcast.amemv.com,REJECT   # 如确认仅章节直播使用可开启
+
+# —— 直播视频 / 音频流 CDN ——
+DOMAIN-SUFFIX,webcastcdn-tos.douyinstatic.com,REJECT
+DOMAIN-SUFFIX,webcastcdn-tos-sign.douyinstatic.com,REJECT
+DOMAIN-SUFFIX,webcast-sourcecdn-tos.bytegecko.com,REJECT
+DOMAIN-SUFFIX,webcast-gr-sourcecdn-tos.bytegecko.com,REJECT
+
+# —— 直播封面 / 贴图等资源 ——
+DOMAIN-SUFFIX,webcast.douyinpic.com,REJECT
+
+# =====================================================================
+# 媒体素材 CDN 域 | bytedcdn.com 等
+# =====================================================================
+# —— 激励 / 前贴片媒体素材 ——
+AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT
+
+# =====================================================================
+# 通用埋点 / 分析域 | log.snssdk.com / rtlog.snssdk.com / data.bytedance.com / ibytedapm.com
+# =====================================================================
+DOMAIN-SUFFIX,log.snssdk.com,REJECT-DROP
+DOMAIN-SUFFIX,rtlog.snssdk.com,REJECT-DROP
+DOMAIN-SUFFIX,data.bytedance.com,REJECT-DROP
+DOMAIN-SUFFIX,ibytedapm.com,REJECT-DROP
+
+# =====================================================================
+# 通用第三方广告 / 追踪域
+# =====================================================================
+DOMAIN-SUFFIX,syzagk.com,REJECT
+DOMAIN,api.dler.io,REJECT
+DOMAIN,jr-ad.ctrip.com,REJECT-DROP
+DOMAIN,tracking.ad-survey.com,REJECT-DROP
+
+# =====================================================================
+# 短链 / 跳转追踪域 | bdurl / zjurl / byteurl
+# =====================================================================
+DOMAIN-SUFFIX,bdurl.net,REJECT
+DOMAIN-SUFFIX,zjurl.cn,REJECT
+DOMAIN,tr.byteurl.cn,REJECT
+IP-CIDR,101.36.166.16/32,{{{激励视频}}},no-resolve                            # dig.zjurl.cn
+
+# =====================================================================
+# IPv4 | 广告源 / 调度节点（去重后）
+# =====================================================================
+# —— fqnovel：mon/misc 调度与埋点 ——
+IP-CIDR,122.225.215.222/32,REJECT-DROP,no-resolve                               # mon3-misc-lf.fqnovel.com
+IP-CIDR,121.12.126.251/32,REJECT-DROP,no-resolve                                # mon11-misc-lf.fqnovel.com
+IP-CIDR,58.216.16.146/32,REJECT-DROP,no-resolve                                 # mon11-misc-lf.fqnovel.com
+IP-CIDR,119.96.140.81/32,REJECT-DROP,no-resolve                                 # mon11-misc-lf.fqnovel.com
+IP-CIDR,115.238.171.187/32,REJECT-DROP,no-resolve                               # mon11-misc-lf.fqnovel.com
+IP-CIDR,220.180.244.200/32,REJECT-DROP,no-resolve                               # mon11-misc-lf.fqnovel.com
+IP-CIDR,59.42.240.90/32,REJECT-DROP,no-resolve                                  # mon11-misc-lf.fqnovel.com
+IP-CIDR,115.231.182.14/32,REJECT-DROP,no-resolve                                # mon11-misc-lf.fqnovel.com
+IP-CIDR,121.12.126.218/32,REJECT-DROP,no-resolve                                # mon11-misc-lf.fqnovel.com
+IP-CIDR,61.164.158.98/32,REJECT-DROP,no-resolve                                 # mon11-misc-lf.fqnovel.com
+IP-CIDR,58.216.106.211/32,REJECT-DROP,no-resolve                                # mon11-misc-lf.fqnovel.com
+
+# —— frontier100（头条广告接口） ——
+IP-CIDR,49.7.47.93/32,REJECT-DROP,no-resolve                                    # frontier100-toutiao-lf.fqnovel.com
+IP-CIDR,49.7.47.89/32,REJECT-DROP,no-resolve                                    # frontier100-toutiao-lf.fqnovel.com
+
+# —— ads / 短链 / 其它广告源 ——
+IP-CIDR,115.223.59.89/32,REJECT-DROP,no-resolve                                 # ad.zijieapi.com
+IP-CIDR,60.163.131.56/32,REJECT-DROP,no-resolve                                 # ads5-normal-lf.zijieapi.com
+IP-CIDR,183.136.203.179/32,REJECT-DROP,no-resolve                               # ads5-normal-lf.zijieapi.com
+IP-CIDR,122.14.229.147/32,REJECT-DROP,no-resolve                                # ads3-normal-lf.zijieapi.com
+IP-CIDR,122.228.79.51/32,REJECT-DROP,no-resolve                                 # ads3-normal-lf.zijieapi.com
+IP-CIDR,222.186.177.145/32,REJECT-DROP,no-resolve                               # api5-normal-lf.fqnovel.com
+IP-CIDR,112.13.108.15/32,REJECT-DROP,no-resolve                                 # api3-normal-lf.fqnovel.com
+IP-CIDR,60.163.131.60/32,REJECT-DROP,no-resolve                                 # 激励视频（ads5）
+
+# —— dig.bdurl / dig.zjurl（短链解析统一） ——
+IP-CIDR,112.123.37.139/32,REJECT-DROP,no-resolve                                # dig.bdurl.net
+IP-CIDR,183.36.24.208/32,REJECT-DROP,no-resolve                                 # dig.bdurl.net
+IP-CIDR,139.224.82.203/32,REJECT-DROP,no-resolve                                # dig.bdurl.net
+IP-CIDR,47.119.215.141/32,REJECT-DROP,no-resolve                                # dig.bdurl.net
+IP-CIDR,117.147.219.239/32,REJECT-DROP,no-resolve                               # dig.bdurl.net
+IP-CIDR,183.246.207.185/32,REJECT-DROP,no-resolve                               # dig.bdurl.net
+IP-CIDR,150.138.251.58/32,REJECT-DROP,no-resolve                                # dig.bdurl.net
+
+# =====================================================================
+# IPv6 | 广告源 / 调度节点（去重+新抓并入）
+# =====================================================================
+# —— mon11（lf/lq） ——
+IP-CIDR6,2409:8c28:203:50:60::15/128,REJECT-DROP,no-resolve                      # mon11-misc-lf.fqnovel.com
+IP-CIDR6,2409:8c28:203:50:60::16/128,REJECT-DROP,no-resolve                      # mon11-misc-lf.fqnovel.com
+IP-CIDR6,2409:8c28:203:50:60::17/128,REJECT-DROP,no-resolve                      # mon11-misc-lf.fqnovel.com
+IP-CIDR6,2409:8c28:203:50:60::3c/128,REJECT-DROP,no-resolve                      # mon11-misc-lf.fqnovel.com
+IP-CIDR6,2408:8744:d03:1004:70::4/128,REJECT-DROP,no-resolve                     # mon11-misc-lq.fqnovel.com
+IP-CIDR6,240e:f7:c010:808::54/128,REJECT-DROP,no-resolve                         # mon11-misc-lf.fqnovel.com（新增）
+IP-CIDR6,240e:f7:a070:361:38::2c/128,REJECT-DROP,no-resolve                      # mon11-misc-lf.fqnovel.com（新增）
+IP-CIDR6,240e:f7:a070:362:38::1/128,REJECT-DROP,no-resolve                       # mon11-misc-lf.fqnovel.com（新增）
+
+# —— mon3（lf） ——
+IP-CIDR6,2409:8c28:2808:42:3::10/128,REJECT-DROP,no-resolve                      # mon3-misc-lf.fqnovel.com
+IP-CIDR6,2409:8c28:2808:42:3::11/128,REJECT-DROP,no-resolve                      # mon3-misc-lf.fqnovel.com
+IP-CIDR6,2409:8c28:2808:3:3::3fb/128,REJECT-DROP,no-resolve                      # mon3-misc-lf.fqnovel.com
+IP-CIDR6,2409:8c28:2808:43:3::1e/128,REJECT-DROP,no-resolve                      # mon3-misc-lf.fqnovel.com
+IP-CIDR6,240e:f7:8013:407:3::7f5/128,REJECT-DROP,no-resolve                      # mon3-misc-lf.fqnovel.com（新增）
+
+# —— applog / 埋点 ——
+IP-CIDR6,2409:8c02:240:1100:fea0::101/128,REJECT-DROP,no-resolve                 # log0-applog-lf.fqnovel.com
+
+# —— ads/saveu（广告/激励）zijieapi（lf/lq） ——
+IP-CIDR6,2409:8c28:6c07:3:8000:0:b00:114/128,REJECT-DROP,no-resolve              # ads5-normal-lf.zijieapi.com
+IP-CIDR6,2409:8c28:2808:41:3::22/128,REJECT-DROP,no-resolve                      # ads3-normal-lf.zijieapi.com
+IP-CIDR6,240e:971:2000:5001:3::32/128,REJECT-DROP,no-resolve                     # ads3-normal-lf.zijieapi.com（新增）
+IP-CIDR6,2408:8740:91fe:112:8000:0:b00:54/128,REJECT-DROP,no-resolve             # ads5-normal-lq.zijieapi.com
+IP-CIDR6,240e:96c:200:5500:8000:0:b00:111/128,REJECT-DROP,no-resolve             # ads5-normal-lf.zijieapi.com（新增）
+IP-CIDR6,240e:978:1208:0:8000:0:b00:135/128,REJECT-DROP,no-resolve               # ads5-normal-lf.zijieapi.com（新增）
+IP-CIDR6,240e:96c:6000:d80::b00:101/128,REJECT-DROP,no-resolve                   # saveu5-normal-lf.zijieapi.com（新增）
+
+# —— fqnovel normal（lf/lq）参考（暂保留注释态） ——
+# IP-CIDR6,2605:340:f044:bd::101/128,REJECT-DROP,no-resolve                      # api5-normal-lf.fqnovel.com
+# IP-CIDR6,2409:8c28:30b0:6:8000:0:b00:167/128,REJECT-DROP,no-resolve            # api5-normal-lf.fqnovel.com（保留参考）
+# IP-CIDR6,2409:8c28:30b0:6:8000:0:b00:118/128,REJECT-DROP,no-resolve            # api5-normal-lf.fqnovel.com（保留参考）
+
+# —— sinfonline（激励链路） ——
+IP-CIDR6,240e:f7:e010:110f:8000:0:b00:69/128,REJECT-DROP,no-resolve              # api5-normal-sinfonlinec.fqnovel.com（新增）
+IP-CIDR6,240e:f7:a060:9205:8000:0:b00:37/128,REJECT-DROP,no-resolve              # api5-normal-sinfonlinec.fqnovel.com（新增）
+
+# —— frontier100（广告接口）lf/lq ——
+IP-CIDR6,2409:8c04:1004:a::16a/128,REJECT-DROP,no-resolve                        # frontier100-toutiao-lf.fqnovel.com
+IP-CIDR6,2409:8c04:1004:a::16b/128,REJECT-DROP,no-resolve                        # frontier100-toutiao-lf.fqnovel.com
+IP-CIDR6,2409:8c04:1004:a::163/128,REJECT-DROP,no-resolve                        # frontier100-toutiao-lf.fqnovel.com
+IP-CIDR6,2408:8726:2000:6::138/128,REJECT-DROP,no-resolve                        # frontier100-toutiao-lq.fqnovel.com
+IP-CIDR6,240e:83:200::14c/128,REJECT-DROP,no-resolve                             # frontier100-toutiao-lf.fqnovel.com（新增）
+IP-CIDR6,240e:83:200::151/128,REJECT-DROP,no-resolve                             # frontier100-toutiao-lf.fqnovel.com（新增）

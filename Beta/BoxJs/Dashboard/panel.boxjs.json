@@ -1,0 +1,852 @@
+{
+  "id": "ByteValley.Panel",
+  "name": "功能看板",
+  "author": "@ByteValley",
+  "description": "功能看板",
+  "icon": "https://avatars.githubusercontent.com/u/100578089?&v=4",
+  "repo": "https://github.com/ByteValley/NetTool",
+  "apps": [
+    {
+      "id": "Panel.NetworkInfo",
+      "name": "网络信息",
+      "descs_html": [
+        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
+        "<b>优先级说明：</b>单值参数读取顺序为 <b>arguments（显式改动）</b> → <b>BoxJS</b> → <b>默认</b>；服务清单遵循 <b>arguments(SERVICES) 非空</b> → <b>多选</b> → <b>文本</b> → <b>默认全量</b>。",
+        "<b>超时单位：</b>统一为“秒”，只认 <code>Timeout</code> 与 <code>SD_TIMEOUT</code>；<code>SD_TIMEOUT=0</code> 表示跟随 <code>Timeout</code>。脚本会按剩余预算自动 clamp 请求超时，避免撑爆面板 timeout。",
+        "<b>IPv6 说明：</b>脚本会快速探测“节点是否有 IPv6 出口”，若无则放弃外网 v6 查询（但仍显示本地 v6）。",
+        "<hr/>",
+        "<h3>使用说明与参数</h3>",
+        "<b>— 基本 —</b><br/>• <code>Update</code>：面板刷新间隔（秒）<br/>• <code>Timeout</code>：脚本总超时（秒）<br/>• <code>BUDGET</code>：总执行预算（秒）。0=自动（≈Timeout-保护值），预算不足会自动跳过耗时项<br/>• <code>SD_TIMEOUT</code>：服务检测单项超时（秒）。0=跟随 Timeout（最小 2 秒）",
+        "<b>— 隐私与显示 —</b><br/>• <code>MASK_IP</code>：直连/入口/落地 IP 脱敏（1/0）<br/>• <code>MASK_POS</code>：直连位置脱敏（auto=跟随 MASK_IP / 1=仅旗帜 / 0=完整）<br/>• <code>IPv6</code>：启用 IPv6（1/0）<br/>• <code>TW_FLAG_MODE</code>：台湾旗模式（0=🇨🇳/1=🇹🇼/2=🇼🇸）<br/>• <code>SD_REGION_MODE</code>：地区样式（full/abbr/flag）<br/>• <code>SD_ICON_THEME</code>：图标主题（check/lock/circle）<br/>• <code>SD_STYLE</code>：服务检测样式（icon/text）<br/>• <code>SD_ARROW</code>：是否用“➟”（1/0）<br/>• <code>SD_SHOW_LAT</code>：显示延迟（1/0）<br/>• <code>SD_SHOW_HTTP</code>：显示 HTTP 码（1/0）<br/>• <code>SD_LANG</code>：语言（zh-Hans/zh-Hant）",
+        "<b>— 数据源 —</b><br/>• <code>DOMESTIC_IPv4</code>：ipip|cip|163|bilibili|126|pingan|ipwhois|ipapi_co|ifconfig|myip<br/>• <code>DOMESTIC_IPv6</code>：ddnspod|neu6|ipsb|ipw6|myipla|ipify|ident|icanhaz|ifconfig<br/>• <code>LANDING_IPv4</code>：ipapi|ipsb|ipwhois|ipapi_co|ifconfig|myip<br/>• <code>LANDING_IPv6</code>：ipsb|ipw6|myipla|ipify|ident|icanhaz|ifconfig",
+        "<b>— 图标接管 —</b><br/>• <code>IconPreset</code>：wifi|globe|dots|antenna|point<br/>• <code>Icon</code>：SF Symbols 名称（留空=用预设）<br/>• <code>IconColor</code>：HEX 颜色（如 #1E90FF）",
+        "<b>— 版式（子标题与留白）—</b><br/>• <code>SUBTITLE_STYLE</code>：line|cnBracket|cnQuote|square|curly|angle|pipe|bullet|plain<br/>• <code>SUBTITLE_MINIMAL</code>：纯净子标题（1/0）<br/>• <code>GAP_LINES</code>：分组前留白行数（0/1/2）",
+        "<b>— 服务与别名 —</b><br/>• <code>SERVICES</code>：支持文本/JSON 数组；分隔符：逗号/分号/竖线/斜杠/空白/换行<br/>• 选择优先级：<b>arguments(SERVICES) 非空</b> → <b>多选</b> → <b>文本</b> → 默认（全部）",
+        "<b>— BoxJS —</b><br/>• 托管订阅（可选）：<code>https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json</code>"
+      ],
+      "icons": [
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png",
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png"
+      ],
+      "keys": [
+        "@Panel.NetworkInfo.Settings",
+        "@Panel.NetworkInfo.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@Panel.NetworkInfo.Settings.Update",
+          "name": "刷新间隔（秒）",
+          "type": "number",
+          "val": 10,
+          "desc": "面板刷新周期；入口定位缓存 TTL=min(Update,3600)"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.Timeout",
+          "name": "脚本超时（秒）",
+          "type": "number",
+          "val": 12
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.BUDGET",
+          "name": "总执行预算（秒）",
+          "type": "number",
+          "val": 0,
+          "desc": "0=自动（≈Timeout-保护值）。预算不足会自动跳过耗时项"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_TIMEOUT",
+          "name": "服务检测单项超时（秒）",
+          "type": "number",
+          "val": 0,
+          "desc": "0=跟随 Timeout（最小 2 秒）"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.MASK_IP",
+          "name": "IP 脱敏（直连/入口/落地）",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.MASK_POS",
+          "name": "直连位置脱敏（MASK_POS）",
+          "type": "selects",
+          "val": "auto",
+          "items": [
+            {
+              "key": "auto",
+              "label": "auto（跟随 MASK_IP）"
+            },
+            {
+              "key": "1",
+              "label": "1（仅旗帜）"
+            },
+            {
+              "key": "0",
+              "label": "0（完整位置）"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.IPv6",
+          "name": "启用 IPv6",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.DOMESTIC_IPv4",
+          "name": "直连 IPv4 源（DOMESTIC_IPv4）",
+          "type": "selects",
+          "val": "ipip",
+          "items": [
+            {
+              "key": "ipip",
+              "label": "ipip.net"
+            },
+            {
+              "key": "cip",
+              "label": "cip.cc"
+            },
+            {
+              "key": "163",
+              "label": "网易 163"
+            },
+            {
+              "key": "126",
+              "label": "网易 126"
+            },
+            {
+              "key": "bilibili",
+              "label": "bilibili"
+            },
+            {
+              "key": "pingan",
+              "label": "平安 pingan"
+            },
+            {
+              "key": "ipwhois",
+              "label": "ipwho.is"
+            },
+            {
+              "key": "ipapi_co",
+              "label": "ipapi.co"
+            },
+            {
+              "key": "ifconfig",
+              "label": "ifconfig.co"
+            },
+            {
+              "key": "myip",
+              "label": "api.myip.com"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.DOMESTIC_IPv6",
+          "name": "直连 IPv6 源（DOMESTIC_IPv6）",
+          "type": "selects",
+          "val": "ddnspod",
+          "items": [
+            {
+              "key": "ddnspod",
+              "label": "ipv6.ddnspod.com"
+            },
+            {
+              "key": "neu6",
+              "label": "东北大学 NEU6"
+            },
+            {
+              "key": "ipsb",
+              "label": "api-ipv6.ip.sb/ip"
+            },
+            {
+              "key": "ipw6",
+              "label": "6.ipw.cn"
+            },
+            {
+              "key": "myipla",
+              "label": "v6.myip.la/raw"
+            },
+            {
+              "key": "ipify",
+              "label": "api6.ipify.org"
+            },
+            {
+              "key": "ident",
+              "label": "v6.ident.me"
+            },
+            {
+              "key": "icanhaz",
+              "label": "ipv6.icanhazip.com"
+            },
+            {
+              "key": "ifconfig",
+              "label": "ifconfig.co/ip"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.LANDING_IPv4",
+          "name": "落地 IPv4 源（LANDING_IPv4）",
+          "type": "selects",
+          "val": "ipapi",
+          "items": [
+            {
+              "key": "ipapi",
+              "label": "ip-api.com"
+            },
+            {
+              "key": "ipsb",
+              "label": "ip.sb (ipv4 geoip)"
+            },
+            {
+              "key": "ipwhois",
+              "label": "ipwho.is"
+            },
+            {
+              "key": "ipapi_co",
+              "label": "ipapi.co"
+            },
+            {
+              "key": "ifconfig",
+              "label": "ifconfig.co"
+            },
+            {
+              "key": "myip",
+              "label": "api.myip.com"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.LANDING_IPv6",
+          "name": "落地 IPv6 源（LANDING_IPv6）",
+          "type": "selects",
+          "val": "ipsb",
+          "items": [
+            {
+              "key": "ipsb",
+              "label": "api-ipv6.ip.sb/ip"
+            },
+            {
+              "key": "ipw6",
+              "label": "6.ipw.cn"
+            },
+            {
+              "key": "myipla",
+              "label": "v6.myip.la/raw"
+            },
+            {
+              "key": "ipify",
+              "label": "api6.ipify.org"
+            },
+            {
+              "key": "ident",
+              "label": "v6.ident.me"
+            },
+            {
+              "key": "icanhaz",
+              "label": "ipv6.icanhazip.com"
+            },
+            {
+              "key": "ifconfig",
+              "label": "ifconfig.co/ip"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.TW_FLAG_MODE",
+          "name": "台湾旗帜模式",
+          "type": "selects",
+          "val": "1",
+          "items": [
+            {
+              "key": "0",
+              "label": "🇨🇳 CN | 中国"
+            },
+            {
+              "key": "1",
+              "label": "🇹🇼 TW | 台湾"
+            },
+            {
+              "key": "2",
+              "label": "🇼🇸 WS | 萨摩亚（占位）"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.IconPreset",
+          "name": "脚本图标（预设）",
+          "type": "selects",
+          "val": "globe",
+          "items": [
+            {
+              "key": "wifi",
+              "label": "📶 wifi.router"
+            },
+            {
+              "key": "globe",
+              "label": "🌐 globe.asia.australia"
+            },
+            {
+              "key": "dots",
+              "label": "📡 dot.radiowaves.left.and.right"
+            },
+            {
+              "key": "antenna",
+              "label": "📡 antenna.radiowaves.left.and.right"
+            },
+            {
+              "key": "point",
+              "label": "🔺 point.3.connected.trianglepath.dotted"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.Icon",
+          "name": "脚本图标名（SF Symbols）",
+          "type": "text",
+          "val": "",
+          "placeholder": "留空=使用上面的预设"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.IconColor",
+          "name": "面板图标颜色（HEX）",
+          "type": "text",
+          "val": "#1E90FF",
+          "placeholder": "#RRGGBB"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_STYLE",
+          "name": "服务检测样式",
+          "type": "selects",
+          "val": "icon",
+          "items": [
+            {
+              "key": "icon",
+              "label": "图标样式"
+            },
+            {
+              "key": "text",
+              "label": "文字样式"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_SHOW_LAT",
+          "name": "显示延迟（Latency）",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_SHOW_HTTP",
+          "name": "显示 HTTP 码",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_LANG",
+          "name": "服务检测语言",
+          "type": "selects",
+          "val": "zh-Hans",
+          "items": [
+            {
+              "key": "zh-Hans",
+              "label": "简体中文"
+            },
+            {
+              "key": "zh-Hant",
+              "label": "繁體中文"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_REGION_MODE",
+          "name": "地区显示样式",
+          "type": "selects",
+          "val": "full",
+          "items": [
+            {
+              "key": "full",
+              "label": "🇯🇵 JP | 日本"
+            },
+            {
+              "key": "abbr",
+              "label": "🇯🇵JP"
+            },
+            {
+              "key": "flag",
+              "label": "🇯🇵（仅旗帜）"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_ICON_THEME",
+          "name": "图标主题（三态）",
+          "type": "selects",
+          "val": "check",
+          "items": [
+            {
+              "key": "check",
+              "label": "✅ / ❇️ / ❎"
+            },
+            {
+              "key": "lock",
+              "label": "🔓 / 🔐 / 🔒"
+            },
+            {
+              "key": "circle",
+              "label": "⭕️ / ⛔️ / 🚫"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_ARROW",
+          "name": "使用“➟”连接服务名与地区",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SERVICES",
+          "name": "服务清单（复选框多选）",
+          "type": "checkboxes",
+          "val": [],
+          "items": [
+            {
+              "key": "youtube",
+              "label": "YouTube"
+            },
+            {
+              "key": "netflix",
+              "label": "Netflix"
+            },
+            {
+              "key": "disney",
+              "label": "Disney+"
+            },
+            {
+              "key": "hulu_us",
+              "label": "Hulu(美)"
+            },
+            {
+              "key": "hulu_jp",
+              "label": "Hulu(日)"
+            },
+            {
+              "key": "hbo",
+              "label": "Max(HBO)"
+            },
+            {
+              "key": "chatgpt_app",
+              "label": "ChatGPT"
+            },
+            {
+              "key": "chatgpt_web",
+              "label": "ChatGPT Web"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SERVICES_TEXT",
+          "name": "服务清单（文本备选）",
+          "type": "text",
+          "val": "",
+          "placeholder": "youtube, netflix, chatgpt_web 或 [\"youtube\",\"netflix\"]"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.LOG",
+          "name": "开启日志（LOG）",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.LOG_LEVEL",
+          "name": "日志级别（LOG_LEVEL）",
+          "type": "selects",
+          "val": "info",
+          "items": [
+            {
+              "key": "debug",
+              "label": "debug（最详细）"
+            },
+            {
+              "key": "info",
+              "label": "info（默认）"
+            },
+            {
+              "key": "warn",
+              "label": "warn"
+            },
+            {
+              "key": "error",
+              "label": "error"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.LOG_TO_PANEL",
+          "name": "日志附加到面板（LOG_TO_PANEL）",
+          "type": "boolean",
+          "val": false
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.LOG_PUSH",
+          "name": "异常推送通知（LOG_PUSH）",
+          "type": "boolean",
+          "val": true
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SUBTITLE_STYLE",
+          "name": "子标题样式（SUBTITLE_STYLE）",
+          "type": "selects",
+          "val": "line",
+          "items": [
+            {
+              "key": "line",
+              "label": "—— 本地 ——（line）"
+            },
+            {
+              "key": "cnBracket",
+              "label": "【 本地 】（cnBracket）"
+            },
+            {
+              "key": "cnQuote",
+              "label": "「 本地 」（cnQuote）"
+            },
+            {
+              "key": "square",
+              "label": "[ 本地 ]（square）"
+            },
+            {
+              "key": "curly",
+              "label": "{ 本地 }（curly）"
+            },
+            {
+              "key": "angle",
+              "label": "《 本地 》（angle）"
+            },
+            {
+              "key": "pipe",
+              "label": "║ 本地 ║（pipe）"
+            },
+            {
+              "key": "bullet",
+              "label": "· 本地 ·（bullet）"
+            },
+            {
+              "key": "plain",
+              "label": "本地（plain）"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SUBTITLE_MINIMAL",
+          "name": "纯净子标题（SUBTITLE_MINIMAL）",
+          "type": "boolean",
+          "val": false
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.GAP_LINES",
+          "name": "分组前留白行数（GAP_LINES）",
+          "type": "selects",
+          "val": "1",
+          "items": [
+            {
+              "key": "0",
+              "label": "0"
+            },
+            {
+              "key": "1",
+              "label": "1（默认）"
+            },
+            {
+              "key": "2",
+              "label": "2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Panel.SubscribeInfo",
+      "name": "订阅信息",
+      "descs_html": [
+        "展示多个机场订阅的总量 / 已用 / 剩余 / 到期时间；支持按月重置日或自定义重置说明，面板内一目了然当前流量使用情况。",
+        "<b>优先级说明：</b>单值参数读取顺序为 <b>模块 arguments（当值≠脚本默认）</b> → <b>BoxJS</b>（@Panel.SubscribeInfo.Settings.*） → <code>#!arguments</code>（与默认相同） → 代码默认值。",
+        "<b>BoxJS 结构：</b>默认使用 <code>@Panel.SubscribeInfo.Settings</code> 作为根对象，字段名与脚本内参数一致，例如 <code>defaultIcon</code>、<code>url1</code>、<code>title1</code>、<code>resetDay1</code> 等。",
+        "<hr/>",
+        "<h3>使用说明与参数</h3>",
+        "<b>— 基本显示 —</b><br/>每个订阅按四行显示：<br/>1）名称 | 总量 | 当前时间<br/>2）已用百分比与已用流量<br/>3）剩余百分比与剩余流量<br/>4）重置信息（如“重置：12天”）与到期日期（YYYY.MM.DD）。",
+        "<b>— 图标与颜色 —</b><br/>• <code>defaultIcon</code> / <code>DefaultIcon</code>：面板图标（SF Symbols 名称），默认 <code>antenna.radiowaves.left.and.right.circle.fill</code><br/>• <code>defaultIconColor</code> / <code>DefaultIconColor</code>：图标 HEX 颜色，默认 <code>#00E28F</code>。",
+        "<b>— 订阅字段（最多 10 组）—</b><br/>• <code>urlN</code> / <code>URLN</code>：第 N 个订阅链接，必须为 http/https，留空或占位符将被忽略。<br/>• <code>titleN</code> / <code>TitleN</code>：第 N 个订阅展示名称，留空则显示为“机场N”。<br/>• <code>resetDayN</code> / <code>ResetDayN</code>：重置规则：<br/>　- 纯数字：按“每月 N 日重置”，面板显示“重置：X天”；<br/>　- 其他文本：原样显示，例如“次月 1 日重置”；<br/>　- 留空：不显示“重置”行，仅显示到期时间。",
+        "<b>— HTTP 头说明 —</b><br/>脚本自动解析订阅响应中的 <code>subscription-userinfo</code> 头：<code>upload</code> / <code>download</code> / <code>total</code> / <code>expire</code>。若无 <code>expire</code> 字段，则默认到期时间为 2099-12-31。",
+        "<b>— BoxJS —</b><br/>• 本面板只读取 <code>@Panel.SubscribeInfo.Settings</code> 中的字段，不使用缓存键；文本留空、<code>null</code>、<code>undefined</code> 或 <code>{{{...}}}</code> 占位符都会视为“未配置”。<br/>• 该面板与「网络信息」共用同一份 BoxJS Dashboard 文件（<code>panel.boxjs.json</code>），仅应用 ID 与设置键不同。",
+        "<b>— 备注 —</b><br/>• 当所有订阅链接均为空或无效时，面板内容为“未配置订阅参数”。<br/>• 本面板仅拉取订阅流量信息，不修改任何订阅内容。"
+      ],
+      "icons": [
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png",
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png"
+      ],
+      "keys": [
+        "@Panel.SubscribeInfo.Settings",
+        "@Panel.SubscribeInfo.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@Panel.SubscribeInfo.Settings.defaultIcon",
+          "name": "面板图标（defaultIcon）",
+          "type": "text",
+          "val": "",
+          "placeholder": "antenna.radiowaves.left.and.right.circle.fill",
+          "desc": "留空=使用脚本默认；SF Symbols 名称"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.defaultIconColor",
+          "name": "面板图标颜色（defaultIconColor）",
+          "type": "text",
+          "val": "",
+          "placeholder": "#00E28F",
+          "desc": "留空=使用脚本默认；HEX 颜色，例如 #00E28F"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url1",
+          "name": "订阅 1 链接（url1）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub1?token=...",
+          "desc": "第 1 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title1",
+          "name": "订阅 1 名称（title1）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 1",
+          "desc": "留空则显示为“机场1”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay1",
+          "name": "订阅 1 重置规则（resetDay1）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：1 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url2",
+          "name": "订阅 2 链接（url2）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub2?token=...",
+          "desc": "第 2 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title2",
+          "name": "订阅 2 名称（title2）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 2",
+          "desc": "留空则显示为“机场2”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay2",
+          "name": "订阅 2 重置规则（resetDay2）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：5 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url3",
+          "name": "订阅 3 链接（url3）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub3?token=...",
+          "desc": "第 3 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title3",
+          "name": "订阅 3 名称（title3）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 3",
+          "desc": "留空则显示为“机场3”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay3",
+          "name": "订阅 3 重置规则（resetDay3）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：10 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url4",
+          "name": "订阅 4 链接（url4）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub4?token=...",
+          "desc": "第 4 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title4",
+          "name": "订阅 4 名称（title4）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 4",
+          "desc": "留空则显示为“机场4”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay4",
+          "name": "订阅 4 重置规则（resetDay4）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：15 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url5",
+          "name": "订阅 5 链接（url5）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub5?token=...",
+          "desc": "第 5 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title5",
+          "name": "订阅 5 名称（title5）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 5",
+          "desc": "留空则显示为“机场5”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay5",
+          "name": "订阅 5 重置规则（resetDay5）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：20 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url6",
+          "name": "订阅 6 链接（url6）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub6?token=...",
+          "desc": "第 6 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title6",
+          "name": "订阅 6 名称（title6）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 6",
+          "desc": "留空则显示为“机场6”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay6",
+          "name": "订阅 6 重置规则（resetDay6）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：25 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url7",
+          "name": "订阅 7 链接（url7）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub7?token=...",
+          "desc": "第 7 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title7",
+          "name": "订阅 7 名称（title7）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 7",
+          "desc": "留空则显示为“机场7”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay7",
+          "name": "订阅 7 重置规则（resetDay7）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：28 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url8",
+          "name": "订阅 8 链接（url8）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub8?token=...",
+          "desc": "第 8 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title8",
+          "name": "订阅 8 名称（title8）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 8",
+          "desc": "留空则显示为“机场8”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay8",
+          "name": "订阅 8 重置规则（resetDay8）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：30 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url9",
+          "name": "订阅 9 链接（url9）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub9?token=...",
+          "desc": "第 9 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title9",
+          "name": "订阅 9 名称（title9）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 9",
+          "desc": "留空则显示为“机场9”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay9",
+          "name": "订阅 9 重置规则（resetDay9）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：3 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.url10",
+          "name": "订阅 10 链接（url10）",
+          "type": "text",
+          "val": "",
+          "placeholder": "https://example.com/sub10?token=...",
+          "desc": "第 10 个机场订阅链接，必须为 http/https"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.title10",
+          "name": "订阅 10 名称（title10）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：机场 10",
+          "desc": "留空则显示为“机场10”"
+        },
+        {
+          "id": "@Panel.SubscribeInfo.Settings.resetDay10",
+          "name": "订阅 10 重置规则（resetDay10）",
+          "type": "text",
+          "val": "",
+          "placeholder": "如：7 或 次月 1 日重置",
+          "desc": "纯数字=每月 N 日重置；文本=原样显示；留空=不显示重置"
+        }
+      ]
+    }
+  ]
+}

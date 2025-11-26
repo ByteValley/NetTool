@@ -1,0 +1,17 @@
+#!name=网络信息
+#!desc=直连/入口/落地信息 + 服务检测；接管图标与网络类型；中国 ISP 规范化；多源并发 race + 城市级优先；IPv6 无出口自动放弃外网 v6；全请求按剩余预算 clamp；支持 BoxJS/arguments 覆盖
+#!category=功能看板
+#!author=ByteValley
+#!homepage=https://github.com/ByteValley/NetTool
+#!version=2025-11-27R1
+
+#!arguments=Update:10,Timeout:12,BUDGET:0,MASK_IP:1,MASK_POS:auto,IPv6:1,DOMESTIC_IPv4:ipip,DOMESTIC_IPv6:ddnspod,LANDING_IPv4:ipapi,LANDING_IPv6:ipsb,TW_FLAG_MODE:1,IconPreset:globe,Icon:globe.asia.australia,IconColor:#1E90FF,SD_STYLE:icon,SD_SHOW_LAT:1,SD_SHOW_HTTP:1,SD_LANG:zh-Hans,SD_TIMEOUT:0,SD_REGION_MODE:full,SD_ICON_THEME:check,SD_ARROW:1,SERVICES:[],LOG:1,LOG_LEVEL:info,LOG_TO_PANEL:0,LOG_PUSH:1,SUBTITLE_STYLE:line,SUBTITLE_MINIMAL:0,GAP_LINES:1
+
+#!arguments-desc=使用说明与参数（优先级：arguments“显式改动” > BoxJS > 默认）\n\n— 基本 —\n• Update: 面板刷新间隔(秒)\n• Timeout: 脚本总超时(秒)\n• BUDGET: 总执行预算(秒)。0=自动（≈Timeout-保护值）。预算不足会自动跳过耗时项\n• SD_TIMEOUT: 服务检测单项超时(秒)。0=跟随 Timeout（最小 2 秒）\n\n— 隐私与显示 —\n• MASK_IP: 直连/入口/落地 IP 脱敏(1/0)\n• MASK_POS: 直连位置脱敏(auto=跟随 MASK_IP / 1=仅旗帜 / 0=完整)\n• IPv6: 启用 IPv6(1/0)。脚本会快速探测“节点是否有 IPv6 出口”，无出口则不做外网 v6 查询（仍显示本地 v6）\n• TW_FLAG_MODE: 台湾旗模式(0=🇨🇳/1=🇹🇼/2=🇼🇸)\n• SD_STYLE: 服务检测样式(icon|text)\n• SD_ARROW: 连接符(1=➟ / 0=｜)\n• SD_REGION_MODE: 地区样式(full/abbr/flag)\n• SD_ICON_THEME: 图标主题(check|lock|circle)\n• SD_SHOW_LAT: 显示延迟(1/0)\n• SD_SHOW_HTTP: 显示 HTTP 码(1/0)\n• SD_LANG: 语言(zh-Hans|zh-Hant)\n\n— 数据源 —\n• DOMESTIC_IPv4: ipip|cip|163|bilibili|126|pingan|ipwhois|ipapi_co|ifconfig|myip\n• DOMESTIC_IPv6: ddnspod|neu6|ipsb|ipw6|myipla|ipify|ident|icanhaz|ifconfig\n• LANDING_IPv4: ipapi|ipsb|ipwhois|ipapi_co|ifconfig|myip\n• LANDING_IPv6: ipsb|ipw6|myipla|ipify|ident|icanhaz|ifconfig\n\n— 服务与别名 —\n• SERVICES: 支持 JSON 数组或逗号/空白分隔；顺序按输入顺序\n• 选择顺序：arguments(SERVICES) 非空优先；否则 BoxJS(SERVICES 数组)；否则 BoxJS(SERVICES_TEXT)；否则默认全开\n\n— 参数托管 —\n• BoxJS订阅: https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json
+
+[Script]
+# 面板脚本超时（Surge 单位为秒）
+网络信息·面板 = type=generic, timeout={{{Timeout}}}, script-update-interval=21600, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/network_info_v2.js, argument=Update={{{Update}}}&Timeout={{{Timeout}}}&BUDGET={{{BUDGET}}}&IPv6={{{IPv6}}}&MASK_IP={{{MASK_IP}}}&MASK_POS={{{MASK_POS}}}&DOMESTIC_IPv4={{{DOMESTIC_IPv4}}}&DOMESTIC_IPv6={{{DOMESTIC_IPv6}}}&LANDING_IPv4={{{LANDING_IPv4}}}&LANDING_IPv6={{{LANDING_IPv6}}}&TW_FLAG_MODE={{{TW_FLAG_MODE}}}&IconPreset={{{IconPreset}}}&Icon={{{Icon}}}&IconColor={{{IconColor}}}&SD_STYLE={{{SD_STYLE}}}&SD_SHOW_LAT={{{SD_SHOW_LAT}}}&SD_SHOW_HTTP={{{SD_SHOW_HTTP}}}&SD_LANG={{{SD_LANG}}}&SD_TIMEOUT={{{SD_TIMEOUT}}}&SD_REGION_MODE={{{SD_REGION_MODE}}}&SD_ICON_THEME={{{SD_ICON_THEME}}}&SD_ARROW={{{SD_ARROW}}}&SERVICES={{{SERVICES}}}&LOG={{{LOG}}}&LOG_LEVEL={{{LOG_LEVEL}}}&LOG_TO_PANEL={{{LOG_TO_PANEL}}}&LOG_PUSH={{{LOG_PUSH}}}&SUBTITLE_STYLE={{{SUBTITLE_STYLE}}}&SUBTITLE_MINIMAL={{{SUBTITLE_MINIMAL}}}&GAP_LINES={{{GAP_LINES}}}
+
+[Panel]
+网络信息 𝕏 = script-name=网络信息·面板, update-interval={{{Update}}}
