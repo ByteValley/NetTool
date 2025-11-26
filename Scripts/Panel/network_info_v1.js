@@ -896,16 +896,30 @@ log('info', 'CFG snapshot', {
     if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
     // 入口
-    if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && ent6.ip)) {
+    const hasEntAny = (ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2))
+        || (ent6 && (ent6.ip || ent6.loc1 || ent6.loc2 || ent6.isp1 || ent6.isp2));
+
+    if (hasEntAny) {
         pushGroupTitle(parts, '入口');
+
         const entIPv4 = ipLine('IPv4', ent4.ip && isIPv4(ent4.ip) ? ent4.ip : '');
         const entIPv6 = ipLine('IPv6', ent6.ip && isIPv6(ent6.ip) ? ent6.ip : '');
         if (entIPv4) parts.push(entIPv4);
         if (entIPv6) parts.push(entIPv6);
-        if (ent4.loc1) parts.push(`${t('location')}¹: ${flagFirst(ent4.loc1)}`);
-        if (ent4.isp1) parts.push(`${t('isp')}¹: ${fmtISP(ent4.isp1, ent4.loc1)}`);
-        if (ent4.loc2) parts.push(`${t('location')}²: ${flagFirst(ent4.loc2)}`);
-        if (ent4.isp2) parts.push(`${t('isp')}²: ${String(ent4.isp2).trim()}`);
+
+        // 位置/运营商：优先展示 v4 的定位结果；如果只有 v6，就展示 v6 的
+        const best = (ent4 && (ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2))
+            ? ent4
+            : (ent6 && (ent6.loc1 || ent6.loc2 || ent6.isp1 || ent6.isp2))
+                ? ent6
+                : null;
+
+        if (best) {
+            if (best.loc1) parts.push(`${t('location')}¹: ${flagFirst(best.loc1)}`);
+            if (best.isp1) parts.push(`${t('isp')}¹: ${fmtISP(best.isp1, best.loc1)}`);
+            if (best.loc2) parts.push(`${t('location')}²: ${flagFirst(best.loc2)}`);
+            if (best.isp2) parts.push(`${t('isp')}²: ${String(best.isp2).trim()}`);
+        }
     }
 
     // 落地
@@ -1331,16 +1345,23 @@ function extractIP(str) {
 }
 
 async function touchLandingOnceQuick() {
+    // v4-only：用于让 /recent 里一定出现 IPv4 remoteAddress（前提：节点/网络真有 v4 出口）
     try {
-        await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_SEC, true);
-    } catch (_) {
-    }
+        await httpGet('https://api-ipv4.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true);
+    } catch (_) {}
+
+    // 兼容原来的落地接口（可能走 v6，但无妨）
+    try {
+        await httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true);
+    } catch (_) {}
+
     if (IPV6_EFF) {
+        // v6-only：用于让 /recent 里稳定出现 IPv6 remoteAddress
         try {
-            await httpGet('https://api-ipv6.ip.sb/ip', IP_HEADERS, Math.min(CONSTS.PRETOUCH_TO_SEC, V6_TO_SEC), true);
-        } catch (_) {
-        }
+            await httpGet('https://api-ipv6.ip.sb/ip', {}, Math.min(CONSTS.PRETOUCH_TO_MS, V6_TO), true);
+        } catch (_) {}
     }
+
     log('debug', 'Pre-touch landing endpoints done');
 }
 
