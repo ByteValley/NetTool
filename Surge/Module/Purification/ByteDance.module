@@ -1,8 +1,9 @@
 #!name=字节系净化
-#!author=ByteValley
 #!desc=按域名精细拦截字节系广告（蛋花/番茄/头条/抖音内嵌），屏蔽开屏/激励/前贴片及埋点，兼容短剧播放，可通过「激励视频」参数调节拦截强度。
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
+#!author=ByteValley
+#!version=2025-11-26R1
 #!arguments=激励视频:REJECT-DROP
 
 [MITM]
@@ -75,6 +76,7 @@ DOMAIN-SUFFIX,partner.toutiao.com,REJECT
 # 番茄小说相关域 | fqnovel.com / fqnovelpic.com
 # =====================================================================
 # —— 广告卡 / 实验 / 监控线路（域名级） ——
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon11-misc)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
@@ -90,7 +92,7 @@ AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT-DROP
 # —— 激励广告链路（可通过激励视频开关） ——
 DOMAIN-KEYWORD,pangolin-sdk-toutiao,REJECT
 # AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlinea)),DIRECT
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlineb)),{{{激励视频}}}   # 覆盖激励链路时启用
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonlineb)),{{{激励视频}}}   # 覆盖激励链路时启用
 
 # —— 番茄图像 / 标记资源域 ——
 AND,((DOMAIN-SUFFIX,fqnovelpic.com),(DOMAIN-KEYWORD,ad-sign)),REJECT
@@ -133,7 +135,6 @@ DOMAIN-SUFFIX,ibytedapm.com,REJECT-DROP
 DOMAIN-SUFFIX,syzagk.com,REJECT
 DOMAIN,api.dler.io,REJECT
 DOMAIN,jr-ad.ctrip.com,REJECT-DROP
-DOMAIN,readapi.zziot.life,REJECT-DROP
 DOMAIN,tracking.ad-survey.com,REJECT-DROP
 
 # =====================================================================
