@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-27R2
+ * 版本：2025-11-27R3 (budget-stable refactor)
  *
  * 概述 · 功能边界
  *  · 展示本地 / 入口 / 落地网络信息（IPv4/IPv6），并并发检测常见服务解锁状态
@@ -16,7 +16,7 @@
  * 渲染结构 · 版式控制
  *  · 分组子标题：本地 / 入口 / 落地 / 服务检测；组间留白由 GAP_LINES 控制（0~2）
  *  · IPv4/IPv6 分行显示，按 MASK_IP 可脱敏；位置按 MASK_POS 可脱敏（未显式设置时随 MASK_IP）
- *  · 子标题样式由 SUBTITLE_STYLE 控制；SUB式_MINIMAL 可输出极简标题
+ *  · 子标题样式由 SUBTITLE_STYLE 控制；SUBTITLE_MINIMAL 可输出极简标题
  *
  * 数据源 · 抓取策略
  *  · 直连 IPv4：按优先级表驱动（cip | 163 | 126 | bilibili | pingan | ipip）
@@ -36,12 +36,6 @@
  *  · 覆盖：YouTube / Netflix / Disney+ / Hulu(美) / Hulu(日) / Max(HBO) / ChatGPT Web / ChatGPT App(API)
  *  · 样式：SD_STYLE = icon|text；SD_REGION_MODE = full|abbr|flag；SD_ICON_THEME = check|lock|circle
  *  · ChatGPT App(API) 地区优先读 Cloudflare 头（CF-IPCountry），无则多源回退
- *  · 别名映射（示例）：
- *    - yt|youtube|油管 → youtube
- *    - nf|netflix|奈飞 → netflix
- *    - disney|disney+|迪士尼 → disney
- *    - chatgpt → chatgpt_app；chatgpt_web|chatgpt-web|chatgpt web → chatgpt_web
- *    - hulu|葫芦|huluus → hulu_us；hulujp → hulu_jp；hbo|max → hbo
  *
  * 服务清单 · 选择优先级
  *  · 模块 #!arguments（SERVICES=...，显式修改时优先）
@@ -56,6 +50,7 @@
  *     3）否则退回模块 arguments / 脚本默认 defVal
  *  · Update                 刷新间隔（秒）                 默认 10
  *  · Timeout                全局超时（秒）                 默认 12
+ *  · BUDGET                 总预算（秒）0=自动             默认 0（自动= min(10s, Timeout)）
  *  · IPv6                   启用 IPv6                      默认 1
  *  · MASK_IP                脱敏 IP                        默认 1
  *  · MASK_POS               脱敏位置                       默认 1（未设时随 MASK_IP）
@@ -77,6 +72,7 @@
  *  · SD_SHOW_HTTP           显示 HTTP 状态码                默认 1
  *  · SD_LANG                语言包                          zh-Hans|zh-Hant（默认 zh-Hans）
  *  · SD_TIMEOUT             单项检测超时（秒）              默认2，0=跟随 Timeout
+ *  · SD_CONCURRENCY         服务检测并发数                  默认 6
  *  · SERVICES               服务清单（数组/逗号分隔）       为空则默认全开（顺序按输入）
  *
  * 日志 · 调试
@@ -84,15 +80,6 @@
  *  · LOG_LEVEL              级别：debug|info|warn|error      默认 info
  *  · LOG_TO_PANEL           面板追加“调试”尾巴               默认 0
  *  · LOG_PUSH               异常系统通知推送                 默认 1
- *
- * 常见问题 · 提示
- *  · 入口为空：需确保近期访问过 ip-api / ip.sb 等落地接口；脚本已内置“预触发”
- *  · Netflix 仅自制剧：地区可用但目录受限，属正常判定
- *  · 台湾旗样式：按 TW_FLAG_MODE 切换（合规/默认/彩蛋）
- *
- * 示例 · 组合参数
- *  · SERVICES=Netflix,YouTube,Disney,ChatGPT,ChatGPT_Web,Hulu_US,Hulu_JP,HBO
- *  · SD_STYLE=text&SD_REGION_MODE=abbr&SD_ARROW=0
  * ========================================================= */
 
 // ====================== 常量 & 配置基线 ======================
@@ -109,7 +96,11 @@ const CONSTS = Object.freeze({
     ENT_MAX_TTL: 3600,
 
     // IPv6 快速探测：每次运行先确认是否支持 v6，再决定是否跑 v6 链路
-    V6_PROBE_TO_MS: 1200
+    V6_PROBE_TO_MS: 1200,
+
+    // 预算相关
+    BUDGET_HARD_MS: 10000,
+    BUDGET_SOFT_GUARD_MS: 260
 });
 
 
@@ -216,29 +207,11 @@ function bootLog(...args) {
         typeof x === 'string' ? x : JSON.stringify(x)
     ).join(' ');
     BOOT_DEBUG.push(line);
-    try {
-        console.log(line);
-    } catch (_) {}
+    try { console.log(line); } catch (_) {}
 }
 
 /**
  * 读取 BoxJS 设置对象（NetworkInfo）
- *
- * 约定存储结构：
- *  KVStore.read("Panel") =>
- *  {
- *    "NetworkInfo": {
- *      "Settings": { "Update": "10", "Timeout": "12", ... },
- *      "Caches":   "..."
- *    },
- *    "SubscribeInfo": {
- *      "Settings": { ... },
- *      "Caches":   "..."
- *    }
- *  }
- *
- *  本脚本只关心：Panel.NetworkInfo.Settings
- *  若不存在 NetworkInfo 或 Settings，则返回 {}（视为“无 BoxJS 覆盖”）
  */
 function readBoxSettings() {
     let raw;
@@ -249,7 +222,6 @@ function readBoxSettings() {
         return {};
     }
 
-    // Panel 根不存在：无 BoxJS 配置
     if (raw === null || raw === undefined || raw === '') {
         bootLog('BoxSettings.Panel.empty');
         return {};
@@ -257,12 +229,10 @@ function readBoxSettings() {
 
     let panel = raw;
     if (typeof raw === 'string') {
-        // 字符串 => JSON
         try {
             panel = JSON.parse(raw);
         } catch (e) {
-            const tag =
-                raw.length > 120 ? raw.slice(0, 120) + '…' : raw;
+            const tag = raw.length > 120 ? raw.slice(0, 120) + '…' : raw;
             bootLog('BoxSettings.Panel.parse.fail:', String(e));
             bootLog('BoxSettings.Panel.raw.snip:', tag);
             return {};
@@ -274,11 +244,8 @@ function readBoxSettings() {
         return {};
     }
 
-    try {
-        bootLog('BoxSettings.Panel.keys:', Object.keys(panel));
-    } catch (_) {}
+    try { bootLog('BoxSettings.Panel.keys:', Object.keys(panel)); } catch (_) {}
 
-    // 标准结构：{ NetworkInfo: { Settings: {...} } }
     if (
         panel.NetworkInfo &&
         panel.NetworkInfo.Settings &&
@@ -288,7 +255,6 @@ function readBoxSettings() {
         return panel.NetworkInfo.Settings;
     }
 
-    // （可选兜底：Panel 根本身就是 Settings；视情况保留/删除）
     if (panel.Settings && typeof panel.Settings === 'object') {
         bootLog('BoxSettings.path: Panel.Settings (fallback)');
         return panel.Settings;
@@ -300,10 +266,6 @@ function readBoxSettings() {
 
 const BOX = readBoxSettings();
 
-/** 统一读取 BoxJS 某个字段
- *  · 空字符串 / null / undefined 视为“未设置”
- *  · true/false 或 "true"/"false" 原样返回，后续交给 toBool / toNum 处理
- */
 function readBoxKey(key) {
     if (!BOX || typeof BOX !== 'object') return undefined;
     if (!Object.prototype.hasOwnProperty.call(BOX, key)) return undefined;
@@ -330,7 +292,6 @@ function parseArgs(raw) {
 
 const $args = parseArgs(typeof $argument !== 'undefined' ? $argument : undefined);
 
-/** 当 $argument 为原始字符串时，兜底读取指定字段（主要给 SERVICES 用） */
 function readArgRaw(name) {
     try {
         if (typeof $argument === 'string') {
@@ -362,28 +323,12 @@ const joinNonEmpty = (arr, sep = ' ') => arr.filter(Boolean).join(sep);
 
 /**
  * ENV：统一参数优先级
- *
- * 优先级：
- *   1）模块参数（arguments）如果“含义上”不同于脚本默认 ⇒ 视为显式修改 ⇒ 最高优先
- *   2）否则，如果 BoxJS 有值 ⇒ 用 BoxJS
- *   3）否则 ⇒ 用脚本默认（= 模块默认）
- *
- *  支持：
- *    · argAlias  ：模块参数别名（数组）
- *    · boxAlias  ：BoxJS 字段别名（数组）
- *
- * 含义相同的判断（canonical）：
- *   · number: 10, "10", "010" 都视为 10
- *   · boolean: true, "true", "1", "on" 都视为 true；false, "false", "0", "off" 都视为 false
- *   · string: 直接按字符串比较
  */
 function ENV(key, defVal, opt = {}) {
     const typeHint = typeof defVal;
-
     const argKeys = [key].concat(opt.argAlias || []);
     const boxKeys = [key].concat(opt.boxAlias || []);
 
-    // ---- 读取模块 arguments ----
     let argRaw;
     let hasArg = false;
     for (const k of argKeys) {
@@ -397,7 +342,6 @@ function ENV(key, defVal, opt = {}) {
         }
     }
 
-    // ---- 读取 BoxJS ----
     let boxRaw;
     let hasBox = false;
     for (const bk of boxKeys) {
@@ -409,39 +353,23 @@ function ENV(key, defVal, opt = {}) {
         }
     }
 
-    // ---- 类型转换函数 ----
     const convert = (val) => {
         if (typeHint === 'number') return toNum(val, defVal);
         if (typeHint === 'boolean') return toBool(val, defVal);
         return val;
     };
 
-    // ---- “含义相同”比较用规范化函数 ----
     const canon = (val) => {
         if (typeHint === 'number') return String(toNum(val, defVal));
         if (typeHint === 'boolean') return toBool(val, defVal) ? 'true' : 'false';
         return String(val);
     };
 
-    // ---- 1）判断模块参数是否“改过默认” ----
     const argChanged = hasArg && !opt.skipArgDiff && canon(argRaw) !== canon(defVal);
 
-    if (argChanged) {
-        // 模块参数显式改动 ⇒ 最高优先
-        return convert(argRaw);
-    }
-
-    // ---- 2）模块参数没改默认 / 没有模块参数 ⇒ 看 BoxJS ----
-    if (hasBox) {
-        return convert(boxRaw);
-    }
-
-    // ---- 3）BoxJS 也没值 ⇒ 如果有 arguments（但没改默认），就按 arguments；否则退回默认 ----
-    if (hasArg) {
-        return convert(argRaw);
-    }
-
-    // ---- 4）都没有 ⇒ defVal
+    if (argChanged) return convert(argRaw);
+    if (hasBox) return convert(boxRaw);
+    if (hasArg) return convert(argRaw);
     return defVal;
 }
 
@@ -450,38 +378,22 @@ const CFG = {
     /* —— 基本 —— */
     Update: toNum(ENV('Update', 10), 10),
     Timeout: toNum(ENV('Timeout', 12), 12),
+    BUDGET_SEC_RAW: ENV('BUDGET', 0),
 
     /* —— 开关类（0/1 / true/false 都支持）—— */
     MASK_IP: toBool(ENV('MASK_IP', true), true),
-
-    /**
-     * MASK_POS：
-     *  · 模块参数显式修改（!== 默认值 "auto"） ⇒ 优先使用模块参数
-     *  · 否则若 BoxJS 有值                     ⇒ 使用 BoxJS
-     *  · 若两者都未配置或配置为 "auto"         ⇒ 跟随 MASK_IP
-     *
-     * 说明：
-     *  · 默认值使用字符串 "auto" 表示“跟随 MASK_IP”
-     *  · 建议在模块 #!arguments 中将 MASK_POS 默认设为 auto
-     *
-     * 优先级依旧遵从通用规则：
-     *  · 模块“改后的”参数 > BoxJS > 模块默认参数 ≡ 脚本默认参数
-     */
     MASK_POS_MODE: ENV('MASK_POS', 'auto'),
-
     IPv6: toBool(ENV('IPv6', true), true),
 
     /* —— 数据源 —— */
     DOMESTIC_IPv4: (() => {
         const v = ENV('DOMESTIC_IPv4', 'ipip');
         if (v !== '' && v != null) return v;
-        // 兼容早期误写 DOMIC_IPv4
         return $args.DOMIC_IPv4 || 'ipip';
     })(),
     DOMESTIC_IPv6: (() => {
         const v = ENV('DOMESTIC_IPv6', 'ddnspod');
         if (v !== '' && v != null) return v;
-        // 兼容早期误写 DOMIC_IPv6
         return $args.DOMIC_IPv6 || 'ddnspod';
     })(),
     LANDING_IPv4: ENV('LANDING_IPv4', 'ipapi'),
@@ -492,8 +404,6 @@ const CFG = {
 
     /* —— 图标接管 —— */
     IconPreset: ENV('IconPreset', 'globe'),
-    // 这里把脚本默认值设成与模块默认一致：globe.asia.australia
-    // 这样“未改过”的模块参数不会锁死，BoxJS 仍能覆盖
     Icon: ENV('Icon', 'globe.asia.australia'),
     IconColor: ENV('IconColor', '#1E90FF'),
 
@@ -505,31 +415,18 @@ const CFG = {
 
     /* —— 单项检测超时（秒）—— */
     SD_TIMEOUT_SEC_RAW: ENV('SD_TIMEOUT', 2),
+    SD_CONCURRENCY: toNum(ENV('SD_CONCURRENCY', 6), 6),
 
     SD_REGION_MODE: ENV('SD_REGION_MODE', 'full'),
     SD_ICON_THEME: ENV('SD_ICON_THEME', 'check'),
     SD_ARROW: toBool(ENV('SD_ARROW', true), true),
 
-    /**
-     * Services 配置来源与优先级：
-     *  · 模块 arguments：SERVICES（解析后非空 ⇒ 视为“显式修改”，优先于 BoxJS）
-     *  · BoxJS 多选：SERVICES（checkboxes，数组 [] 视为“未指定”）
-     *  · BoxJS 文本：SERVICES_TEXT（逗号/空白/JSON 数组均可）
-     *
-     * 解析顺序：
-     *  1）若模块 SERVICES 解析后非空 ⇒ 使用模块 SERVICES
-     *  2）否则若 BoxJS 多选非空     ⇒ 使用 BoxJS 多选
-     *  3）否则若 BoxJS 文本非空     ⇒ 使用 BoxJS 文本
-     *  4）以上都为空                ⇒ 使用脚本默认全量服务列表
-     *
-     * 总体优先级：
-     *  · 模块“改后的”参数 > BoxJS（多选 > 文本）> 模块默认参数 ≡ 脚本默认参数
-     */
+    /* —— Services —— */
     SERVICES_BOX_CHECKED_RAW: (() => {
         const v = readBoxKey('SERVICES');
-        if (v == null) return null; // null 表示“无此键”
+        if (v == null) return null;
         if (Array.isArray(v)) {
-            if (!v.length) return null; // 空数组视为“未指定”
+            if (!v.length) return null;
             return JSON.stringify(v);
         }
         const s = String(v).trim();
@@ -583,14 +480,12 @@ function makeSubTitleRenderer(styleKey, minimal = false) {
     return minimal ? (s) => String(s) : (s) => fn(String(s));
 }
 
-/** 分组标题：插入留白 + 应用样式/纯净模式 */
 function pushGroupTitle(parts, title) {
     for (let i = 0; i < CFG.GAP_LINES; i++) parts.push('');
     const render = makeSubTitleRenderer(CFG.SUBTITLE_STYLE, CFG.SUBTITLE_MINIMAL);
     parts.push(render(title));
 }
 
-// 将子标题设置正规化
 CFG.SUBTITLE_STYLE = normalizeSubStyle(CFG.SUBTITLE_STYLE);
 CFG.SUBTITLE_MINIMAL = toBool(CFG.SUBTITLE_MINIMAL, false);
 CFG.GAP_LINES = Math.max(0, Math.min(2, toNum(CFG.GAP_LINES, 1)));
@@ -607,12 +502,10 @@ const ICON_NAME = (CFG.Icon || '').trim()
     || ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || 'globe.asia.australia';
 const ICON_COLOR = CFG.IconColor;
 
-// IPv6 配置：用户意愿 + 设备是否真的有 v6（本地 IPv6 显示用）
 const WANT_V6 = !!CFG.IPv6;
 const HAS_V6 = !!($network?.v6?.primaryAddress);
 const IPV6_EFF = WANT_V6 && HAS_V6;
 
-// SD_TIMEOUT_MS：统一只使用 SD_TIMEOUT（秒），0/空=跟随 Timeout
 const SD_TIMEOUT_MS = (() => {
     const baseSec = Number(CFG.Timeout) || 8;
     const secRaw = Number(CFG.SD_TIMEOUT_SEC_RAW);
@@ -620,7 +513,6 @@ const SD_TIMEOUT_MS = (() => {
     return Math.max(CONSTS.SD_MIN_TIMEOUT, sec * 1000);
 })();
 
-// IPv6 请求用更短超时，避免拖慢整体（但仍不低于 SD_MIN_TIMEOUT）
 const V6_TO = Math.min(
     Math.max(CONSTS.SD_MIN_TIMEOUT, SD_TIMEOUT_MS),
     2500
@@ -628,11 +520,6 @@ const V6_TO = Math.min(
 
 const MASK_IP = !!CFG.MASK_IP;
 
-/**
- * MASK_POS 生效值：
- *  · CFG.MASK_POS_MODE 为 "auto"/"follow"/"same"/空 ⇒ 跟随 MASK_IP
- *  · 其他值按布尔解析（1/0/true/false）
- */
 const _maskPosMode = String(CFG.MASK_POS_MODE ?? 'auto').trim().toLowerCase();
 CFG.MASK_POS = (_maskPosMode === '' ||
     _maskPosMode === 'auto' ||
@@ -672,6 +559,49 @@ const SD_ICONS = (() => {
     }
 })();
 
+// ====================== 预算系统（总时长“兜底收工”） ======================
+const BUDGET_MS = (() => {
+    const raw = Number(CFG.BUDGET_SEC_RAW);
+    const base = Math.max(1, Number(CFG.Timeout) || 8) * 1000;
+    if (Number.isFinite(raw) && raw > 0) return Math.max(3500, raw * 1000);
+    return Math.min(CONSTS.BUDGET_HARD_MS, Math.max(5500, base));
+})();
+const DEADLINE = Date.now() + BUDGET_MS;
+
+function budgetLeft() {
+    return Math.max(0, DEADLINE - Date.now());
+}
+
+/**
+ * 预算感知 cap：
+ *  - 临近截止会把单次请求的 cap 压短，避免把脚本拖到超时
+ */
+function capByBudget(capMs, floorMs = 220) {
+    const left = budgetLeft();
+    if (left <= CONSTS.BUDGET_SOFT_GUARD_MS) return Math.max(120, floorMs);
+    const room = Math.max(120, left - CONSTS.BUDGET_SOFT_GUARD_MS);
+    return Math.max(120, Math.min(Number(capMs) || room, room));
+}
+
+function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+async function withTimeout(promise, ms, onTimeoutValue, tag) {
+    const lim = Math.max(120, Number(ms) || 0);
+    let tmr;
+    try {
+        return await Promise.race([
+            Promise.resolve(promise),
+            new Promise((resolve) => {
+                tmr = setTimeout(() => resolve(onTimeoutValue), lim);
+            })
+        ]);
+    } finally {
+        if (tmr) clearTimeout(tmr);
+    }
+}
+
 // ====================== 日志系统（基于 CFG） ======================
 const LOG_ON = !!CFG.LOG;
 const LOG_TO_PANEL = !!CFG.LOG_TO_PANEL;
@@ -680,7 +610,7 @@ const LOG_LEVEL = CFG.LOG_LEVEL || 'info';
 
 const LOG_LEVELS = {debug: 10, info: 20, warn: 30, error: 40};
 const LOG_THRESH = LOG_LEVELS[LOG_LEVEL] ?? 20;
-const DEBUG_LINES = BOOT_DEBUG.slice();   // 把启动阶段的 BootLog 接进来
+const DEBUG_LINES = BOOT_DEBUG.slice();
 
 function _maskMaybe(ip) {
     if (!ip) return '';
@@ -702,9 +632,7 @@ function log(level, ...args) {
     if (L < LOG_THRESH) return;
     const msg = args.map((x) => typeof x === 'string' ? x : JSON.stringify(x));
     const line = `[NI][${level.toUpperCase()}] ${msg.join(' ')}`;
-    try {
-        console.log(line);
-    } catch (_) {}
+    try { console.log(line); } catch (_) {}
     DEBUG_LINES.push(line);
     if (DEBUG_LINES.length > CONSTS.LOG_RING_MAX) DEBUG_LINES.shift();
 }
@@ -715,17 +643,10 @@ function logErrPush(title, body) {
 }
 
 // ====================== 源常量 & 解析器（抽离） ======================
-
-// 统一 JSON 解析（不会抛异常）
 function safeJSON(s, d = {}) {
-    try {
-        return JSON.parse(s || '');
-    } catch {
-        return d;
-    }
+    try { return JSON.parse(s || ''); } catch { return d; }
 }
 
-// 统一“是否已细到市/区”判断（DirectV4 优先策略用）
 function hasCityLevel(loc) {
     if (!loc) return false;
     try {
@@ -738,7 +659,6 @@ function hasCityLevel(loc) {
     }
 }
 
-// —— 直连 IPv4 源：key -> { url, parse(resp) -> {ip, loc, isp} } ——
 const DIRECT_V4_SOURCES = Object.freeze({
     ipip: {
         url: 'https://myip.ipip.net/json',
@@ -816,7 +736,6 @@ const DIRECT_V4_SOURCES = Object.freeze({
     }
 });
 
-// —— 落地 IPv4 源 ——
 const LANDING_V4_SOURCES = Object.freeze({
     ipapi: {
         url: 'http://ip-api.com/json?lang=zh-CN',
@@ -853,7 +772,6 @@ const LANDING_V4_SOURCES = Object.freeze({
     }
 });
 
-// —— 仅取 IP 的 IPv6 端点（直连/落地复用）——
 const IPV6_IP_ENDPOINTS = Object.freeze({
     ddnspod: 'https://ipv6.ddnspod.com',
     neu6: 'https://speed.neu6.edu.cn/getIP.php',
@@ -862,7 +780,6 @@ const IPV6_IP_ENDPOINTS = Object.freeze({
     ipify: 'https://api6.ipify.org'
 });
 
-// —— 默认尝试顺序（集中管理）——
 const ORDER = Object.freeze({
     directV4: ['cip', '163', '126', 'bilibili', 'pingan', 'ipip'],
     landingV4: ['ipapi', 'ipwhois', 'ipsb'],
@@ -870,7 +787,6 @@ const ORDER = Object.freeze({
     landingV6: ['ipsb', 'ident', 'ipify']
 });
 
-// 统一：首选 + 回退列表 生成（并去重）
 function makeTryOrder(prefer, fallbackList) {
     return [prefer, ...fallbackList].filter((x, i, a) => x && a.indexOf(x) === i);
 }
@@ -879,6 +795,8 @@ function makeTryOrder(prefer, fallbackList) {
 log('info', 'Start', JSON.stringify({
     Update: CFG.Update,
     Timeout: CFG.Timeout,
+    Budget_ms: BUDGET_MS,
+    Budget_left_ms: budgetLeft(),
     IPv6_local: IPV6_EFF,
     WANT_V6,
     HAS_V6,
@@ -888,34 +806,14 @@ log('info', 'Start', JSON.stringify({
     TW_FLAG_MODE,
     SUBTITLE_STYLE: CFG.SUBTITLE_STYLE,
     SUBTITLE_MINIMAL: CFG.SUBTITLE_MINIMAL,
-    GAP_LINES: CFG.GAP_LINES
+    GAP_LINES: CFG.GAP_LINES,
+    SD_CONCURRENCY: Math.max(1, Math.min(8, CFG.SD_CONCURRENCY || 6))
 }));
 
-// 追加：BoxJS & CFG 快照
 log('debug', 'BoxSettings(BOX)', BOX);
-log('debug', 'CFG snapshot', {
-    Update: CFG.Update,
-    Timeout: CFG.Timeout,
-    MASK_IP: CFG.MASK_IP,
-    MASK_POS: CFG.MASK_POS,
-    IPv6: CFG.IPv6,
-    DOMESTIC_IPv4: CFG.DOMESTIC_IPv4,
-    DOMESTIC_IPv6: CFG.DOMESTIC_IPv6,
-    LANDING_IPv4: CFG.LANDING_IPv4,
-    LANDING_IPv6: CFG.LANDING_IPv6,
-    SD_STYLE: CFG.SD_STYLE,
-    SD_REGION_MODE: CFG.SD_REGION_MODE,
-    SD_ICON_THEME: CFG.SD_ICON_THEME,
-    SD_LANG: CFG.SD_LANG,
-    SD_TIMEOUT: CFG.SD_TIMEOUT_SEC_RAW,
-    SERVICES_ARG_TEXT: CFG.SERVICES_ARG_TEXT,
-    SERVICES_BOX_CHECKED_RAW: CFG.SERVICES_BOX_CHECKED_RAW,
-    SERVICES_BOX_TEXT: CFG.SERVICES_BOX_TEXT
-});
 
 // ====================== 主流程（IIFE） ======================
 ;(async () => {
-    // v4 预触发：确保 recent 能拿到 policy/entrance
     const preTouchV4 = touchLandingOnceQuick({v6: false}).catch(() => {});
 
     const t0 = Date.now();
@@ -923,13 +821,13 @@ log('debug', 'CFG snapshot', {
         log('warn', 'DirectV4', String(e));
         return {};
     });
-    log('info', 'DirectV4 fetched', (Date.now() - t0) + 'ms', {
-        v4: _maskMaybe(cn.ip || '')
-    });
+    log('info', 'DirectV4 fetched', (Date.now() - t0) + 'ms', {v4: _maskMaybe(cn.ip || '')});
 
     await preTouchV4;
 
-    // 第一次扫描 recent：拿 policy + entrance4/6（6 可能为空）
+    // 服务检测尽量提前启动（但最终渲染仍在后面）
+    const sdPromise = runServiceChecks().catch(() => []);
+
     const t1 = Date.now();
     let {policyName, entrance4, entrance6} = await getPolicyAndEntranceBoth();
     log('info', 'EntranceBoth#1', {
@@ -939,10 +837,9 @@ log('debug', 'CFG snapshot', {
         cost: (Date.now() - t1) + 'ms'
     });
 
-    // 如果只抓到 v6（或啥都没抓到），补一次 IPv4-only 触发并二扫 recent
     if (!entrance4) {
         await httpGet('https://api-ipv4.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true).catch(() => {});
-        await new Promise((r) => setTimeout(r, 80)); // 给 recent 一点时间落记录
+        await sleep(80);
 
         const t1a = Date.now();
         const r1a = await getPolicyAndEntranceBoth();
@@ -958,11 +855,9 @@ log('debug', 'CFG snapshot', {
         });
     }
 
-    // 每次运行：快速探测“是否支持代理 IPv6 出口”；支持才跑 v6 链路
     const probe = await probeLandingV6(LANDING_IPv6);
     const V6_READY = probe.ok;
 
-    // 若 v6 可用：补一次 v6 预触发并二次扫描 recent，提高 entrance6 命中率
     if (V6_READY) {
         await touchLandingOnceQuick({v6: true}).catch(() => {});
         if (!entrance6) {
@@ -980,13 +875,11 @@ log('debug', 'CFG snapshot', {
         entrance6 = '';
     }
 
-    // 本地 IPv6：只在设备真有 v6 时才展示（与代理出口 v6 无关）
     const cn6 = IPV6_EFF ? await getDirectV6(DOMESTIC_IPv6).catch((e) => {
         log('warn', 'DirectV6', String(e));
         return {};
     }) : {};
 
-    // 入口定位
     const ent4 = isIPv4(entrance4 || '')
         ? await getEntranceBundle(entrance4).catch((e) => {
             log('warn', 'EntranceBundle v4', String(e));
@@ -1000,7 +893,6 @@ log('debug', 'CFG snapshot', {
         })
         : {};
 
-    // 落地：v4 正常跑；v6 复用 probe 结果（避免再次请求）
     const t2 = Date.now();
     const px = await getLandingV4(LANDING_IPv4).catch((e) => {
         log('warn', 'LandingV4', String(e));
@@ -1013,20 +905,12 @@ log('debug', 'CFG snapshot', {
         v6_ready: V6_READY
     });
 
-    log('info', '$network peek', JSON.stringify({
-        wifi: $network?.wifi,
-        cellular: $network?.cellular || $network?.['cellular-data'],
-        v4: $network?.v4,
-        v6: $network?.v6
-    }));
     const title = netTypeLine() || t('unknownNet');
 
-    // 组装渲染
     const parts = [];
     parts.push(`${t('runAt')}: ${now()}`);
     parts.push(`${t('policy')}: ${policyName || '-'}`);
 
-    // 本地
     pushGroupTitle(parts, '本地');
     const directIPv4 = ipLine('IPv4', cn.ip);
     const directIPv6 = ipLine('IPv6', cn6.ip);
@@ -1036,7 +920,6 @@ log('debug', 'CFG snapshot', {
     parts.push(`${t('location')}: ${directLoc}`);
     if (cn.isp) parts.push(`${t('isp')}: ${fmtISP(cn.isp, cn.loc)}`);
 
-    // 入口
     if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) ||
         (ent6 && (ent6.ip || ent6.loc1 || ent6.loc2 || ent6.isp1 || ent6.isp2))) {
 
@@ -1047,7 +930,6 @@ log('debug', 'CFG snapshot', {
         if (entIPv4) parts.push(entIPv4);
         if (entIPv6) parts.push(entIPv6);
 
-        // v4 有定位就优先展示 v4；否则展示 v6（修复“仅 IPv6 时没位置/运营商”）
         const entShow = (ent4 && (ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) ? ent4 : ent6;
 
         if (entShow?.loc1) parts.push(`${t('location')}¹: ${flagFirst(entShow.loc1)}`);
@@ -1056,7 +938,6 @@ log('debug', 'CFG snapshot', {
         if (entShow?.isp2) parts.push(`${t('isp')}²: ${String(entShow.isp2).trim()}`);
     }
 
-    // 落地
     if (px.ip || px6.ip || px.loc || px.isp) {
         pushGroupTitle(parts, '落地');
         const landIPv4 = ipLine('IPv4', px.ip);
@@ -1067,14 +948,12 @@ log('debug', 'CFG snapshot', {
         if (px.isp) parts.push(`${t('isp')}: ${fmtISP(px.isp, px.loc)}`);
     }
 
-    // 服务检测
-    const sdLines = await runServiceChecks();
+    const sdLines = await sdPromise;
     if (sdLines.length) {
         pushGroupTitle(parts, '服务检测');
         parts.push(...sdLines);
     }
 
-    // 调试尾巴（可选）
     if (LOG_TO_PANEL && DEBUG_LINES.length) {
         pushGroupTitle(parts, t('debug'));
         const tail = DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES).join('\n');
@@ -1083,13 +962,10 @@ log('debug', 'CFG snapshot', {
 
     const content = maybeTify(parts.join('\n'));
     $done({title: maybeTify(title), content, icon: ICON_NAME, 'icon-color': ICON_COLOR});
-
 })().catch((err) => {
     const msg = String(err);
     logErrPush(t('panelTitle'), msg);
-    const errTitle = t('panelTitle');
-    const errBody = maybeTify(msg);
-    $done({title: errTitle, content: errBody, icon: ICON_NAME, 'icon-color': ICON_COLOR});
+    $done({title: t('panelTitle'), content: maybeTify(msg), icon: ICON_NAME, 'icon-color': ICON_COLOR});
 });
 
 // ====================== 工具 & 渲染 ======================
@@ -1125,10 +1001,6 @@ function isIPv6(ip) {
     return IPV6_RE.test(ip || '');
 }
 
-function isIP(ip) {
-    return isIPv4(ip) || isIPv6(ip);
-}
-
 function maskIP(ip) {
     if (!ip || !MASK_IP) return ip || '';
     if (isIPv4(ip)) {
@@ -1142,7 +1014,6 @@ function maskIP(ip) {
     return ip;
 }
 
-/** 防串值：label 含 4/6 时强约束 IP 家族 */
 function ipLine(label, ip) {
     if (!ip) return null;
     const s = String(ip).trim();
@@ -1243,23 +1114,25 @@ function netTypeLine() {
         if (/^(en|eth|wlan)/i.test(iface)) return `${t('wifi')} | -`;
     } catch (_) {}
 
-    log('info', 'netType detect', JSON.stringify({
-        ssid: $network?.wifi?.ssid,
-        radio: $network?.cellular?.radio || $network?.['cellular-data']?.radio,
-        iface4: $network?.v4?.primaryInterface,
-        iface6: $network?.v6?.primaryInterface
-    }));
     return t('unknownNet');
 }
 
-// ====================== HTTP 基础 ======================
+// ====================== HTTP 基础（预算感知） ======================
 function httpCall(method, req, timeoutMs = null, capMs = null, logTag = 'HTTP') {
     return new Promise((resolve, reject) => {
         const base = (Number(CFG.Timeout) || 8) * 1000;
 
         let to = (timeoutMs == null) ? base : Number(timeoutMs);
         if (!Number.isFinite(to) || to <= 0) to = base;
-        if (Number.isFinite(capMs) && capMs > 0) to = Math.min(to, capMs);
+
+        const cap = capMs == null ? 3500 : Number(capMs);
+        const capped = capByBudget(Number.isFinite(cap) ? cap : 3500);
+        to = Math.min(to, capped);
+
+        if (budgetLeft() <= CONSTS.BUDGET_SOFT_GUARD_MS) {
+            log('warn', `${logTag} skip (budget empty)`, req.url);
+            return reject(new Error('budget-empty'));
+        }
 
         const start = Date.now();
         let done = false;
@@ -1270,7 +1143,7 @@ function httpCall(method, req, timeoutMs = null, capMs = null, logTag = 'HTTP') 
             const cost = Date.now() - start;
             log('warn', `${logTag} watchdog`, req.url, 'cost', cost + 'ms');
             reject(new Error('watchdog-timeout'));
-        }, to + 200);
+        }, to + 220);
 
         const payload = Object.assign({}, req, {timeout: to});
         const fn = (String(method).toUpperCase() === 'POST') ? $httpClient.post : $httpClient.get;
@@ -1293,28 +1166,21 @@ function httpCall(method, req, timeoutMs = null, capMs = null, logTag = 'HTTP') 
 }
 
 function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false) {
-    // 面板关键链路：强制封顶，宁可快速失败走回退，也别卡死整段脚本
-    const cap = 3500;
     const req = {url, headers};
     if (followRedirect) req.followRedirect = true;
-    return httpCall('GET', req, timeoutMs, cap, 'HTTP GET');
+    return httpCall('GET', req, timeoutMs, 3500, 'HTTP GET');
 }
 
 function httpPost(url, headers = {}, body = "", timeoutMs = null) {
-    const cap = 3500;
     const req = {url, headers, body};
-    return httpCall('POST', req, timeoutMs, cap, 'HTTP POST');
+    return httpCall('POST', req, timeoutMs, 3500, 'HTTP POST');
 }
 
 function httpAPI(path = '/v1/requests/recent') {
     return new Promise((res) => {
         if (typeof $httpAPI === 'function') {
-            $httpAPI('GET', path, null, (x) => {
-                log('debug', 'httpAPI', path, 'ok');
-                res(x);
-            });
+            $httpAPI('GET', path, null, (x) => res(x));
         } else {
-            log('warn', 'httpAPI not available');
             res({});
         }
     });
@@ -1326,6 +1192,8 @@ async function trySources(order, sourceMap, {preferLogTag, needCityPrefer = fals
     let firstOK = null;
 
     for (const key of order) {
+        if (budgetLeft() <= 300) break;
+
         const def = sourceMap[key];
         if (!def) {
             log('warn', `${preferLogTag} missing def`, key);
@@ -1375,6 +1243,8 @@ async function tryIPv6Ip(order, opt = {}) {
     const maxTries = Math.max(1, Math.min(Number(opt.maxTries || order.length), order.length));
 
     for (const key of order.slice(0, maxTries)) {
+        if (budgetLeft() <= 260) break;
+
         const url = IPV6_IP_ENDPOINTS[key];
         if (!url) continue;
         try {
@@ -1388,7 +1258,6 @@ async function tryIPv6Ip(order, opt = {}) {
     return {};
 }
 
-/* ===== 四个对外接口（签名保持一致） ===== */
 async function getDirectV4(preferKey) {
     const order = makeTryOrder(preferKey, ORDER.directV4);
     const res = await trySources(order, DIRECT_V4_SOURCES, {
@@ -1428,14 +1297,6 @@ async function getLandingV4(preferKey) {
     return res || {};
 }
 
-async function getLandingV6(preferKey) {
-    const order = makeTryOrder(preferKey, ORDER.landingV6);
-    const res = await tryIPv6Ip(order, {timeoutMs: V6_TO, maxTries: order.length});
-    if (!res || !res.ip) log('warn', 'LandingV6 fail (all)');
-    return res || {};
-}
-
-/** 每次运行：快速探测“是否支持代理 IPv6 出口”（支持才跑 v6 链路） */
 async function probeLandingV6(preferKey) {
     const order = makeTryOrder(preferKey, ORDER.landingV6);
     const r = await tryIPv6Ip(order, {
@@ -1447,7 +1308,6 @@ async function probeLandingV6(preferKey) {
 
 // ====================== 入口/策略（稳态获取） ======================
 const ENT_SOURCES_RE = /(ip-api\.com|ipwhois\.app|ip\.sb|ipinfo\.io|ident\.me|ipify\.org|ifconfig\.co)/i;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function extractIP(str) {
     const s = String(str || '').replace(/\(Proxy\)/i, '').trim();
@@ -1460,11 +1320,9 @@ function extractIP(str) {
     return '';
 }
 
-/** 预触发：v4 必跑；v6 仅在确认 v6 ready 后才跑 */
 async function touchLandingOnceQuick(opt = {}) {
     const doV6 = !!opt.v6;
 
-    // v4：同时打一个“可能走 v6”的常用接口 + 一个“明确 IPv4-only”的接口
     await Promise.allSettled([
         httpGet('http://ip-api.com/json?lang=zh-CN', {}, CONSTS.PRETOUCH_TO_MS, true),
         httpGet('https://api-ipv4.ip.sb/ip', {}, CONSTS.PRETOUCH_TO_MS, true)
@@ -1508,17 +1366,14 @@ async function getPolicyAndEntranceBoth() {
             if (eip) (isIPv6(eip) ? (ip6 = eip) : (ip4 = eip));
         }
     }
-    log('debug', 'Policy/Entrance candidates', {policy, v4: _maskMaybe(ip4), v6: _maskMaybe(ip6), hits: hits.length});
     return {policyName: policy, entrance4: ip4, entrance6: ip6};
 }
 
 // —— 入口位置缓存（跟 Update 联动） ——
-// 入口定位强制快速：避免慢节点把面板整体拖死
 const ENT_REQ_TO = Math.min(2200, Math.max(1200, SD_TIMEOUT_MS || 0));
 const ENT_TTL_SEC = Math.max(CONSTS.ENT_MIN_TTL, Math.min(Number(CFG.Update) || 10, CONSTS.ENT_MAX_TTL));
 let ENT_CACHE = {ip: "", t: 0, data: null};
 
-/* ===== 入口定位：表驱动链（平安 + 链） ===== */
 const ENT_LOC_CHAIN = Object.freeze({
     pingan: async (ip) => {
         const r = await httpGet('https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=' + encodeURIComponent(ip), {}, ENT_REQ_TO);
@@ -1563,19 +1418,9 @@ async function getEntranceBundle(ip) {
     const fresh = (nowT - ENT_CACHE.t) < ENT_TTL_SEC * 1000;
 
     if (ENT_CACHE.ip === ip && fresh && ENT_CACHE.data) {
-        const left = Math.max(0, ENT_TTL_SEC * 1000 - (nowT - ENT_CACHE.t));
-        log('info', 'Entrance cache HIT', {ip: _maskMaybe(ip), ttl_ms_left: left});
         return ENT_CACHE.data;
     }
 
-    log('info', (ENT_CACHE.ip === ip && ENT_CACHE.data) ? 'Entrance cache EXPIRED' : 'Entrance cache MISS', {
-        ip: _maskMaybe(ip),
-        age_ms: ENT_CACHE.t ? (nowT - ENT_CACHE.t) : 0
-    });
-
-    const t0 = Date.now();
-
-    // 关键：并发打 4 个源，2s 左右收工；按优先级挑选结果
     const [p, a, w, s] = await Promise.allSettled([
         ENT_LOC_CHAIN.pingan(ip),
         ENT_LOC_CHAIN.ipapi(ip),
@@ -1589,13 +1434,7 @@ async function getEntranceBundle(ip) {
     };
 
     const p1 = (p.status === 'fulfilled') ? (p.value || {}) : {};
-    const c2 = pick([a, w, s]);  // ipapi -> ipwhois -> ipsb
-
-    log('debug', 'Entrance locate results(fast)', {
-        pingan: p.status,
-        chain: [a.status, w.status, s.status].join('/'),
-        cost: (Date.now() - t0) + 'ms'
-    });
+    const c2 = pick([a, w, s]);
 
     const res = {
         ip,
@@ -1610,7 +1449,6 @@ async function getEntranceBundle(ip) {
 }
 
 // ====================== 服务清单解析 & 检测 ======================
-/** 服务名映射与测试函数注册（新增服务仅需添加别名与测试） */
 const SD_I18N = ({
     "zh-Hans": {
         youTube: "YouTube", chatgpt_app: "ChatGPT", chatgpt: "ChatGPT Web",
@@ -1670,85 +1508,35 @@ function normSvcList(list) {
     return out;
 }
 
-/**
- * 服务清单优先级：
- *   1）模块 arguments（SERVICES）若非空 ⇒ 最高优先级
- *   2）BoxJS 多选（SERVICES，checkboxes）
- *   3）BoxJS 文本（SERVICES_TEXT）
- *   4）以上都为空 ⇒ 使用脚本默认全量 SD_DEFAULT_ORDER
- */
 function selectServices() {
-    // 1) 模块 arguments（SERVICES 参数）
     const argList = parseServices(CFG.SERVICES_ARG_TEXT);
-    if (argList.length > 0) {
-        log("info", "Services: arguments", argList);
-        return argList;
-    }
+    if (argList.length > 0) return argList;
 
-    // 2) BoxJS 复选框多选（checkboxes）
     const boxCheckedList = parseServices(CFG.SERVICES_BOX_CHECKED_RAW);
-    if (boxCheckedList.length > 0) {
-        log("info", "Services: BoxJS checkbox", boxCheckedList);
-        return boxCheckedList;
-    }
+    if (boxCheckedList.length > 0) return boxCheckedList;
 
-    // 3) BoxJS 文本备选（SERVICES_TEXT）
     const boxTextList = parseServices(CFG.SERVICES_BOX_TEXT);
-    if (boxTextList.length > 0) {
-        log("info", "Services: BoxJS text", boxTextList);
-        return boxTextList;
-    }
+    if (boxTextList.length > 0) return boxTextList;
 
-    // 4) 全都没配 ⇒ 使用脚本内置默认全量顺序
-    log("info", "Services: default(all)");
     return SD_DEFAULT_ORDER.slice();
 }
 
-// ====================== 服务检测 HTTP 工具 ======================
-const sd_now = () => Date.now();
+// ====================== 服务检测 HTTP 工具（预算感知） ======================
 const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const SD_BASE_HEADERS = {"User-Agent": SD_UA, "Accept-Language": "en"};
 
 function sd_httpGet(url, headers = {}, followRedirect = true) {
-    return new Promise((resolve) => {
-        const start = sd_now();
-        $httpClient.get({
-            url,
-            headers: {...SD_BASE_HEADERS, ...headers},
-            timeout: SD_TIMEOUT_MS,
-            followRedirect
-        }, (err, resp, data) => {
-            const cost = sd_now() - start;
-            if (err || !resp) {
-                log('warn', 'sd_httpGet FAIL', url, 'cost', cost + 'ms', String(err || ''));
-                return resolve({ok: false, status: 0, cost, headers: {}, data: ""});
-            }
-            const status = resp.status || resp.statusCode || 0;
-            log('debug', 'sd_httpGet OK', url, 'status', status, 'cost', cost + 'ms');
-            resolve({ok: true, status, cost, headers: resp.headers || {}, data: data || ""});
-        });
-    });
+    const start = Date.now();
+    return httpGet(url, {...SD_BASE_HEADERS, ...headers}, SD_TIMEOUT_MS, followRedirect)
+        .then((r) => ({ok: true, status: r.status, cost: Date.now() - start, headers: r.headers || {}, data: r.body || ""}))
+        .catch((e) => ({ok: false, status: 0, cost: Date.now() - start, headers: {}, data: "", err: String(e || '')}));
 }
 
 function sd_httpPost(url, headers = {}, body = "") {
-    return new Promise((resolve) => {
-        const start = sd_now();
-        $httpClient.post({
-            url,
-            headers: {...SD_BASE_HEADERS, ...headers},
-            timeout: SD_TIMEOUT_MS,
-            body
-        }, (err, resp, data) => {
-            const cost = sd_now() - start;
-            if (err || !resp) {
-                log('warn', 'sd_httpPost FAIL', url, 'cost', cost + 'ms', String(err || ''));
-                return resolve({ok: false, status: 0, cost, headers: {}, data: ""});
-            }
-            const status = resp.status || resp.statusCode || 0;
-            log('debug', 'sd_httpPost OK', url, 'status', status, 'cost', cost + 'ms');
-            resolve({ok: true, status, cost, headers: resp.headers || {}, data: data || ""});
-        });
-    });
+    const start = Date.now();
+    return httpPost(url, {...SD_BASE_HEADERS, ...headers}, body, SD_TIMEOUT_MS)
+        .then((r) => ({ok: true, status: r.status, cost: Date.now() - start, headers: r.headers || {}, data: r.body || ""}))
+        .catch((e) => ({ok: false, status: 0, cost: Date.now() - start, headers: {}, data: "", err: String(e || '')}));
 }
 
 // ====================== 台湾旗模式（服务检测渲染） ======================
@@ -1796,7 +1584,6 @@ function sd_ccPretty(cc) {
 
 const isPartial = (tag) => /自制|自製|original/i.test(String(tag || '')) || /部分/i.test(String(tag || ''));
 
-// ====================== 各服务检测 ======================
 function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     const st = state ? state : (ok ? (isPartial(tag) ? 'partial' : 'full') : 'blocked');
     const icon = SD_ICONS[st];
@@ -1832,25 +1619,31 @@ function sd_renderLine({name, ok, cc, cost, status, tag, state}) {
     return tail ? `${head} ｜ ${tail}` : head;
 }
 
+function sd_nameOfKey(key) {
+    switch (key) {
+        case 'youtube': return SD_I18N.youTube;
+        case 'netflix': return SD_I18N.netflix;
+        case 'disney': return SD_I18N.disney;
+        case 'hulu_us': return SD_I18N.huluUS;
+        case 'hulu_jp': return SD_I18N.huluJP;
+        case 'hbo': return SD_I18N.hbo;
+        case 'chatgpt_web': return SD_I18N.chatgpt;
+        case 'chatgpt_app': return SD_I18N.chatgpt_app;
+        default: return key;
+    }
+}
+
+// ====================== 各服务检测 ======================
 const SD_NF_ORIGINAL = '80018499';
 const SD_NF_NONORIG = '81280792';
 const sd_nfGet = (id) => sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true);
 
 async function sd_testYouTube() {
-    log('debug', 'SD YouTube begin');
     const r = await sd_httpGet('https://www.youtube.com/premium?hl=en', {}, true);
-    if (!r.ok) return sd_renderLine({
-        name: SD_I18N.youTube,
-        ok: false,
-        cc: '',
-        cost: r.cost,
-        status: r.status,
-        tag: t('notReachable')
-    });
+    if (!r.ok) return sd_renderLine({name: SD_I18N.youTube, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
     let cc = 'US';
     try {
         let m = r.data.match(/"countryCode":"([A-Z]{2})"/);
-        if (!m) m = r.data.match(/["']INNERTUBE_CONTEXT_GL["']\s*:\s*["']([A-Z]{2})["']/);
         if (!m) m = r.data.match(/["']GL["']\s*:\s*["']([A-Z]{2})["']/);
         if (m) cc = m[1];
     } catch (_) {}
@@ -1858,16 +1651,8 @@ async function sd_testYouTube() {
 }
 
 async function sd_testChatGPTWeb() {
-    log('debug', 'SD ChatGPT Web begin');
     const r = await sd_httpGet('https://chatgpt.com/cdn-cgi/trace', {}, true);
-    if (!r.ok) return sd_renderLine({
-        name: SD_I18N.chatgpt,
-        ok: false,
-        cc: '',
-        cost: r.cost,
-        status: r.status,
-        tag: t('notReachable')
-    });
+    if (!r.ok) return sd_renderLine({name: SD_I18N.chatgpt, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
     let cc = '';
     try {
         const m = r.data.match(/loc=([A-Z]{2})/);
@@ -1877,16 +1662,8 @@ async function sd_testChatGPTWeb() {
 }
 
 async function sd_testChatGPTAppAPI() {
-    log('debug', 'SD ChatGPT App begin');
     const r = await sd_httpGet('https://api.openai.com/v1/models', {}, true);
-    if (!r.ok) return sd_renderLine({
-        name: SD_I18N.chatgpt_app,
-        ok: false,
-        cc: '',
-        cost: r.cost,
-        status: r.status,
-        tag: t('notReachable')
-    });
+    if (!r.ok) return sd_renderLine({name: SD_I18N.chatgpt_app, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
     let cc = '';
     try {
         const h = r.headers || {};
@@ -1898,77 +1675,21 @@ async function sd_testChatGPTAppAPI() {
 }
 
 async function sd_testNetflix() {
-    log('debug', 'SD Netflix begin');
-    try {
-        const r1 = await sd_nfGet(SD_NF_NONORIG);
-        if (!r1.ok) return sd_renderLine({
-            name: SD_I18N.netflix,
-            ok: false,
-            cc: '',
-            cost: r1.cost,
-            status: r1.status,
-            tag: t('fail')
-        });
-        if (r1.status === 403) return sd_renderLine({
-            name: SD_I18N.netflix,
-            ok: false,
-            cc: '',
-            cost: r1.cost,
-            status: r1.status,
-            tag: t('regionBlocked')
-        });
-        if (r1.status === 404) {
-            const r2 = await sd_nfGet(SD_NF_ORIGINAL);
-            if (!r2.ok) return sd_renderLine({
-                name: SD_I18N.netflix,
-                ok: false,
-                cc: '',
-                cost: r2.cost,
-                status: r2.status,
-                tag: t('fail')
-            });
-            if (r2.status === 404) return sd_renderLine({
-                name: SD_I18N.netflix,
-                ok: false,
-                cc: '',
-                cost: r2.cost,
-                status: r2.status,
-                tag: t('regionBlocked')
-            });
-            const cc = sd_parseNFRegion(r2) || '';
-            return sd_renderLine({
-                name: SD_I18N.netflix,
-                ok: true,
-                cc,
-                cost: r2.cost,
-                status: r2.status,
-                tag: t('nfOriginals'),
-                state: 'partial'
-            });
-        }
-        if (r1.status === 200) {
-            const cc = sd_parseNFRegion(r1) || '';
-            return sd_renderLine({
-                name: SD_I18N.netflix,
-                ok: true,
-                cc,
-                cost: r1.cost,
-                status: r1.status,
-                tag: t('nfFull'),
-                state: 'full'
-            });
-        }
-        return sd_renderLine({
-            name: SD_I18N.netflix,
-            ok: false,
-            cc: '',
-            cost: r1.cost,
-            status: r1.status,
-            tag: `HTTP ${r1.status}`
-        });
-    } catch (e) {
-        return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: null, status: 0, tag: t('fail')});
+    const r1 = await sd_nfGet(SD_NF_NONORIG);
+    if (!r1.ok) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: t('fail')});
+    if (r1.status === 403) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: t('regionBlocked')});
+    if (r1.status === 404) {
+        const r2 = await sd_nfGet(SD_NF_ORIGINAL);
+        if (!r2.ok) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r2.cost, status: r2.status, tag: t('fail')});
+        if (r2.status === 404) return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r2.cost, status: r2.status, tag: t('regionBlocked')});
+        const cc = sd_parseNFRegion(r2) || '';
+        return sd_renderLine({name: SD_I18N.netflix, ok: true, cc, cost: r2.cost, status: r2.status, tag: t('nfOriginals'), state: 'partial'});
     }
+    if (r1.status === 200) {
+        const cc = sd_parseNFRegion(r1) || '';
+        return sd_renderLine({name: SD_I18N.netflix, ok: true, cc, cost: r1.cost, status: r1.status, tag: t('nfFull'), state: 'full'});
+    }
+    return sd_renderLine({name: SD_I18N.netflix, ok: false, cc: '', cost: r1.cost, status: r1.status, tag: `HTTP ${r1.status}`});
 }
 
 function sd_parseNFRegion(resp) {
@@ -1985,131 +1706,87 @@ function sd_parseNFRegion(resp) {
 }
 
 async function sd_testDisney() {
-    log('debug', 'SD Disney+ begin');
-
-    async function home() {
-        const r = await sd_httpGet('https://www.disneyplus.com/', {'Accept-Language': 'en'}, true);
-        if (!r.ok || r.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.data || '')) {
-            throw 'NA';
-        }
-        let cc = '';
-        try {
-            const m = r.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || r.data.match(/data-country=["']([A-Z]{2})["']/i);
-            if (m) cc = m[1];
-        } catch (_) {}
-        return {cc, cost: r.cost, status: r.status};
+    // R3：完全去掉 7s race，统一跟随 SD_TIMEOUT + Budget
+    const rHome = await sd_httpGet('https://www.disneyplus.com/', {'Accept-Language': 'en'}, true);
+    if (!rHome.ok || rHome.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(rHome.data || '')) {
+        const tag = (!rHome.ok) ? t('timeout') : t('regionBlocked');
+        return sd_renderLine({name: SD_I18N.disney, ok: false, cc: '', cost: rHome.cost, status: rHome.status, tag});
     }
 
-    async function bam() {
-        const headers = {
-            'Accept-Language': 'en',
-            'Authorization': 'ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84',
-            'Content-Type': 'application/json',
-            'User-Agent': SD_UA
-        };
-        const body = JSON.stringify({
-            query: 'mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }',
-            variables: {
-                input: {
-                    applicationRuntime: 'chrome',
-                    attributes: {
-                        browserName: 'chrome',
-                        browserVersion: '120.0.0.0',
-                        manufacturer: 'apple',
-                        model: null,
-                        operatingSystem: 'macintosh',
-                        operatingSystemVersion: '10.15.7',
-                        osDeviceIds: []
-                    },
-                    deviceFamily: 'browser', deviceLanguage: 'en', deviceProfile: 'macosx'
-                }
-            }
-        });
-        const r = await sd_httpPost('https://disney.api.edge.bamgrid.com/graph/v1/device/graphql', headers, body);
-        if (!r.ok || r.status !== 200) throw 'NA';
-        const d = safeJSON(r.data, {});
-        if (d?.errors) throw 'NA';
-        const inLoc = d?.extensions?.sdk?.session?.inSupportedLocation;
-        const cc = d?.extensions?.sdk?.session?.location?.countryCode;
-        return {inLoc, cc, cost: r.cost, status: r.status};
-    }
-
-    const timeout = (ms, code) => new Promise((_, rej) => setTimeout(() => rej(code), ms));
-
+    let homeCC = '';
     try {
-        const h = await Promise.race([home(), timeout(7000, 'TO')]);
-        const b = await Promise.race([bam(), timeout(7000, 'TO')]).catch(() => ({}));
-        const blocked = (b && b.inLoc === false);
-        const cc = blocked ? '' : (b?.cc || h?.cc || (await sd_queryLandingCCMulti()) || '');
-        return sd_renderLine({
-            name: SD_I18N.disney,
-            ok: !blocked,
-            cc,
-            cost: (b?.cost || h?.cost || 0),
-            status: (b?.status || h?.status || 0),
-            tag: blocked ? t('regionBlocked') : ''
-        });
-    } catch (e) {
-        const tag = (e === 'TO') ? t('timeout') : t('fail');
-        return sd_renderLine({name: SD_I18N.disney, ok: false, cc: '', cost: null, status: 0, tag});
+        const m = rHome.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || rHome.data.match(/data-country=["']([A-Z]{2})["']/i);
+        if (m) homeCC = m[1].toUpperCase();
+    } catch (_) {}
+
+    const headers = {
+        'Accept-Language': 'en',
+        'Authorization': 'ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84',
+        'Content-Type': 'application/json',
+        'User-Agent': SD_UA
+    };
+    const body = JSON.stringify({
+        query: 'mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }',
+        variables: {
+            input: {
+                applicationRuntime: 'chrome',
+                attributes: {
+                    browserName: 'chrome',
+                    browserVersion: '120.0.0.0',
+                    manufacturer: 'apple',
+                    model: null,
+                    operatingSystem: 'macintosh',
+                    operatingSystemVersion: '10.15.7',
+                    osDeviceIds: []
+                },
+                deviceFamily: 'browser', deviceLanguage: 'en', deviceProfile: 'macosx'
+            }
+        }
+    });
+
+    const rBam = await sd_httpPost('https://disney.api.edge.bamgrid.com/graph/v1/device/graphql', headers, body);
+    if (!rBam.ok || rBam.status !== 200) {
+        const cc = homeCC || (await sd_queryLandingCCMulti()) || '';
+        return sd_renderLine({name: SD_I18N.disney, ok: true, cc, cost: rHome.cost, status: rHome.status, tag: ''});
     }
+
+    const d = safeJSON(rBam.data, {});
+    if (d?.errors) {
+        const cc = homeCC || (await sd_queryLandingCCMulti()) || '';
+        return sd_renderLine({name: SD_I18N.disney, ok: true, cc, cost: rHome.cost, status: rHome.status, tag: ''});
+    }
+
+    const inLoc = d?.extensions?.sdk?.session?.inSupportedLocation;
+    const bamCC = d?.extensions?.sdk?.session?.location?.countryCode;
+    const blocked = (inLoc === false);
+    const cc = blocked ? '' : ((bamCC || homeCC || (await sd_queryLandingCCMulti()) || '').toUpperCase());
+    return sd_renderLine({
+        name: SD_I18N.disney,
+        ok: !blocked,
+        cc,
+        cost: Math.min(rHome.cost || 0, rBam.cost || 0) || (rBam.cost || rHome.cost || 0),
+        status: rBam.status || rHome.status || 0,
+        tag: blocked ? t('regionBlocked') : ''
+    });
 }
 
 async function sd_testHuluUS() {
-    log('debug', 'SD Hulu US begin');
     const r = await sd_httpGet('https://www.hulu.com/', {}, true);
-    if (!r.ok) return sd_renderLine({
-        name: SD_I18N.huluUS,
-        ok: false,
-        cc: '',
-        cost: r.cost,
-        status: r.status,
-        tag: t('notReachable')
-    });
+    if (!r.ok) return sd_renderLine({name: SD_I18N.huluUS, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
     const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || '');
-    return sd_renderLine({
-        name: SD_I18N.huluUS,
-        ok: !blocked,
-        cc: blocked ? '' : 'US',
-        cost: r.cost,
-        status: r.status,
-        tag: blocked ? t('regionBlocked') : ''
-    });
+    return sd_renderLine({name: SD_I18N.huluUS, ok: !blocked, cc: blocked ? '' : 'US', cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : ''});
 }
 
 async function sd_testHuluJP() {
-    log('debug', 'SD Hulu JP begin');
     const r = await sd_httpGet('https://www.hulu.jp/', {'Accept-Language': 'ja'}, true);
-    if (!r.ok) return sd_renderLine({
-        name: SD_I18N.huluJP,
-        ok: false,
-        cc: '',
-        cost: r.cost,
-        status: r.status,
-        tag: t('notReachable')
-    });
+    if (!r.ok) return sd_renderLine({name: SD_I18N.huluJP, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
     const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || '');
-    return sd_renderLine({
-        name: SD_I18N.huluJP,
-        ok: !blocked,
-        cc: blocked ? '' : 'JP',
-        cost: r.cost,
-        status: r.status,
-        tag: blocked ? t('regionBlocked') : ''
-    });
+    return sd_renderLine({name: SD_I18N.huluJP, ok: !blocked, cc: blocked ? '' : 'JP', cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : ''});
 }
 
 async function sd_testHBO() {
-    log('debug', 'SD Max(HBO) begin');
     const r = await sd_httpGet('https://www.max.com/', {}, true);
-    if (!r.ok) return sd_renderLine({
-        name: SD_I18N.hbo,
-        ok: false,
-        cc: '',
-        cost: r.cost,
-        status: r.status,
-        tag: t('notReachable')
-    });
+    if (!r.ok) return sd_renderLine({name: SD_I18N.hbo, ok: false, cc: '', cost: r.cost, status: r.status, tag: t('notReachable')});
     const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || '');
     let cc = '';
     try {
@@ -2117,14 +1794,7 @@ async function sd_testHBO() {
         if (m) cc = m[1].toUpperCase();
     } catch (_) {}
     if (!cc) cc = await sd_queryLandingCCMulti();
-    return sd_renderLine({
-        name: SD_I18N.hbo,
-        ok: !blocked,
-        cc: blocked ? '' : cc,
-        cost: r.cost,
-        status: r.status,
-        tag: blocked ? t('regionBlocked') : ''
-    });
+    return sd_renderLine({name: SD_I18N.hbo, ok: !blocked, cc: blocked ? '' : cc, cost: r.cost, status: r.status, tag: blocked ? t('regionBlocked') : ''});
 }
 
 async function sd_queryLandingCC() {
@@ -2165,19 +1835,89 @@ async function sd_queryLandingCCMulti() {
     return '';
 }
 
+/**
+ * R3：服务检测“整体限时 + 并发队列”
+ * - 未完成的服务补 “超时”，避免拖死脚本
+ */
 async function runServiceChecks() {
-    try {
-        const order = selectServices();
-        if (!order.length) return [];
-        log('info', 'Service checks start', order);
-        const tasks = order.map((k) => SD_TESTS_MAP[k] && SD_TESTS_MAP[k]());
-        const lines = await Promise.all(tasks);
-        log('info', 'Service checks done');
-        return lines.filter(Boolean);
-    } catch (e) {
-        log('error', 'Service checks error', String(e));
-        return [];
+    const order = selectServices();
+    if (!order.length) return [];
+
+    const conc = Math.max(1, Math.min(8, Number(CFG.SD_CONCURRENCY) || 6));
+    const stageCap = Math.max(800, Math.min(5200, capByBudget(5200)));
+
+    const results = new Array(order.length);
+    let cursor = 0;
+    let inflight = 0;
+    let finished = 0;
+    let doneFlag = false;
+
+    const finish = () => {
+        if (doneFlag) return;
+        doneFlag = true;
+    };
+
+    const tryLaunch = () => {
+        while (!doneFlag && inflight < conc && cursor < order.length) {
+            if (budgetLeft() <= 320) break;
+
+            const idx = cursor++;
+            const key = order[idx];
+            const fn = SD_TESTS_MAP[key];
+
+            if (!fn) {
+                results[idx] = sd_renderLine({name: sd_nameOfKey(key), ok: false, cc: '', cost: 0, status: 0, tag: t('fail')});
+                finished++;
+                continue;
+            }
+
+            inflight++;
+            Promise.resolve(fn())
+                .then((line) => { results[idx] = line; })
+                .catch(() => {
+                    results[idx] = sd_renderLine({name: sd_nameOfKey(key), ok: false, cc: '', cost: null, status: 0, tag: t('fail')});
+                })
+                .finally(() => {
+                    inflight--;
+                    finished++;
+                    if (finished >= order.length) finish();
+                    else tryLaunch();
+                });
+        }
+    };
+
+    tryLaunch();
+
+    await withTimeout(
+        new Promise((r) => {
+            const tick = () => {
+                if (doneFlag) return r(true);
+                if (finished >= order.length) return r(true);
+                if (budgetLeft() <= 260) return r(true);
+                setTimeout(tick, 30);
+            };
+            tick();
+        }),
+        stageCap,
+        false,
+        'sd-stage'
+    );
+
+    finish();
+
+    for (let i = 0; i < results.length; i++) {
+        if (!results[i]) {
+            results[i] = sd_renderLine({
+                name: sd_nameOfKey(order[i]),
+                ok: false,
+                cc: '',
+                cost: null,
+                status: 0,
+                tag: t('timeout')
+            });
+        }
     }
+    return results.filter(Boolean);
 }
 
 // ====================== 简→繁（仅在 zh-Hant） ======================
