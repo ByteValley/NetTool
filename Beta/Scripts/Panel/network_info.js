@@ -593,13 +593,22 @@ const DIRECT_V4_SOURCES = Object.freeze({
       const loc = j?.data?.location || [];
       const c0 = loc[0];
       const flag = flagOf(c0 === '中国' ? 'CN' : c0);
+
+      // ===== FIX：ipip 的 isp 位序兼容（有时在 loc[3]）=====
+      let isp = '';
+      if (Array.isArray(loc)) {
+        if (loc.length >= 5) isp = loc[4] || '';
+        else if (loc.length >= 4) isp = loc[3] || '';
+      }
+
       return {
         ip: j?.data?.ip || '',
         loc: joinNonEmpty([flag, loc[0], loc[1], loc[2]], ' ').replace(/\s*中国\s*/, ''),
-        isp: loc[4] || ''
+        isp: (isp || '').toString().trim()
       };
     }
-  },
+  }
+
   cip: {
     url: 'http://cip.cc/',
     parse: (r) => {
@@ -1188,6 +1197,23 @@ async function tryIPv6Ip(order, opt = {}) {
   return {};
 }
 
+async function fillDirectIspSameIp(targetIp, skipKey) {
+  const order = (ORDER.directV4 || []).filter((k) => k && k !== skipKey);
+  for (const key of order) {
+    if (budgetLeft() <= 320) break;
+    const def = DIRECT_V4_SOURCES[key];
+    if (!def) continue;
+    try {
+      const r = await httpGet(def.url);
+      const x = def.parse(r) || {};
+      const ip = String(x.ip || '').trim();
+      const isp = String(x.isp || '').trim();
+      if (ip === targetIp && isp) return isp;
+    } catch (_) {}
+  }
+  return '';
+}
+
 async function getDirectV4(preferKey) {
   const order = makeTryOrder(preferKey, ORDER.directV4);
   const res = await trySources(order, DIRECT_V4_SOURCES, {
@@ -1206,6 +1232,13 @@ async function getDirectV4(preferKey) {
       return {};
     }
   }
+
+  // ===== FIX：本地 isp 为空就补齐（仅同 IP）=====
+  if (!String(res.isp || '').trim()) {
+    const filled = await fillDirectIspSameIp(String(res.ip).trim(), preferKey).catch(() => '');
+    if (filled) res.isp = filled;
+  }
+
   return res;
 }
 
