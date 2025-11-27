@@ -10,15 +10,15 @@
       "id": "Panel.NetworkInfo",
       "name": "网络信息",
       "descs_html": [
-        "直连/入口/落地 IP 与位置；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”。",
+        "直连/入口/落地 IP 与位置；入口 <b>isp¹ 自动兜底补齐</b>；入口 <b>loc¹/loc² 去重</b>；中国 ISP 规范化；脚本接管图标与网络类型行；台湾旗模式；服务检测合并；三态图标与地区样式；icon/text 支持“➟”；预算感知 clamp 避免撑爆 timeout。",
         "<b>优先级说明：</b>单值参数读取顺序为 <b>arguments（显式改动）</b> → <b>BoxJS</b> → <b>默认</b>；服务清单遵循 <b>arguments(SERVICES) 非空</b> → <b>多选</b> → <b>文本</b> → <b>默认全量</b>。",
-        "<b>超时单位：</b>统一为“秒”，只认 <code>Timeout</code> 与 <code>SD_TIMEOUT</code>；<code>SD_TIMEOUT=0</code> 表示跟随 <code>Timeout</code>。脚本会按剩余预算自动 clamp 请求超时，避免撑爆面板 timeout。",
+        "<b>超时单位：</b>统一为“秒”，只认 <code>Timeout</code> 与 <code>SD_TIMEOUT</code>；<code>SD_TIMEOUT=0</code> 表示跟随 <code>Timeout</code>（脚本内部最小 2 秒）。所有 HTTP 请求会按剩余预算自动 clamp。",
         "<b>IPv6 说明：</b>脚本会快速探测“节点是否有 IPv6 出口”，若无则放弃外网 v6 查询（但仍显示本地 v6）。",
         "<hr/>",
         "<h3>使用说明与参数</h3>",
-        "<b>— 基本 —</b><br/>• <code>Update</code>：面板刷新间隔（秒）<br/>• <code>Timeout</code>：脚本总超时（秒）<br/>• <code>BUDGET</code>：总执行预算（秒）。0=自动（≈Timeout-保护值），预算不足会自动跳过耗时项<br/>• <code>SD_TIMEOUT</code>：服务检测单项超时（秒）。0=跟随 Timeout（最小 2 秒）",
-        "<b>— 隐私与显示 —</b><br/>• <code>MASK_IP</code>：直连/入口/落地 IP 脱敏（1/0）<br/>• <code>MASK_POS</code>：直连位置脱敏（auto=跟随 MASK_IP / 1=仅旗帜 / 0=完整）<br/>• <code>IPv6</code>：启用 IPv6（1/0）<br/>• <code>TW_FLAG_MODE</code>：台湾旗模式（0=🇨🇳/1=🇹🇼/2=🇼🇸）<br/>• <code>SD_REGION_MODE</code>：地区样式（full/abbr/flag）<br/>• <code>SD_ICON_THEME</code>：图标主题（check/lock/circle）<br/>• <code>SD_STYLE</code>：服务检测样式（icon/text）<br/>• <code>SD_ARROW</code>：是否用“➟”（1/0）<br/>• <code>SD_SHOW_LAT</code>：显示延迟（1/0）<br/>• <code>SD_SHOW_HTTP</code>：显示 HTTP 码（1/0）<br/>• <code>SD_LANG</code>：语言（zh-Hans/zh-Hant）",
-        "<b>— 数据源 —</b><br/>• <code>DOMESTIC_IPv4</code>：ipip|cip|163|bilibili|126|pingan|ipwhois|ipapi_co|ifconfig|myip<br/>• <code>DOMESTIC_IPv6</code>：ddnspod|neu6|ipsb|ipw6|myipla|ipify|ident|icanhaz|ifconfig<br/>• <code>LANDING_IPv4</code>：ipapi|ipsb|ipwhois|ipapi_co|ifconfig|myip<br/>• <code>LANDING_IPv6</code>：ipsb|ipw6|myipla|ipify|ident|icanhaz|ifconfig",
+        "<b>— 基本 —</b><br/>• <code>Update</code>：面板刷新间隔（秒）<br/>• <code>Timeout</code>：脚本总超时（秒）<br/>• <code>BUDGET</code>：总执行预算（秒）。0=自动（脚本会在 5.5s~10s 与 Timeout 之间折中）<br/>• <code>SD_TIMEOUT</code>：服务检测单项超时（秒）。0=跟随 Timeout（最小 2 秒）<br/>• <code>SD_CONCURRENCY</code>：服务检测并发（1~8）",
+        "<b>— 隐私与显示 —</b><br/>• <code>MASK_IP</code>：直连/入口/落地 IP 脱敏（1/0）<br/>• <code>MASK_POS</code>：位置脱敏（auto=跟随 MASK_IP / 1=仅旗帜 / 0=完整）<br/>• <code>IPv6</code>：启用 IPv6（1/0）<br/>• <code>TW_FLAG_MODE</code>：台湾旗模式（0=🇨🇳/1=🇹🇼/2=🇼🇸）<br/>• <code>SD_REGION_MODE</code>：地区样式（full/abbr/flag）<br/>• <code>SD_ICON_THEME</code>：图标主题（check/lock/circle）<br/>• <code>SD_STYLE</code>：服务检测样式（icon/text）<br/>• <code>SD_ARROW</code>：是否用“➟”（1/0）<br/>• <code>SD_SHOW_LAT</code>：显示延迟（1/0）<br/>• <code>SD_SHOW_HTTP</code>：显示 HTTP 码（1/0）<br/>• <code>SD_LANG</code>：语言（zh-Hans/zh-Hant）",
+        "<b>— 数据源 —</b><br/>• <code>DOMESTIC_IPv4</code>：ipip|cip|163|126|bilibili|pingan<br/>• <code>DOMESTIC_IPv6</code>：ddnspod|neu6|ipsb|ident|ipify<br/>• <code>LANDING_IPv4</code>：ipapi|ipwhois|ipsb<br/>• <code>LANDING_IPv6</code>：ipsb|ident|ipify",
         "<b>— 图标接管 —</b><br/>• <code>IconPreset</code>：wifi|globe|dots|antenna|point<br/>• <code>Icon</code>：SF Symbols 名称（留空=用预设）<br/>• <code>IconColor</code>：HEX 颜色（如 #1E90FF）",
         "<b>— 版式（子标题与留白）—</b><br/>• <code>SUBTITLE_STYLE</code>：line|cnBracket|cnQuote|square|curly|angle|pipe|bullet|plain<br/>• <code>SUBTITLE_MINIMAL</code>：纯净子标题（1/0）<br/>• <code>GAP_LINES</code>：分组前留白行数（0/1/2）",
         "<b>— 服务与别名 —</b><br/>• <code>SERVICES</code>：支持文本/JSON 数组；分隔符：逗号/分号/竖线/斜杠/空白/换行<br/>• 选择优先级：<b>arguments(SERVICES) 非空</b> → <b>多选</b> → <b>文本</b> → 默认（全部）",
@@ -44,21 +44,29 @@
           "id": "@Panel.NetworkInfo.Settings.Timeout",
           "name": "脚本超时（秒）",
           "type": "number",
-          "val": 12
+          "val": 14,
+          "desc": "建议 ≥ 10；脚本内部仍会按预算 clamp 单次请求超时"
         },
         {
           "id": "@Panel.NetworkInfo.Settings.BUDGET",
           "name": "总执行预算（秒）",
           "type": "number",
           "val": 0,
-          "desc": "0=自动（≈Timeout-保护值）。预算不足会自动跳过耗时项"
+          "desc": "0=自动（脚本内部 5.5s~10s 与 Timeout 折中）；预算不足会自动跳过耗时项"
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_TIMEOUT",
           "name": "服务检测单项超时（秒）",
           "type": "number",
-          "val": 0,
-          "desc": "0=跟随 Timeout（最小 2 秒）"
+          "val": 3,
+          "desc": "0=跟随 Timeout；最小 2 秒；会按剩余预算自动 clamp"
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SD_CONCURRENCY",
+          "name": "服务检测并发（SD_CONCURRENCY）",
+          "type": "number",
+          "val": 6,
+          "desc": "1~8；并发越高越快，但更吃预算"
         },
         {
           "id": "@Panel.NetworkInfo.Settings.MASK_IP",
@@ -68,7 +76,7 @@
         },
         {
           "id": "@Panel.NetworkInfo.Settings.MASK_POS",
-          "name": "直连位置脱敏（MASK_POS）",
+          "name": "位置脱敏（MASK_POS）",
           "type": "selects",
           "val": "auto",
           "items": [
@@ -100,7 +108,7 @@
           "items": [
             {
               "key": "ipip",
-              "label": "ipip.net"
+              "label": "ipip.net（推荐）"
             },
             {
               "key": "cip",
@@ -121,22 +129,6 @@
             {
               "key": "pingan",
               "label": "平安 pingan"
-            },
-            {
-              "key": "ipwhois",
-              "label": "ipwho.is"
-            },
-            {
-              "key": "ipapi_co",
-              "label": "ipapi.co"
-            },
-            {
-              "key": "ifconfig",
-              "label": "ifconfig.co"
-            },
-            {
-              "key": "myip",
-              "label": "api.myip.com"
             }
           ]
         },
@@ -148,7 +140,7 @@
           "items": [
             {
               "key": "ddnspod",
-              "label": "ipv6.ddnspod.com"
+              "label": "ipv6.ddnspod.com（推荐）"
             },
             {
               "key": "neu6",
@@ -159,28 +151,12 @@
               "label": "api-ipv6.ip.sb/ip"
             },
             {
-              "key": "ipw6",
-              "label": "6.ipw.cn"
-            },
-            {
-              "key": "myipla",
-              "label": "v6.myip.la/raw"
-            },
-            {
-              "key": "ipify",
-              "label": "api6.ipify.org"
-            },
-            {
               "key": "ident",
               "label": "v6.ident.me"
             },
             {
-              "key": "icanhaz",
-              "label": "ipv6.icanhazip.com"
-            },
-            {
-              "key": "ifconfig",
-              "label": "ifconfig.co/ip"
+              "key": "ipify",
+              "label": "api6.ipify.org"
             }
           ]
         },
@@ -192,63 +168,35 @@
           "items": [
             {
               "key": "ipapi",
-              "label": "ip-api.com"
-            },
-            {
-              "key": "ipsb",
-              "label": "ip.sb (ipv4 geoip)"
+              "label": "ip-api.com（推荐）"
             },
             {
               "key": "ipwhois",
-              "label": "ipwho.is"
+              "label": "ipwhois.app"
             },
             {
-              "key": "ipapi_co",
-              "label": "ipapi.co"
-            },
-            {
-              "key": "ifconfig",
-              "label": "ifconfig.co"
-            },
-            {
-              "key": "myip",
-              "label": "api.myip.com"
+              "key": "ipsb",
+              "label": "ip.sb（ipv4 geoip）"
             }
           ]
         },
         {
           "id": "@Panel.NetworkInfo.Settings.LANDING_IPv6",
-          "name": "落地 IPv6 源（LANDING_IPv6）",
+          "name": "落地 IPv6 探测源（LANDING_IPv6）",
           "type": "selects",
           "val": "ipsb",
           "items": [
             {
               "key": "ipsb",
-              "label": "api-ipv6.ip.sb/ip"
-            },
-            {
-              "key": "ipw6",
-              "label": "6.ipw.cn"
-            },
-            {
-              "key": "myipla",
-              "label": "v6.myip.la/raw"
-            },
-            {
-              "key": "ipify",
-              "label": "api6.ipify.org"
+              "label": "api-ipv6.ip.sb/ip（推荐）"
             },
             {
               "key": "ident",
               "label": "v6.ident.me"
             },
             {
-              "key": "icanhaz",
-              "label": "ipv6.icanhazip.com"
-            },
-            {
-              "key": "ifconfig",
-              "label": "ifconfig.co/ip"
+              "key": "ipify",
+              "label": "api6.ipify.org"
             }
           ]
         },
@@ -315,8 +263,78 @@
           "placeholder": "#RRGGBB"
         },
         {
+          "id": "@Panel.NetworkInfo.Settings.SUBTITLE_STYLE",
+          "name": "子标题样式（SUBTITLE_STYLE）",
+          "type": "selects",
+          "val": "line",
+          "items": [
+            {
+              "key": "line",
+              "label": "—— 本地 ——（line）"
+            },
+            {
+              "key": "cnBracket",
+              "label": "【 本地 】（cnBracket）"
+            },
+            {
+              "key": "cnQuote",
+              "label": "「 本地 」（cnQuote）"
+            },
+            {
+              "key": "square",
+              "label": "[ 本地 ]（square）"
+            },
+            {
+              "key": "curly",
+              "label": "{ 本地 }（curly）"
+            },
+            {
+              "key": "angle",
+              "label": "《 本地 》（angle）"
+            },
+            {
+              "key": "pipe",
+              "label": "║ 本地 ║（pipe）"
+            },
+            {
+              "key": "bullet",
+              "label": "· 本地 ·（bullet）"
+            },
+            {
+              "key": "plain",
+              "label": "本地（plain）"
+            }
+          ]
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.SUBTITLE_MINIMAL",
+          "name": "纯净子标题（SUBTITLE_MINIMAL）",
+          "type": "boolean",
+          "val": false
+        },
+        {
+          "id": "@Panel.NetworkInfo.Settings.GAP_LINES",
+          "name": "分组前留白行数（GAP_LINES）",
+          "type": "selects",
+          "val": "1",
+          "items": [
+            {
+              "key": "0",
+              "label": "0"
+            },
+            {
+              "key": "1",
+              "label": "1（默认）"
+            },
+            {
+              "key": "2",
+              "label": "2"
+            }
+          ]
+        },
+        {
           "id": "@Panel.NetworkInfo.Settings.SD_STYLE",
-          "name": "服务检测样式",
+          "name": "服务检测样式（SD_STYLE）",
           "type": "selects",
           "val": "icon",
           "items": [
@@ -332,19 +350,19 @@
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_SHOW_LAT",
-          "name": "显示延迟（Latency）",
+          "name": "显示延迟（SD_SHOW_LAT）",
           "type": "boolean",
           "val": true
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_SHOW_HTTP",
-          "name": "显示 HTTP 码",
+          "name": "显示 HTTP 码（SD_SHOW_HTTP）",
           "type": "boolean",
           "val": true
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_LANG",
-          "name": "服务检测语言",
+          "name": "服务检测语言（SD_LANG）",
           "type": "selects",
           "val": "zh-Hans",
           "items": [
@@ -360,7 +378,7 @@
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_REGION_MODE",
-          "name": "地区显示样式",
+          "name": "地区显示样式（SD_REGION_MODE）",
           "type": "selects",
           "val": "full",
           "items": [
@@ -380,7 +398,7 @@
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_ICON_THEME",
-          "name": "图标主题（三态）",
+          "name": "图标主题（三态）（SD_ICON_THEME）",
           "type": "selects",
           "val": "check",
           "items": [
@@ -400,7 +418,7 @@
         },
         {
           "id": "@Panel.NetworkInfo.Settings.SD_ARROW",
-          "name": "使用“➟”连接服务名与地区",
+          "name": "使用“➟”连接服务名与地区（SD_ARROW）",
           "type": "boolean",
           "val": true
         },
@@ -492,76 +510,6 @@
           "name": "异常推送通知（LOG_PUSH）",
           "type": "boolean",
           "val": true
-        },
-        {
-          "id": "@Panel.NetworkInfo.Settings.SUBTITLE_STYLE",
-          "name": "子标题样式（SUBTITLE_STYLE）",
-          "type": "selects",
-          "val": "line",
-          "items": [
-            {
-              "key": "line",
-              "label": "—— 本地 ——（line）"
-            },
-            {
-              "key": "cnBracket",
-              "label": "【 本地 】（cnBracket）"
-            },
-            {
-              "key": "cnQuote",
-              "label": "「 本地 」（cnQuote）"
-            },
-            {
-              "key": "square",
-              "label": "[ 本地 ]（square）"
-            },
-            {
-              "key": "curly",
-              "label": "{ 本地 }（curly）"
-            },
-            {
-              "key": "angle",
-              "label": "《 本地 》（angle）"
-            },
-            {
-              "key": "pipe",
-              "label": "║ 本地 ║（pipe）"
-            },
-            {
-              "key": "bullet",
-              "label": "· 本地 ·（bullet）"
-            },
-            {
-              "key": "plain",
-              "label": "本地（plain）"
-            }
-          ]
-        },
-        {
-          "id": "@Panel.NetworkInfo.Settings.SUBTITLE_MINIMAL",
-          "name": "纯净子标题（SUBTITLE_MINIMAL）",
-          "type": "boolean",
-          "val": false
-        },
-        {
-          "id": "@Panel.NetworkInfo.Settings.GAP_LINES",
-          "name": "分组前留白行数（GAP_LINES）",
-          "type": "selects",
-          "val": "1",
-          "items": [
-            {
-              "key": "0",
-              "label": "0"
-            },
-            {
-              "key": "1",
-              "label": "1（默认）"
-            },
-            {
-              "key": "2",
-              "label": "2"
-            }
-          ]
         }
       ]
     },
