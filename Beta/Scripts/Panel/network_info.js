@@ -1,7 +1,13 @@
 /* =========================================================
  * 模块：网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者：ByteValley
- * 版本：2025-11-27R4 (entrance isp1 fallback)
+ * 版本：2025-11-27R5 (direct isp fix)
+ *
+ * R5 变更
+ *  · 修复：本地“运营商”不显示 —— ipip location 位序兼容（isp 可能在 loc[3]）
+ *  · 修复：本地 isp 为空时按“同 IP”用其他直连源补齐（仅缺失时触发）
+ *  · 修正：SD_TIMEOUT 默认 0（跟随 Timeout），与 BoxJS 文案一致
+ *  · 修正：Icon 默认值不写死，避免 IconPreset 永远不生效
  *
  * R4 变更
  *  · 修复：入口“运营商¹”偶发为空 —— pingan 无 isp 时，自动用第二梯队补齐
@@ -330,7 +336,7 @@ const CFG = {
 
   /* —— 图标接管 —— */
   IconPreset: ENV('IconPreset', 'globe'),
-  Icon: ENV('Icon', 'globe.asia.australia'),
+  Icon: ENV('Icon', ''), // R5：默认不写死，避免 IconPreset 永远不生效
   IconColor: ENV('IconColor', '#1E90FF'),
 
   /* —— 服务检测基本样式 —— */
@@ -340,7 +346,7 @@ const CFG = {
   SD_LANG: ENV('SD_LANG', 'zh-Hans'),
 
   /* —— 单项检测超时（秒）—— */
-  SD_TIMEOUT_SEC_RAW: ENV('SD_TIMEOUT', 2),
+  SD_TIMEOUT_SEC_RAW: ENV('SD_TIMEOUT', 0), // R5：默认 0 跟随 Timeout
   SD_CONCURRENCY: toNum(ENV('SD_CONCURRENCY', 6), 6),
 
   SD_REGION_MODE: ENV('SD_REGION_MODE', 'full'),
@@ -594,7 +600,7 @@ const DIRECT_V4_SOURCES = Object.freeze({
       const c0 = loc[0];
       const flag = flagOf(c0 === '中国' ? 'CN' : c0);
 
-      // ===== FIX：ipip 的 isp 位序兼容（有时在 loc[3]）=====
+      // ===== R5：ipip 的 isp 位序兼容（有时在 loc[3]）=====
       let isp = '';
       if (Array.isArray(loc)) {
         if (loc.length >= 5) isp = loc[4] || '';
@@ -607,8 +613,7 @@ const DIRECT_V4_SOURCES = Object.freeze({
         isp: (isp || '').toString().trim()
       };
     }
-  }
-
+  },
   cip: {
     url: 'http://cip.cc/',
     parse: (r) => {
@@ -1197,7 +1202,10 @@ async function tryIPv6Ip(order, opt = {}) {
   return {};
 }
 
+// ===== R5：本地 ISP 缺失时的“同 IP”补齐（只在 isp 空时触发）=====
 async function fillDirectIspSameIp(targetIp, skipKey) {
+  const ip = String(targetIp || '').trim();
+  if (!ip) return '';
   const order = (ORDER.directV4 || []).filter((k) => k && k !== skipKey);
   for (const key of order) {
     if (budgetLeft() <= 320) break;
@@ -1206,9 +1214,9 @@ async function fillDirectIspSameIp(targetIp, skipKey) {
     try {
       const r = await httpGet(def.url);
       const x = def.parse(r) || {};
-      const ip = String(x.ip || '').trim();
-      const isp = String(x.isp || '').trim();
-      if (ip === targetIp && isp) return isp;
+      const ip2 = String(x.ip || '').trim();
+      const isp2 = String(x.isp || '').trim();
+      if (ip2 && ip2 === ip && isp2) return isp2;
     } catch (_) {}
   }
   return '';
@@ -1233,9 +1241,9 @@ async function getDirectV4(preferKey) {
     }
   }
 
-  // ===== FIX：本地 isp 为空就补齐（仅同 IP）=====
+  // R5：本地 isp 为空，就按“同 IP”从其他直连源补齐
   if (!String(res.isp || '').trim()) {
-    const filled = await fillDirectIspSameIp(String(res.ip).trim(), preferKey).catch(() => '');
+    const filled = await fillDirectIspSameIp(res.ip, preferKey).catch(() => '');
     if (filled) res.isp = filled;
   }
 
