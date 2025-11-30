@@ -79,12 +79,8 @@ DOMAIN-SUFFIX,partner.toutiao.com,REJECT
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon11-misc)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lq)),REJECT
-
-DOMAIN,api3-normal-lf.fqnovel.com,REJECT-DROP
-DOMAIN,api5-normal-lq.fqnovel.com,REJECT-DROP
-DOMAIN,mon11-misc-lq.fqnovel.com,REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lq)),REJECT-DROP
 
 # —— frontier100（头条广告接口映射到番茄） ——
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,frontier100)),REJECT-DROP
