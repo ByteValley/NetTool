@@ -1,0 +1,11 @@
+#!name=listenleap
+#!desc=listenleap-帮你听懂英语播客-通过播客学英语
+#!category=功能增强
+#!author=[https://t.me/GieGie777],[@liul0ng]
+
+[Script]
+# > 帮你听懂英语播客-通过播客学英语
+listenleap = type=http-response, pattern=^https:\/\/www\.listenleap\.com\/front-api\/user\/getUserInfoByUserToken, script-path=https://raw.githubusercontent.com/WeiGiegie/666/main/listenleap.js, requires-body=true, max-size=-1, timeout=60
+
+[MITM]
+hostname = %APPEND% www.listenleap.com
