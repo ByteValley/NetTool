@@ -1,0 +1,46 @@
+{
+  "description" : "",
+  "version" : "1.0.4",
+  "remoteResource" : {
+    "url" : "https:\/\/sdl.dtzsghnr.cn\/d\/联通.zip",
+    "hash" : "23be4b25ea383d5777372d16b9a536d1",
+    "autoUpdateInterval" : 600
+  },
+  "runInApp" : false,
+  "intentInputTypes" : [
+
+  ],
+  "localizedDescriptions" : {
+    "ja" : "",
+    "es" : "",
+    "fr" : "",
+    "it" : "",
+    "ru" : "",
+    "en" : "",
+    "pt" : "",
+    "de" : "",
+    "zh" : ""
+  },
+  "author" : {
+    "homepage" : null,
+    "name" : "DTZSGHNR",
+    "email" : "2753086015@qq.com"
+  },
+  "localizedNames" : {
+    "pt" : "",
+    "de" : "",
+    "ja" : "",
+    "en" : "",
+    "zh" : "",
+    "it" : "",
+    "fr" : "",
+    "ru" : "",
+    "es" : ""
+  },
+  "color" : "rgba(238, 92, 98,1)",
+  "name" : "中國聯通",
+  "icon" : "antenna.radiowaves.left.and.right",
+  "contributors" : [
+
+  ]
+}
