@@ -1,8 +1,0 @@
-{
-  "name": "中国联通 · 小组件配置",
-  "identifier": "ChinaUnicom_2024_Config",
-  "description": "中国联通话费 / 流量 / 语音小组件的 Scripting 版配置面板。",
-  "version": "1.0.0",
-  "main": "widget.tsx",
-  "category": "app"
-}
