@@ -1,0 +1,38 @@
+{
+  "icon" : "antenna.radiowaves.left.and.right",
+  "color" : "rgba(102, 196, 235,1)",
+  "runInApp" : false,
+  "name" : "中國電信",
+  "author" : null,
+  "description" : "",
+  "localizedNames" : {
+    "es" : "",
+    "ja" : "",
+    "de" : "",
+    "pt" : "",
+    "en" : "",
+    "it" : "",
+    "zh" : "",
+    "fr" : "",
+    "ru" : ""
+  },
+  "localizedDescriptions" : {
+    "es" : "",
+    "pt" : "",
+    "en" : "",
+    "fr" : "",
+    "it" : "",
+    "ru" : "",
+    "zh" : "",
+    "de" : "",
+    "ja" : ""
+  },
+  "intentInputTypes" : [
+
+  ],
+  "contributors" : [
+
+  ],
+  "version" : "1.0.0",
+  "remoteResource" : null
+}
