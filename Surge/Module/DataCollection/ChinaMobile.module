@@ -6,5 +6,5 @@
 10086 = type=http-request, pattern=^https?:\/\/api\.example\.com\/10086\/query, script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
-# hostname = %APPEND% api.example.com
-hostname = %APPEND% client.app.coc.10086.cn
+hostname = %APPEND% api.example.com
+# hostname = %APPEND% client.app.coc.10086.cn
