@@ -273,7 +273,7 @@ function formatFlowValue(value: number, unit: string = "MB"): { balance: string;
   }
 }
 
-// ===== 工具：百分比/时间（电信同款）=====
+// ===== 工具：百分比/时间 =====
 function clamp01(n: number): number {
   if (n < 0) return 0
   if (n > 1) return 1
@@ -291,48 +291,48 @@ function nowHHMM(): string {
   return `${hh}:${mm}`
 }
 
-// ======= 电信同款：暗色底样式 =======
+// ======= 暗色大图标/圆环卡片主题 =======
 const darkCardBg: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.28)",
-  dark: "rgba(0, 0, 0, 0.42)",
+  light: "rgba(0, 0, 0, 0.10)",
+  dark: "rgba(0, 0, 0, 0.25)",
 }
 
-const labelStyle: DynamicShapeStyle = {
-  light: "rgba(255,255,255,0.70)",
-  dark: "rgba(255,255,255,0.72)",
-}
-
-const valueStyle: DynamicShapeStyle = {
-  light: "rgba(255,255,255,0.94)",
-  dark: "rgba(255,255,255,0.96)",
-}
-
-const timeStyle: DynamicShapeStyle = {
-  light: "rgba(255,255,255,0.55)",
-  dark: "rgba(255,255,255,0.58)",
-}
-
-// ======= 电信同款主题：tint + icon =======
 const cardThemes = {
   fee: {
-    tint: { light: "#8caaee", dark: "#8caaee" } as DynamicShapeStyle,
-    icon: "creditcard.fill",
+    tint: { light: "#1a73e8", dark: "#66adff" } as DynamicShapeStyle,
+    icon: "bolt.horizontal.circle.fill",
   },
   voice: {
-    tint: { light: "#a6d189", dark: "#a6d189" } as DynamicShapeStyle,
+    tint: { light: "#34b38f", dark: "#63d8a0" } as DynamicShapeStyle,
     icon: "phone.fill",
   },
   flow: {
-    tint: { light: "#ef9f76", dark: "#ef9f76" } as DynamicShapeStyle,
+    tint: { light: "#ff8c42", dark: "#ffb07a" } as DynamicShapeStyle,
     icon: "antenna.radiowaves.left.and.right",
   },
   otherFlow: {
-    tint: { light: "#ca9ee6", dark: "#ca9ee6" } as DynamicShapeStyle,
+    tint: { light: "#8a6eff", dark: "#c59bff" } as DynamicShapeStyle,
     icon: "wifi.circle.fill",
   },
 }
 
-// ======= 电信同款 RingCard（替换原 DataCard）=======
+// 文字颜色
+const labelStyle: DynamicShapeStyle = {
+  light: "rgba(0, 0, 0, 0.72)",
+  dark: "rgba(255,255,255,0.72)",
+}
+
+const valueStyle: DynamicShapeStyle = {
+  light: "rgba(0, 0, 0, 0.92)",
+  dark: "rgba(255,255,255,0.96)",
+}
+
+const timeStyle: DynamicShapeStyle = {
+  light: "rgba(0, 0, 0, 0.40)",
+  dark: "rgba(255,255,255,0.58)",
+}
+
+// ======= 样式卡片 =======
 function RingCard({
   title,
   valueText,
