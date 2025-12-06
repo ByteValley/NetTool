@@ -19,7 +19,7 @@ const VERSION = "1.0.2"
 
 // 联通 BoxJS 订阅 & 模块地址
 const UNICOM_BOXJS_SUB_URL =
-  "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/boxjs.json"
+  "http://boxjs.com/#/sub/add/https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/DataCollection/ChinaUnicom.box.js"
 
 const UNICOM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/DataCollection/ChinaUnicom.module"
