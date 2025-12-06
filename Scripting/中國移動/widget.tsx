@@ -223,7 +223,6 @@ function parseData(
       voiceVal.remain = res.voice.val
     }
 
-    // 按照原代码返回格式
     const result = {
       ok: true,
       fee: { val: fee, unit: "元", plan: planFee },
@@ -244,88 +243,45 @@ function parseData(
   }
 }
 
-// ======= 工具函数：流量数值格式化 =======
-function formatFlowValue(
-  value: number,
-  unit: string = "MB"
-): { balance: string; unit: string } {
-  if (unit === "GB" && value < 1) {
-    return {
-      balance: (value * 1024).toFixed(2),
-      unit: "MB",
-    }
+// 根据配置页 + 缓存获取刷新间隔（分钟）
+function getRefreshInterval(): number {
+  const DEFAULT = 60
+
+  let settings: ChinaMobileSettings | null = null
+  try {
+    settings = Storage.get<ChinaMobileSettings>(SETTINGS_KEY) ?? null
+  } catch (_) {
+    // ignore
   }
-  if (unit === "MB" && value >= 1024) {
-    return {
-      balance: (value / 1024).toFixed(2),
-      unit: "GB",
-    }
-  }
-  return {
-    balance: value.toFixed(2),
-    unit,
-  }
+
+  const cache = loadFromCache() || {}
+
+  const fromSettings =
+    settings && typeof settings.refreshInterval === "number"
+      ? settings.refreshInterval
+      : undefined
+  const fromCache =
+    cache && typeof cache.refreshInterval === "number"
+      ? cache.refreshInterval
+      : undefined
+
+  let raw = fromSettings ?? fromCache ?? DEFAULT
+
+  if (!isFinite(raw)) raw = DEFAULT
+  raw = Math.round(raw)
+  if (raw < 5) raw = 5
+  if (raw > 360) raw = 360
+
+  return raw
 }
 
-/**
- * =========================
- *  旧联通风格卡片（保留，可随时切回）
- * =========================
- */
-const cardThemes = {
-  fee: {
-    background: { light: "rgba(140, 170, 238, 0.12)", dark: "rgba(140, 170, 238, 0.18)" } as DynamicShapeStyle,
-    iconColor: { light: "#8caaee", dark: "#8caaee" } as DynamicShapeStyle,
-    titleColor: { light: "#737994", dark: "#99d1db" } as DynamicShapeStyle,
-    descColor: { light: "#51576d", dark: "#c6d0f5" } as DynamicShapeStyle,
-    icon: "creditcard.fill",
-  },
-  voice: {
-    background: { light: "rgba(166, 209, 137, 0.12)", dark: "rgba(166, 209, 137, 0.18)" } as DynamicShapeStyle,
-    iconColor: { light: "#a6d189", dark: "#a6d189" } as DynamicShapeStyle,
-    titleColor: { light: "#626880", dark: "#81c8be" } as DynamicShapeStyle,
-    descColor: { light: "#51576d", dark: "#c6d0f5" } as DynamicShapeStyle,
-    icon: "phone.fill",
-  },
-  flow: {
-    background: { light: "rgba(239, 159, 118, 0.12)", dark: "rgba(239, 159, 118, 0.18)" } as DynamicShapeStyle,
-    iconColor: { light: "#ef9f76", dark: "#ef9f76" } as DynamicShapeStyle,
-    titleColor: { light: "#737994", dark: "#e5c890" } as DynamicShapeStyle,
-    descColor: { light: "#51576d", dark: "#c6d0f5" } as DynamicShapeStyle,
-    icon: "antenna.radiowaves.left.and.right",
-  },
-  flowDir: {
-    background: { light: "rgba(202, 158, 230, 0.12)", dark: "rgba(202, 158, 230, 0.18)" } as DynamicShapeStyle,
-    iconColor: { light: "#ca9ee6", dark: "#ca9ee6" } as DynamicShapeStyle,
-    titleColor: { light: "#737994", dark: "#babbf1" } as DynamicShapeStyle,
-    descColor: { light: "#51576d", dark: "#c6d0f5" } as DynamicShapeStyle,
-    icon: "wifi.circle.fill",
-  },
-}
-
-// 使用联通的默认颜色（硬编码，旧卡片用）
-const DEFAULT_TITLE_STYLE: DynamicShapeStyle = {
-  light: "#666666",
-  dark: "#CCCCCC",
-}
-const DEFAULT_DESC_STYLE: DynamicShapeStyle = {
-  light: "#000000",
-  dark: "#FFFFFF",
-}
-
-/**
- * =========================
- *  新：暗色大图标 / RingCard 圆环样式
- * =========================
- */
-
-// 卡片背景（统一）
+// ======= RingCard 暗色大图标/圆环卡片主题 =======
 const darkCardBg: DynamicShapeStyle = {
   light: "rgba(0, 0, 0, 0.10)",
   dark: "rgba(0, 0, 0, 0.25)",
 }
 
-// RingCard 主题（移动版：话费 / 语音 / 通用流量 / 定向流量）
+// 这里用移动版的 4 个主题
 const ringCardThemes = {
   fee: {
     tint: { light: "#1a73e8", dark: "#66adff" } as DynamicShapeStyle,
@@ -345,7 +301,7 @@ const ringCardThemes = {
   },
 }
 
-// 文本颜色
+// 文字颜色
 const labelStyle: DynamicShapeStyle = {
   light: "rgba(0, 0, 0, 0.72)",
   dark: "rgba(255,255,255,0.72)",
@@ -379,7 +335,7 @@ function nowHHMM(): string {
   return `${h}:${m}`
 }
 
-// ======= 新 RingCard 组件 =======
+// RingCard 组件
 function RingCard({
   title,
   valueText,
@@ -425,14 +381,15 @@ function RingCard({
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
-      {/* 顶部：首卡不画圈 -> 仅大 Logo 居中；其它卡 -> 圆环 + 上图标下百分比 */}
       {noRing ? (
+        // 首卡：只展示大 Logo，不画圆环
         <VStack alignment="center" frame={{ width: 48, height: 48 }}>
           <Spacer />
           <LogoImage size={30} />
           <Spacer />
         </VStack>
       ) : (
+        // 其它卡：圆环 + 图标 + 百分比
         <ZStack frame={{ width: 48, height: 48 }}>
           <Gauge
             value={r}
@@ -444,16 +401,10 @@ function RingCard({
             tint={theme.tint}
             scaleEffect={0.95}
           />
-
           <VStack alignment="center" frame={{ width: 48, height: 48 }}>
             <Spacer minLength={2} />
-
-            {/* 上半部分：图标 */}
             <LogoImage size={22} />
-
             <Spacer />
-
-            {/* 下半部分：百分比（这里显示“已使用占比”） */}
             {showGauge ? (
               <Text font={9} fontWeight="bold" foregroundStyle={valueStyle}>
                 {percentText(r)}
@@ -461,13 +412,12 @@ function RingCard({
             ) : (
               <Text font={1}> </Text>
             )}
-
             <Spacer minLength={2} />
           </VStack>
         </ZStack>
       )}
 
-      {/* 时间（只给左侧话费卡用） */}
+      {/* 时间（给话费卡显示） */}
       {showTime ? (
         <>
           <Spacer minLength={4} />
@@ -506,8 +456,7 @@ function RingCard({
   )
 }
 
-// ======= 主 Widget 视图：接入 RingCard 样式 =======
-
+// 主组件视图：使用 RingCard
 function WidgetView({ data }: { data: MobileData }) {
   const logoPath = "https://raw.githubusercontent.com/anker1209/icon/main/zgyd.png"
 
@@ -526,7 +475,7 @@ function WidgetView({ data }: { data: MobileData }) {
       ? data.flowDir.used / data.flowDir.total
       : undefined
 
-  // 小号组件：只展示话费大卡
+  // 小号：只展示话费大卡
   if (Widget.family === "systemSmall") {
     return (
       <RingCard
@@ -541,7 +490,7 @@ function WidgetView({ data }: { data: MobileData }) {
     )
   }
 
-  // 中/大号组件：一行四张 RingCard
+  // 中/大号：4 张 RingCard 一排
   return (
     <VStack
       alignment="center"
@@ -549,7 +498,7 @@ function WidgetView({ data }: { data: MobileData }) {
       spacing={8}
     >
       <HStack alignment="center" spacing={8}>
-        {/* 话费 - 首卡：大 Logo + 时间，无圆环 */}
+        {/* 话费卡：大 Logo + 时间 */}
         <RingCard
           title={data.fee.title}
           valueText={`${data.fee.balance}${data.fee.unit}`}
@@ -560,14 +509,6 @@ function WidgetView({ data }: { data: MobileData }) {
           noRing={true}
         />
 
-        {/* 语音 - 圆环百分比（已用/总） */}
-        <RingCard
-          title={data.voice.title}
-          valueText={`${data.voice.balance}${data.voice.unit}`}
-          theme={ringCardThemes.voice}
-          ratio={voiceRatio}
-        />
-
         {/* 通用流量 */}
         <RingCard
           title={data.flow.title}
@@ -576,7 +517,7 @@ function WidgetView({ data }: { data: MobileData }) {
           ratio={flowRatio}
         />
 
-        {/* 定向流量（如果有） */}
+        {/* 定向流量 */}
         {data.flowDir ? (
           <RingCard
             title={data.flowDir.title}
@@ -585,19 +526,26 @@ function WidgetView({ data }: { data: MobileData }) {
             ratio={flowDirRatio}
           />
         ) : null}
+
+        {/* 语音卡：已用占比 */}
+        <RingCard
+          title={data.voice.title}
+          valueText={`${data.voice.balance}${data.voice.unit}`}
+          theme={ringCardThemes.voice}
+          ratio={voiceRatio}
+        />
       </HStack>
     </VStack>
   )
 }
 
-// ======= 渲染入口（保持原逻辑） =======
-
+// 渲染入口
 async function render() {
   const oldCache = loadFromCache() || {}
-  const settings = Storage.get<ChinaMobileSettings>(SETTINGS_KEY)
-  const currentInterval = oldCache.refreshInterval || settings?.refreshInterval || 60
 
-  const nextUpdate = new Date(Date.now() + currentInterval * 60 * 1000)
+  const refreshInterval = getRefreshInterval()
+
+  const nextUpdate = new Date(Date.now() + refreshInterval * 60 * 1000)
   const reloadPolicy: WidgetReloadPolicy = {
     policy: "after",
     date: nextUpdate,
@@ -612,7 +560,7 @@ async function render() {
 
       if (pData && pData.ok) {
         pData.source = "API"
-        pData.refreshInterval = currentInterval
+        pData.refreshInterval = refreshInterval
         // 保留缓存中的样式配置
         if (oldCache.small_style) pData.small_style = oldCache.small_style
         if (oldCache.medium_style) pData.medium_style = oldCache.medium_style
@@ -654,5 +602,4 @@ async function render() {
   )
 }
 
-render()
 render()

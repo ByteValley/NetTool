@@ -12,23 +12,20 @@ import {
   Gauge,
   fetch,
 } from "scripting"
+import type { ChinaTelecomSettings } from "./telecomApi"
 import { getSettings, queryImportantData } from "./telecomApi"
 
 /* 兼容声明：避免 TS 报 “找不到 Storage / FileManager” */
 declare const Storage: any
 declare const FileManager: any
 
-// 设置结构定义
-type ChinaTelecomSettings = {
-  apiUrl: string
-  mobile: string
-  password: string
-}
-
 const SETTINGS_KEY = "chinaTelecomSettings"
 const LOGO_URL =
   "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10000.png"
 const LOGO_CACHE_KEY = "chinaTelecom_logo_path"
+
+// 设置结构定义（如果你愿意，可以只用 import 的 type，不再重复定义）
+// 这里不再重复定义 ChinaTelecomSettings，直接用 telecomApi 中的类型
 
 // 下载并缓存 Logo 图片
 async function getLogoPath(): Promise<string | null> {
@@ -67,13 +64,34 @@ async function getLogoPath(): Promise<string | null> {
 // 组件数据结构
 type TelecomData = {
   fee: { title: string; balance: string; unit: string }
-  voice: { title: string; balance: string; unit: string; used?: number; total?: number }
-  flow: { title: string; balance: string; unit: string; used?: number; total?: number }
-  otherFlow?: { title: string; balance: string; unit: string; used?: number; total?: number }
+  voice: {
+    title: string
+    balance: string
+    unit: string
+    used?: number
+    total?: number
+  }
+  flow: {
+    title: string
+    balance: string
+    unit: string
+    used?: number
+    total?: number
+  }
+  otherFlow?: {
+    title: string
+    balance: string
+    unit: string
+    used?: number
+    total?: number
+  }
 }
 
 // 格式化流量值（自动转换单位：大于1GB显示GB，不够1GB显示MB）
-function formatFlowValue(value: number, unit: string = "MB"): { balance: string; unit: string } {
+function formatFlowValue(
+  value: number,
+  unit: string = "MB",
+): { balance: string; unit: string } {
   if (value > 1024) {
     return {
       balance: (value / 1024).toFixed(2),
@@ -162,7 +180,7 @@ function RingCard({
 }: {
   title: string
   valueText: string
-  theme: typeof cardThemes.fee
+  theme: (typeof cardThemes)["fee"]
   ratio?: number
   logoPath?: string | null
   useLogo?: boolean
@@ -281,7 +299,7 @@ function RingCard({
   )
 }
 
-// 小尺寸组件：保持你原先的竖排三条信息（不动也行）
+// 小尺寸组件：保持你原先的竖排三条信息
 function SmallDataCard({
   title,
   value,
@@ -296,7 +314,7 @@ function SmallDataCard({
   title: string
   value: string
   unit: string
-  theme: typeof cardThemes.fee
+  theme: (typeof cardThemes)["fee"]
   titleStyle: DynamicShapeStyle
   descStyle: DynamicShapeStyle
   showLogo?: boolean
@@ -322,14 +340,31 @@ function SmallDataCard({
           {useLogoAsIcon && logoPath ? (
             <Image filePath={logoPath} frame={{ width: 16, height: 16 }} resizable />
           ) : (
-            <Image systemName={theme.icon} font={12} fontWeight="medium" foregroundStyle={theme.tint} />
+            <Image
+              systemName={theme.icon}
+              font={12}
+              fontWeight="medium"
+              foregroundStyle={theme.tint}
+            />
           )}
         </HStack>
         <VStack alignment="leading" spacing={2} frame={{ minWidth: 0, maxWidth: Infinity }}>
-          <Text font={9} fontWeight="medium" foregroundStyle={cardTitleStyle} lineLimit={1} minScaleFactor={0.8}>
+          <Text
+            font={9}
+            fontWeight="medium"
+            foregroundStyle={cardTitleStyle}
+            lineLimit={1}
+            minScaleFactor={0.8}
+          >
             {title}
           </Text>
-          <Text font={14} fontWeight="bold" foregroundStyle={cardDescStyle} lineLimit={1} minScaleFactor={0.7}>
+          <Text
+            font={14}
+            fontWeight="bold"
+            foregroundStyle={cardDescStyle}
+            lineLimit={1}
+            minScaleFactor={0.7}
+          >
             {`${value}${unit}`}
           </Text>
         </VStack>
@@ -355,7 +390,9 @@ function SmallWidgetView({
   logoPath?: string | null
 }) {
   const flowRemain =
-    data.flow?.total && data.flow?.used !== undefined ? Math.max(0, data.flow.total - data.flow.used) : 0
+    data.flow?.total && data.flow?.used !== undefined
+      ? Math.max(0, data.flow.total - data.flow.used)
+      : 0
   const otherFlowRemain =
     data.otherFlow?.total && data.otherFlow?.used !== undefined
       ? Math.max(0, data.otherFlow.total - data.otherFlow.used)
@@ -363,7 +400,11 @@ function SmallWidgetView({
   const totalFlowFormatted = formatFlowValue(flowRemain + otherFlowRemain, "MB")
 
   return (
-    <VStack alignment="leading" padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }} spacing={6}>
+    <VStack
+      alignment="leading"
+      padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
+      spacing={6}
+    >
       <SmallDataCard
         title={data.fee.title}
         value={data.fee.balance}
@@ -410,24 +451,42 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
   const descStyle = defaultDescStyle
 
   if (Widget.family === "systemSmall") {
-    return <SmallWidgetView data={data} titleStyle={titleStyle} descStyle={descStyle} logoPath={logoPath} />
+    return (
+      <SmallWidgetView
+        data={data}
+        titleStyle={titleStyle}
+        descStyle={descStyle}
+        logoPath={logoPath}
+      />
+    )
   }
 
   // ===== 强制四列：如果没有 otherFlow 也补一个 0 =====
-  const other = data.otherFlow ?? {
-    title: "其他流量",
-    balance: "0",
-    unit: "MB",
-    used: 0,
-    total: 0,
-  }
+  const other =
+    data.otherFlow ?? {
+      title: "其他流量",
+      balance: "0",
+      unit: "MB",
+      used: 0,
+      total: 0,
+    }
 
-  const voiceRatio = other ? clamp01((safeNum(data.voice.used) / Math.max(1, safeNum(data.voice.total))) || 0) : 0
-  const flowRatio = clamp01((safeNum(data.flow.used) / Math.max(1, safeNum(data.flow.total))) || 0)
-  const otherRatio = clamp01((safeNum(other.used) / Math.max(1, safeNum(other.total))) || 0)
+  const voiceRatio = clamp01(
+    (safeNum(data.voice.used) / Math.max(1, safeNum(data.voice.total))) || 0,
+  )
+  const flowRatio = clamp01(
+    (safeNum(data.flow.used) / Math.max(1, safeNum(data.flow.total))) || 0,
+  )
+  const otherRatio = clamp01(
+    (safeNum(other.used) / Math.max(1, safeNum(other.total))) || 0,
+  )
 
   return (
-    <VStack alignment="leading" padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }} spacing={8}>
+    <VStack
+      alignment="leading"
+      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
+      spacing={8}
+    >
       <HStack alignment="center" spacing={8}>
         <RingCard
           title={data.fee.title}
@@ -461,7 +520,7 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
   )
 }
 
-// 将 API 响应转换为 TelecomData（保持你原逻辑）
+// 将 API 响应转换为 TelecomData
 function convertToTelecomData(apiData: any): TelecomData {
   const responseData = apiData.responseData?.data
   if (!responseData) {
@@ -482,7 +541,9 @@ function convertToTelecomData(apiData: any): TelecomData {
     feeTitle = "账户余额"
     feeValue = balance - arrear
   } else if (balance === 0 && phoneBillRegion?.subTitleHh) {
-    const realTimeFee = parseFloat(phoneBillRegion.subTitleHh.replace("元", "") || "0")
+    const realTimeFee = parseFloat(
+      phoneBillRegion.subTitleHh.replace("元", "") || "0",
+    )
     if (realTimeFee > 0) {
       feeTitle = "实时费用"
       feeValue = realTimeFee
@@ -499,7 +560,8 @@ function convertToTelecomData(apiData: any): TelecomData {
   const voiceDataInfo = voiceInfo?.voiceDataInfo
   const voiceBalance = parseFloat(voiceDataInfo?.balance || "0")
   const voiceUsed = parseFloat(voiceDataInfo?.used || "0")
-  const voiceTotal = parseFloat(voiceDataInfo?.total || "0")
+  const voiceTotal =
+    parseFloat(voiceDataInfo?.total || "0") || voiceUsed + voiceBalance
   const voiceData = {
     title: "剩余语音",
     balance: voiceBalance.toFixed(0),
@@ -557,14 +619,17 @@ function convertToTelecomData(apiData: any): TelecomData {
 }
 
 async function render() {
-  const refreshInterval = 15
+  // 统一使用 telecomApi 的 getSettings
+  const settings = getSettings() as ChinaTelecomSettings | null
+
+  // 从设置里取刷新间隔（分钟），没有配置时默认 15
+  const refreshInterval = settings?.refreshInterval ?? 15
   const nextUpdate = new Date(Date.now() + refreshInterval * 60 * 1000)
   const reloadPolicy: WidgetReloadPolicy = {
     policy: "after",
     date: nextUpdate,
   }
 
-  const settings = getSettings()
   if (!settings || !settings.mobile || !settings.password) {
     Widget.present(<Text>请先在主应用中设置手机号和密码</Text>, reloadPolicy)
     return
