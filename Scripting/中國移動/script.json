@@ -1,0 +1,22 @@
+{
+  "color" : "rgba(128, 138, 148,1)",
+  "runInApp" : false,
+  "author" : null,
+  "description" : null,
+  "name" : "中國移動",
+  "version" : "1.0.0",
+  "localizedNames" : null,
+  "contributors" : [
+
+  ],
+  "localizedDescriptions" : null,
+  "icon" : "square.2.layers.3d.fill",
+  "intentInputTypes" : [
+
+  ],
+  "remoteResource" : {
+    "url" : "https:\/\/sdl.dtzsghnr.cn\/d\/中国移动.zip",
+    "hash" : "1eef96220458273251bdaa045cf7e38e",
+    "autoUpdateInterval" : 600
+  }
+}
