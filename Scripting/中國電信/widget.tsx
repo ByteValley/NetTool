@@ -522,11 +522,15 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
 
 // 将 API 响应转换为 TelecomData
 function convertToTelecomData(apiData: any): TelecomData {
+  console.log("📦 [Telecom] 原始 apiData =", JSON.stringify(apiData))
+
   const responseData = apiData.responseData?.data
   if (!responseData) {
+    console.error("❌ [Telecom] API 响应数据格式不正确，无 responseData.data")
     throw new Error("API 响应数据格式不正确")
   }
 
+  // ========== 话费 ==========
   const balanceInfo = responseData.balanceInfo
   const indexBalanceDataInfo = balanceInfo?.indexBalanceDataInfo
   const phoneBillRegion = balanceInfo?.phoneBillRegion
@@ -534,12 +538,20 @@ function convertToTelecomData(apiData: any): TelecomData {
   let balance = parseFloat(indexBalanceDataInfo?.balance || "0")
   const arrear = parseFloat(indexBalanceDataInfo?.arrear || "0")
 
+  console.log(
+    "💰 [Telecom] 话费 balanceInfo =",
+    JSON.stringify(balanceInfo),
+    "解析后 balance =", balance,
+    "arrear =", arrear,
+  )
+
   let feeTitle = "剩余话费"
   let feeValue = balance
 
   if (arrear > 0) {
     feeTitle = "账户余额"
     feeValue = balance - arrear
+    console.log("💰 [Telecom] 存在欠费，展示账户余额:", feeValue)
   } else if (balance === 0 && phoneBillRegion?.subTitleHh) {
     const realTimeFee = parseFloat(
       phoneBillRegion.subTitleHh.replace("元", "") || "0",
@@ -547,6 +559,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     if (realTimeFee > 0) {
       feeTitle = "实时费用"
       feeValue = realTimeFee
+      console.log("💰 [Telecom] 使用实时费用展示:", feeValue)
     }
   }
 
@@ -556,27 +569,111 @@ function convertToTelecomData(apiData: any): TelecomData {
     unit: "元",
   }
 
+  // ========== 语音 ==========
   const voiceInfo = responseData.voiceInfo
   const voiceDataInfo = voiceInfo?.voiceDataInfo
-  const voiceBalance = parseFloat(voiceDataInfo?.balance || "0")
-  const voiceUsed = parseFloat(voiceDataInfo?.used || "0")
+
+  console.log("📞 [Telecom] voiceInfo =", JSON.stringify(voiceInfo))
+
+  const voiceBalance = safeNum(voiceDataInfo?.balance)
+  const voiceUsed = safeNum(voiceDataInfo?.used)
+  const voiceTotalRaw = safeNum(voiceDataInfo?.total)
   const voiceTotal =
-    parseFloat(voiceDataInfo?.total || "0") || voiceUsed + voiceBalance
+    voiceTotalRaw > 0 ? voiceTotalRaw : voiceUsed + voiceBalance
+
+  console.log(
+    "📞 [Telecom] 语音解析: balance=",
+    voiceBalance,
+    "used=",
+    voiceUsed,
+    "totalRaw=",
+    voiceTotalRaw,
+    "finalTotal=",
+    voiceTotal,
+  )
+
   const voiceData = {
     title: "剩余语音",
     balance: voiceBalance.toFixed(0),
     unit: "分钟",
     used: voiceUsed,
-    total: voiceTotal > 0 ? voiceTotal : voiceUsed + voiceBalance,
+    total: voiceTotal,
   }
 
-  const flowInfo = responseData.flowInfo
-  const commonFlow = flowInfo?.commonFlow
-  const commonBalanceBytes = parseFloat(commonFlow?.balance || "0")
-  const commonUsedBytes = parseFloat(commonFlow?.used || "0")
-  const commonBalanceMB = commonBalanceBytes / 1024
-  const commonUsedMB = commonUsedBytes / 1024
+  // ========== 流量（通用 + 其他） ==========
+  const flowInfo = responseData.flowInfo || {}
+  console.log("📶 [Telecom] flowInfo =", JSON.stringify(flowInfo))
+
+  const commonFlow = flowInfo.commonFlow
+  const specialAmount = flowInfo.specialAmount
+
+  // 原始值（一般是 KB）
+  let commonBalanceKB = safeNum(commonFlow?.balance)
+  let commonUsedKB = safeNum(commonFlow?.used)
+  let specialBalanceKB = specialAmount ? safeNum(specialAmount.balance) : 0
+  let specialUsedKB = specialAmount ? safeNum(specialAmount.used) : 0
+
+  console.log(
+    "📶 [Telecom] 原始通用流量 KB: balanceKB=",
+    commonBalanceKB,
+    "usedKB=",
+    commonUsedKB,
+  )
+  console.log(
+    "🌐 [Telecom] 原始其他流量 KB: balanceKB=",
+    specialBalanceKB,
+    "usedKB=",
+    specialUsedKB,
+  )
+
+  // 统一转 MB（假设后端给的是 KB）
+  let commonBalanceMB = commonBalanceKB / 1024
+  let commonUsedMB = commonUsedKB / 1024
+  let specialBalanceMB = specialBalanceKB / 1024
+  let specialUsedMB = specialUsedKB / 1024
+
+  console.log(
+    "📶 [Telecom] 通用流量 MB: balanceMB=",
+    commonBalanceMB,
+    "usedMB=",
+    commonUsedMB,
+  )
+  console.log(
+    "🌐 [Telecom] 其他流量 MB: balanceMB=",
+    specialBalanceMB,
+    "usedMB=",
+    specialUsedMB,
+  )
+
+  // ⚠️ 兜底逻辑：
+  // 如果「通用=0 且 其他>0」，认为套餐没有区分通用/定向，把 other 挪到通用展示
+  if (
+    commonBalanceMB === 0 &&
+    commonUsedMB === 0 &&
+    (specialBalanceMB > 0 || specialUsedMB > 0)
+  ) {
+    console.log(
+      "🔁 [Telecom] 触发兜底逻辑：通用为 0，其他 > 0，将 specialAmount 视作通用流量展示",
+    )
+
+    commonBalanceMB = specialBalanceMB
+    commonUsedMB = specialUsedMB
+
+    // 挪过去后，其他流量清空，不再单独展示
+    specialBalanceMB = 0
+    specialUsedMB = 0
+  }
+
   const commonTotalMB = commonBalanceMB + commonUsedMB
+
+  console.log(
+    "📶 [Telecom] 最终通用流量 MB: balanceMB=",
+    commonBalanceMB,
+    "usedMB=",
+    commonUsedMB,
+    "totalMB=",
+    commonTotalMB,
+  )
 
   const flowFormatted = formatFlowValue(commonBalanceMB, "MB")
   const flowData_converted = {
@@ -587,35 +684,44 @@ function convertToTelecomData(apiData: any): TelecomData {
     total: commonTotalMB,
   }
 
-  const specialAmount = flowInfo?.specialAmount
+  // 其他流量（仅当兜底没把它挪走时才展示）
   let otherFlowData:
     | { title: string; balance: string; unit: string; used?: number; total?: number }
     | undefined
-  if (specialAmount) {
-    const specialBalanceBytes = parseFloat(specialAmount.balance || "0")
-    const specialUsedBytes = parseFloat(specialAmount.used || "0")
-    const specialBalanceMB = specialBalanceBytes / 1024
-    const specialUsedMB = specialUsedBytes / 1024
-    const specialTotalMB = specialBalanceMB + specialUsedMB
 
-    if (specialBalanceMB > 0 || specialUsedMB > 0) {
-      const otherFlowFormatted = formatFlowValue(specialBalanceMB, "MB")
-      otherFlowData = {
-        title: "其他流量",
-        balance: otherFlowFormatted.balance,
-        unit: otherFlowFormatted.unit,
-        used: specialUsedMB,
-        total: specialTotalMB,
-      }
+  if (specialBalanceMB > 0 || specialUsedMB > 0) {
+    const specialTotalMB = specialBalanceMB + specialUsedMB
+    const otherFlowFormatted = formatFlowValue(specialBalanceMB, "MB")
+
+    console.log(
+      "🌐 [Telecom] 最终其他流量 MB: balanceMB=",
+      specialBalanceMB,
+      "usedMB=",
+      specialUsedMB,
+      "totalMB=",
+      specialTotalMB,
+    )
+
+    otherFlowData = {
+      title: "其他流量",
+      balance: otherFlowFormatted.balance,
+      unit: otherFlowFormatted.unit,
+      used: specialUsedMB,
+      total: specialTotalMB,
     }
+  } else {
+    console.log("🌐 [Telecom] 最终其他流量为空，不单独展示")
   }
 
-  return {
+  const result: TelecomData = {
     fee: feeData,
     voice: voiceData,
     flow: flowData_converted,
     otherFlow: otherFlowData,
   }
+
+  console.log("✅ [Telecom] 最终 TelecomData =", JSON.stringify(result))
+  return result
 }
 
 async function render() {
