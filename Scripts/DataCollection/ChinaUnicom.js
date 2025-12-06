@@ -11,17 +11,17 @@ hostname = m.client.10010.com
 ===================
 【Surge 脚本配置】
 [Script]
-联通组件 = type=http-request,pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon,requires-body=1,max-size=0,script-path=https://你的域名/ChinaUnicom.cookie.js,script-update-interval=0
+联通组件 = type=http-request,pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/DataCollection/ChinaUnicom.js,script-update-interval=0
 
 ===================
 【Loon 脚本配置】
 [Script]
-http-request https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon tag=联通组件, script-path=https://你的域名/ChinaUnicom.cookie.js, timeout=60
+http-request https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon tag=联通组件, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/DataCollection/ChinaUnicom.js, timeout=60
 
 ===================
 【Quantumult X 脚本配置】
 [rewrite_local]
-https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon url script-request-header https://你的域名/ChinaUnicom.cookie.js
+https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/DataCollection/ChinaUnicom.js
 
 [mitm]
 hostname = m.client.10010.com
