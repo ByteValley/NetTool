@@ -24,7 +24,7 @@
       ],
       "settings": [
         {
-          "id": "@DataCollection.ChinaUnicom.Settings.Cookie",  // 🔴 路径：根 key + 对象路径
+          "id": "@DataCollection.ChinaUnicom.Settings.Cookie",
           "name": "联通 Cookie（ChinaUnicom_cookie）",
           "type": "text",
           "val": "",
