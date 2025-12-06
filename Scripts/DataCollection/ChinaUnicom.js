@@ -27,8 +27,9 @@ https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon url script-request-head
 hostname = m.client.10010.com
 */
 
-const APIKey = 'DataCollection.ChinaUnicom'; // 只是脚本自己的命名空间，随便但建议统一
-const BOX_SETTINGS_KEY = '#@DataCollection.ChinaUnicome.Settings'; // ⚠️ 和 BoxJS 里的 key 完全一致（含 e）
+
+const APIKey = 'DataCollection.ChinaUnicom'; // 只是脚本名字，便于日志识别
+const ROOT_KEY = '#DataCollection';         // ✅ 持久化根 key：DataCollection
 
 $ = new API(APIKey, true);
 
@@ -43,27 +44,30 @@ function GetCookie() {
   $.log(headers);
 
   if (cookie && cookie.indexOf('JSESSIONID') > -1) {
-    // 读取现有的 Settings JSON
-    let settings = {};
+    let root = {};
     try {
-      const raw = $.read(BOX_SETTINGS_KEY);
+      const raw = $.read(ROOT_KEY); // 读已有 DataCollection
       if (raw) {
-        settings = JSON.parse(raw);
+        root = JSON.parse(raw);
       }
     } catch (e) {
-      settings = {};
+      root = {};
     }
 
-    // 写入 / 覆盖 Cookie 字段
-    settings.Cookie = cookie;
+    // 确保层级存在
+    if (!root.ChinaUnicom) root.ChinaUnicom = {};
+    if (!root.ChinaUnicom.Settings) root.ChinaUnicom.Settings = {};
 
-    // 持久化回 @DataCollection.ChinaUnicome.Settings
-    $.write(JSON.stringify(settings), BOX_SETTINGS_KEY);
+    // 写入 Cookie
+    root.ChinaUnicom.Settings.Cookie = cookie;
+
+    // 持久化回 DataCollection
+    $.write(JSON.stringify(root), ROOT_KEY);
 
     $.notify(
       '中国联通',
       'Cookie 写入成功',
-      '@DataCollection.ChinaUnicome.Settings.Cookie'
+      'DataCollection.ChinaUnicom.Settings.Cookie'
     );
   } else {
     $.notify(
@@ -74,6 +78,7 @@ function GetCookie() {
   }
 
   $.done();
+
 }
 
 /* prettier-ignore */
