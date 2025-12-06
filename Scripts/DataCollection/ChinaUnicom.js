@@ -27,8 +27,8 @@ https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon url script-request-head
 hostname = m.client.10010.com
 */
 
-const APIKey = 'ChinaUnicom';           // 只是当前脚本的命名空间
-const COOKIE_KEY = '#ChinaUnicom_cookie'; // 带 # => 直接写入全局持久化键 ChinaUnicom_cookie
+const APIKey = 'DataCollection.ChinaUnicom'; // 只是脚本自己的命名空间，随便但建议统一
+const BOX_SETTINGS_KEY = '#@DataCollection.ChinaUnicome.Settings'; // ⚠️ 和 BoxJS 里的 key 完全一致（含 e）
 
 $ = new API(APIKey, true);
 
@@ -39,14 +39,38 @@ if (typeof $request !== 'undefined') {
 function GetCookie() {
   const headers = $request.headers || {};
   const cookie = headers.Cookie || headers.cookie || '';
+
   $.log(headers);
 
   if (cookie && cookie.indexOf('JSESSIONID') > -1) {
-    // 写入全局 BoxJS 变量：ChinaUnicom_cookie
-    $.write(cookie, COOKIE_KEY);
-    $.notify('中国联通', 'Cookie 写入成功', '变量：ChinaUnicom_cookie');
+    // 读取现有的 Settings JSON
+    let settings = {};
+    try {
+      const raw = $.read(BOX_SETTINGS_KEY);
+      if (raw) {
+        settings = JSON.parse(raw);
+      }
+    } catch (e) {
+      settings = {};
+    }
+
+    // 写入 / 覆盖 Cookie 字段
+    settings.Cookie = cookie;
+
+    // 持久化回 @DataCollection.ChinaUnicome.Settings
+    $.write(JSON.stringify(settings), BOX_SETTINGS_KEY);
+
+    $.notify(
+      '中国联通',
+      'Cookie 写入成功',
+      '@DataCollection.ChinaUnicome.Settings.Cookie'
+    );
   } else {
-    $.notify('中国联通', '未检测到 JSESSIONID', '请在【首页-流量查询】界面重新触发一次');
+    $.notify(
+      '中国联通',
+      '未检测到 JSESSIONID',
+      '请在【首页-流量查询】界面重新触发一次'
+    );
   }
 
   $.done();
