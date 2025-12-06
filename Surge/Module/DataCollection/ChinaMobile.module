@@ -12,7 +12,7 @@
 
 {{{禁用PANEL}}}移动余量查询·面板 = type = generic, timeout=60, script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js,argument=icon=arrow.up.arrow.down.circle&icon-color=#5d84f8&phonenumber={{{手机号码}}}&bark_key={{{BarkKey}}}&debug={{{调试模式}}}&silent={{{静默模式}}}&service={{{Scriptable服务模式}}}
 
-移动余量查询·组件 = type = http-request, pattern=^https?:\/\/api\.example\.com\/10086\/query, script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, argument=silent={{{静默模式}}}, requires-body=true, max-size=-1, timeout=60
+移动余量查询·组件 = type = http-request, pattern=^https?:\/\/api\.example\.com\/10086\/query, script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, requires-body=true, max-size=-1, timeout=60
 
 [Panel]
 {{{禁用PANEL}}}移动余量查询 = script-name=移动余量查询·面板, update-interval=21600
