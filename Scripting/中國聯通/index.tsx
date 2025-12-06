@@ -12,8 +12,17 @@ import {
   Spacer,
   HStack,
   Link,
-  Toggle
+  Toggle,
 } from "scripting"
+
+const VERSION = "1.0.2"
+
+// 联通 BoxJS 订阅 & 模块地址
+const UNICOM_BOXJS_SUB_URL =
+  "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/boxjs.json"
+
+const UNICOM_MODULE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/DataCollection/ChinaUnicom.module"
 
 // Define the settings structure
 type ChinaUnicomSettings = {
@@ -34,7 +43,6 @@ type ChinaUnicomSettings = {
 }
 
 const SETTINGS_KEY = "chinaUnicomSettings"
-const VERSION = "1.0.0"
 
 // Default settings - 适配暗色模式的简洁配色
 const defaultSettings: ChinaUnicomSettings = {
@@ -62,7 +70,8 @@ const defaultSettings: ChinaUnicomSettings = {
 
 function SettingsPage() {
   const dismiss = Navigation.useDismiss()
-  const initialSettings = Storage.get<ChinaUnicomSettings>(SETTINGS_KEY) ?? defaultSettings
+  const initialSettings =
+    Storage.get<ChinaUnicomSettings>(SETTINGS_KEY) ?? defaultSettings
 
   // State for the form fields
   const [cookie, setCookie] = useState(initialSettings.cookie)
@@ -70,15 +79,45 @@ function SettingsPage() {
   const [titleNightColor, setTitleNightColor] = useState(initialSettings.titleNightColor)
   const [descDayColor, setDescDayColor] = useState(initialSettings.descDayColor)
   const [descNightColor, setDescNightColor] = useState(initialSettings.descNightColor)
-  const [refreshTimeDayColor, setRefreshTimeDayColor] = useState(initialSettings.refreshTimeDayColor)
-  const [refreshTimeNightColor, setRefreshTimeNightColor] = useState(initialSettings.refreshTimeNightColor)
+  const [refreshTimeDayColor, setRefreshTimeDayColor] = useState(
+    initialSettings.refreshTimeDayColor,
+  )
+  const [refreshTimeNightColor, setRefreshTimeNightColor] = useState(
+    initialSettings.refreshTimeNightColor,
+  )
   const [refreshInterval, setRefreshInterval] = useState(initialSettings.refreshInterval)
   const [showFlow, setShowFlow] = useState(initialSettings.showFlow ?? true)
-  const [showOtherFlow, setShowOtherFlow] = useState(initialSettings.showOtherFlow ?? true)
-  const [otherFlowMatchType, setOtherFlowMatchType] = useState<"flowType" | "addupItemCode">(initialSettings.otherFlowMatchType ?? "flowType")
-  const [otherFlowMatchValue, setOtherFlowMatchValue] = useState(initialSettings.otherFlowMatchValue ?? "3")
+  const [showOtherFlow, setShowOtherFlow] = useState(
+    initialSettings.showOtherFlow ?? true,
+  )
+  const [otherFlowMatchType, setOtherFlowMatchType] = useState<
+    "flowType" | "addupItemCode"
+  >(initialSettings.otherFlowMatchType ?? "flowType")
+  const [otherFlowMatchValue, setOtherFlowMatchValue] = useState(
+    initialSettings.otherFlowMatchValue ?? "3",
+  )
   const [enableBoxJs, setEnableBoxJs] = useState(initialSettings.enableBoxJs ?? false)
   const [boxJsUrl, setBoxJsUrl] = useState(initialSettings.boxJsUrl ?? "")
+
+  // 打开联通 BoxJS 订阅
+  const handleOpenUnicomBoxJsSub = async () => {
+    await Safari.openURL(UNICOM_BOXJS_SUB_URL)
+  }
+
+  // 一键安装到 Surge
+  const handleInstallToSurge = async () => {
+    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
+    const surgeUrl = `surge:///install-module?url=${encodedUrl}`
+    await Safari.openURL(surgeUrl)
+  }
+
+  // 一键安装到 Egern
+  const handleInstallToEgern = async () => {
+    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
+    const name = encodeURIComponent("中国联通余量查询")
+    const egernUrl = `egern:/modules/new?name=${name}&url=${encodedUrl}`
+    await Safari.openURL(egernUrl)
+  }
 
   const handleSave = () => {
     const newSettings: ChinaUnicomSettings = {
@@ -104,10 +143,37 @@ function SettingsPage() {
   return (
     <VStack>
       <Form>
-        <Section
-          title="登录凭证"
-          footer={<Text>请在此处粘贴您获取的联通营业厅 App 的 Cookie。</Text>}
-        >
+        {/* 新增：BoxJS 订阅 + 模块一键安装 */}
+        <Section title="组件模块一键安装">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 6 }}
+          >
+            使用前建议按顺序完成以下步骤：
+            {"\n"}1）在 BoxJS 中订阅配置（可同步 Cookie 等信息）
+            {"\n"}2）安装中国联通余量查询模块到支持的客户端
+          </Text>
+
+          <Button title="📦 打开 BoxJS 订阅" action={handleOpenUnicomBoxJsSub} />
+          <Button title="⚡ 安装到 Surge" action={handleInstallToSurge} />
+          <Button title="🌀 安装到 Egern" action={handleInstallToEgern} />
+
+          <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ top: 8 }}>
+            • BoxJS：在浏览器中打开 BoxJS 后，订阅联通配置
+            {"\n"}• Surge：跳转到模块安装页，确认后即可添加
+            {"\n"}• Egern：打开“添加模块”页面并自动填入模块地址
+          </Text>
+        </Section>
+
+        <Section title="登录凭证">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 4 }}
+          >
+            请在此处粘贴您获取的联通营业厅 App 的 Cookie。
+          </Text>
           <TextField
             title="Cookie"
             value={cookie}
@@ -116,10 +182,14 @@ function SettingsPage() {
           />
         </Section>
 
-        <Section
-          title="刷新设置"
-          footer={<Text>设置小组件自动刷新的频率（分钟）。</Text>}
-        >
+        <Section title="刷新设置">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 4 }}
+          >
+            设置小组件自动刷新的频率（分钟）。
+          </Text>
           <TextField
             title="刷新间隔 (分钟)"
             value={String(refreshInterval)}
@@ -130,10 +200,14 @@ function SettingsPage() {
           />
         </Section>
 
-        <Section
-          title="流量显示设置"
-          footer={<Text>配置是否显示通用流量和其他流量。</Text>}
-        >
+        <Section title="流量显示设置">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 4 }}
+          >
+            配置是否显示通用流量和其他流量。
+          </Text>
           <Toggle
             title="显示剩余通用流量"
             value={showFlow}
@@ -141,16 +215,22 @@ function SettingsPage() {
           />
         </Section>
 
-        <Section
-          title="其他流量设置"
-          footer={<Text>配置是否显示其他流量（如省内流量、闲时流量等）。可通过 flowType 或 addupItemCode 来匹配。</Text>}
-        >
+        <Section title="其他流量设置">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 4 }}
+          >
+            配置是否显示其他流量（如省内流量、闲时流量等）。可通过 flowType 或
+            addupItemCode 来匹配。
+          </Text>
+
           <Toggle
             title="显示其他流量"
             value={showOtherFlow}
             onChanged={setShowOtherFlow}
           />
-          
+
           {showOtherFlow ? (
             <>
               <TextField
@@ -169,19 +249,28 @@ function SettingsPage() {
                 prompt="flowType: 3 或 addupItemCode: 40026"
                 onChanged={setOtherFlowMatchValue}
               />
-              <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ top: 4 }}>
-                • flowType="3": 匹配所有其他类型流量（省内、闲时等）{'\n'}
-                • addupItemCode="40026": 匹配特定类型的套餐内流量{'\n'}
-                • 建议使用 flowType="3" 以适配不同套餐
+              <Text
+                font="caption2"
+                foregroundStyle="secondaryLabel"
+                padding={{ top: 4 }}
+              >
+                • flowType="3": 匹配所有其他类型流量（省内、闲时等）
+                {"\n"}• addupItemCode="40026": 匹配特定类型的套餐内流量
+                {"\n"}• 建议使用 flowType="3" 以适配不同套餐
               </Text>
             </>
           ) : null}
         </Section>
 
-        <Section
-          title="BoxJs 配置"
-          footer={<Text>开启后将从 BoxJs 读取 10010.cookie 作为 Cookie。如果开启，将优先使用 BoxJs 中的 Cookie。</Text>}
-        >
+        <Section title="BoxJs 配置">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 4 }}
+          >
+            开启后将从 BoxJs 读取 10010.cookie 作为 Cookie。开启时将优先使用
+            BoxJs 中的 Cookie。
+          </Text>
           <Toggle
             title="启用 BoxJs"
             value={enableBoxJs}
