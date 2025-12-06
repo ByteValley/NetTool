@@ -24,9 +24,6 @@ const LOGO_URL =
   "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10000.png"
 const LOGO_CACHE_KEY = "chinaTelecom_logo_path"
 
-// 设置结构定义（如果你愿意，可以只用 import 的 type，不再重复定义）
-// 这里不再重复定义 ChinaTelecomSettings，直接用 telecomApi 中的类型
-
 // 下载并缓存 Logo 图片
 async function getLogoPath(): Promise<string | null> {
   try {
@@ -107,6 +104,19 @@ function formatFlowValue(
 function safeNum(v: unknown, fallback = 0): number {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? ""))
   return Number.isFinite(n) ? n : fallback
+}
+
+// 把 "0KB" / "512MB" / "119.85GB" 统一转成 MB
+function parseFlowStrToMB(str: string | undefined | null): number {
+  if (!str) return 0
+  const match = String(str).trim().match(/([\d.]+)\s*(KB|MB|GB)/i)
+  if (!match) return 0
+  const val = parseFloat(match[1])
+  const unit = match[2].toUpperCase()
+  if (!Number.isFinite(val)) return 0
+  if (unit === "KB") return val / 1024
+  if (unit === "GB") return val * 1024
+  return val // MB
 }
 
 function clamp01(n: number): number {
@@ -541,8 +551,10 @@ function convertToTelecomData(apiData: any): TelecomData {
   console.log(
     "💰 [Telecom] 话费 balanceInfo =",
     JSON.stringify(balanceInfo),
-    "解析后 balance =", balance,
-    "arrear =", arrear,
+    "解析后 balance =",
+    balance,
+    "arrear =",
+    arrear,
   )
 
   let feeTitle = "剩余话费"
@@ -606,76 +618,184 @@ function convertToTelecomData(apiData: any): TelecomData {
 
   const commonFlow = flowInfo.commonFlow
   const specialAmount = flowInfo.specialAmount
+  const flowList: any[] = flowInfo.flowList || []
 
-  // 原始值（一般是 KB）
-  let commonBalanceKB = safeNum(commonFlow?.balance)
+  // ---- 1. 先用 commonFlow / specialAmount 的「字节值」初始化 ----
+  let commonRemainKB = safeNum(commonFlow?.balance)
   let commonUsedKB = safeNum(commonFlow?.used)
-  let specialBalanceKB = specialAmount ? safeNum(specialAmount.balance) : 0
-  let specialUsedKB = specialAmount ? safeNum(specialAmount.used) : 0
+  let specialRemainKB = safeNum(specialAmount?.balance)
+  let specialUsedKB = safeNum(specialAmount?.used)
+
+  const hasCommonFromBytes = commonRemainKB > 0 || commonUsedKB > 0
+  const hasSpecialFromBytes = specialRemainKB > 0 || specialUsedKB > 0
 
   console.log(
-    "📶 [Telecom] 原始通用流量 KB: balanceKB=",
-    commonBalanceKB,
-    "usedKB=",
+    "📶 [Telecom] 使用 commonFlow（KB） => remainKB =",
+    commonRemainKB,
+    "usedKB =",
     commonUsedKB,
   )
   console.log(
-    "🌐 [Telecom] 原始其他流量 KB: balanceKB=",
-    specialBalanceKB,
-    "usedKB=",
+    "🌐 [Telecom] 使用 specialAmount（KB） => remainKB =",
+    specialRemainKB,
+    "usedKB =",
     specialUsedKB,
   )
 
-  // 统一转 MB（假设后端给的是 KB）
-  let commonBalanceMB = commonBalanceKB / 1024
+  // 转成 MB
+  let commonRemainMB = commonRemainKB / 1024
   let commonUsedMB = commonUsedKB / 1024
-  let specialBalanceMB = specialBalanceKB / 1024
+  let specialRemainMB = specialRemainKB / 1024
   let specialUsedMB = specialUsedKB / 1024
 
   console.log(
-    "📶 [Telecom] 通用流量 MB: balanceMB=",
-    commonBalanceMB,
+    "📶 [Telecom] 初始通用流量 MB: remainMB=",
+    commonRemainMB,
     "usedMB=",
     commonUsedMB,
   )
   console.log(
-    "🌐 [Telecom] 其他流量 MB: balanceMB=",
-    specialBalanceMB,
+    "🌐 [Telecom] 初始其他流量 MB: remainMB=",
+    specialRemainMB,
     "usedMB=",
     specialUsedMB,
   )
 
-  // ⚠️ 兜底逻辑：
-  // 如果「通用=0 且 其他>0」，认为套餐没有区分通用/定向，把 other 挪到通用展示
-  if (
-    commonBalanceMB === 0 &&
-    commonUsedMB === 0 &&
-    (specialBalanceMB > 0 || specialUsedMB > 0)
-  ) {
+  // ---- 2. flowList 兜底：只有当对应类别【没有字节数据】时才介入 ----
+
+  // 简单解析 "4.29GB" / "774.67MB" / "123KB" 为 MB
+  function parseFlowStrToMB(str?: string | null): number {
+    if (!str) return 0
+    const s = String(str).trim()
+    if (!s) return 0
+
+    const num = parseFloat(s)
+    if (!Number.isFinite(num)) return 0
+
+    if (/gb/i.test(s)) return num * 1024
+    if (/mb/i.test(s)) return num
+    if (/kb/i.test(s)) return num / 1024
+
+    // 没写单位时，默认按 MB 处理
+    return num
+  }
+
+  const COMMON_KEYWORDS = ["通用", "全国", "国内"]
+  const SPECIAL_KEYWORDS = ["专用", "定向", "专属"]
+
+  if (Array.isArray(flowList) && flowList.length > 0) {
     console.log(
-      "🔁 [Telecom] 触发兜底逻辑：通用为 0，其他 > 0，将 specialAmount 视作通用流量展示",
+      "📶 [Telecom] 尝试从 flowList 兜底修正通用/其他流量，共",
+      flowList.length,
+      "条",
     )
 
-    commonBalanceMB = specialBalanceMB
+    for (const item of flowList) {
+      const title: string = String(item.title || "")
+      const usedStr: string = String(item.leftTitleHh || "")
+      const remainStr: string = String(item.rightTitleHh || "")
+
+      let usedMB = parseFlowStrToMB(usedStr)
+      let remainMB = parseFlowStrToMB(remainStr)
+
+      // 没解析出东西就跳过
+      if (usedMB <= 0 && remainMB <= 0) continue
+
+      const isCommonTitle = COMMON_KEYWORDS.some((k) => title.includes(k))
+      const isSpecialTitle = SPECIAL_KEYWORDS.some((k) => title.includes(k))
+
+      console.log(
+        "📶 [Telecom] flowList item:",
+        title,
+        "used=",
+        usedStr,
+        "->",
+        usedMB,
+        "MB; remain=",
+        remainStr,
+        "->",
+        remainMB,
+        "MB",
+      )
+
+      if (isCommonTitle && hasCommonFromBytes) {
+        console.log(
+          "📶 [Telecom] 通用流量已有 commonFlow 字节值，flowList 仅作为展示，不再叠加。",
+        )
+        continue
+      }
+
+      if (isSpecialTitle && hasSpecialFromBytes) {
+        console.log(
+          "🌐 [Telecom] 其他流量已有 specialAmount 字节值，flowList 仅作为展示，不再叠加。",
+        )
+        continue
+      }
+
+      if (isCommonTitle && !hasCommonFromBytes) {
+        // ✅ 通用流量缺失字节数据，用 flowList 兜底
+        commonUsedMB += usedMB
+        commonRemainMB += remainMB
+        console.log(
+          "📶 [Telecom] 通过 flowList 兜底【通用流量】 => remainMB=",
+          commonRemainMB,
+          "usedMB=",
+          commonUsedMB,
+        )
+      } else {
+        // ✅ 其余一律视作「其他流量」兜底（专用/定向等）
+        specialUsedMB += usedMB
+        specialRemainMB += remainMB
+        console.log(
+          "🌐 [Telecom] 通过 flowList 兜底【其他流量】 => remainMB=",
+          specialRemainMB,
+          "usedMB=",
+          specialUsedMB,
+        )
+      }
+    }
+  }
+
+  // ---- 3. 再做一次兜底规则：通用=0 且 其他>0 时，挪过去展示 ----
+  if (
+    commonRemainMB === 0 &&
+    commonUsedMB === 0 &&
+    (specialRemainMB > 0 || specialUsedMB > 0)
+  ) {
+    console.log(
+      "🔁 [Telecom] 触发兜底逻辑：通用为 0，其他 > 0，将其他流量整体视作通用展示",
+    )
+
+    commonRemainMB = specialRemainMB
     commonUsedMB = specialUsedMB
 
-    // 挪过去后，其他流量清空，不再单独展示
-    specialBalanceMB = 0
+    // 其他清空，不再单独展示
+    specialRemainMB = 0
     specialUsedMB = 0
   }
 
-  const commonTotalMB = commonBalanceMB + commonUsedMB
+  const commonTotalMB = commonRemainMB + commonUsedMB
+  const specialTotalMB = specialRemainMB + specialUsedMB
 
   console.log(
-    "📶 [Telecom] 最终通用流量 MB: balanceMB=",
-    commonBalanceMB,
+    "📶 [Telecom] 最终通用流量 MB: remainMB=",
+    commonRemainMB,
     "usedMB=",
     commonUsedMB,
     "totalMB=",
     commonTotalMB,
   )
+  console.log(
+    "🌐 [Telecom] 最终其他流量 MB: remainMB=",
+    specialRemainMB,
+    "usedMB=",
+    specialUsedMB,
+    "totalMB=",
+    specialTotalMB,
+  )
 
-  const flowFormatted = formatFlowValue(commonBalanceMB, "MB")
+  // 通用流量：用剩余值格式化展示
+  const flowFormatted = formatFlowValue(commonRemainMB, "MB")
   const flowData_converted = {
     title: "通用流量",
     balance: flowFormatted.balance,
@@ -684,24 +804,13 @@ function convertToTelecomData(apiData: any): TelecomData {
     total: commonTotalMB,
   }
 
-  // 其他流量（仅当兜底没把它挪走时才展示）
+  // 其他流量：仅当还有值时才展示
   let otherFlowData:
     | { title: string; balance: string; unit: string; used?: number; total?: number }
     | undefined
 
-  if (specialBalanceMB > 0 || specialUsedMB > 0) {
-    const specialTotalMB = specialBalanceMB + specialUsedMB
-    const otherFlowFormatted = formatFlowValue(specialBalanceMB, "MB")
-
-    console.log(
-      "🌐 [Telecom] 最终其他流量 MB: balanceMB=",
-      specialBalanceMB,
-      "usedMB=",
-      specialUsedMB,
-      "totalMB=",
-      specialTotalMB,
-    )
-
+  if (specialRemainMB > 0 || specialUsedMB > 0) {
+    const otherFlowFormatted = formatFlowValue(specialRemainMB, "MB")
     otherFlowData = {
       title: "其他流量",
       balance: otherFlowFormatted.balance,
