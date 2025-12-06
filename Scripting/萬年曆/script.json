@@ -1,0 +1,26 @@
+{
+  "icon" : "calendar",
+  "localizedNames" : null,
+  "remoteResource" : {
+    "hash" : "5ed9aec6652c2b6d5bd7da575e62fbd0",
+    "autoUpdateInterval" : 600,
+    "url" : "https:\/\/github.com\/ScriptingApp\/Community-Scripts\/raw\/refs\/heads\/main\/万年历.scripting"
+  },
+  "description" : null,
+  "name" : "萬年曆",
+  "runInApp" : false,
+  "author" : {
+    "homepage" : "https:\/\/x.com\/thomfang",
+    "email" : "tilfon@live.com",
+    "name" : "thomfang"
+  },
+  "version" : "1.0.0",
+  "localizedDescriptions" : null,
+  "contributors" : [
+
+  ],
+  "intentInputTypes" : [
+
+  ],
+  "color" : "rgba(71, 102, 194,1)"
+}
