@@ -96,11 +96,15 @@ type DetailApiResponse = {
   }>
 }
 
-// 从 BoxJs 读取 Cookie
+// 从 BoxJs 读取 Cookie（@DataCollection.ChinaUnicome.Settings.Cookie）
+// 从 BoxJs 读取 Cookie（DataCollection -> ChinaUnicome.Settings.Cookie）
 async function fetchCookieFromBoxJs(boxJsUrl: string): Promise<string | null> {
+  const boxKey = "DataCollection" // ⚠️ 和你现在通过的 key 一致
+
   try {
-    const url = `${boxJsUrl.replace(/\/$/, "")}/query/data/10010.cookie`
-    console.log("📡 从 BoxJs 读取 Cookie:", url)
+    const base = boxJsUrl.replace(/\/$/, "")
+    const url = `${base}/query/data/${boxKey}`
+    console.log("📡 从 BoxJs 读取联通 Cookie:", url)
 
     const response = await fetch(url, {
       headers: {
@@ -108,23 +112,45 @@ async function fetchCookieFromBoxJs(boxJsUrl: string): Promise<string | null> {
       },
     })
 
-    if (response.ok) {
-      const data = await response.json()
-      // BoxJs 返回格式: { "key": "10010.cookie", "val": "cookie值" }
-      const cookie = data?.val
-      if (cookie && typeof cookie === "string" && cookie.trim()) {
-        console.log("✅ 从 BoxJs 成功读取 Cookie")
-        return cookie.trim()
-      } else {
-        console.warn("⚠️ BoxJs 返回的数据格式不正确:", data)
-      }
-    } else {
+    if (!response.ok) {
       console.error("❌ 从 BoxJs 读取 Cookie 失败，状态码:", response.status)
+      return null
+    }
+
+    const data = await response.json()
+    // BoxJs 返回格式大致为:
+    // { "key": "DataCollection", "val": "{ \"ChinaUnicom\": { \"Settings\": { \"Cookie\": \"...\" } } }" }
+    const rawVal = data?.val
+
+    if (!rawVal) {
+      console.warn("⚠️ BoxJs 返回的 val 为空:", data)
+      return null
+    }
+
+    let root: any
+    try {
+      // 有些环境 val 已经是对象，有些是字符串，这里兼容一下
+      root = typeof rawVal === "string" ? JSON.parse(rawVal) : rawVal
+    } catch (e) {
+      console.error("❌ 解析 BoxJs DataCollection JSON 失败:", e, "原始 val:", rawVal)
+      return null
+    }
+
+    const cookie = root?.ChinaUnicom?.Settings?.Cookie
+    if (cookie && typeof cookie === "string" && cookie.trim()) {
+      console.log("✅ 从 BoxJs 成功读取联通 Cookie")
+      return cookie.trim()
+    } else {
+      console.warn(
+        "⚠️ DataCollection.ChinaUnicom.Settings.Cookie 不存在或格式不正确:",
+        root
+      )
+      return null
     }
   } catch (error) {
     console.error("🚨 从 BoxJs 读取 Cookie 异常:", error)
+    return null
   }
-  return null
 }
 
 // 获取话费数据（仅从第一个 API）
