@@ -11,7 +11,7 @@ import {
   useState,
 } from "scripting"
 
-const VERSION = "1.0.1"
+const VERSION = "1.0.2"
 
 // 和 widget.tsx 对应的设置结构
 type ChinaMobileSettings = {
@@ -23,6 +23,10 @@ const SETTINGS_KEY = "chinaMobileSettings"
 // 中国移动模块地址（Surge / Egern 共用）
 const CM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/DataCollection/ChinaMobile.module"
+
+// BoxJS 订阅地址（用于填写手机号等参数）
+const BOXJS_SUB_URL =
+  "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/boxjs.json"
 
 // 默认配置
 const defaultSettings: ChinaMobileSettings = {
@@ -37,8 +41,13 @@ function SettingsPage() {
     defaultSettings
 
   const [refreshInterval, setRefreshInterval] = useState<number>(
-    initialSettings.refreshInterval ?? 60
+    initialSettings.refreshInterval ?? 60,
   )
+
+  // 打开 BoxJS 订阅页面
+  const handleOpenBoxJsSub = async () => {
+    await Safari.openURL(BOXJS_SUB_URL)
+  }
 
   // 一键安装到 Surge
   const handleInstallToSurge = async () => {
@@ -106,19 +115,25 @@ function SettingsPage() {
   return (
     <VStack>
       <Form>
-        {/* 模块一键安装 */}
+        {/* 模块一键安装 + BoxJS */}
         <Section title="组件模块一键安装">
           <Text font="body" padding={{ bottom: 8 }}>
-            直接将中国移动余量查询模块安装到支持的客户端：
+            使用前请按顺序完成以下步骤：
+            {"\n"}1）在 BoxJS 中订阅配置并填写手机号
+            {"\n"}2）安装中国移动余量查询模块到支持的客户端
           </Text>
+
+          {/* BoxJS 订阅按钮（放在 Surge 上方） */}
+          <Button title="📦 打开 BoxJS 订阅" action={handleOpenBoxJsSub} />
+
+          {/* Surge / Egern 一键安装 */}
           <Button title="⚡ 安装到 Surge" action={handleInstallToSurge} />
-          <Button
-            title="🌀 安装到 Egern"
-            action={handleInstallToEgern}
-          />
+          <Button title="🌀 安装到 Egern" action={handleInstallToEgern} />
+
           <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ top: 8 }}>
-            • Surge：跳转到模块安装页，确认后即可添加{'\n'}
-            • Egern：打开“添加模块”页面并自动填入模块地址
+            • BoxJS：在浏览器中打开 BoxJS 后，订阅并填写手机号等参数
+            {"\n"}• Surge：跳转到模块安装页，确认后即可添加
+            {"\n"}• Egern：打开“添加模块”页面并自动填入模块地址
           </Text>
         </Section>
 
