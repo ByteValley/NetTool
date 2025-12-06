@@ -19,11 +19,12 @@
         "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/Unicom.png"
       ],
       "keys": [
-        "DataCollection"   // 🔴 这里改成真实存在的根 key
+        "@DataCollection.ChinaUnicom.Settings",
+        "@DataCollection.ChinaUnicom.Caches"
       ],
       "settings": [
         {
-          "id": "DataCollection.ChinaUnicome.Settings.Cookie",  // 🔴 路径：根 key + 对象路径
+          "id": "@DataCollection.ChinaUnicom.Settings.Cookie",  // 🔴 路径：根 key + 对象路径
           "name": "联通 Cookie（ChinaUnicom_cookie）",
           "type": "text",
           "val": "",
