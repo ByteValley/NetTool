@@ -1,22 +1,18 @@
 {
-  "color" : "rgba(128, 138, 148,1)",
-  "runInApp" : false,
-  "author" : null,
-  "description" : null,
-  "name" : "中國移動",
-  "version" : "1.0.0",
-  "localizedNames" : null,
-  "contributors" : [
-
-  ],
-  "localizedDescriptions" : null,
-  "icon" : "square.2.layers.3d.fill",
-  "intentInputTypes" : [
-
-  ],
-  "remoteResource" : {
-    "url" : "https:\/\/sdl.dtzsghnr.cn\/d\/中国移动.zip",
-    "hash" : "1eef96220458273251bdaa045cf7e38e",
-    "autoUpdateInterval" : 600
-  }
+  "name": "中國移動",
+  "color": "rgba(0, 95, 255, 1.00)",
+  "runInApp": false,
+  "author": null,
+  "icon": "antenna.radiowaves.left.and.right",
+  "contributors": [],
+  "description": null,
+  "intentInputTypes": [],
+  "version": "1.0.0",
+  "remoteResource": {
+    "autoUpdateInterval": 300,
+    "url": "https://imarkr.com/api/github/download//ByteValley/NetTool/tree/main/Scripting/中國移動.zip",
+    "hash": "cab18821c011679df5b01b5fc35f76c1"
+  },
+  "localizedDescriptions": null,
+  "localizedNames": null
 }

@@ -1,38 +1,38 @@
 {
-  "icon" : "antenna.radiowaves.left.and.right",
-  "color" : "rgba(102, 196, 235,1)",
-  "runInApp" : false,
-  "name" : "中國電信",
-  "author" : null,
-  "description" : "",
-  "localizedNames" : {
-    "es" : "",
-    "ja" : "",
-    "de" : "",
-    "pt" : "",
-    "en" : "",
-    "it" : "",
-    "zh" : "",
-    "fr" : "",
-    "ru" : ""
+  "localizedNames": {
+    "ru": "",
+    "de": "",
+    "es": "",
+    "zh": "",
+    "en": "",
+    "ja": "",
+    "fr": "",
+    "pt": "",
+    "it": ""
   },
-  "localizedDescriptions" : {
-    "es" : "",
-    "pt" : "",
-    "en" : "",
-    "fr" : "",
-    "it" : "",
-    "ru" : "",
-    "zh" : "",
-    "de" : "",
-    "ja" : ""
+  "author": null,
+  "localizedDescriptions": {
+    "it": "",
+    "fr": "",
+    "en": "",
+    "pt": "",
+    "ja": "",
+    "es": "",
+    "de": "",
+    "zh": "",
+    "ru": ""
   },
-  "intentInputTypes" : [
-
-  ],
-  "contributors" : [
-
-  ],
-  "version" : "1.0.0",
-  "remoteResource" : null
+  "remoteResource": {
+    "hash": "dcee71cbbdcf73a0aa69d383ee020321",
+    "autoUpdateInterval": 300,
+    "url": "https://imarkr.com/api/github/download//ByteValley/NetTool/tree/main/Scripting/中國電信.zip"
+  },
+  "intentInputTypes": [],
+  "runInApp": false,
+  "name": "中國電信",
+  "contributors": [],
+  "description": "",
+  "version": "1.0.0",
+  "icon": "antenna.radiowaves.left.and.right",
+  "color": "rgba(28, 140, 255,1)"
 }

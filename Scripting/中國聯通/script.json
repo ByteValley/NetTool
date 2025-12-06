@@ -1,46 +1,42 @@
 {
-  "description" : "",
-  "version" : "1.0.4",
-  "remoteResource" : {
-    "url" : "https:\/\/sdl.dtzsghnr.cn\/d\/联通.zip",
-    "hash" : "23be4b25ea383d5777372d16b9a536d1",
-    "autoUpdateInterval" : 600
+  "icon": "antenna.radiowaves.left.and.right",
+  "contributors": [],
+  "color": "rgba(238, 92, 98,1)",
+  "localizedNames": {
+    "de": "",
+    "ja": "",
+    "fr": "",
+    "pt": "",
+    "ru": "",
+    "zh": "",
+    "es": "",
+    "it": "",
+    "en": ""
   },
-  "runInApp" : false,
-  "intentInputTypes" : [
-
-  ],
-  "localizedDescriptions" : {
-    "ja" : "",
-    "es" : "",
-    "fr" : "",
-    "it" : "",
-    "ru" : "",
-    "en" : "",
-    "pt" : "",
-    "de" : "",
-    "zh" : ""
+  "version": "1.0.4",
+  "name": "中國聯通",
+  "description": "",
+  "author": {
+    "email": "2753086015@qq.com",
+    "name": "DTZSGHNR",
+    "homepage": null
   },
-  "author" : {
-    "homepage" : null,
-    "name" : "DTZSGHNR",
-    "email" : "2753086015@qq.com"
+  "remoteResource": {
+    "autoUpdateInterval": 300,
+    "hash": "5c378726cb5dbe61088b550ced2590fc",
+    "url": "https://imarkr.com/api/github/download//ByteValley/NetTool/tree/main/Scripting/中國聯通.zip"
   },
-  "localizedNames" : {
-    "pt" : "",
-    "de" : "",
-    "ja" : "",
-    "en" : "",
-    "zh" : "",
-    "it" : "",
-    "fr" : "",
-    "ru" : "",
-    "es" : ""
-  },
-  "color" : "rgba(238, 92, 98,1)",
-  "name" : "中國聯通",
-  "icon" : "antenna.radiowaves.left.and.right",
-  "contributors" : [
-
-  ]
+  "runInApp": false,
+  "intentInputTypes": [],
+  "localizedDescriptions": {
+    "pt": "",
+    "es": "",
+    "zh": "",
+    "ru": "",
+    "de": "",
+    "en": "",
+    "it": "",
+    "fr": "",
+    "ja": ""
+  }
 }
