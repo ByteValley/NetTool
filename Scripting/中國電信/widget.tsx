@@ -123,12 +123,12 @@ function nowHHMM(): string {
   return `${hh}:${mm}`
 }
 
-// ================= 样式定义（对齐移动版） =================
+// ================= 样式定义 =================
 
 // 外层大卡底
 const outerCardBg: DynamicShapeStyle = {
   light: "rgba(255,255,255,0.98)",
-  dark: "rgba(0,0,0,0.80)",
+  dark: "rgba(0, 0, 0, 0.90)",
 }
 
 // 每格浅色背景 + 主题色
@@ -146,7 +146,7 @@ const ringCardThemes = {
     icon: "antenna.radiowaves.left.and.right",
     bg: {
       light: "rgba(50,205,50,0.08)",
-      dark: "rgba(4, 18, 8, 0.96)",
+      dark: "rgba(3, 9, 28, 1.0)",
     } as DynamicShapeStyle,
   },
   otherFlow: {
@@ -162,7 +162,7 @@ const ringCardThemes = {
     icon: "phone.badge.waveform.fill",
     bg: {
       light: "rgba(248,101,39,0.10)",
-      dark: "rgba(20, 10, 4, 0.96)",
+      dark: "rgba(13, 10, 34, 1.0)",
     } as DynamicShapeStyle,
   },
 }
