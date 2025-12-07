@@ -43,16 +43,17 @@ const API_URL =
 const API_DETAIL_URL =
   "https://m.client.10010.com/servicequerybusiness/operationservice/queryOcsPackageFlowLeftContentRevisedInJune"
 
-// 联通 Logo（用于首卡居中大图标）
+// 联通 Logo（用于话费卡大图标）
 const UNICOM_LOGO_URL =
   "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10010.png"
 
-// 组件数据结构
+// 组件数据结构（加入 updateTime，方便和移动保持一致）
 type UnicomData = {
   fee: { title: string; balance: string; unit: string }
   voice: { title: string; balance: string; unit: string; used?: number; total?: number }
   flow: { title: string; balance: string; unit: string; used?: number; total?: number }
   otherFlow?: { title: string; balance: string; unit: string; used?: number; total?: number }
+  updateTime: string
 }
 
 // 话费数据类型
@@ -82,11 +83,11 @@ type DetailApiResponse = {
   canuseFlowAllUnit?: string
   canuseVoiceAllUnit?: string
   canuseSmsAllUnit?: string
-  // 流量汇总列表：flowtype=1通用流量，2定向流量，3定向流量
+  // 流量汇总列表：flowtype=1通用流量，2/3定向流量
   flowSumList?: Array<{
-    flowtype: string // 流量类型
-    xcanusevalue: string // 剩余流量（MB）
-    xusedvalue: string // 已用流量（MB）
+    flowtype: string
+    xcanusevalue: string
+    xusedvalue: string
     elemtype?: string
   }>
   fresSumList?: Array<{
@@ -96,10 +97,11 @@ type DetailApiResponse = {
   }>
 }
 
-// 从 BoxJs 读取 Cookie（@DataCollection.ChinaUnicome.Settings.Cookie）
-// 从 BoxJs 读取 Cookie（DataCollection -> ChinaUnicome.Settings.Cookie）
+// ================= BoxJS / 数据获取 =================
+
+// 从 BoxJs 读取 Cookie（DataCollection -> ChinaUnicom.Settings.Cookie）
 async function fetchCookieFromBoxJs(boxJsUrl: string): Promise<string | null> {
-  const boxKey = "DataCollection" // ⚠️ 和你现在通过的 key 一致
+  const boxKey = "DataCollection"
 
   try {
     const base = boxJsUrl.replace(/\/$/, "")
@@ -118,8 +120,6 @@ async function fetchCookieFromBoxJs(boxJsUrl: string): Promise<string | null> {
     }
 
     const data = await response.json()
-    // BoxJs 返回格式大致为:
-    // { "key": "DataCollection", "val": "{ \"ChinaUnicom\": { \"Settings\": { \"Cookie\": \"...\" } } }" }
     const rawVal = data?.val
 
     if (!rawVal) {
@@ -129,7 +129,6 @@ async function fetchCookieFromBoxJs(boxJsUrl: string): Promise<string | null> {
 
     let root: any
     try {
-      // 有些环境 val 已经是对象，有些是字符串，这里兼容一下
       root = typeof rawVal === "string" ? JSON.parse(rawVal) : rawVal
     } catch (e) {
       console.error("❌ 解析 BoxJs DataCollection JSON 失败:", e, "原始 val:", rawVal)
@@ -210,20 +209,20 @@ async function fetchDetailData(cookie: string): Promise<DetailApiResponse | null
   return null
 }
 
-// 从详细 API 提取语音和流量数据
+// 从详细 API 提取语音和流量数据（通用流量）
 function extractVoiceAndFlowData(detailData: DetailApiResponse): {
   voice: { title: string; balance: string; unit: string; used?: number; total?: number }
   flow: { title: string; balance: string; unit: string; used?: number; total?: number }
 } | null {
   try {
-    // 提取语音数据
+    // 语音
     const voiceResource = detailData.resources?.find((r) => r.type === "Voice")
     const voiceRemain = voiceResource?.remainResource || "0"
     const voiceUsed = voiceResource?.userResource || "0"
     const voiceTotal = parseFloat(voiceRemain) + parseFloat(voiceUsed)
     const voiceUnit = detailData.canuseVoiceAllUnit || "分钟"
 
-    // 提取流量数据：优先从 flowSumList 获取通用流量（flowtype="1"）
+    // 通用流量：优先 flowSumList flowtype = "1"
     const generalFlow = detailData.flowSumList?.find((item) => item.flowtype === "1")
     let flowRemainMB = 0
     let flowUsedMB = 0
@@ -232,7 +231,7 @@ function extractVoiceAndFlowData(detailData: DetailApiResponse): {
       flowRemainMB = parseFloat(generalFlow.xcanusevalue)
       flowUsedMB = parseFloat(generalFlow.xusedvalue || "0")
     } else {
-      // 兼容：从 resources 获取
+      // 兼容 resources
       const flowResource = detailData.resources?.find((r) => r.type === "Flow")
       const remainStr = flowResource?.remainResource || "0"
       const usedStr = flowResource?.userResource || "0"
@@ -286,7 +285,10 @@ function extractVoiceAndFlowData(detailData: DetailApiResponse): {
 }
 
 // 格式化流量值（自动转换单位）
-function formatFlowValue(value: number, unit: string = "MB"): { balance: string; unit: string } {
+function formatFlowValue(value: number, unit: string = "MB"): {
+  balance: string
+  unit: string
+} {
   if (value >= 1024) {
     return {
       balance: (value / 1024).toFixed(2),
@@ -299,15 +301,16 @@ function formatFlowValue(value: number, unit: string = "MB"): { balance: string;
   }
 }
 
-// ===== 工具：百分比/时间 =====
+// ===== 工具：百分比/时间（和移动保持一致） =====
 function clamp01(n: number): number {
+  if (!isFinite(n)) return 0
   if (n < 0) return 0
   if (n > 1) return 1
   return n
 }
 
 function percentText(ratio: number): string {
-  return `${Math.round(clamp01(ratio) * 100)}%`
+  return (clamp01(ratio) * 100).toFixed(2)
 }
 
 function nowHHMM(): string {
@@ -317,35 +320,54 @@ function nowHHMM(): string {
   return `${hh}:${mm}`
 }
 
-// ======= 暗色大图标/圆环卡片主题 =======
-const darkCardBg: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.10)",
-  dark: "rgba(0, 0, 0, 0.25)",
+// ================= UI 样式：对齐中国移动版本 =================
+
+// 外层白色卡片
+const outerCardBg: DynamicShapeStyle = {
+  light: "rgba(255,255,255,0.98)",
+  dark: "rgba(0,0,0,0.80)",
 }
 
-const cardThemes = {
+// 每格浅色背景 + 主题色
+const ringCardThemes = {
   fee: {
-    tint: { light: "#1a73e8", dark: "#66adff" } as DynamicShapeStyle,
+    tint: { light: "#0080CB", dark: "#66adff" } as DynamicShapeStyle,
     icon: "bolt.horizontal.circle.fill",
-  },
-  voice: {
-    tint: { light: "#34b38f", dark: "#63d8a0" } as DynamicShapeStyle,
-    icon: "phone.fill",
+    bg: {
+      light: "rgba(0,128,203,0.06)",
+      dark: "rgba(5, 16, 32, 0.96)",
+    } as DynamicShapeStyle,
   },
   flow: {
-    tint: { light: "#ff8c42", dark: "#ffb07a" } as DynamicShapeStyle,
+    tint: { light: "#32CD32", dark: "#63e08f" } as DynamicShapeStyle,
     icon: "antenna.radiowaves.left.and.right",
+    bg: {
+      light: "rgba(50,205,50,0.08)",
+      dark: "rgba(4, 18, 8, 0.96)",
+    } as DynamicShapeStyle,
   },
   otherFlow: {
-    tint: { light: "#8a6eff", dark: "#c59bff" } as DynamicShapeStyle,
-    icon: "wifi.circle.fill",
+    tint: { light: "#8A6EFF", dark: "#c59bff" } as DynamicShapeStyle,
+    icon: "wifi",
+    bg: {
+      light: "rgba(138,110,255,0.10)",
+      dark: "rgba(8, 6, 24, 0.96)",
+    } as DynamicShapeStyle,
+  },
+  voice: {
+    tint: { light: "#F86527", dark: "#ffb07a" } as DynamicShapeStyle,
+    icon: "phone.badge.waveform.fill",
+    bg: {
+      light: "rgba(248,101,39,0.10)",
+      dark: "rgba(20, 10, 4, 0.96)",
+    } as DynamicShapeStyle,
   },
 }
 
 // 文字颜色
 const labelStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.72)",
-  dark: "rgba(255,255,255,0.72)",
+  light: "rgba(0, 0, 0, 0.55)",
+  dark: "rgba(255,255,255,0.65)",
 }
 
 const valueStyle: DynamicShapeStyle = {
@@ -353,216 +375,207 @@ const valueStyle: DynamicShapeStyle = {
   dark: "rgba(255,255,255,0.96)",
 }
 
+// 更新时间颜色
 const timeStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.40)",
-  dark: "rgba(255,255,255,0.58)",
+  light: "rgba(0, 0, 0, 0.55)",
+  dark: "rgba(255,255,255,0.65)",
 }
 
-// ======= 样式卡片 =======
-function RingCard({
+// 左侧话费块（和移动 FeeCard 同版，只是 logo 换成联通）
+function FeeCard({
   title,
   valueText,
   theme,
-  ratio,
-  useLogo,
-  showTime,
-  noRing,
+  logoPath,
+  updateTime,
 }: {
   title: string
   valueText: string
-  theme: typeof cardThemes.fee
-  ratio?: number
-  useLogo?: boolean
-  showTime?: boolean
-  noRing?: boolean
+  theme: typeof ringCardThemes.fee
+  logoPath?: string | null
+  updateTime: string
 }) {
-  const showGauge = ratio !== undefined && !noRing
-  const r = showGauge ? clamp01(ratio!) : 1
+  const isUrlLogo =
+    !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
+
+  const LogoImage = ({ size }: { size: number }) =>
+    logoPath ? (
+      isUrlLogo ? (
+        <Image imageUrl={logoPath} resizable frame={{ width: size, height: size }} />
+      ) : (
+        <Image filePath={logoPath} resizable frame={{ width: size, height: size }} />
+      )
+    ) : (
+      <Image
+        systemName={theme.icon}
+        font={size}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+      />
+    )
 
   return (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: darkCardBg,
+        style: theme.bg,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
-      {/* 顶部：首卡不画圈 => 大 Logo；其它卡 => 圆环 + 图标 + 百分比 */}
-      {noRing ? (
-        <VStack alignment="center" frame={{ width: 48, height: 48 }}>
-          <Spacer />
-          {useLogo ? (
-            <Image imageUrl={UNICOM_LOGO_URL} resizable frame={{ width: 30, height: 30 }} />
-          ) : (
-            <Image systemName={theme.icon} font={26} fontWeight="semibold" foregroundStyle={theme.tint} />
-          )}
-          <Spacer />
-        </VStack>
-      ) : (
-        <ZStack frame={{ width: 48, height: 48 }}>
-          <Gauge
-            value={r}
-            min={0}
-            max={1}
-            label={<Text font={1}> </Text>}
-            currentValueLabel={<Text font={1}> </Text>}
-            gaugeStyle="accessoryCircularCapacity"
-            tint={theme.tint}
-            scaleEffect={0.95}
-          />
-          <VStack alignment="center" frame={{ width: 48, height: 48 }}>
-            <Spacer minLength={2} />
-            <Image systemName={theme.icon} font={18} fontWeight="semibold" foregroundStyle={theme.tint} />
-            <Spacer />
-            <Text font={9} fontWeight="bold" foregroundStyle={valueStyle}>
-              {percentText(r)}
-            </Text>
-            <Spacer minLength={2} />
-          </VStack>
-        </ZStack>
-      )}
+      {/* 顶部 logo */}
+      <Spacer minLength={2} />
+      <HStack alignment="center">
+        <Spacer />
+        <LogoImage size={40} />
+        <Spacer />
+      </HStack>
 
-      {showTime ? (
-        <>
-          <Spacer minLength={4} />
-          <Text font={9} fontWeight="medium" foregroundStyle={timeStyle}>
-            {nowHHMM()}
-          </Text>
-        </>
-      ) : (
-        <Spacer minLength={8} />
-      )}
+      {/* 更新时间：保证不换行 */}
+      <Spacer minLength={4} />
+      <HStack alignment="center" spacing={3}>
+        <Spacer />
+        <Image
+          systemName="arrow.2.circlepath"
+          font={4}
+          foregroundStyle={timeStyle}
+        />
+        <Text
+          font={13}
+          foregroundStyle={timeStyle}
+          lineLimit={1}
+          minScaleFactor={0.5}
+        >
+          {updateTime}
+        </Text>
+        <Spacer />
+      </HStack>
 
-      <Text font={16} fontWeight="bold" foregroundStyle={valueStyle} lineLimit={1} minScaleFactor={0.6}>
+      {/* 数值 + 标题 */}
+      <Spacer minLength={6} />
+      <Text
+        font={15}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+        lineLimit={1}
+        minScaleFactor={0.7}
+      >
         {valueText}
       </Text>
-
       <Spacer minLength={2} />
-
-      <Text font={9} fontWeight="medium" foregroundStyle={labelStyle} lineLimit={1} minScaleFactor={0.8}>
+      <Text
+        font={10}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+        lineLimit={1}
+        minScaleFactor={0.7}
+      >
         {title}
       </Text>
+      <Spacer minLength={4} />
     </VStack>
   )
 }
 
-// ======= 小尺寸卡片（保持你原结构，但改成暗色底 + tint）=======
-function SmallDataCard({
+// 圆环卡（和移动 RingStatCard 同版）
+function RingStatCard({
   title,
-  value,
-  unit,
+  valueText,
   theme,
-  titleStyle,
-  descStyle,
-  useLogoAsIcon,
+  ratio,
 }: {
   title: string
-  value: string
-  unit: string
-  theme: typeof cardThemes.fee
-  titleStyle: DynamicShapeStyle
-  descStyle: DynamicShapeStyle
-  useLogoAsIcon?: boolean
+  valueText: string
+  theme: typeof ringCardThemes.flow
+  ratio?: number
 }) {
-  return (
-    <ZStack>
-      <HStack
-        alignment="center"
-        padding={{ top: 6, leading: 8, bottom: 6, trailing: 8 }}
-        spacing={6}
-        frame={{ minWidth: 0, maxWidth: Infinity }}
-        widgetBackground={{
-          style: darkCardBg,
-          shape: { type: "rect", cornerRadius: 12, style: "continuous" },
-        }}
-      >
-        <HStack alignment="center" frame={{ width: 20, height: 20 }}>
-          {useLogoAsIcon ? (
-            <Image imageUrl={UNICOM_LOGO_URL} frame={{ width: 16, height: 16 }} resizable />
-          ) : (
-            <Image systemName={theme.icon} font={12} fontWeight="medium" foregroundStyle={theme.tint} />
-          )}
-        </HStack>
+  const r = clamp01(ratio ?? 0)
 
-        <VStack alignment="leading" spacing={2} frame={{ minWidth: 0, maxWidth: Infinity }}>
-          <Text font={9} fontWeight="medium" foregroundStyle={titleStyle} lineLimit={1} minScaleFactor={0.8}>
-            {title}
+  return (
+    <VStack
+      alignment="center"
+      padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
+      widgetBackground={{
+        style: theme.bg,
+        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
+      }}
+    >
+      <Spacer minLength={2} />
+      <ZStack frame={{ width: 56, height: 56 }}>
+        <Gauge
+          value={r}
+          min={0}
+          max={1}
+          label={<Text font={1}> </Text>}
+          currentValueLabel={<Text font={1}> </Text>}
+          gaugeStyle="accessoryCircularCapacity"
+          tint={theme.tint}
+        />
+        <VStack alignment="center">
+          <Spacer minLength={4} />
+          <Image
+            systemName={theme.icon}
+            font={12}
+            fontWeight="semibold"
+            foregroundStyle={theme.tint}
+          />
+          <Spacer minLength={2} />
+          <Text font={11} fontWeight="semibold" foregroundStyle={theme.tint}>
+            {percentText(r)}
           </Text>
-          <Text font={14} fontWeight="bold" foregroundStyle={descStyle} lineLimit={1} minScaleFactor={0.7}>
-            {`${value}${unit}`}
+          <Text font={9} foregroundStyle={timeStyle}>
+            %
           </Text>
+          <Spacer minLength={4} />
         </VStack>
-      </HStack>
-    </ZStack>
-  )
-}
+      </ZStack>
 
-// 小尺寸组件视图
-function SmallWidgetView({
-  data,
-  titleStyle,
-  descStyle,
-}: {
-  data: UnicomData
-  titleStyle: DynamicShapeStyle
-  descStyle: DynamicShapeStyle
-}) {
-  // 计算总流量剩余（通用流量 + 定向流量）
-  const flowRemain =
-    data.flow?.total && data.flow?.used !== undefined ? Math.max(0, data.flow.total - data.flow.used) : 0
-  const otherFlowRemain =
-    data.otherFlow?.total && data.otherFlow?.used !== undefined ? Math.max(0, data.otherFlow.total - data.otherFlow.used) : 0
-  const totalFlowFormatted = formatFlowValue(flowRemain + otherFlowRemain, "MB")
-
-  return (
-    <VStack alignment="leading" padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }} spacing={6}>
-      <SmallDataCard
-        title={data.fee.title}
-        value={data.fee.balance}
-        unit={data.fee.unit}
-        theme={cardThemes.fee}
-        titleStyle={titleStyle}
-        descStyle={descStyle}
-        useLogoAsIcon={true}
-      />
-      <SmallDataCard
-        title="剩余总流量"
-        value={totalFlowFormatted.balance}
-        unit={totalFlowFormatted.unit}
-        theme={cardThemes.flow}
-        titleStyle={titleStyle}
-        descStyle={descStyle}
-      />
-      <SmallDataCard
-        title={data.voice.title}
-        value={data.voice.balance}
-        unit="MIN"
-        theme={cardThemes.voice}
-        titleStyle={titleStyle}
-        descStyle={descStyle}
-      />
+      {/* 数值 + 标题 */}
+      <Spacer minLength={6} />
+      <Text
+        font={15}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+        lineLimit={1}
+        minScaleFactor={0.7}
+      >
+        {valueText}
+      </Text>
+      <Spacer minLength={2} />
+      <Text
+        font={10}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+        lineLimit={1}
+        minScaleFactor={0.7}
+      >
+        {title}
+      </Text>
+      <Spacer minLength={4} />
     </VStack>
   )
 }
 
-function WidgetView({ data, settings }: { data: UnicomData; settings: ChinaUnicomSettings }) {
-  // 你原先的设置色仍保留（用于小组件三条文字颜色）
-  const titleStyle: DynamicShapeStyle = {
-    light: settings.titleDayColor,
-    dark: settings.titleNightColor,
-  }
-  const descStyle: DynamicShapeStyle = {
-    light: settings.descDayColor,
-    dark: settings.descNightColor,
-  }
+// 主视图
+function WidgetView({ data }: { data: UnicomData }) {
+  const logoPath = UNICOM_LOGO_URL
 
-  if (Widget.family === "systemSmall") {
-    return <SmallWidgetView data={data} titleStyle={titleStyle} descStyle={descStyle} />
-  }
+  // ==== 计算百分比：remain / total ====
+  const voiceTotal =
+    typeof data.voice.total === "number"
+      ? data.voice.total
+      : parseFloat(String(data.voice.total ?? "0"))
+  const voiceRemain = parseFloat(String(data.voice.balance ?? "0"))
+  const voiceRatio = voiceTotal > 0 ? voiceRemain / voiceTotal : 0
 
-  // 强制四列：没有 otherFlow 也补 0（电信同款排版）
+  const flowTotal =
+    typeof data.flow.total === "number"
+      ? data.flow.total
+      : parseFloat(String(data.flow.total ?? "0"))
+  const flowRemain = parseFloat(String(data.flow.balance ?? "0"))
+  const flowRatio = flowTotal > 0 ? flowRemain / flowTotal : 0
+
+  // 👉 没有 otherFlow 也补一格 0 定向流量
   const other = data.otherFlow ?? {
     title: "定向流量",
     balance: "0",
@@ -571,28 +584,76 @@ function WidgetView({ data, settings }: { data: UnicomData; settings: ChinaUnico
     total: 0,
   }
 
-  const voiceRatio = clamp01((Number(data.voice.used ?? 0) / Math.max(1, Number(data.voice.total ?? 0))) || 0)
-  const flowRatio = clamp01((Number(data.flow.used ?? 0) / Math.max(1, Number(data.flow.total ?? 0))) || 0)
-  const otherRatio = clamp01((Number(other.used ?? 0) / Math.max(1, Number(other.total ?? 0))) || 0)
+  const otherTotal =
+    typeof other.total === "number"
+      ? other.total
+      : parseFloat(String(other.total ?? "0"))
+  const otherRemain = parseFloat(String(other.balance ?? "0"))
+  const otherRatio = otherTotal > 0 ? otherRemain / otherTotal : 0
 
-  return (
-    <VStack alignment="leading" padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }} spacing={8}>
-      <HStack alignment="center" spacing={8}>
-        <RingCard
+  // ==== 小号组件：跟移动一样，只展示话费卡 ====
+  if (Widget.family === "systemSmall") {
+    return (
+      <VStack
+        alignment="center"
+        padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
+      >
+        <FeeCard
           title={data.fee.title}
           valueText={`${data.fee.balance}${data.fee.unit}`}
-          theme={cardThemes.fee}
-          useLogo={true}
-          showTime={true}
-          noRing={true}
+          theme={ringCardThemes.fee}
+          logoPath={logoPath}
+          updateTime={data.updateTime}
         />
-        <RingCard title={data.flow.title} valueText={`${data.flow.balance}${data.flow.unit}`} theme={cardThemes.flow} ratio={flowRatio} />
-        <RingCard title={other.title} valueText={`${other.balance}${other.unit}`} theme={cardThemes.otherFlow} ratio={otherRatio} />
-        <RingCard title={data.voice.title} valueText={`${data.voice.balance}MIN`} theme={cardThemes.voice} ratio={voiceRatio} />
+      </VStack>
+    )
+  }
+
+  // ==== 中 / 大号组件：固定 4 列 ====
+  return (
+    <VStack
+      alignment="center"
+      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
+      widgetBackground={{
+        style: outerCardBg,
+        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
+      }}
+    >
+      <HStack alignment="center" spacing={10}>
+        <FeeCard
+          title={data.fee.title}
+          valueText={`${data.fee.balance}${data.fee.unit}`}
+          theme={ringCardThemes.fee}
+          logoPath={logoPath}
+          updateTime={data.updateTime}
+        />
+
+        <RingStatCard
+          title={data.flow.title}
+          valueText={`${data.flow.balance}${data.flow.unit}`}
+          theme={ringCardThemes.flow}
+          ratio={flowRatio}
+        />
+
+        <RingStatCard
+          title={other.title}
+          valueText={`${other.balance}${other.unit}`}
+          theme={ringCardThemes.otherFlow}
+          ratio={otherRatio}
+        />
+
+        <RingStatCard
+          title={data.voice.title}
+          valueText={`${data.voice.balance}${data.voice.unit}`}
+          theme={ringCardThemes.voice}
+          ratio={voiceRatio}
+        />
       </HStack>
     </VStack>
   )
 }
+
+// ================= 主渲染入口 =================
 
 async function render() {
   const settings = (Storage?.get?.(SETTINGS_KEY) ?? null) as ChinaUnicomSettings | null
@@ -618,12 +679,18 @@ async function render() {
   }
 
   if (!cookie) {
-    Widget.present(<Text>请先在主应用中设置联通 Cookie，或配置 BoxJs 地址。</Text>, reloadPolicy)
+    Widget.present(
+      <Text>请先在主应用中设置联通 Cookie，或配置 BoxJs 地址。</Text>,
+      reloadPolicy
+    )
     return
   }
 
   // 并行获取两个 API 数据
-  const [feeData, detailData] = await Promise.all([fetchFeeData(cookie), fetchDetailData(cookie)])
+  const [feeData, detailData] = await Promise.all([
+    fetchFeeData(cookie),
+    fetchDetailData(cookie),
+  ])
 
   if (!feeData || !detailData) {
     Widget.present(<Text>获取数据失败，请检查网络或 Cookie。</Text>, reloadPolicy)
@@ -649,8 +716,7 @@ async function render() {
     let totalRemainMB = 0
     let totalUsedMB = 0
 
-    // 方法1：从 flowSumList 获取（flowtype="3"）
-    // flowSumList 中的值单位是 MB
+    // 方法1：flowSumList （默认为 flowtype=3 作为定向）
     if (matchType === "flowType" && matchValue === "3") {
       const item = detailData.flowSumList?.find((item) => item.flowtype === "3")
       if (item) {
@@ -660,9 +726,10 @@ async function render() {
     }
 
     // 方法2：从 fresSumList 获取
-    // fresSumList 中的值单位也是 MB
     if (totalRemainMB === 0 && matchType === "flowType") {
-      const item = detailData.fresSumList?.find((item) => item.flowtype === matchValue)
+      const item = detailData.fresSumList?.find(
+        (item) => item.flowtype === matchValue
+      )
       if (item) {
         totalRemainMB = parseFloat(item.xcanusevalue || "0")
         totalUsedMB = parseFloat(item.xusedvalue || "0")
@@ -670,13 +737,15 @@ async function render() {
     }
 
     // 方法3：从 resources 计算
-    // resources 中的值需要根据 canuseFlowAllUnit 判断单位
     if (totalRemainMB === 0) {
       const unit = detailData.canuseFlowAllUnit || "MB"
       detailData.resources
         ?.find((r) => r.type === "Flow")
         ?.details?.forEach((detail: any) => {
-          const match = matchType === "flowType" ? detail.flowType === matchValue : detail.addupItemCode === matchValue
+          const match =
+            matchType === "flowType"
+              ? detail.flowType === matchValue
+              : detail.addupItemCode === matchValue
 
           if (match && detail.remain) {
             const remain = parseFloat(detail.remain)
@@ -720,15 +789,18 @@ async function render() {
     voice: voiceAndFlowData.voice,
     flow: voiceAndFlowData.flow,
     otherFlow: otherFlowData,
+    updateTime: nowHHMM(),
   }
 
-  // 确保 settings 不为 null
   if (!settings) {
-    Widget.present(<Text>请先在主应用中设置联通 Cookie，或配置 BoxJs 地址。</Text>, reloadPolicy)
+    Widget.present(
+      <Text>请先在主应用中设置联通 Cookie，或配置 BoxJs 地址。</Text>,
+      reloadPolicy
+    )
     return
   }
 
-  Widget.present(<WidgetView data={mergedData} settings={settings} />, reloadPolicy)
+  Widget.present(<WidgetView data={mergedData} />, reloadPolicy)
 }
 
 render()
