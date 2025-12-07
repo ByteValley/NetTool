@@ -418,6 +418,7 @@ function FeeCard({
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
         style: theme.bg,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
@@ -495,6 +496,7 @@ function RingStatCard({
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
         style: theme.bg,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
