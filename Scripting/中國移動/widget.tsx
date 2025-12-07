@@ -230,7 +230,7 @@ function parseData(
           total: Math.floor(t).toString(),
           used: Math.floor(u).toString(),
           remain: Math.floor(r).toString(),
-          unit: "分",
+          unit: "MIN",
         }
       }
     } else if (res.voice && res.voice.val) {
@@ -254,7 +254,7 @@ function parseData(
     fee: { val: "0", unit: "元", plan: "0" },
     flowGen: { total: "0", used: "0", remain: "0", unit: "MB" },
     flowDir: { total: "0", used: "0", remain: "0", unit: "MB" },
-    voice: { total: "0", used: "0", remain: "0", unit: "分" },
+    voice: { total: "0", used: "0", remain: "0", unit: "MIN" },
     updateTime: nowHHMM(),
   }
 }
