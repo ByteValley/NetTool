@@ -434,7 +434,7 @@ function convertToTelecomData(apiData: any): TelecomData {
   const voiceData = {
     title: "剩余语音",
     balance: voiceBalance.toFixed(0),
-    unit: "MIN",
+    unit: "分钟",
     used: voiceUsed,
     total: voiceTotal,
   }

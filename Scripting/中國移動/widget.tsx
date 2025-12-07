@@ -164,7 +164,7 @@ function parseData(
 
     let flowGen = { total: "0", used: "0", remain: "0", unit: "MB" }
     let flowDir = { total: "0", used: "0", remain: "0", unit: "MB" }
-    let voiceVal = { total: "0", used: "0", remain: "0", unit: "MIN" }
+    let voiceVal = { total: "0", used: "0", remain: "0", unit: "分钟" }
 
     if (res.plan && res.plan.planRemianFlowListRes) {
       const flowRoot = res.plan.planRemianFlowListRes
@@ -230,7 +230,7 @@ function parseData(
           total: Math.floor(t).toString(),
           used: Math.floor(u).toString(),
           remain: Math.floor(r).toString(),
-          unit: "MIN",
+          unit: "分钟",
         }
       }
     } else if (res.voice && res.voice.val) {
@@ -254,7 +254,7 @@ function parseData(
     fee: { val: "0", unit: "元", plan: "0" },
     flowGen: { total: "0", used: "0", remain: "0", unit: "MB" },
     flowDir: { total: "0", used: "0", remain: "0", unit: "MB" },
-    voice: { total: "0", used: "0", remain: "0", unit: "MIN" },
+    voice: { total: "0", used: "0", remain: "0", unit: "分钟" },
     updateTime: nowHHMM(),
   }
 }
