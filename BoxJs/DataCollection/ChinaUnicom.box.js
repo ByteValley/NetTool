@@ -3,7 +3,7 @@
   "name": "数据采集",
   "author": "@ByteValley",
   "description": "各类数据采集脚本（运营商、App Cookie 等）",
-  "icon": "https://avatars.githubusercontent.com/u/100578089?v=4",
+  "icon": "https://github.com/ByteValley/Icon/blob/main/server/DataManagement1.png",
   "repo": "https://github.com/ByteValley/NetTool",
   "apps": [
     {
@@ -15,8 +15,8 @@
         "<b>说明：</b><br/>• 本条仅存储 Cookie 完整字符串（包含 JSESSIONID 等），不拆分字段；<br/>• 推荐通过脚本自动抓取，手动填写仅用于调试或紧急情况。"
       ],
       "icons": [
-        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/Unicom.png",
-        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/Unicom.png"
+        "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/icon.png",
+        "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/icon.png"
       ],
       "keys": [
         "@DataCollection.ChinaUnicom.Settings",
