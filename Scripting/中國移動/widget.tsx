@@ -295,7 +295,7 @@ function getRefreshInterval(): number {
 // 外层白色卡片
 const outerCardBg: DynamicShapeStyle = {
   light: "rgba(255,255,255,0.98)",
-  dark: "rgba(0,0,0,0.65)",
+  dark: "rgba(0,0,0,0.80)",
 }
 
 // 每格浅色背景 + 主题色
@@ -305,7 +305,7 @@ const ringCardThemes = {
     icon: "bolt.horizontal.circle.fill",
     bg: {
       light: "rgba(0,128,203,0.06)",
-      dark: "rgba(8, 24, 40, 0.95)",
+      dark: "rgba(5, 16, 32, 0.96)",
     } as DynamicShapeStyle,
   },
   flow: {
@@ -313,7 +313,7 @@ const ringCardThemes = {
     icon: "antenna.radiowaves.left.and.right",
     bg: {
       light: "rgba(50,205,50,0.08)",
-      dark: "rgba(6, 24, 10, 0.95)",
+      dark: "rgba(4, 18, 8, 0.96)",
     } as DynamicShapeStyle,
   },
   flowDir: {
@@ -321,7 +321,7 @@ const ringCardThemes = {
     icon: "wifi",
     bg: {
       light: "rgba(138,110,255,0.10)",
-      dark: "rgba(13, 9, 30, 0.95)",
+      dark: "rgba(8, 6, 24, 0.96)",
     } as DynamicShapeStyle,
   },
   voice: {
@@ -329,7 +329,7 @@ const ringCardThemes = {
     icon: "phone.badge.waveform.fill",
     bg: {
       light: "rgba(248,101,39,0.10)",
-      dark: "rgba(32, 16, 6, 0.95)",
+      dark: "rgba(20, 10, 4, 0.96)",
     } as DynamicShapeStyle,
   },
 }
@@ -411,7 +411,7 @@ function FeeCard({
           foregroundStyle={timeStyle}
         />
         <Text
-          font={15}
+          font={13}
           foregroundStyle={timeStyle}
           lineLimit={1}
           minScaleFactor={0.5}
