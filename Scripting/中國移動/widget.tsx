@@ -316,7 +316,7 @@ const ringCardThemes = {
       dark: "rgba(3, 9, 28, 1.0)",
     } as DynamicShapeStyle,
   },
-  otherFlow: {
+  flowDir: {
     tint: { light: "#8A6EFF", dark: "#c59bff" } as DynamicShapeStyle,
     icon: "wifi",
     bg: {
