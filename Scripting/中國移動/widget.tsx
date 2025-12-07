@@ -13,7 +13,8 @@ import {
   Gauge,
 } from "scripting"
 
-// 设置结构定义
+// ================= 基础设置 =================
+
 type ChinaMobileSettings = {
   refreshInterval: number
 }
@@ -28,9 +29,31 @@ type MobileData = {
   voice: { title: string; balance: string; unit: string; used?: number; total?: number }
   flow: { title: string; balance: string; unit: string; used?: number; total?: number }
   flowDir?: { title: string; balance: string; unit: string; used?: number; total?: number }
+  updateTime: string
 }
 
-// 将解析后的数据转换为 UI 显示格式
+// ================= 工具函数 =================
+
+function clamp01(x: number): number {
+  if (!isFinite(x)) return 0
+  if (x < 0) return 0
+  if (x > 1) return 1
+  return x
+}
+
+function percentText(r: number): string {
+  return (clamp01(r) * 100).toFixed(2)
+}
+
+function nowHHMM(): string {
+  const d = new Date()
+  const h = d.getHours().toString().padStart(2, "0")
+  const m = d.getMinutes().toString().padStart(2, "0")
+  return `${h}:${m}`
+}
+
+// ================= 数据转换 =================
+
 function convertToMobileData(parsed: any): MobileData {
   return {
     fee: {
@@ -60,10 +83,12 @@ function convertToMobileData(parsed: any): MobileData {
       used: parseFloat(parsed.voice.used),
       total: parseFloat(parsed.voice.total),
     },
+    updateTime: typeof parsed.updateTime === "string" ? parsed.updateTime : nowHHMM(),
   }
 }
 
-// 从 REWRITE_URL API 读取数据（通过 Quantumult X 重写规则）
+// ================= 数据获取 & 缓存 =================
+
 async function loadFromRewriteApi(): Promise<any> {
   try {
     const response = await fetch(REWRITE_URL, {
@@ -76,9 +101,7 @@ async function loadFromRewriteApi(): Promise<any> {
 
     if (response.ok) {
       const res = await response.json()
-      if (res && res.fee) {
-        return res
-      }
+      if (res && res.fee) return res
     }
   } catch (error) {
     console.error("[中国移动] API 请求失败:", error)
@@ -86,35 +109,24 @@ async function loadFromRewriteApi(): Promise<any> {
   return null
 }
 
-// 从缓存读取（使用 FileManager，与原代码一致）
 function loadFromCache(): any {
   try {
     const path = FileManager.appGroupDocumentsDirectory + "/" + CACHE_FILE
     if (FileManager.existsSync(path)) {
-      try {
-        const data = FileManager.readAsStringSync(path)
-        return JSON.parse(data)
-      } catch (e) {
-        console.error("[中国移动] 解析缓存失败")
-        return null
-      }
+      const data = FileManager.readAsStringSync(path)
+      return JSON.parse(data)
     }
   } catch (e) {
-    console.error("[中国移动] 读取缓存失败")
+    console.error("[中国移动] 读取/解析缓存失败")
   }
   return null
 }
 
-// 保存到缓存（使用 FileManager，与原代码一致）
 function saveToCache(data: any) {
   try {
     const path = FileManager.appGroupDocumentsDirectory + "/" + CACHE_FILE
-    // 添加更新时间（如果没有）
     if (!data.updateTime) {
-      const now = new Date()
-      data.updateTime = `${now.getHours()}:${
-        now.getMinutes() < 10 ? "0" + now.getMinutes() : now.getMinutes()
-      }`
+      data.updateTime = nowHHMM()
     }
     FileManager.writeAsStringSync(path, JSON.stringify(data))
   } catch (e) {
@@ -122,7 +134,8 @@ function saveToCache(data: any) {
   }
 }
 
-// 数据解析（完全按照原代码逻辑，返回包含 ok 字段的对象）
+// ================= 原逻辑数据解析 =================
+
 function parseData(
   res: any
 ): {
@@ -136,6 +149,7 @@ function parseData(
   small_style?: any
   medium_style?: any
   user_boxjs_url?: string
+  updateTime?: string
 } | null {
   try {
     let fee = "0"
@@ -150,7 +164,7 @@ function parseData(
 
     let flowGen = { total: "0", used: "0", remain: "0", unit: "MB" }
     let flowDir = { total: "0", used: "0", remain: "0", unit: "MB" }
-    let voiceVal = { total: "0", used: "0", remain: "0", unit: "分" }
+    let voiceVal = { total: "0", used: "0", remain: "0", unit: "MIN" }
 
     if (res.plan && res.plan.planRemianFlowListRes) {
       const flowRoot = res.plan.planRemianFlowListRes
@@ -223,36 +237,37 @@ function parseData(
       voiceVal.remain = res.voice.val
     }
 
-    const result = {
+    return {
       ok: true,
       fee: { val: fee, unit: "元", plan: planFee },
-      flowGen: flowGen,
-      flowDir: flowDir,
+      flowGen,
+      flowDir,
       voice: voiceVal,
+      updateTime: nowHHMM(),
     }
-    return result
   } catch (e) {
     console.error("[中国移动] 数据解析错误")
-    return {
-      ok: false,
-      fee: { val: "0", unit: "元", plan: "0" },
-      flowGen: { total: "0", used: "0", remain: "0", unit: "MB" },
-      flowDir: { total: "0", used: "0", remain: "0", unit: "MB" },
-      voice: { total: "0", used: "0", remain: "0", unit: "分" },
-    }
+  }
+
+  return {
+    ok: false,
+    fee: { val: "0", unit: "元", plan: "0" },
+    flowGen: { total: "0", used: "0", remain: "0", unit: "MB" },
+    flowDir: { total: "0", used: "0", remain: "0", unit: "MB" },
+    voice: { total: "0", used: "0", remain: "0", unit: "分" },
+    updateTime: nowHHMM(),
   }
 }
 
-// 根据配置页 + 缓存获取刷新间隔（分钟）
+// ================= 刷新间隔 =================
+
 function getRefreshInterval(): number {
   const DEFAULT = 60
 
   let settings: ChinaMobileSettings | null = null
   try {
     settings = Storage.get<ChinaMobileSettings>(SETTINGS_KEY) ?? null
-  } catch (_) {
-    // ignore
-  }
+  } catch (_) { }
 
   const cache = loadFromCache() || {}
 
@@ -275,36 +290,53 @@ function getRefreshInterval(): number {
   return raw
 }
 
-// ======= RingCard 暗色大图标/圆环卡片主题 =======
-const darkCardBg: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.10)",
-  dark: "rgba(0, 0, 0, 0.25)",
+// ================= 样式定义 =================
+
+// 外层白色卡片
+const outerCardBg: DynamicShapeStyle = {
+  light: "rgba(255,255,255,0.98)",
+  dark: "rgba(0,0,0,0.65)",
 }
 
-// 这里用移动版的 4 个主题
+// 每格浅色背景 + 主题色
 const ringCardThemes = {
   fee: {
-    tint: { light: "#1a73e8", dark: "#66adff" } as DynamicShapeStyle,
+    tint: { light: "#0080CB", dark: "#66adff" } as DynamicShapeStyle,
     icon: "bolt.horizontal.circle.fill",
-  },
-  voice: {
-    tint: { light: "#34b38f", dark: "#63d8a0" } as DynamicShapeStyle,
-    icon: "phone.fill",
+    bg: {
+      light: "rgba(0,128,203,0.06)",
+      dark: "rgba(8, 24, 40, 0.95)",
+    } as DynamicShapeStyle,
   },
   flow: {
-    tint: { light: "#ff8c42", dark: "#ffb07a" } as DynamicShapeStyle,
+    tint: { light: "#32CD32", dark: "#63e08f" } as DynamicShapeStyle,
     icon: "antenna.radiowaves.left.and.right",
+    bg: {
+      light: "rgba(50,205,50,0.08)",
+      dark: "rgba(6, 24, 10, 0.95)",
+    } as DynamicShapeStyle,
   },
   flowDir: {
-    tint: { light: "#8a6eff", dark: "#c59bff" } as DynamicShapeStyle,
-    icon: "wifi.circle.fill",
+    tint: { light: "#8A6EFF", dark: "#c59bff" } as DynamicShapeStyle,
+    icon: "wifi",
+    bg: {
+      light: "rgba(138,110,255,0.10)",
+      dark: "rgba(13, 9, 30, 0.95)",
+    } as DynamicShapeStyle,
+  },
+  voice: {
+    tint: { light: "#F86527", dark: "#ffb07a" } as DynamicShapeStyle,
+    icon: "phone.badge.waveform.fill",
+    bg: {
+      light: "rgba(248,101,39,0.10)",
+      dark: "rgba(32, 16, 6, 0.95)",
+    } as DynamicShapeStyle,
   },
 }
 
-// 文字颜色
 const labelStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.72)",
-  dark: "rgba(255,255,255,0.72)",
+  light: "rgba(0, 0, 0, 0.55)",
+  dark: "rgba(255,255,255,0.65)", // 0.75 -> 0.65
 }
 
 const valueStyle: DynamicShapeStyle = {
@@ -313,213 +345,262 @@ const valueStyle: DynamicShapeStyle = {
 }
 
 const timeStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.40)",
-  dark: "rgba(255,255,255,0.58)",
+  light: "rgba(0, 0, 0, 0.55)",
+  dark: "rgba(255,255,255,0.65)", // 同步
 }
 
-function clamp01(x: number): number {
-  if (!isFinite(x)) return 0
-  if (x < 0) return 0
-  if (x > 1) return 1
-  return x
-}
+// ================= UI 组件 =================
 
-function percentText(r: number): string {
-  return `${Math.round(clamp01(r) * 100)}%`
-}
-
-function nowHHMM(): string {
-  const d = new Date()
-  const h = d.getHours().toString().padStart(2, "0")
-  const m = d.getMinutes().toString().padStart(2, "0")
-  return `${h}:${m}`
-}
-
-// RingCard 组件
-function RingCard({
+// 左侧话费块
+function FeeCard({
   title,
   valueText,
   theme,
-  ratio,
   logoPath,
-  useLogo,
-  showTime,
-  noRing,
+  updateTime,
 }: {
   title: string
   valueText: string
   theme: typeof ringCardThemes.fee
-  ratio?: number
   logoPath?: string | null
-  useLogo?: boolean
-  showTime?: boolean
-  noRing?: boolean
+  updateTime: string
 }) {
-  const showGauge = ratio !== undefined && !noRing
-  const r = showGauge ? clamp01(ratio!) : 1
   const isUrlLogo =
     !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
 
   const LogoImage = ({ size }: { size: number }) =>
-    useLogo && logoPath ? (
+    logoPath ? (
       isUrlLogo ? (
         <Image imageUrl={logoPath} resizable frame={{ width: size, height: size }} />
       ) : (
         <Image filePath={logoPath} resizable frame={{ width: size, height: size }} />
       )
     ) : (
-      <Image systemName={theme.icon} font={size} fontWeight="semibold" foregroundStyle={theme.tint} />
+      <Image
+        systemName={theme.icon}
+        font={size}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+      />
     )
 
   return (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: darkCardBg,
+        style: theme.bg,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
-      {noRing ? (
-        // 首卡：只展示大 Logo，不画圆环
-        <VStack alignment="center" frame={{ width: 48, height: 48 }}>
-          <Spacer />
-          <LogoImage size={30} />
-          <Spacer />
-        </VStack>
-      ) : (
-        // 其它卡：圆环 + 图标 + 百分比
-        <ZStack frame={{ width: 48, height: 48 }}>
-          <Gauge
-            value={r}
-            min={0}
-            max={1}
-            label={<Text font={1}> </Text>}
-            currentValueLabel={<Text font={1}> </Text>}
-            gaugeStyle="accessoryCircularCapacity"
-            tint={theme.tint}
-            scaleEffect={0.95}
-          />
-          <VStack alignment="center" frame={{ width: 48, height: 48 }}>
-            <Spacer minLength={2} />
-            <LogoImage size={22} />
-            <Spacer />
-            {showGauge ? (
-              <Text font={9} fontWeight="bold" foregroundStyle={valueStyle}>
-                {percentText(r)}
-              </Text>
-            ) : (
-              <Text font={1}> </Text>
-            )}
-            <Spacer minLength={2} />
-          </VStack>
-        </ZStack>
-      )}
+      {/* 顶部 logo */}
+      <Spacer minLength={2} />
+      <HStack alignment="center">
+        <Spacer />
+        <LogoImage size={40} />
+        <Spacer />
+      </HStack>
 
-      {/* 时间（给话费卡显示） */}
-      {showTime ? (
-        <>
-          <Spacer minLength={4} />
-          <Text font={9} fontWeight="medium" foregroundStyle={timeStyle}>
-            {nowHHMM()}
-          </Text>
-        </>
-      ) : (
-        <Spacer minLength={8} />
-      )}
+      {/* 更新时间：保证不换行 */}
+      <Spacer minLength={4} />
+      <HStack alignment="center" spacing={3}>
+        <Spacer />
+        <Image
+          systemName="arrow.2.circlepath"
+          font={4}
+          foregroundStyle={timeStyle}
+        />
+        <Text
+          font={15}
+          foregroundStyle={timeStyle}
+          lineLimit={1}
+          minScaleFactor={0.5}
+        >
+          {updateTime}
+        </Text>
+        <Spacer />
+      </HStack>
 
-      {/* 大数值 */}
+      {/* 数值 + 标题 */}
+      <Spacer minLength={6} />
       <Text
-        font={16}
-        fontWeight="bold"
-        foregroundStyle={valueStyle}
+        font={15}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
         lineLimit={1}
-        minScaleFactor={0.6}
+        minScaleFactor={0.7}
       >
         {valueText}
       </Text>
-
       <Spacer minLength={2} />
-
-      {/* 小标题 */}
       <Text
-        font={9}
-        fontWeight="medium"
-        foregroundStyle={labelStyle}
+        font={10}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
         lineLimit={1}
-        minScaleFactor={0.8}
+        minScaleFactor={0.7}
       >
         {title}
       </Text>
+      <Spacer minLength={4} />
     </VStack>
   )
 }
 
-// 主组件视图：使用 RingCard
-function WidgetView({ data }: { data: MobileData }) {
-  const logoPath = "https://raw.githubusercontent.com/anker1209/icon/main/zgyd.png"
+// 圆环卡
+function RingStatCard({
+  title,
+  valueText,
+  theme,
+  ratio,
+}: {
+  title: string
+  valueText: string
+  theme: typeof ringCardThemes.flow
+  ratio?: number
+}) {
+  const r = clamp01(ratio ?? 0)
 
-  const voiceRatio =
-    data.voice.total && data.voice.total > 0 && data.voice.used !== undefined
-      ? data.voice.used / data.voice.total
-      : undefined
-
-  const flowRatio =
-    data.flow.total && data.flow.total > 0 && data.flow.used !== undefined
-      ? data.flow.used / data.flow.total
-      : undefined
-
-  const flowDirRatio =
-    data.flowDir && data.flowDir.total && data.flowDir.total > 0 && data.flowDir.used !== undefined
-      ? data.flowDir.used / data.flowDir.total
-      : undefined
-
-  // 小号：只展示话费大卡
-  if (Widget.family === "systemSmall") {
-    return (
-      <RingCard
-        title={data.fee.title}
-        valueText={`${data.fee.balance}${data.fee.unit}`}
-        theme={ringCardThemes.fee}
-        logoPath={logoPath}
-        useLogo={true}
-        showTime={true}
-        noRing={true}
-      />
-    )
-  }
-
-  // 中/大号：4 张 RingCard 一排
   return (
     <VStack
       alignment="center"
-      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      spacing={8}
+      padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
+      widgetBackground={{
+        style: theme.bg,
+        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
+      }}
     >
-      <HStack alignment="center" spacing={8}>
-        {/* 话费卡：大 Logo + 时间 */}
-        <RingCard
+      <Spacer minLength={2} />
+      <ZStack frame={{ width: 56, height: 56 }}>
+        <Gauge
+          value={r}
+          min={0}
+          max={1}
+          label={<Text font={1}> </Text>}
+          currentValueLabel={<Text font={1}> </Text>}
+          gaugeStyle="accessoryCircularCapacity"
+          tint={theme.tint}
+        />
+        <VStack alignment="center">
+          <Spacer minLength={4} />
+          <Image
+            systemName={theme.icon}
+            font={12}
+            fontWeight="semibold"
+            foregroundStyle={theme.tint}
+          />
+          <Spacer minLength={2} />
+          <Text font={11} fontWeight="semibold" foregroundStyle={theme.tint}>
+            {percentText(r)}
+          </Text>
+          <Text font={9} foregroundStyle={timeStyle}>
+            %
+          </Text>
+          <Spacer minLength={4} />
+        </VStack>
+      </ZStack>
+
+      {/* 数值 + 标题 */}
+      <Spacer minLength={6} />
+      <Text
+        font={15}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+        lineLimit={1}
+        minScaleFactor={0.7}
+      >
+        {valueText}
+      </Text>
+      <Spacer minLength={2} />
+      <Text
+        font={10}
+        fontWeight="semibold"
+        foregroundStyle={theme.tint}
+        lineLimit={1}
+        minScaleFactor={0.7}
+      >
+        {title}
+      </Text>
+      <Spacer minLength={4} />
+    </VStack>
+  )
+}
+
+// 主视图
+function WidgetView({ data }: { data: MobileData }) {
+  const logoPath = "https://raw.githubusercontent.com/anker1209/icon/main/zgyd.png"
+
+  // 剩余百分比：remain / total
+  const voiceTotal =
+    typeof data.voice.total === "number"
+      ? data.voice.total
+      : parseFloat(String(data.voice.total ?? "0"))
+  const voiceRemain = parseFloat(String(data.voice.balance ?? "0"))
+  const voiceRatio = voiceTotal > 0 ? voiceRemain / voiceTotal : 0
+
+  const flowTotal =
+    typeof data.flow.total === "number"
+      ? data.flow.total
+      : parseFloat(String(data.flow.total ?? "0"))
+  const flowRemain = parseFloat(String(data.flow.balance ?? "0"))
+  const flowRatio = flowTotal > 0 ? flowRemain / flowTotal : 0
+
+  let flowDirRatio = 0
+  if (data.flowDir) {
+    const flowDirTotal =
+      typeof data.flowDir.total === "number"
+        ? data.flowDir.total
+        : parseFloat(String(data.flowDir.total ?? "0"))
+    const flowDirRemain = parseFloat(String(data.flowDir.balance ?? "0"))
+    flowDirRatio = flowDirTotal > 0 ? flowDirRemain / flowDirTotal : 0
+  }
+
+  // 小号组件
+  if (Widget.family === "systemSmall") {
+    return (
+      <VStack
+        alignment="center"
+        padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
+      >
+        <FeeCard
           title={data.fee.title}
           valueText={`${data.fee.balance}${data.fee.unit}`}
           theme={ringCardThemes.fee}
           logoPath={logoPath}
-          useLogo={true}
-          showTime={true}
-          noRing={true}
+          updateTime={data.updateTime}
+        />
+      </VStack>
+    )
+  }
+
+  // 中 / 大号组件
+  return (
+    <VStack
+      alignment="center"
+      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
+      widgetBackground={{
+        style: outerCardBg,
+        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
+      }}
+    >
+      <HStack alignment="center" spacing={10}>
+        <FeeCard
+          title={data.fee.title}
+          valueText={`${data.fee.balance}${data.fee.unit}`}
+          theme={ringCardThemes.fee}
+          logoPath={logoPath}
+          updateTime={data.updateTime}
         />
 
-        {/* 通用流量 */}
-        <RingCard
+        <RingStatCard
           title={data.flow.title}
           valueText={`${data.flow.balance}${data.flow.unit}`}
           theme={ringCardThemes.flow}
           ratio={flowRatio}
         />
 
-        {/* 定向流量 */}
         {data.flowDir ? (
-          <RingCard
+          <RingStatCard
             title={data.flowDir.title}
             valueText={`${data.flowDir.balance}${data.flowDir.unit}`}
             theme={ringCardThemes.flowDir}
@@ -527,8 +608,7 @@ function WidgetView({ data }: { data: MobileData }) {
           />
         ) : null}
 
-        {/* 语音卡：已用占比 */}
-        <RingCard
+        <RingStatCard
           title={data.voice.title}
           valueText={`${data.voice.balance}${data.voice.unit}`}
           theme={ringCardThemes.voice}
@@ -539,10 +619,10 @@ function WidgetView({ data }: { data: MobileData }) {
   )
 }
 
-// 渲染入口
+// ================= 主渲染入口 =================
+
 async function render() {
   const oldCache = loadFromCache() || {}
-
   const refreshInterval = getRefreshInterval()
 
   const nextUpdate = new Date(Date.now() + refreshInterval * 60 * 1000)
@@ -551,19 +631,18 @@ async function render() {
     date: nextUpdate,
   }
 
-  // 1. 优先尝试从 REWRITE_URL API 读取（通过 Quantumult X 重写规则）
   try {
     const apiData = await loadFromRewriteApi()
-
     if (apiData && apiData.fee) {
       const pData = parseData(apiData)
-
       if (pData && pData.ok) {
         pData.source = "API"
         pData.refreshInterval = refreshInterval
-        // 保留缓存中的样式配置
         if (oldCache.small_style) pData.small_style = oldCache.small_style
         if (oldCache.medium_style) pData.medium_style = oldCache.medium_style
+        if (!pData.updateTime && oldCache.updateTime) {
+          pData.updateTime = oldCache.updateTime
+        }
 
         saveToCache(pData)
 
@@ -576,7 +655,6 @@ async function render() {
     console.error("[中国移动] API 读取失败")
   }
 
-  // 2. 如果 API 失败，尝试使用缓存
   const cache = loadFromCache()
   if (cache && cache.ok && cache.fee) {
     cache.usingCache = true
@@ -586,16 +664,15 @@ async function render() {
     return
   }
 
-  // 3. 最后返回错误信息
   console.error("[中国移动] 获取数据失败")
   Widget.present(
     <VStack spacing={8} padding={16} alignment="center">
       <Text font="headline">获取数据失败</Text>
       <Text font="body" foregroundStyle="secondaryLabel">
-        请确保已安装 Quantumult X 重写规则
+        请确保已安装重写规则
       </Text>
       <Text font="caption" foregroundStyle="secondaryLabel">
-        请在主应用中点击"安装重写规则"按钮
+        请在主应用中点击“安装重写规则”按钮
       </Text>
     </VStack>,
     reloadPolicy
