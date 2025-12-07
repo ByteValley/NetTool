@@ -220,7 +220,7 @@ function extractVoiceAndFlowData(detailData: DetailApiResponse): {
     const voiceRemain = voiceResource?.remainResource || "0"
     const voiceUsed = voiceResource?.userResource || "0"
     const voiceTotal = parseFloat(voiceRemain) + parseFloat(voiceUsed)
-    const voiceUnit = detailData.canuseVoiceAllUnit || "分钟"
+    const voiceUnit = detailData.canuseVoiceAllUnit || "MIN"
 
     // 通用流量：优先 flowSumList flowtype = "1"
     const generalFlow = detailData.flowSumList?.find((item) => item.flowtype === "1")
