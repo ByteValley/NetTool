@@ -149,7 +149,7 @@ const ringCardThemes = {
       dark: "rgba(3, 9, 28, 1.0)",
     } as DynamicShapeStyle,
   },
-  otherFlow: {
+  flowDir: {
     tint: { light: "#8A6EFF", dark: "#c59bff" } as DynamicShapeStyle,
     icon: "wifi",
     bg: {
@@ -698,7 +698,7 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
         <RingStatCard
           title={other.title}
           valueText={`${other.balance}${other.unit}`}
-          theme={ringCardThemes.otherFlow}
+          theme={ringCardThemes.flowDir}
           ratio={otherRatio}
         />
 
