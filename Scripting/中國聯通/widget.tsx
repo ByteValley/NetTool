@@ -82,7 +82,7 @@ type DetailApiResponse = {
   canuseFlowAllUnit?: string
   canuseVoiceAllUnit?: string
   canuseSmsAllUnit?: string
-  // 流量汇总列表：flowtype=1通用流量，2定向流量，3其他流量
+  // 流量汇总列表：flowtype=1通用流量，2定向流量，3定向流量
   flowSumList?: Array<{
     flowtype: string // 流量类型
     xcanusevalue: string // 剩余流量（MB）
@@ -509,7 +509,7 @@ function SmallWidgetView({
   titleStyle: DynamicShapeStyle
   descStyle: DynamicShapeStyle
 }) {
-  // 计算总流量剩余（通用流量 + 其他流量）
+  // 计算总流量剩余（通用流量 + 定向流量）
   const flowRemain =
     data.flow?.total && data.flow?.used !== undefined ? Math.max(0, data.flow.total - data.flow.used) : 0
   const otherFlowRemain =
@@ -564,7 +564,7 @@ function WidgetView({ data, settings }: { data: UnicomData; settings: ChinaUnico
 
   // 强制四列：没有 otherFlow 也补 0（电信同款排版）
   const other = data.otherFlow ?? {
-    title: "其他流量",
+    title: "定向流量",
     balance: "0",
     unit: "MB",
     used: 0,
@@ -636,7 +636,7 @@ async function render() {
     return
   }
 
-  // 提取其他流量数据
+  // 提取定向流量数据
   let otherFlowData:
     | { title: string; balance: string; unit: string; used?: number; total?: number }
     | undefined
@@ -699,7 +699,7 @@ async function render() {
       const totalMB = totalRemainMB + totalUsedMB
 
       otherFlowData = {
-        title: "其他流量",
+        title: "定向流量",
         balance: formatted.balance,
         unit: formatted.unit,
         used: totalUsedMB,
@@ -707,7 +707,7 @@ async function render() {
       }
 
       console.log(
-        "🌐 其他流量:",
+        "🌐 定向流量:",
         `已用${formatFlowValue(totalUsedMB, "MB").balance}${formatFlowValue(totalUsedMB, "MB").unit} ` +
         `剩余${formatted.balance}${formatted.unit} ` +
         `总计${formatFlowValue(totalMB, "MB").balance}${formatFlowValue(totalMB, "MB").unit}`

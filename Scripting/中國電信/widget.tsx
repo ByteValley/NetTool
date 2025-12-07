@@ -474,7 +474,7 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
   // ===== 强制四列：如果没有 otherFlow 也补一个 0 =====
   const other =
     data.otherFlow ?? {
-      title: "其他流量",
+      title: "定向流量",
       balance: "0",
       unit: "MB",
       used: 0,
@@ -655,7 +655,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     commonUsedMB,
   )
   console.log(
-    "🌐 [Telecom] 初始其他流量 MB: remainMB=",
+    "🌐 [Telecom] 初始定向流量 MB: remainMB=",
     specialRemainMB,
     "usedMB=",
     specialUsedMB,
@@ -685,7 +685,7 @@ function convertToTelecomData(apiData: any): TelecomData {
 
   if (Array.isArray(flowList) && flowList.length > 0) {
     console.log(
-      "📶 [Telecom] 尝试从 flowList 兜底修正通用/其他流量，共",
+      "📶 [Telecom] 尝试从 flowList 兜底修正通用/定向流量，共",
       flowList.length,
       "条",
     )
@@ -727,7 +727,7 @@ function convertToTelecomData(apiData: any): TelecomData {
 
       if (isSpecialTitle && hasSpecialFromBytes) {
         console.log(
-          "🌐 [Telecom] 其他流量已有 specialAmount 字节值，flowList 仅作为展示，不再叠加。",
+          "🌐 [Telecom] 定向流量已有 specialAmount 字节值，flowList 仅作为展示，不再叠加。",
         )
         continue
       }
@@ -743,11 +743,11 @@ function convertToTelecomData(apiData: any): TelecomData {
           commonUsedMB,
         )
       } else {
-        // ✅ 其余一律视作「其他流量」兜底（专用/定向等）
+        // ✅ 其余一律视作「定向流量」兜底（专用/定向等）
         specialUsedMB += usedMB
         specialRemainMB += remainMB
         console.log(
-          "🌐 [Telecom] 通过 flowList 兜底【其他流量】 => remainMB=",
+          "🌐 [Telecom] 通过 flowList 兜底【定向流量】 => remainMB=",
           specialRemainMB,
           "usedMB=",
           specialUsedMB,
@@ -763,7 +763,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     (specialRemainMB > 0 || specialUsedMB > 0)
   ) {
     console.log(
-      "🔁 [Telecom] 触发兜底逻辑：通用为 0，其他 > 0，将其他流量整体视作通用展示",
+      "🔁 [Telecom] 触发兜底逻辑：通用为 0，其他 > 0，将定向流量整体视作通用展示",
     )
 
     commonRemainMB = specialRemainMB
@@ -786,7 +786,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     commonTotalMB,
   )
   console.log(
-    "🌐 [Telecom] 最终其他流量 MB: remainMB=",
+    "🌐 [Telecom] 最终定向流量 MB: remainMB=",
     specialRemainMB,
     "usedMB=",
     specialUsedMB,
@@ -804,7 +804,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     total: commonTotalMB,
   }
 
-  // 其他流量：仅当还有值时才展示
+  // 定向流量：仅当还有值时才展示
   let otherFlowData:
     | { title: string; balance: string; unit: string; used?: number; total?: number }
     | undefined
@@ -812,14 +812,14 @@ function convertToTelecomData(apiData: any): TelecomData {
   if (specialRemainMB > 0 || specialUsedMB > 0) {
     const otherFlowFormatted = formatFlowValue(specialRemainMB, "MB")
     otherFlowData = {
-      title: "其他流量",
+      title: "定向流量",
       balance: otherFlowFormatted.balance,
       unit: otherFlowFormatted.unit,
       used: specialUsedMB,
       total: specialTotalMB,
     }
   } else {
-    console.log("🌐 [Telecom] 最终其他流量为空，不单独展示")
+    console.log("🌐 [Telecom] 最终定向流量为空，不单独展示")
   }
 
   const result: TelecomData = {
