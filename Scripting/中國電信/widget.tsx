@@ -704,7 +704,7 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
 
         <RingStatCard
           title={data.voice.title}
-          valueText={`${data.voice.balance}MIN`}
+          valueText={`${data.voice.balance}分钟`}
           theme={ringCardThemes.voice}
           ratio={voiceRatio}
         />
