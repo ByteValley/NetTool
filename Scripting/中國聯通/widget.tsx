@@ -437,12 +437,12 @@ function FeeCard({
       <HStack alignment="center" spacing={3}>
         <Spacer />
         <Image
-          systemName="arrow.2.circlepath"
-          font={4}
+          systemName="arrow.triangle.2.circlepath"
+          font={5}
           foregroundStyle={timeStyle}
         />
         <Text
-          font={13}
+          font={11}
           foregroundStyle={timeStyle}
           lineLimit={1}
           minScaleFactor={0.5}

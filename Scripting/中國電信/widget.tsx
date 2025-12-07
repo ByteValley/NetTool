@@ -239,9 +239,9 @@ function FeeCard({
       <Spacer minLength={4} />
       <HStack alignment="center" spacing={3}>
         <Spacer />
-        <Image systemName="arrow.2.circlepath" font={4} foregroundStyle={timeStyle} />
+        <Image systemName="arrow.triangle.2.circlepath" font={4} foregroundStyle={timeStyle} />
         <Text
-          font={13}
+          font={11}
           foregroundStyle={timeStyle}
           lineLimit={1}
           minScaleFactor={0.5}
