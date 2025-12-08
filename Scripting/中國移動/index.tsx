@@ -1,24 +1,32 @@
 import {
   Navigation,
-  Form,
+  NavigationStack,
+  List,
   Section,
   Button,
   Text,
-  VStack,
-  Spacer,
-  HStack,
-  TextField,
+  Picker,
   useState,
-  Toggle,
 } from "scripting"
 
-const VERSION = "2025-12-08R1"
+declare const Storage: any
+declare const Dialog: any
+declare const Safari: any
+declare const FileManager: any
+
+// 版本号说明（Semantic Versioning）
+// MAJOR：破坏性变更或配置结构调整（不兼容旧版）
+// MINOR：新增功能、兼容性增强（兼容旧版）
+// PATCH：修复 Bug、UI 微调、文案修改等小改动
+const VERSION = "1.0.2"
+
+// 构建日期：YYYY-MM-DD
+const BUILD_DATE = "2025-12-08"
 
 // 和 widget.tsx 对应的设置结构
 type ChinaMobileSettings = {
+  // 小组件自动刷新间隔（单位：分钟）
   refreshInterval: number
-  // 圆环百分比含义：false = 已用百分比；true = 剩余百分比
-  showRemainRatio: boolean
 }
 
 const SETTINGS_KEY = "chinaMobileSettings"
@@ -31,26 +39,44 @@ const CM_MODULE_URL =
 const BOXJS_SUB_URL =
   "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/boxjs.json"
 
+// 刷新间隔选项（单位：分钟）
+const REFRESH_OPTIONS = [
+  { label: "15 分钟", value: 15 },
+  { label: "30 分钟", value: 30 },
+  { label: "1 小时", value: 60 },   // 默认
+  { label: "2 小时", value: 120 },
+  { label: "3 小时", value: 180 },
+  { label: "6 小时", value: 360 },
+  { label: "12 小时", value: 720 },
+  { label: "24 小时", value: 1440 },
+]
+
 // 默认配置
 const defaultSettings: ChinaMobileSettings = {
-  refreshInterval: 60, // 默认 60 分钟
-  showRemainRatio: false, // 默认显示已用百分比（与联通保持一致）
+  refreshInterval: 60, // 默认 1 小时
 }
 
-function SettingsPage() {
+function SettingsView() {
   const dismiss = Navigation.useDismiss()
 
   const initialSettings =
-    (Storage.get<ChinaMobileSettings>(SETTINGS_KEY) as ChinaMobileSettings | null) ??
-    defaultSettings
+    (Storage.get(SETTINGS_KEY) as ChinaMobileSettings | null) ?? defaultSettings
 
   const [refreshInterval, setRefreshInterval] = useState<number>(
-    initialSettings.refreshInterval ?? 60,
+    initialSettings.refreshInterval || 60,
   )
 
-  const [showRemainRatio, setShowRemainRatio] = useState<boolean>(
-    initialSettings.showRemainRatio ?? false,
-  )
+  // About
+  const handleAbout = async () => {
+    await Dialog.alert({
+      title: "移动余量组件",
+      message:
+        `作者：©ByteValley\n` +
+        `版本：v${VERSION}（${BUILD_DATE}）\n` +
+        `致谢：@DTZSGHNR`,
+      buttonLabel: "关闭",
+    })
+  }
 
   // 打开 BoxJS 订阅页面
   const handleOpenBoxJsSub = async () => {
@@ -80,13 +106,13 @@ function SettingsPage() {
         FileManager.removeSync(path)
         await Dialog.alert({
           title: "清除成功",
-          message: "缓存已清除",
+          message: "缓存已清除，下次将重新获取最新数据。",
           buttonLabel: "确定",
         })
       } else {
         await Dialog.alert({
           title: "提示",
-          message: "缓存文件不存在",
+          message: "缓存文件不存在，无需清除。",
           buttonLabel: "确定",
         })
       }
@@ -99,109 +125,105 @@ function SettingsPage() {
     }
   }
 
-  // 保存刷新间隔 + 圆环模式
-  const handleSaveSettings = async () => {
-    let interval = Number(refreshInterval)
-    if (!isFinite(interval)) interval = 60
-    interval = Math.round(interval)
-    if (interval < 5) interval = 5
-    if (interval > 360) interval = 360
-
-    const newSettings: ChinaMobileSettings = {
-      refreshInterval: interval,
-      showRemainRatio,
-    }
+  // 保存设置（只存储刷新间隔，关闭页面）
+  const handleSaveSettings = () => {
+    const interval = Number(refreshInterval) || 60
+    const newSettings: ChinaMobileSettings = { refreshInterval: interval }
     Storage.set(SETTINGS_KEY, newSettings)
-
-    await Dialog.alert({
-      title: "已保存",
-      message: `刷新间隔已设置为 ${interval} 分钟\n圆环显示：${showRemainRatio ? "剩余百分比" : "已用百分比"
-        }`,
-      buttonLabel: "确定",
-    })
-
     dismiss()
   }
 
   return (
-    <VStack>
-      <Form>
-        {/* 组件模块一键安装 */}
-        <Section title="组件模块一键安装">
-          <Text font="body" padding={{ bottom: 8 }}>
-            使用前请按顺序完成以下步骤：
-            {"\n"}1）在 BoxJS 中订阅配置并填写手机号
-            {"\n"}2）安装中国移动余量查询模块到支持的客户端
-          </Text>
-
-          <Button title="📦 打开 BoxJS 订阅" action={handleOpenBoxJsSub} />
-          <Button title="⚡ 安装到 Surge" action={handleInstallToSurge} />
-          <Button title="🌀 安装到 Egern" action={handleInstallToEgern} />
-
-          <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ top: 8 }}>
-            • BoxJS：在浏览器中打开 BoxJS 后，订阅并填写手机号等参数
-            {"\n"}• Surge：跳转到模块安装页，确认后即可添加
-            {"\n"}• Egern：打开“添加模块”页面并自动填入模块地址
-          </Text>
+    <NavigationStack>
+      <List
+        navigationTitle={"移动余量组件"}
+        navigationBarTitleDisplayMode={"inline"}
+        toolbar={{
+          topBarLeading: [<Button title={"关闭"} action={dismiss} />],
+          topBarTrailing: [<Button title={"完成"} action={handleSaveSettings} />],
+          bottomBar: [
+            <Button
+              systemImage="info.circle"
+              title="关于本组件"
+              action={handleAbout}
+              foregroundStyle="secondaryLabel"
+            />,
+          ],
+        }}
+      >
+        {/* 组件模块 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              组件模块
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              使用前建议按顺序完成：
+              {"\n"}1）在 BoxJS 中订阅配置并填写手机号等参数
+              {"\n"}2）安装中国移动余量查询模块到支持的客户端
+            </Text>
+          }
+        >
+          <Button title="📦 添加 BoxJS 订阅" action={handleOpenBoxJsSub} />
+          <Button title="⚡ 安装 Surge 模块" action={handleInstallToSurge} />
+          <Button title="🌀 安装 Egern 模块" action={handleInstallToEgern} />
         </Section>
 
-        {/* 刷新设置 */}
-        <Section title="刷新设置">
-          <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ bottom: 4 }}>
-            设置小组件自动刷新的频率（分钟，建议 5–360）。
-          </Text>
-          <TextField
-            title="刷新间隔 (分钟)"
-            value={String(refreshInterval)}
-            prompt="例如：60"
-            onChanged={(text) => {
-              const v = parseInt(text, 10)
-              setRefreshInterval(isNaN(v) ? 0 : v)
+        {/* 刷新配置 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              刷新配置
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              刷新间隔为小组件自动刷新的最小时间，建议 15 分钟～24 小时。
+            </Text>
+          }
+        >
+          <Picker
+            title={"刷新间隔"}
+            value={refreshInterval}
+            onChanged={(value: number) => {
+              setRefreshInterval(Number(value))
             }}
-          />
-        </Section>
-
-        {/* 卡片渲染设置 */}
-        <Section title="卡片渲染设置">
-          <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ bottom: 4 }}>
-            控制圆环百分比的含义（通用流量 / 定向流量 / 语音）：
-            关闭＝显示已用百分比；开启＝显示剩余百分比。
-          </Text>
-          <Toggle
-            title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已用百分比"}
-            value={showRemainRatio}
-            onChanged={setShowRemainRatio}
-          />
+            pickerStyle={"menu"}
+          >
+            {REFRESH_OPTIONS.map((opt) => (
+              <Text key={opt.value} tag={opt.value as any}>
+                {opt.label}
+              </Text>
+            ))}
+          </Picker>
         </Section>
 
         {/* 缓存管理 */}
-        <Section title="缓存管理">
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              缓存管理
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              当数据异常或长期未更新时，可尝试清除缓存后重新拉取。
+            </Text>
+          }
+        >
           <Button title="🗑️ 清除缓存" action={handleClearCache} />
-          <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ top: 4 }}>
-            清除缓存数据，下次将重新获取最新数据。
-          </Text>
         </Section>
-
-        {/* 保存按钮 */}
-        <Section title="保存设置">
-          <Button title="💾 保存设置" action={handleSaveSettings} />
-        </Section>
-      </Form>
-
-      <Spacer />
-      <VStack alignment="center" spacing={4} padding={{ bottom: 10 }}>
-        <HStack alignment="center" spacing={4}>
-          <Text font="caption2" foregroundStyle="secondaryLabel">
-            开发：
-          </Text>
-          <Text font="caption2" foregroundStyle="accentColor">@DTZSGHNR</Text>
-        </HStack>
-        <Text font="caption2" foregroundStyle="secondaryLabel">
-          Version {VERSION}
-        </Text>
-      </VStack>
-    </VStack>
+      </List>
+    </NavigationStack>
   )
 }
 
-Navigation.present(<SettingsPage />)
+async function run() {
+  await Navigation.present({
+    element: <SettingsView />,
+  })
+}
+
+run()
