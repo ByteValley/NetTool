@@ -18,7 +18,7 @@ declare const FileManager: any
 // MAJOR：破坏性变更或配置结构调整（不兼容旧版）
 // MINOR：新增功能、兼容性增强（兼容旧版）
 // PATCH：修复 Bug、UI 微调、文案修改等小改动
-const VERSION = "1.0.2"
+const VERSION = "1.0.0"
 
 // 构建日期：YYYY-MM-DD
 const BUILD_DATE = "2025-12-08"
