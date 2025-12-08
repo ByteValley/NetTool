@@ -3,7 +3,6 @@ import {
   Form,
   Section,
   TextField,
-  ColorPicker,
   Button,
   Color,
   useState,
@@ -15,7 +14,9 @@ import {
   Toggle,
 } from "scripting"
 
-const VERSION = "1.0.2"
+declare const Storage: any
+
+const VERSION = "2025-12-08R1"
 
 // 联通 BoxJS 订阅 & 模块地址
 const UNICOM_BOXJS_SUB_URL =
@@ -24,7 +25,7 @@ const UNICOM_BOXJS_SUB_URL =
 const UNICOM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/DataCollection/ChinaUnicom.module"
 
-// Define the settings structure
+// 设置结构
 type ChinaUnicomSettings = {
   cookie: string
   titleDayColor: Color
@@ -40,11 +41,13 @@ type ChinaUnicomSettings = {
   otherFlowMatchValue: string
   enableBoxJs: boolean
   boxJsUrl: string
+  // 统一控制圆环百分比：false=已用，true=剩余
+  showRemainRatio: boolean
 }
 
 const SETTINGS_KEY = "chinaUnicomSettings"
 
-// Default settings - 适配暗色模式的简洁配色
+// 默认设置
 const defaultSettings: ChinaUnicomSettings = {
   cookie: "",
   // 标题颜色：浅色模式用深灰，暗色模式用浅灰
@@ -56,6 +59,7 @@ const defaultSettings: ChinaUnicomSettings = {
   // 刷新时间颜色：浅色模式用中灰，暗色模式用浅灰
   refreshTimeDayColor: "#999999",
   refreshTimeNightColor: "#AAAAAA",
+  // 默认刷新间隔 15 分钟
   refreshInterval: 15,
   // 通用流量配置
   showFlow: true,
@@ -66,26 +70,26 @@ const defaultSettings: ChinaUnicomSettings = {
   // BoxJs 配置
   enableBoxJs: false,
   boxJsUrl: "",
+  // 默认：显示“已使用百分比”
+  showRemainRatio: false,
 }
 
 function SettingsPage() {
   const dismiss = Navigation.useDismiss()
   const initialSettings =
-    Storage.get<ChinaUnicomSettings>(SETTINGS_KEY) ?? defaultSettings
+    (Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null) ?? defaultSettings
 
   // State for the form fields
   const [cookie, setCookie] = useState(initialSettings.cookie)
-  const [titleDayColor, setTitleDayColor] = useState(initialSettings.titleDayColor)
-  const [titleNightColor, setTitleNightColor] = useState(initialSettings.titleNightColor)
-  const [descDayColor, setDescDayColor] = useState(initialSettings.descDayColor)
-  const [descNightColor, setDescNightColor] = useState(initialSettings.descNightColor)
-  const [refreshTimeDayColor, setRefreshTimeDayColor] = useState(
-    initialSettings.refreshTimeDayColor,
+  const [titleDayColor] = useState(initialSettings.titleDayColor)
+  const [titleNightColor] = useState(initialSettings.titleNightColor)
+  const [descDayColor] = useState(initialSettings.descDayColor)
+  const [descNightColor] = useState(initialSettings.descNightColor)
+  const [refreshTimeDayColor] = useState(initialSettings.refreshTimeDayColor)
+  const [refreshTimeNightColor] = useState(initialSettings.refreshTimeNightColor)
+  const [refreshInterval, setRefreshInterval] = useState(
+    initialSettings.refreshInterval,
   )
-  const [refreshTimeNightColor, setRefreshTimeNightColor] = useState(
-    initialSettings.refreshTimeNightColor,
-  )
-  const [refreshInterval, setRefreshInterval] = useState(initialSettings.refreshInterval)
   const [showFlow, setShowFlow] = useState(initialSettings.showFlow ?? true)
   const [showOtherFlow, setShowOtherFlow] = useState(
     initialSettings.showOtherFlow ?? true,
@@ -98,6 +102,10 @@ function SettingsPage() {
   )
   const [enableBoxJs, setEnableBoxJs] = useState(initialSettings.enableBoxJs ?? false)
   const [boxJsUrl, setBoxJsUrl] = useState(initialSettings.boxJsUrl ?? "")
+  // 新增：是否显示“剩余百分比”
+  const [showRemainRatio, setShowRemainRatio] = useState(
+    initialSettings.showRemainRatio ?? false,
+  )
 
   // 打开联通 BoxJS 订阅
   const handleOpenUnicomBoxJsSub = async () => {
@@ -135,6 +143,7 @@ function SettingsPage() {
       otherFlowMatchValue,
       enableBoxJs,
       boxJsUrl,
+      showRemainRatio,
     }
     Storage.set(SETTINGS_KEY, newSettings)
     dismiss()
@@ -143,7 +152,7 @@ function SettingsPage() {
   return (
     <VStack>
       <Form>
-        {/* 新增：BoxJS 订阅 + 模块一键安装 */}
+        {/* BoxJS 订阅 + 模块一键安装 */}
         <Section title="组件模块一键安装">
           <Text
             font="caption2"
@@ -197,6 +206,22 @@ function SettingsPage() {
               const interval = parseInt(text, 10)
               setRefreshInterval(isNaN(interval) ? 0 : interval)
             }}
+          />
+        </Section>
+
+        <Section title="面板渲染设置">
+          <Text
+            font="caption2"
+            foregroundStyle="secondaryLabel"
+            padding={{ bottom: 4 }}
+          >
+            控制圆环百分比的含义（通用流量 / 定向流量 / 语音）：
+            关闭＝显示已使用百分比；开启＝显示剩余百分比。
+          </Text>
+          <Toggle
+            title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
+            value={showRemainRatio}
+            onChanged={setShowRemainRatio}
           />
         </Section>
 
