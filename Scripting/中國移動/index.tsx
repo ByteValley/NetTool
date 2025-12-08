@@ -43,9 +43,9 @@ const BOXJS_SUB_URL =
 const REFRESH_OPTIONS = [
   { label: "15 分钟", value: 15 },
   { label: "30 分钟", value: 30 },
-  { label: "1 小时", value: 60 },   // 默认
+  { label: "1 小时", value: 60 },
   { label: "2 小时", value: 120 },
-  { label: "3 小时", value: 180 },
+  { label: "3 小时", value: 180 },   // 默认
   { label: "6 小时", value: 360 },
   { label: "12 小时", value: 720 },
   { label: "24 小时", value: 1440 },
@@ -53,7 +53,7 @@ const REFRESH_OPTIONS = [
 
 // 默认配置
 const defaultSettings: ChinaMobileSettings = {
-  refreshInterval: 60, // 默认 1 小时
+  refreshInterval: 180, // 默认 3 小时
 }
 
 function SettingsView() {
