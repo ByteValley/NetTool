@@ -14,6 +14,7 @@ import {
 
 declare const Storage: any
 declare const Dialog: any
+declare const Safari: any
 
 // 版本号说明（Semantic Versioning）
 // MAJOR：破坏性变更或配置结构调整（不兼容旧版）
@@ -43,6 +44,12 @@ const REFRESH_OPTIONS = [
   { label: "24 小时", value: 1440 },
 ]
 
+// 定向流量匹配类型选项
+const MATCH_TYPE_OPTIONS: { label: string; value: "flowType" | "addupItemCode" }[] = [
+  { label: "按 flowType 聚合（默认）", value: "flowType" },
+  { label: "按 addupItemCode 精确匹配", value: "addupItemCode" },
+]
+
 // 设置结构
 type ChinaUnicomSettings = {
   cookie: string
@@ -53,8 +60,6 @@ type ChinaUnicomSettings = {
   refreshTimeDayColor: Color
   refreshTimeNightColor: Color
   refreshInterval: number // 以分钟为单位
-  showFlow: boolean
-  showOtherFlow: boolean
   otherFlowMatchType: "flowType" | "addupItemCode"
   otherFlowMatchValue: string
   enableBoxJs: boolean
@@ -76,8 +81,6 @@ const defaultSettings: ChinaUnicomSettings = {
   refreshTimeNightColor: "#AAAAAA",
   // 默认刷新间隔：3 小时
   refreshInterval: 180,
-  showFlow: true,
-  showOtherFlow: true,
   otherFlowMatchType: "flowType",
   otherFlowMatchValue: "3",
   enableBoxJs: false,
@@ -91,6 +94,14 @@ function SettingsView() {
   const initialSettings =
     (Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null) ?? defaultSettings
 
+  // 计算初始匹配类型索引（内部用 number，保存时再映射回 "flowType" | "addupItemCode"）
+  const initialMatchType =
+    initialSettings.otherFlowMatchType ?? defaultSettings.otherFlowMatchType
+  const initialMatchIndex = Math.max(
+    0,
+    MATCH_TYPE_OPTIONS.findIndex((opt) => opt.value === initialMatchType),
+  )
+
   // State
   const [cookie, setCookie] = useState(initialSettings.cookie)
   const [titleDayColor] = useState(initialSettings.titleDayColor)
@@ -102,13 +113,7 @@ function SettingsView() {
   const [refreshInterval, setRefreshInterval] = useState(
     initialSettings.refreshInterval || 180,
   )
-  const [showFlow, setShowFlow] = useState(initialSettings.showFlow ?? true)
-  const [showOtherFlow, setShowOtherFlow] = useState(
-    initialSettings.showOtherFlow ?? true,
-  )
-  const [otherFlowMatchType, setOtherFlowMatchType] = useState<
-    "flowType" | "addupItemCode"
-  >(initialSettings.otherFlowMatchType ?? "flowType")
+  const [matchTypeIndex, setMatchTypeIndex] = useState<number>(initialMatchIndex)
   const [otherFlowMatchValue, setOtherFlowMatchValue] = useState(
     initialSettings.otherFlowMatchValue ?? "3",
   )
@@ -117,6 +122,10 @@ function SettingsView() {
   const [showRemainRatio, setShowRemainRatio] = useState(
     initialSettings.showRemainRatio ?? false,
   )
+
+  // 当前匹配类型（由索引映射得到）
+  const currentMatchType: "flowType" | "addupItemCode" =
+    MATCH_TYPE_OPTIONS[matchTypeIndex]?.value ?? "flowType"
 
   const handleSave = () => {
     const newSettings: ChinaUnicomSettings = {
@@ -128,9 +137,7 @@ function SettingsView() {
       refreshTimeDayColor,
       refreshTimeNightColor,
       refreshInterval,
-      showFlow,
-      showOtherFlow,
-      otherFlowMatchType,
+      otherFlowMatchType: currentMatchType,
       otherFlowMatchValue,
       enableBoxJs,
       boxJsUrl,
@@ -220,7 +227,7 @@ function SettingsView() {
             <Text font="caption2" foregroundStyle="secondaryLabel">
               • 开启后优先从 BoxJs 读取联通 Cookie；
               未配置或读取失败时，再使用下方「登录凭证」中的手动 Cookie。
-              {"\n"}• BoxJs地址，例如：https://boxjs.com 或 http://192.168.1.5:9999
+              {"\n"}• BoxJs 地址，例如：https://boxjs.com 或 http://192.168.1.5:9999
             </Text>
           }
         >
@@ -253,7 +260,7 @@ function SettingsView() {
           }
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              建议通过重写抓取中国联通客端登录态 Cookie 后粘贴到此处。
+              建议通过重写抓取中国联通客户端登录态 Cookie 后粘贴到此处。
             </Text>
           }
         >
@@ -303,26 +310,6 @@ function SettingsView() {
           </Picker>
         </Section>
 
-        {/* 通用流量配置 */}
-        <Section
-          header={
-            <Text font="body" fontWeight="semibold">
-              通用流量配置
-            </Text>
-          }
-          footer={
-            <Text font="caption2" foregroundStyle="secondaryLabel">
-              关闭后将隐藏绿色「通用流量」卡片，仅保留其它卡片。
-            </Text>
-          }
-        >
-          <Toggle
-            title="显示通用流量卡片"
-            value={showFlow}
-            onChanged={setShowFlow}
-          />
-        </Section>
-
         {/* 定向流量配置 */}
         <Section
           header={
@@ -332,37 +319,38 @@ function SettingsView() {
           }
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              默认按 flowType="3" 聚合定向、省内、闲时等其它流量。
-              如需精确到某个套餐，可改用 addupItemCode（例如 40026）。
+              • 匹配类型：
+              {"\n\t"}• flowType：适合按「通用/定向/省内」这类分类聚合（默认 flowType=3）。
+              {"\n\t"}• addupItemCode：适合精确指向某一套餐（如 40008 为联通王卡专属 30G）。
+              {"\n"}• 匹配值：根据上方类型填写，建议先在日志中确认 flowType / addupItemCode。
             </Text>
           }
         >
-          <Toggle
-            title="显示定向/其它流量卡片"
-            value={showOtherFlow}
-            onChanged={setShowOtherFlow}
-          />
+          <Picker
+            title={"匹配类型"}
+            value={matchTypeIndex}
+            onChanged={(value: number) => {
+              setMatchTypeIndex(Number(value))
+            }}
+            pickerStyle={"menu"}
+          >
+            {MATCH_TYPE_OPTIONS.map((opt, index) => (
+              <Text key={opt.value} tag={index as any}>
+                {opt.label}
+              </Text>
+            ))}
+          </Picker>
 
-          {showOtherFlow ? (
-            <>
-              <TextField
-                title="匹配类型"
-                value={otherFlowMatchType}
-                prompt="flowType 或 addupItemCode"
-                onChanged={(text) => {
-                  if (text === "flowType" || text === "addupItemCode") {
-                    setOtherFlowMatchType(text)
-                  }
-                }}
-              />
-              <TextField
-                title="匹配值"
-                value={otherFlowMatchValue}
-                prompt="flowType: 3 或 addupItemCode: 40026"
-                onChanged={setOtherFlowMatchValue}
-              />
-            </>
-          ) : null}
+          <TextField
+            title="匹配值"
+            value={otherFlowMatchValue}
+            prompt={
+              currentMatchType === "flowType"
+                ? '例如：3（定向/专属/其它流量）'
+                : '例如：40008（联通王卡专属 30G）'
+            }
+            onChanged={setOtherFlowMatchValue}
+          />
         </Section>
       </List>
     </NavigationStack>
