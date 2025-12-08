@@ -1,5 +1,6 @@
 import {
   Navigation,
+  NavigationStack,
   Form,
   Section,
   TextField,
@@ -8,15 +9,13 @@ import {
   useState,
   Text,
   VStack,
-  Spacer,
-  HStack,
-  Link,
   Toggle,
 } from "scripting"
 
 declare const Storage: any
+declare const Dialog: any
 
-const VERSION = "2025-12-08R1"
+const VERSION = "2025-12-08R9"
 
 // 联通 BoxJS 订阅 & 模块地址
 const UNICOM_BOXJS_SUB_URL =
@@ -50,36 +49,29 @@ const SETTINGS_KEY = "chinaUnicomSettings"
 // 默认设置
 const defaultSettings: ChinaUnicomSettings = {
   cookie: "",
-  // 标题颜色：浅色模式用深灰，暗色模式用浅灰
   titleDayColor: "#666666",
   titleNightColor: "#CCCCCC",
-  // 内容颜色：浅色模式用黑色，暗色模式用白色
   descDayColor: "#000000",
   descNightColor: "#FFFFFF",
-  // 刷新时间颜色：浅色模式用中灰，暗色模式用浅灰
   refreshTimeDayColor: "#999999",
   refreshTimeNightColor: "#AAAAAA",
-  // 默认刷新间隔 15 分钟
   refreshInterval: 15,
-  // 通用流量配置
   showFlow: true,
-  // 其他流量配置
   showOtherFlow: true,
   otherFlowMatchType: "flowType",
   otherFlowMatchValue: "3",
-  // BoxJs 配置
   enableBoxJs: false,
   boxJsUrl: "",
-  // 默认：显示“已使用百分比”
   showRemainRatio: false,
 }
 
-function SettingsPage() {
+function SettingsView() {
   const dismiss = Navigation.useDismiss()
+
   const initialSettings =
     (Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null) ?? defaultSettings
 
-  // State for the form fields
+  // State
   const [cookie, setCookie] = useState(initialSettings.cookie)
   const [titleDayColor] = useState(initialSettings.titleDayColor)
   const [titleNightColor] = useState(initialSettings.titleNightColor)
@@ -102,30 +94,9 @@ function SettingsPage() {
   )
   const [enableBoxJs, setEnableBoxJs] = useState(initialSettings.enableBoxJs ?? false)
   const [boxJsUrl, setBoxJsUrl] = useState(initialSettings.boxJsUrl ?? "")
-  // 新增：是否显示“剩余百分比”
   const [showRemainRatio, setShowRemainRatio] = useState(
     initialSettings.showRemainRatio ?? false,
   )
-
-  // 打开联通 BoxJS 订阅
-  const handleOpenUnicomBoxJsSub = async () => {
-    await Safari.openURL(UNICOM_BOXJS_SUB_URL)
-  }
-
-  // 一键安装到 Surge
-  const handleInstallToSurge = async () => {
-    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
-    const surgeUrl = `surge:///install-module?url=${encodedUrl}`
-    await Safari.openURL(surgeUrl)
-  }
-
-  // 一键安装到 Egern
-  const handleInstallToEgern = async () => {
-    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
-    const name = encodeURIComponent("中国联通余量查询")
-    const egernUrl = `egern:/modules/new?name=${name}&url=${encodedUrl}`
-    await Safari.openURL(egernUrl)
-  }
 
   const handleSave = () => {
     const newSettings: ChinaUnicomSettings = {
@@ -149,10 +120,62 @@ function SettingsPage() {
     dismiss()
   }
 
+  const handleAbout = async () => {
+    await Dialog.alert({
+      title: "联通余量组件",
+      message:
+        `作者：©ByteValley\n` +
+        `版本：v${VERSION}`,
+      buttonLabel: "好",
+    })
+  }
+
+  // 打开联通 BoxJS 订阅
+  const handleOpenUnicomBoxJsSub = async () => {
+    await Safari.openURL(UNICOM_BOXJS_SUB_URL)
+  }
+
+  // 一键安装到 Surge
+  const handleInstallToSurge = async () => {
+    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
+    const surgeUrl = `surge:///install-module?url=${encodedUrl}`
+    await Safari.openURL(surgeUrl)
+  }
+
+  // 一键安装到 Egern
+  const handleInstallToEgern = async () => {
+    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
+    const name = encodeURIComponent("中国联通余量查询")
+    const egernUrl = `egern:/modules/new?name=${name}&url=${encodedUrl}`
+    await Safari.openURL(egernUrl)
+  }
+
   return (
-    <VStack>
+    <VStack
+      spacing={0}
+      navigationTitle={"联通余量组件"}
+      navigationBarTitleDisplayMode={"inline"}
+      toolbar={{
+        topBarLeading: [
+          <Button title={"关闭"} action={dismiss} />,
+        ],
+        topBarTrailing: [
+          <Button title={"完成"} action={handleSave} />,
+        ],
+        bottomBar: [
+          // 用一个正式的按钮来承载版权 & 版本信息
+          <Button
+            systemImage="info.circle"
+            title="关于本组件"
+            action={handleAbout}
+            foregroundStyle="secondaryLabel"
+          />,
+        ],
+      }}
+      background={"clear"}
+    >
+      {/* 表单本身让系统按默认 grouped 样式铺满 */}
       <Form>
-        {/* BoxJS 订阅 + 模块一键安装 */}
         <Section title="组件模块一键安装">
           <Text
             font="caption2"
@@ -163,16 +186,9 @@ function SettingsPage() {
             {"\n"}1）在 BoxJS 中订阅配置（可同步 Cookie 等信息）
             {"\n"}2）安装中国联通余量查询模块到支持的客户端
           </Text>
-
-          <Button title="📦 打开 BoxJS 订阅" action={handleOpenUnicomBoxJsSub} />
-          <Button title="⚡ 安装到 Surge" action={handleInstallToSurge} />
-          <Button title="🌀 安装到 Egern" action={handleInstallToEgern} />
-
-          <Text font="caption2" foregroundStyle="secondaryLabel" padding={{ top: 8 }}>
-            • BoxJS：在浏览器中打开 BoxJS 后，订阅联通配置
-            {"\n"}• Surge：跳转到模块安装页，确认后即可添加
-            {"\n"}• Egern：打开“添加模块”页面并自动填入模块地址
-          </Text>
+          <Button title="📦 添加 BoxJS 订阅" action={handleOpenUnicomBoxJsSub} />
+          <Button title="⚡ 安装 Surge 模块" action={handleInstallToSurge} />
+          <Button title="🌀 安装 Egern 模块" action={handleInstallToEgern} />
         </Section>
 
         <Section title="登录凭证">
@@ -181,12 +197,12 @@ function SettingsPage() {
             foregroundStyle="secondaryLabel"
             padding={{ bottom: 4 }}
           >
-            请在此处粘贴您获取的联通营业厅 App 的 Cookie。
+            建议通过重写或 BoxJs 抓取 10010 App 登录态 Cookie 后粘贴到此处。
           </Text>
           <TextField
             title="Cookie"
             value={cookie}
-            prompt="在此处粘贴 Cookie"
+            prompt="在此处粘贴联通 App 的 Cookie"
             onChanged={setCookie}
           />
         </Section>
@@ -197,14 +213,15 @@ function SettingsPage() {
             foregroundStyle="secondaryLabel"
             padding={{ bottom: 4 }}
           >
-            设置小组件自动刷新的频率（分钟）。
+            控制组件自动刷新的最小间隔时间，建议 5–60 分钟。
           </Text>
           <TextField
             title="刷新间隔 (分钟)"
             value={String(refreshInterval)}
+            prompt="例如：15"
             onChanged={(text) => {
-              const interval = parseInt(text, 10)
-              setRefreshInterval(isNaN(interval) ? 0 : interval)
+              const v = parseInt(text, 10)
+              setRefreshInterval(isNaN(v) ? 0 : v)
             }}
           />
         </Section>
@@ -215,8 +232,8 @@ function SettingsPage() {
             foregroundStyle="secondaryLabel"
             padding={{ bottom: 4 }}
           >
-            控制圆环百分比的含义（通用流量 / 定向流量 / 语音）：
-            关闭＝显示已使用百分比；开启＝显示剩余百分比。
+            作用于通用流量 / 定向流量 / 语音三个圆环：
+            关闭＝按已用占比绘制；开启＝按剩余占比绘制。
           </Text>
           <Toggle
             title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
@@ -225,33 +242,32 @@ function SettingsPage() {
           />
         </Section>
 
-        <Section title="流量显示设置">
+        <Section title="通用流量显示">
           <Text
             font="caption2"
             foregroundStyle="secondaryLabel"
             padding={{ bottom: 4 }}
           >
-            配置是否显示通用流量和其他流量。
+            关闭后将隐藏绿色「通用流量」卡片，仅保留其它卡片。
           </Text>
           <Toggle
-            title="显示剩余通用流量"
+            title="显示通用流量卡片"
             value={showFlow}
             onChanged={setShowFlow}
           />
         </Section>
 
-        <Section title="其他流量设置">
+        <Section title="定向/其它流量">
           <Text
             font="caption2"
             foregroundStyle="secondaryLabel"
             padding={{ bottom: 4 }}
           >
-            配置是否显示其他流量（如省内流量、闲时流量等）。可通过 flowType 或
-            addupItemCode 来匹配。
+            默认按 flowType=&quot;3&quot; 聚合定向、省内、闲时等其它流量。
+            如需精确到某个套餐，可改用 addupItemCode（例如 40026）。
           </Text>
-
           <Toggle
-            title="显示其他流量"
+            title="显示定向/其它流量卡片"
             value={showOtherFlow}
             onChanged={setShowOtherFlow}
           />
@@ -274,15 +290,6 @@ function SettingsPage() {
                 prompt="flowType: 3 或 addupItemCode: 40026"
                 onChanged={setOtherFlowMatchValue}
               />
-              <Text
-                font="caption2"
-                foregroundStyle="secondaryLabel"
-                padding={{ top: 4 }}
-              >
-                • flowType="3": 匹配所有其他类型流量（省内、闲时等）
-                {"\n"}• addupItemCode="40026": 匹配特定类型的套餐内流量
-                {"\n"}• 建议使用 flowType="3" 以适配不同套餐
-              </Text>
             </>
           ) : null}
         </Section>
@@ -293,11 +300,12 @@ function SettingsPage() {
             foregroundStyle="secondaryLabel"
             padding={{ bottom: 4 }}
           >
-            开启后将从 BoxJs 读取 10010.cookie 作为 Cookie。开启时将优先使用
-            BoxJs 中的 Cookie。
+            开启后优先从 BoxJs 的
+            DataCollection.ChinaUnicom.Settings.Cookie 读取联通 Cookie；
+            未配置或读取失败时退回到上方手动粘贴的 Cookie。
           </Text>
           <Toggle
-            title="启用 BoxJs"
+            title="启用 BoxJs 读取 Cookie"
             value={enableBoxJs}
             onChanged={setEnableBoxJs}
           />
@@ -305,36 +313,24 @@ function SettingsPage() {
             <TextField
               title="BoxJs 地址"
               value={boxJsUrl}
-              prompt="请输入 BoxJs 地址，例如：http://boxjs.com"
+              prompt="例如：http://boxjs.com 或 http://192.168.1.5:9999"
               onChanged={setBoxJsUrl}
             />
           ) : null}
         </Section>
-
-        <Button title="保存设置" action={handleSave} />
       </Form>
-      <Spacer />
-      <VStack alignment="center" spacing={4} padding={{ bottom: 10 }}>
-        <HStack alignment="center" spacing={4}>
-          <Text font="caption2" foregroundStyle="secondaryLabel">
-            ©界面样式修改自
-          </Text>
-          <Link url="mailto:627908664@qq.com">
-            <Text font="caption2" foregroundStyle="accentColor">@王大大</Text>
-          </Link>
-        </HStack>
-        <HStack alignment="center" spacing={4}>
-          <Text font="caption2" foregroundStyle="secondaryLabel">
-            优化开发：
-          </Text>
-          <Text font="caption2" foregroundStyle="accentColor">@DTZSGHNR</Text>
-        </HStack>
-        <Text font="caption2" foregroundStyle="secondaryLabel">
-          Version {VERSION}
-        </Text>
-      </VStack>
     </VStack>
   )
 }
 
-Navigation.present(<SettingsPage />)
+async function run() {
+  await Navigation.present({
+    element: (
+      <NavigationStack>
+        <SettingsView />
+      </NavigationStack>
+    ),
+  })
+}
+
+run()
