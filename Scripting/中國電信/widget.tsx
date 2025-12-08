@@ -19,7 +19,6 @@ import { getSettings, queryImportantData } from "./telecomApi"
 declare const Storage: any
 declare const FileManager: any
 
-const SETTINGS_KEY = "chinaTelecomSettings"
 const LOGO_URL =
   "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10000.png"
 const LOGO_CACHE_KEY = "chinaTelecom_logo_path"
@@ -32,7 +31,9 @@ async function getLogoPath(): Promise<string | null> {
       try {
         if (FileManager?.existsSync?.(cachedPath)) return cachedPath
         if (FileManager?.fileExists?.(cachedPath)) return cachedPath
-      } catch { }
+      } catch {
+        // ignore
+      }
     }
 
     const response = await fetch(LOGO_URL)
@@ -60,7 +61,14 @@ async function getLogoPath(): Promise<string | null> {
 
 // 组件数据结构
 type TelecomData = {
-  fee: { title: string; balance: string; unit: string }
+  fee: {
+    title: string
+    balance: string
+    unit: string
+    remain?: number
+    realTimeFee?: number
+    hasArrear?: boolean
+  }
   voice: {
     title: string
     balance: string
@@ -84,11 +92,8 @@ type TelecomData = {
   }
 }
 
-// 格式化流量值
-function formatFlowValue(
-  value: number,
-  unit: string = "MB"
-): { balance: string; unit: string } {
+// 格式化流量值（自动 MB→GB）
+function formatFlowValue(value: number): { balance: string; unit: string } {
   if (value > 1024) {
     return {
       balance: (value / 1024).toFixed(2),
@@ -123,6 +128,14 @@ function nowHHMM(): string {
   return `${hh}:${mm}`
 }
 
+// 根据开关计算比例：true=剩余 / total；false=已用 / total
+function calcRatio(total: number, remain: number, showRemainRatio: boolean): number {
+  if (total <= 0) return 0
+  const used = Math.max(0, Math.min(total, total - remain))
+  const remainSafe = Math.max(0, Math.min(total, remain))
+  return showRemainRatio ? remainSafe / total : used / total
+}
+
 // ================= 样式定义 =================
 
 // 外层大卡底
@@ -131,7 +144,6 @@ const outerCardBg: DynamicShapeStyle = {
   dark: "rgba(0, 0, 0, 0.90)",
 }
 
-// 每格浅色背景 + 主题色
 const ringCardThemes = {
   fee: {
     tint: { light: "#0080CB", dark: "#66adff" } as DynamicShapeStyle,
@@ -167,37 +179,25 @@ const ringCardThemes = {
   },
 }
 
-const labelStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.55)",
-  dark: "rgba(255,255,255,0.65)",
-}
-
-const valueStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.92)",
-  dark: "rgba(255,255,255,0.96)",
-}
+type RingCardTheme = (typeof ringCardThemes)[keyof typeof ringCardThemes]
 
 const timeStyle: DynamicShapeStyle = {
   light: "rgba(0, 0, 0, 0.55)",
   dark: "rgba(255,255,255,0.65)",
 }
 
-// ================= UI 组件（对齐移动版 FeeCard / RingStatCard） =================
+// ================= UI 组件 =================
 
 // 左侧话费块
-function FeeCard({
-  title,
-  valueText,
-  theme,
-  logoPath,
-  updateTime,
-}: {
+function FeeCard(props: {
   title: string
   valueText: string
-  theme: typeof ringCardThemes.fee
+  theme: RingCardTheme
   logoPath?: string | null
   updateTime: string
 }) {
+  const { title, valueText, theme, logoPath, updateTime } = props
+
   const isUrlLogo =
     !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
 
@@ -235,17 +235,16 @@ function FeeCard({
         <Spacer />
       </HStack>
 
-      {/* 更新时间：一行，图标小一点，时间略大 */}
+      {/* 更新时间 */}
       <Spacer minLength={4} />
       <HStack alignment="center" spacing={3}>
         <Spacer />
-        <Image systemName="arrow.triangle.2.circlepath" font={4} foregroundStyle={timeStyle} />
-        <Text
-          font={11}
+        <Image
+          systemName="arrow.triangle.2.circlepath"
+          font={4}
           foregroundStyle={timeStyle}
-          lineLimit={1}
-          minScaleFactor={0.5}
-        >
+        />
+        <Text font={11} foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.5}>
           {updateTime}
         </Text>
         <Spacer />
@@ -280,17 +279,13 @@ function FeeCard({
 }
 
 // 圆环卡
-function RingStatCard({
-  title,
-  valueText,
-  theme,
-  ratio,
-}: {
+function RingStatCard(props: {
   title: string
   valueText: string
-  theme: typeof ringCardThemes.flow
+  theme: RingCardTheme
   ratio?: number
 }) {
+  const { title, valueText, theme, ratio } = props
   const r = clamp01(ratio ?? 0)
 
   return (
@@ -375,38 +370,53 @@ function convertToTelecomData(apiData: any): TelecomData {
   const indexBalanceDataInfo = balanceInfo?.indexBalanceDataInfo
   const phoneBillRegion = balanceInfo?.phoneBillRegion
 
-  let balance = parseFloat(indexBalanceDataInfo?.balance || "0")
-  const arrear = parseFloat(indexBalanceDataInfo?.arrear || "0")
+  const rawBalance = safeNum(indexBalanceDataInfo?.balance)
+  const arrear = safeNum(indexBalanceDataInfo?.arrear)
+
+  // 计算“剩余”侧：有欠费则账户余额，没有则剩余话费
+  let remainFee = rawBalance
+  if (arrear > 0) {
+    remainFee = rawBalance - arrear
+  }
+
+  // 实时费用（如果有）
+  let realTimeFee = 0
+  if (phoneBillRegion?.subTitleHh) {
+    realTimeFee = safeNum(
+      (phoneBillRegion.subTitleHh as string)?.replace("元", ""),
+    )
+  }
 
   console.log(
     "💰 [Telecom] 话费 balanceInfo =",
     JSON.stringify(balanceInfo),
-    "解析后 balance =",
-    balance,
+    "rawBalance =",
+    rawBalance,
     "arrear =",
-    arrear
+    arrear,
+    "remainFee =",
+    remainFee,
+    "realTimeFee =",
+    realTimeFee,
   )
 
-  let feeTitle = "剩余话费"
-  let feeValue = balance
+  // 默认仍按“剩余侧”展示，具体显示逻辑放到 WidgetView 里按开关切
+  let feeTitle = arrear > 0 ? "账户余额" : "剩余话费"
+  let feeValueNumber = remainFee
 
-  if (arrear > 0) {
-    feeTitle = "账户余额"
-    feeValue = balance - arrear
-    console.log("💰 [Telecom] 存在欠费，展示账户余额:", feeValue)
-  } else if (balance === 0 && phoneBillRegion?.subTitleHh) {
-    const realTimeFee = parseFloat(phoneBillRegion.subTitleHh.replace("元", "") || "0")
-    if (realTimeFee > 0) {
-      feeTitle = "实时费用"
-      feeValue = realTimeFee
-      console.log("💰 [Telecom] 使用实时费用展示:", feeValue)
-    }
+  // 如果剩余为 0 但实时费用 > 0，就默认用实时费用兜底
+  if (remainFee === 0 && realTimeFee > 0) {
+    feeTitle = "实时费用"
+    feeValueNumber = realTimeFee
   }
 
-  const feeData = {
+  const feeData: TelecomData["fee"] = {
     title: feeTitle,
-    balance: feeValue.toFixed(2),
+    balance: feeValueNumber.toFixed(2),
     unit: "元",
+    remain: remainFee,
+    realTimeFee: realTimeFee > 0 ? realTimeFee : undefined,
+    hasArrear: arrear > 0,
   }
 
   // ========== 语音 ==========
@@ -431,7 +441,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     voiceTotal
   )
 
-  const voiceData = {
+  const voiceData: TelecomData["voice"] = {
     title: "剩余语音",
     balance: voiceBalance.toFixed(0),
     unit: "分钟",
@@ -515,8 +525,8 @@ function convertToTelecomData(apiData: any): TelecomData {
       const usedStr: string = String(item.leftTitleHh || "")
       const remainStr: string = String(item.rightTitleHh || "")
 
-      let usedMB = parseFlowStrToMB(usedStr)
-      let remainMB = parseFlowStrToMB(remainStr)
+      const usedMB = parseFlowStrToMB(usedStr)
+      const remainMB = parseFlowStrToMB(remainStr)
 
       if (usedMB <= 0 && remainMB <= 0) continue
 
@@ -555,6 +565,7 @@ function convertToTelecomData(apiData: any): TelecomData {
     commonUsedMB === 0 &&
     (specialRemainMB > 0 || specialUsedMB > 0)
   ) {
+    // 兜底：只有定向流量时，把它当通用
     commonRemainMB = specialRemainMB
     commonUsedMB = specialUsedMB
     specialRemainMB = 0
@@ -581,25 +592,23 @@ function convertToTelecomData(apiData: any): TelecomData {
     specialTotalMB
   )
 
-  const flowFormatted = formatFlowValue(commonRemainMB, "MB")
-  const flowData_converted = {
+  const flowRemainFormatted = formatFlowValue(commonRemainMB)
+  const flowData_converted: TelecomData["flow"] = {
     title: "通用流量",
-    balance: flowFormatted.balance,
-    unit: flowFormatted.unit,
+    balance: flowRemainFormatted.balance,
+    unit: flowRemainFormatted.unit,
     used: commonUsedMB,
     total: commonTotalMB,
   }
 
-  let otherFlowData:
-    | { title: string; balance: string; unit: string; used?: number; total?: number }
-    | undefined
+  let otherFlowData: TelecomData["otherFlow"]
 
   if (specialRemainMB > 0 || specialUsedMB > 0) {
-    const otherFlowFormatted = formatFlowValue(specialRemainMB, "MB")
+    const otherRemainFormatted = formatFlowValue(specialRemainMB)
     otherFlowData = {
       title: "定向流量",
-      balance: otherFlowFormatted.balance,
-      unit: otherFlowFormatted.unit,
+      balance: otherRemainFormatted.balance,
+      unit: otherRemainFormatted.unit,
       used: specialUsedMB,
       total: specialTotalMB,
     }
@@ -620,38 +629,72 @@ function convertToTelecomData(apiData: any): TelecomData {
 
 // ================= 主视图 =================
 
-function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string | null }) {
-  // 计算剩余比例：remain / total
-  const voiceTotal =
-    typeof data.voice.total === "number"
-      ? data.voice.total
-      : parseFloat(String(data.voice.total ?? "0"))
-  const voiceRemain = parseFloat(String(data.voice.balance ?? "0"))
-  const voiceRatio = voiceTotal > 0 ? voiceRemain / voiceTotal : 0
+function WidgetView(props: {
+  data: TelecomData
+  logoPath?: string | null
+  showRemainRatio: boolean
+}) {
+  const { data, logoPath, showRemainRatio } = props
+  const updateTime = nowHHMM()
 
-  const flowTotal =
-    typeof data.flow.total === "number"
-      ? data.flow.total
-      : parseFloat(String(data.flow.total ?? "0"))
-  const flowRemain = parseFloat(String(data.flow.balance ?? "0"))
-  const flowRatio = flowTotal > 0 ? flowRemain / flowTotal : 0
+  // ===== 话费：按开关决定显示剩余还是实时费用 =====
+  const feeRemain = safeNum(
+    data.fee.remain ?? data.fee.balance, // 兼容旧数据
+  )
+  const feeRealtime = data.fee.realTimeFee != null
+    ? safeNum(data.fee.realTimeFee)
+    : feeRemain
+  const feeHasArrear = !!data.fee.hasArrear
 
-  let otherRatio = 0
-  const other = data.otherFlow ?? {
+  // showRemainRatio = true  显示“剩余话费 / 账户余额”
+  // showRemainRatio = false 显示“实时费用”（如果有），否则仍回落到剩余侧
+  const feeTitle = showRemainRatio
+    ? feeHasArrear
+      ? "账户余额"
+      : "剩余话费"
+    : data.fee.realTimeFee != null
+      ? "实时费用"
+      : feeHasArrear
+        ? "账户余额"
+        : "剩余话费"
+
+  const feeNumber = showRemainRatio ? feeRemain : feeRealtime
+  const feeValueText = `${feeNumber.toFixed(2)}${data.fee.unit}`
+
+  // ===== 语音：用 used/total 算，显示已用或剩余分钟 =====
+  const voiceTotal = safeNum(data.voice.total)
+  const voiceUsed = safeNum(data.voice.used)
+  const voiceRemain = Math.max(0, voiceTotal - voiceUsed)
+  const voiceRatio = calcRatio(voiceTotal, voiceRemain, showRemainRatio)
+  const voiceDisplay = showRemainRatio ? voiceRemain : voiceUsed
+  const voiceTitle = showRemainRatio ? "剩余语音" : "已用语音"
+
+  // ===== 通用流量：用 MB 数值算比例，再格式化展示 =====
+  const flowTotalMB = safeNum(data.flow.total)
+  const flowUsedMB = safeNum(data.flow.used)
+  const flowRemainMB = Math.max(0, flowTotalMB - flowUsedMB)
+  const flowRatio = calcRatio(flowTotalMB, flowRemainMB, showRemainRatio)
+  const flowDisplayMB = showRemainRatio ? flowRemainMB : flowUsedMB
+  const flowDisplayFormatted = formatFlowValue(flowDisplayMB)
+  const flowTitle = showRemainRatio ? "通用流量" : "已用通用流量"
+
+  // ===== 定向流量：同上 =====
+  const otherRaw = data.otherFlow ?? {
     title: "定向流量",
     balance: "0",
     unit: "MB",
     used: 0,
     total: 0,
   }
-  const otherTotal =
-    typeof other.total === "number"
-      ? other.total
-      : parseFloat(String(other.total ?? "0"))
-  const otherRemain = parseFloat(String(other.balance ?? "0"))
-  if (otherTotal > 0) otherRatio = otherRemain / otherTotal
+  const otherTotalMB = safeNum(otherRaw.total)
+  const otherUsedMB = safeNum(otherRaw.used)
+  const otherRemainMB = Math.max(0, otherTotalMB - otherUsedMB)
+  const otherRatio = calcRatio(otherTotalMB, otherRemainMB, showRemainRatio)
+  const otherDisplayMB = showRemainRatio ? otherRemainMB : otherUsedMB
+  const otherDisplayFormatted = formatFlowValue(otherDisplayMB)
+  const otherTitle = showRemainRatio ? "定向流量" : "已用定向流量"
 
-  // 小号组件：沿用大话费卡
+  // 小号组件
   if (Widget.family === "systemSmall") {
     return (
       <VStack
@@ -659,11 +702,11 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
         padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
       >
         <FeeCard
-          title={data.fee.title}
-          valueText={`${data.fee.balance}${data.fee.unit}`}
+          title={feeTitle}
+          valueText={feeValueText}
           theme={ringCardThemes.fee}
-          logoPath={logoPath ?? undefined}
-          updateTime={nowHHMM()}
+          logoPath={logoPath}
+          updateTime={updateTime}
         />
       </VStack>
     )
@@ -681,30 +724,30 @@ function WidgetView({ data, logoPath }: { data: TelecomData; logoPath?: string |
     >
       <HStack alignment="center" spacing={10}>
         <FeeCard
-          title={data.fee.title}
-          valueText={`${data.fee.balance}${data.fee.unit}`}
+          title={feeTitle}
+          valueText={feeValueText}
           theme={ringCardThemes.fee}
-          logoPath={logoPath ?? undefined}
-          updateTime={nowHHMM()}
+          logoPath={logoPath}
+          updateTime={updateTime}
         />
 
         <RingStatCard
-          title={data.flow.title}
-          valueText={`${data.flow.balance}${data.flow.unit}`}
+          title={flowTitle}
+          valueText={`${flowDisplayFormatted.balance}${flowDisplayFormatted.unit}`}
           theme={ringCardThemes.flow}
           ratio={flowRatio}
         />
 
         <RingStatCard
-          title={other.title}
-          valueText={`${other.balance}${other.unit}`}
+          title={otherTitle}
+          valueText={`${otherDisplayFormatted.balance}${otherDisplayFormatted.unit}`}
           theme={ringCardThemes.flowDir}
           ratio={otherRatio}
         />
 
         <RingStatCard
-          title={data.voice.title}
-          valueText={`${data.voice.balance}分钟`}
+          title={voiceTitle}
+          valueText={`${voiceDisplay.toFixed(0)}分钟`}
           theme={ringCardThemes.voice}
           ratio={voiceRatio}
         />
@@ -731,11 +774,20 @@ async function render() {
     return
   }
 
+  const showRemainRatio = !!(settings as any)?.showRemainRatio
+
   try {
     const logoPath = await getLogoPath()
     const apiData = await queryImportantData()
     const telecomData = convertToTelecomData(apiData)
-    Widget.present(<WidgetView data={telecomData} logoPath={logoPath} />, reloadPolicy)
+    Widget.present(
+      <WidgetView
+        data={telecomData}
+        logoPath={logoPath}
+        showRemainRatio={showRemainRatio}
+      />,
+      reloadPolicy,
+    )
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error("渲染失败:", errorMessage)
