@@ -6,8 +6,8 @@
   "icon" : "antenna.radiowaves.left.and.right",
   "color" : "rgba(28, 140, 255,1)",
   "author": {
-    "email": "2753086015@qq.com",
-    "name": "DTZSGHNR",
+    "email": null,
+    "name": "ByteValley",
     "homepage": null
   },
   "contributors" : [
@@ -31,7 +31,7 @@
     "es" : "",
     "it" : ""
   },
-  "version" : "2025-12-08R1",
+  "version" : "1.0.0",
   "localizedNames" : {
     "en" : "",
     "fr" : "",
