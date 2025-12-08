@@ -7,6 +7,7 @@ import {
   Text,
   Picker,
   Toggle,
+  Script,
   useState,
 } from "scripting"
 
@@ -239,10 +240,25 @@ function SettingsView() {
   )
 }
 
+// ========= App 包装：用于 interactiveDismissDisabled =========
+
+type AppProps = {
+  interactiveDismissDisabled?: boolean
+}
+
+function App(_props: AppProps) {
+  // 如果以后你想做全局 dismiss，可以在这里用 Navigation.useDismiss()
+  // const dismiss = Navigation.useDismiss()
+  return <SettingsView />
+}
+
+// ========= 入口 =========
+
 async function run() {
   await Navigation.present({
-    element: <SettingsView />,
+    element: <App interactiveDismissDisabled />,
   })
+  Script.exit()
 }
 
 run()
