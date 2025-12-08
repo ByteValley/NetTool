@@ -33,6 +33,8 @@ type ChinaUnicomSettings = {
   otherFlowMatchValue?: string
   enableBoxJs?: boolean
   boxJsUrl?: string
+  // 统一控制圆环百分比：false=已用，true=剩余
+  showRemainRatio?: boolean
 }
 
 const SETTINGS_KEY = "chinaUnicomSettings"
@@ -47,7 +49,7 @@ const API_DETAIL_URL =
 const UNICOM_LOGO_URL =
   "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10010.png"
 
-// 组件数据结构（加入 updateTime，方便和移动保持一致）
+// 组件数据结构
 type UnicomData = {
   fee: { title: string; balance: string; unit: string }
   voice: { title: string; balance: string; unit: string; used?: number; total?: number }
@@ -83,7 +85,6 @@ type DetailApiResponse = {
   canuseFlowAllUnit?: string
   canuseVoiceAllUnit?: string
   canuseSmsAllUnit?: string
-  // 流量汇总列表：flowtype=1通用流量，2/3定向流量
   flowSumList?: Array<{
     flowtype: string
     xcanusevalue: string
@@ -142,7 +143,7 @@ async function fetchCookieFromBoxJs(boxJsUrl: string): Promise<string | null> {
     } else {
       console.warn(
         "⚠️ DataCollection.ChinaUnicom.Settings.Cookie 不存在或格式不正确:",
-        root
+        root,
       )
       return null
     }
@@ -220,7 +221,6 @@ function extractVoiceAndFlowData(detailData: DetailApiResponse): {
     const voiceRemain = voiceResource?.remainResource || "0"
     const voiceUsed = voiceResource?.userResource || "0"
     const voiceTotal = parseFloat(voiceRemain) + parseFloat(voiceUsed)
-    // const voiceUnit = detailData.canuseVoiceAllUnit || "分钟"
     const voiceUnit = "分钟"
 
     // 通用流量：优先 flowSumList flowtype = "1"
@@ -269,13 +269,13 @@ function extractVoiceAndFlowData(detailData: DetailApiResponse): {
 
     console.log(
       "📞 语音:",
-      `已用${voiceUsed}${voiceUnit} 剩余${voiceRemain}${voiceUnit} 总计${voiceTotal}${voiceUnit}`
+      `已用${voiceUsed}${voiceUnit} 剩余${voiceRemain}${voiceUnit} 总计${voiceTotal}${voiceUnit}`,
     )
     console.log(
       "📶 通用流量:",
       `已用${formatFlowValue(flowUsedMB, "MB").balance}${formatFlowValue(flowUsedMB, "MB").unit} ` +
       `剩余${flowFormatted.balance}${flowFormatted.unit} ` +
-      `总计${formatFlowValue(flowTotalMB, "MB").balance}${formatFlowValue(flowTotalMB, "MB").unit}`
+      `总计${formatFlowValue(flowTotalMB, "MB").balance}${formatFlowValue(flowTotalMB, "MB").unit}`,
     )
 
     return result
@@ -286,7 +286,10 @@ function extractVoiceAndFlowData(detailData: DetailApiResponse): {
 }
 
 // 格式化流量值（自动转换单位）
-function formatFlowValue(value: number, unit: string = "MB"): {
+function formatFlowValue(
+  value: number,
+  unit: string = "MB",
+): {
   balance: string
   unit: string
 } {
@@ -302,7 +305,7 @@ function formatFlowValue(value: number, unit: string = "MB"): {
   }
 }
 
-// ===== 工具：百分比/时间（和移动保持一致） =====
+// ===== 工具：百分比/时间 =====
 function clamp01(n: number): number {
   if (!isFinite(n)) return 0
   if (n < 0) return 0
@@ -321,6 +324,16 @@ function nowHHMM(): string {
   return `${hh}:${mm}`
 }
 
+// 根据开关计算比例：true = 剩余 / total；false = 已用 / total
+function calcRatio(total: number, remain: number, showRemainRatio: boolean): number {
+  if (total <= 0) return 0
+
+  const remainRatio = remain / total
+  const usedRatio = (total - remain) / total
+
+  const r = showRemainRatio ? remainRatio : usedRatio
+  return clamp01(r)
+}
 
 // ================= 样式定义 =================
 
@@ -366,24 +379,13 @@ const ringCardThemes = {
   },
 }
 
-// 文字颜色
-const labelStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.55)",
-  dark: "rgba(255,255,255,0.65)",
-}
-
-const valueStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.92)",
-  dark: "rgba(255,255,255,0.96)",
-}
-
 // 更新时间颜色
 const timeStyle: DynamicShapeStyle = {
   light: "rgba(0, 0, 0, 0.55)",
   dark: "rgba(255,255,255,0.65)",
 }
 
-// 左侧话费块（和移动 FeeCard 同版，只是 logo 换成联通）
+// 左侧话费块
 function FeeCard({
   title,
   valueText,
@@ -434,7 +436,7 @@ function FeeCard({
         <Spacer />
       </HStack>
 
-      {/* 更新时间：保证不换行 */}
+      {/* 更新时间 */}
       <Spacer minLength={4} />
       <HStack alignment="center" spacing={3}>
         <Spacer />
@@ -480,7 +482,7 @@ function FeeCard({
   )
 }
 
-// 圆环卡（和移动 RingStatCard 同版）
+// 圆环卡
 function RingStatCard({
   title,
   valueText,
@@ -561,25 +563,51 @@ function RingStatCard({
 }
 
 // 主视图
-function WidgetView({ data }: { data: UnicomData }) {
+function WidgetView(props: { data: UnicomData; showRemainRatio: boolean }) {
+  const { data, showRemainRatio } = props
   const logoPath = UNICOM_LOGO_URL
 
-  // ==== 计算百分比：remain / total ====
+  // ===== 语音：全部用 used / total（分钟） =====
   const voiceTotal =
     typeof data.voice.total === "number"
       ? data.voice.total
       : parseFloat(String(data.voice.total ?? "0"))
-  const voiceRemain = parseFloat(String(data.voice.balance ?? "0"))
-  const voiceRatio = voiceTotal > 0 ? voiceRemain / voiceTotal : 0
+  const voiceUsed =
+    typeof data.voice.used === "number"
+      ? data.voice.used
+      : 0
+  const voiceRemain = Math.max(voiceTotal - voiceUsed, 0)
 
+  const voiceRatio = calcRatio(voiceTotal, voiceRemain, showRemainRatio)
+
+  const voiceRemainText = `${voiceRemain.toFixed(0)}${data.voice.unit}`
+  const voiceUsedText = `${Number.isFinite(voiceUsed) ? voiceUsed.toFixed(0) : 0}${data.voice.unit
+    }`
+  const voiceValueText = showRemainRatio ? voiceRemainText : voiceUsedText
+  const voiceTitle = showRemainRatio ? "剩余语音" : "已用语音"
+
+  // ===== 通用流量：used / total 均为 MB，显示时再格式化 =====
   const flowTotal =
     typeof data.flow.total === "number"
       ? data.flow.total
       : parseFloat(String(data.flow.total ?? "0"))
-  const flowRemain = parseFloat(String(data.flow.balance ?? "0"))
-  const flowRatio = flowTotal > 0 ? flowRemain / flowTotal : 0
+  const flowUsed =
+    typeof data.flow.used === "number"
+      ? data.flow.used
+      : 0
+  const flowRemain = Math.max(flowTotal - flowUsed, 0)
 
-  // 👉 没有 otherFlow 也补一格 0 定向流量
+  const flowRatio = calcRatio(flowTotal, flowRemain, showRemainRatio)
+
+  const flowRemainFormatted = formatFlowValue(flowRemain, "MB")
+  const flowUsedFormatted = formatFlowValue(flowUsed, "MB")
+
+  const flowRemainText = `${flowRemainFormatted.balance}${flowRemainFormatted.unit}`
+  const flowUsedText = `${flowUsedFormatted.balance}${flowUsedFormatted.unit}`
+  const flowValueText = showRemainRatio ? flowRemainText : flowUsedText
+  const flowTitle = showRemainRatio ? "通用流量" : "已用通用流量"
+
+  // ===== 定向流量（无则补 0），同样只用 MB 数值 =====
   const other = data.otherFlow ?? {
     title: "定向流量",
     balance: "0",
@@ -592,10 +620,23 @@ function WidgetView({ data }: { data: UnicomData }) {
     typeof other.total === "number"
       ? other.total
       : parseFloat(String(other.total ?? "0"))
-  const otherRemain = parseFloat(String(other.balance ?? "0"))
-  const otherRatio = otherTotal > 0 ? otherRemain / otherTotal : 0
+  const otherUsed =
+    typeof other.used === "number"
+      ? other.used
+      : 0
+  const otherRemain = Math.max(otherTotal - otherUsed, 0)
 
-  // ==== 小号组件：跟移动一样，只展示话费卡 ====
+  const otherRatio = calcRatio(otherTotal, otherRemain, showRemainRatio)
+
+  const otherRemainFormatted = formatFlowValue(otherRemain, "MB")
+  const otherUsedFormatted = formatFlowValue(otherUsed, "MB")
+
+  const otherRemainText = `${otherRemainFormatted.balance}${otherRemainFormatted.unit}`
+  const otherUsedText = `${otherUsedFormatted.balance}${otherUsedFormatted.unit}`
+  const otherValueText = showRemainRatio ? otherRemainText : otherUsedText
+  const otherTitle = showRemainRatio ? "定向流量" : "已用定向流量"
+
+  // 小号组件：只展示话费卡（不参与开关）
   if (Widget.family === "systemSmall") {
     return (
       <VStack
@@ -613,7 +654,7 @@ function WidgetView({ data }: { data: UnicomData }) {
     )
   }
 
-  // ==== 中 / 大号组件：固定 4 列 ====
+  // 中 / 大号组件：四格
   return (
     <VStack
       alignment="center"
@@ -633,22 +674,22 @@ function WidgetView({ data }: { data: UnicomData }) {
         />
 
         <RingStatCard
-          title={data.flow.title}
-          valueText={`${data.flow.balance}${data.flow.unit}`}
+          title={flowTitle}
+          valueText={flowValueText}
           theme={ringCardThemes.flow}
           ratio={flowRatio}
         />
 
         <RingStatCard
-          title={other.title}
-          valueText={`${other.balance}${other.unit}`}
+          title={otherTitle}
+          valueText={otherValueText}
           theme={ringCardThemes.flowDir}
           ratio={otherRatio}
         />
 
         <RingStatCard
-          title={data.voice.title}
-          valueText={`${data.voice.balance}${data.voice.unit}`}
+          title={voiceTitle}
+          valueText={voiceValueText}
           theme={ringCardThemes.voice}
           ratio={voiceRatio}
         />
@@ -685,7 +726,7 @@ async function render() {
   if (!cookie) {
     Widget.present(
       <Text>请先在主应用中设置联通 Cookie，或配置 BoxJs 地址。</Text>,
-      reloadPolicy
+      reloadPolicy,
     )
     return
   }
@@ -732,7 +773,7 @@ async function render() {
     // 方法2：从 fresSumList 获取
     if (totalRemainMB === 0 && matchType === "flowType") {
       const item = detailData.fresSumList?.find(
-        (item) => item.flowtype === matchValue
+        (item) => item.flowtype === matchValue,
       )
       if (item) {
         totalRemainMB = parseFloat(item.xcanusevalue || "0")
@@ -783,7 +824,7 @@ async function render() {
         "🌐 定向流量:",
         `已用${formatFlowValue(totalUsedMB, "MB").balance}${formatFlowValue(totalUsedMB, "MB").unit} ` +
         `剩余${formatted.balance}${formatted.unit} ` +
-        `总计${formatFlowValue(totalMB, "MB").balance}${formatFlowValue(totalMB, "MB").unit}`
+        `总计${formatFlowValue(totalMB, "MB").balance}${formatFlowValue(totalMB, "MB").unit}`,
       )
     }
   }
@@ -799,12 +840,17 @@ async function render() {
   if (!settings) {
     Widget.present(
       <Text>请先在主应用中设置联通 Cookie，或配置 BoxJs 地址。</Text>,
-      reloadPolicy
+      reloadPolicy,
     )
     return
   }
 
-  Widget.present(<WidgetView data={mergedData} />, reloadPolicy)
+  const showRemainRatio = !!settings.showRemainRatio
+
+  Widget.present(
+    <WidgetView data={mergedData} showRemainRatio={showRemainRatio} />,
+    reloadPolicy,
+  )
 }
 
 render()
