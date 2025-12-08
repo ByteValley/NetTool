@@ -17,6 +17,8 @@ import {
 
 type ChinaMobileSettings = {
   refreshInterval: number
+  // 圆环百分比含义：false = 已用百分比；true = 剩余百分比
+  showRemainRatio?: boolean
 }
 
 const SETTINGS_KEY = "chinaMobileSettings"
@@ -50,6 +52,22 @@ function nowHHMM(): string {
   const h = d.getHours().toString().padStart(2, "0")
   const m = d.getMinutes().toString().padStart(2, "0")
   return `${h}:${m}`
+}
+
+// 根据开关计算比例：true = 剩余 / total；false = 已用 / total
+function calcRatio(total: number, remain: number, showRemainRatio: boolean): number {
+  if (total <= 0) return 0
+  const remainRatio = remain / total
+  const usedRatio = (total - remain) / total
+  const r = showRemainRatio ? remainRatio : usedRatio
+  return clamp01(r)
+}
+
+// 按单位格式化数值：GB 保留 2 位，MB 取整
+function formatByUnit(value: number, unit: string): string {
+  if (!isFinite(value)) value = 0
+  if (unit === "GB") return value.toFixed(2)
+  return value.toFixed(0)
 }
 
 // ================= 数据转换 =================
@@ -336,7 +354,7 @@ const ringCardThemes = {
 
 const labelStyle: DynamicShapeStyle = {
   light: "rgba(0, 0, 0, 0.55)",
-  dark: "rgba(255,255,255,0.65)", // 0.75 -> 0.65
+  dark: "rgba(255,255,255,0.65)",
 }
 
 const valueStyle: DynamicShapeStyle = {
@@ -346,12 +364,12 @@ const valueStyle: DynamicShapeStyle = {
 
 const timeStyle: DynamicShapeStyle = {
   light: "rgba(0, 0, 0, 0.55)",
-  dark: "rgba(255,255,255,0.65)", // 同步
+  dark: "rgba(255,255,255,0.65)",
 }
 
 // ================= UI 组件 =================
 
-// 左侧话费块
+// 左侧话费块（不参与已用/剩余切换）
 function FeeCard({
   title,
   valueText,
@@ -394,7 +412,6 @@ function FeeCard({
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
-      {/* 顶部 logo */}
       <Spacer minLength={2} />
       <HStack alignment="center">
         <Spacer />
@@ -402,7 +419,6 @@ function FeeCard({
         <Spacer />
       </HStack>
 
-      {/* 更新时间：保证不换行 */}
       <Spacer minLength={4} />
       <HStack alignment="center" spacing={3}>
         <Spacer />
@@ -422,7 +438,6 @@ function FeeCard({
         <Spacer />
       </HStack>
 
-      {/* 数值 + 标题 */}
       <Spacer minLength={6} />
       <Text
         font={15}
@@ -502,7 +517,6 @@ function RingStatCard({
         </VStack>
       </ZStack>
 
-      {/* 数值 + 标题 */}
       <Spacer minLength={6} />
       <Text
         font={15}
@@ -529,35 +543,74 @@ function RingStatCard({
 }
 
 // 主视图
-function WidgetView({ data }: { data: MobileData }) {
+function WidgetView({ data, showRemainRatio }: { data: MobileData; showRemainRatio: boolean }) {
   const logoPath = "https://raw.githubusercontent.com/anker1209/icon/main/zgyd.png"
 
-  // 剩余百分比：remain / total
+  // ===== 语音（分钟）=====
   const voiceTotal =
     typeof data.voice.total === "number"
       ? data.voice.total
       : parseFloat(String(data.voice.total ?? "0"))
-  const voiceRemain = parseFloat(String(data.voice.balance ?? "0"))
-  const voiceRatio = voiceTotal > 0 ? voiceRemain / voiceTotal : 0
+  const voiceUsed =
+    typeof data.voice.used === "number"
+      ? data.voice.used
+      : 0
+  const voiceRemain = Math.max(voiceTotal - voiceUsed, 0)
 
+  const voiceRatio = calcRatio(voiceTotal, voiceRemain, showRemainRatio)
+
+  const voiceRemainText = `${voiceRemain.toFixed(0)}${data.voice.unit}`
+  const voiceUsedText = `${formatByUnit(voiceUsed, "分钟")}${data.voice.unit}`
+  const voiceValueText = showRemainRatio ? voiceRemainText : voiceUsedText
+  const voiceTitle = showRemainRatio ? "剩余语音" : "已用语音"
+
+  // ===== 通用流量 =====
   const flowTotal =
     typeof data.flow.total === "number"
       ? data.flow.total
       : parseFloat(String(data.flow.total ?? "0"))
-  const flowRemain = parseFloat(String(data.flow.balance ?? "0"))
-  const flowRatio = flowTotal > 0 ? flowRemain / flowTotal : 0
+  const flowUsed =
+    typeof data.flow.used === "number"
+      ? data.flow.used
+      : 0
+  const flowRemain = Math.max(flowTotal - flowUsed, 0)
 
-  let flowDirRatio = 0
-  if (data.flowDir) {
-    const flowDirTotal =
-      typeof data.flowDir.total === "number"
-        ? data.flowDir.total
-        : parseFloat(String(data.flowDir.total ?? "0"))
-    const flowDirRemain = parseFloat(String(data.flowDir.balance ?? "0"))
-    flowDirRatio = flowDirTotal > 0 ? flowDirRemain / flowDirTotal : 0
-  }
+  const flowRatio = calcRatio(flowTotal, flowRemain, showRemainRatio)
 
-  // 小号组件
+  const flowRemainText = `${formatByUnit(flowRemain, data.flow.unit)}${data.flow.unit}`
+  const flowUsedText = `${formatByUnit(flowUsed, data.flow.unit)}${data.flow.unit}`
+  const flowValueText = showRemainRatio ? flowRemainText : flowUsedText
+  const flowTitle = showRemainRatio ? "通用流量" : "已用通用流量"
+
+  // ===== 定向流量（无则补 0）=====
+  const flowDirRaw =
+    data.flowDir ?? ({
+      title: "定向流量",
+      balance: "0",
+      unit: "MB",
+      used: 0,
+      total: 0,
+    } as MobileData["flowDir"])
+
+  const dirUnit = flowDirRaw?.unit ?? "MB"
+  const dirTotal =
+    typeof flowDirRaw?.total === "number"
+      ? (flowDirRaw?.total as number)
+      : parseFloat(String(flowDirRaw?.total ?? "0"))
+  const dirUsed =
+    typeof flowDirRaw?.used === "number"
+      ? (flowDirRaw?.used as number)
+      : 0
+  const dirRemain = Math.max(dirTotal - dirUsed, 0)
+
+  const dirRatio = calcRatio(dirTotal, dirRemain, showRemainRatio)
+
+  const dirRemainText = `${formatByUnit(dirRemain, dirUnit)}${dirUnit}`
+  const dirUsedText = `${formatByUnit(dirUsed, dirUnit)}${dirUnit}`
+  const dirValueText = showRemainRatio ? dirRemainText : dirUsedText
+  const dirTitle = showRemainRatio ? "定向流量" : "已用定向流量"
+
+  // 小号组件：只展示话费卡
   if (Widget.family === "systemSmall") {
     return (
       <VStack
@@ -595,24 +648,22 @@ function WidgetView({ data }: { data: MobileData }) {
         />
 
         <RingStatCard
-          title={data.flow.title}
-          valueText={`${data.flow.balance}${data.flow.unit}`}
+          title={flowTitle}
+          valueText={flowValueText}
           theme={ringCardThemes.flow}
           ratio={flowRatio}
         />
 
-        {data.flowDir ? (
-          <RingStatCard
-            title={data.flowDir.title}
-            valueText={`${data.flowDir.balance}${data.flowDir.unit}`}
-            theme={ringCardThemes.flowDir}
-            ratio={flowDirRatio}
-          />
-        ) : null}
+        <RingStatCard
+          title={dirTitle}
+          valueText={dirValueText}
+          theme={ringCardThemes.flowDir}
+          ratio={dirRatio}
+        />
 
         <RingStatCard
-          title={data.voice.title}
-          valueText={`${data.voice.balance}${data.voice.unit}`}
+          title={voiceTitle}
+          valueText={voiceValueText}
           theme={ringCardThemes.voice}
           ratio={voiceRatio}
         />
@@ -626,6 +677,13 @@ function WidgetView({ data }: { data: MobileData }) {
 async function render() {
   const oldCache = loadFromCache() || {}
   const refreshInterval = getRefreshInterval()
+
+  let settings: ChinaMobileSettings | null = null
+  try {
+    settings = Storage.get<ChinaMobileSettings>(SETTINGS_KEY) ?? null
+  } catch (_) { }
+
+  const showRemainRatio = settings?.showRemainRatio ?? false
 
   const nextUpdate = new Date(Date.now() + refreshInterval * 60 * 1000)
   const reloadPolicy: WidgetReloadPolicy = {
@@ -649,7 +707,10 @@ async function render() {
         saveToCache(pData)
 
         const mobileData = convertToMobileData(pData)
-        Widget.present(<WidgetView data={mobileData} />, reloadPolicy)
+        Widget.present(
+          <WidgetView data={mobileData} showRemainRatio={showRemainRatio} />,
+          reloadPolicy,
+        )
         return
       }
     }
@@ -662,7 +723,10 @@ async function render() {
     cache.usingCache = true
     cache.source = "Cache"
     const mobileData = convertToMobileData(cache)
-    Widget.present(<WidgetView data={mobileData} />, reloadPolicy)
+    Widget.present(
+      <WidgetView data={mobileData} showRemainRatio={showRemainRatio} />,
+      reloadPolicy,
+    )
     return
   }
 
@@ -677,7 +741,7 @@ async function render() {
         请在主应用中点击“安装重写规则”按钮
       </Text>
     </VStack>,
-    reloadPolicy
+    reloadPolicy,
   )
 }
 
