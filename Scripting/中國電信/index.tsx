@@ -30,11 +30,11 @@ const SETTINGS_KEY = "chinaTelecomSettings"
 
 // 刷新间隔选项（单位：分钟）
 const REFRESH_OPTIONS = [
-  { label: "15 分钟", value: 15 },   // 默认
+  { label: "15 分钟", value: 15 },
   { label: "30 分钟", value: 30 },
   { label: "1 小时", value: 60 },
   { label: "2 小时", value: 120 },
-  { label: "3 小时", value: 180 },
+  { label: "3 小时", value: 180 },   // 默认
   { label: "6 小时", value: 360 },
   { label: "12 小时", value: 720 },
   { label: "24 小时", value: 1440 },
@@ -47,8 +47,8 @@ const defaultSettings: ChinaTelecomSettings = {
   // 刷新时间颜色（预留给组件用）
   refreshTimeDayColor: "#999999",
   refreshTimeNightColor: "#AAAAAA",
-  // 默认刷新间隔 15 分钟
-  refreshInterval: 15,
+  // 默认刷新间隔 3 小时
+  refreshInterval: 180,
   // 默认显示“已使用百分比”
   showRemainRatio: false,
 }
@@ -149,20 +149,28 @@ function SettingsView() {
           />
         </Section>
 
-        {/* 刷新配置 */}
+        {/* 渲染配置（合并刷新配置） */}
         <Section
           header={
             <Text font="body" fontWeight="semibold">
-              刷新配置
+              渲染配置
             </Text>
           }
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              刷新间隔为小组件自动刷新的最小时间，建议 15 分钟～24 小时。
-              间隔越短更新越及时，但可能略微增加电量与网络消耗。
+              • 百分比含义：统一控制卡片的「已用 / 剩余」视角。
+              {"\n\t"}1）关闭＝查看已使用（流量/语音显示已用百分比和已用数值，话费优先显示实时费用）；
+              {"\n\t"}2）开启＝查看剩余（流量/语音显示剩余百分比和剩余数值，话费显示剩余话费/账户余额）。
+              {"\n"}• 刷新间隔为组件自动刷新的最小时间，建议 15 分钟～24 小时。
             </Text>
           }
         >
+          <Toggle
+            title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
+            value={showRemainRatio}
+            onChanged={setShowRemainRatio}
+          />
+
           <Picker
             title={"刷新间隔"}
             value={refreshInterval}
@@ -177,28 +185,6 @@ function SettingsView() {
               </Text>
             ))}
           </Picker>
-        </Section>
-
-        {/* 渲染配置 */}
-        <Section
-          header={
-            <Text font="body" fontWeight="semibold">
-              渲染配置
-            </Text>
-          }
-          footer={
-            <Text font="caption2" foregroundStyle="secondaryLabel">
-              统一控制卡片的「已用 / 剩余」视角：
-              关闭＝查看已使用（流量/语音显示已用百分比与已用数值，话费优先显示实时费用）；
-              {"\n"}开启＝查看剩余（流量/语音显示剩余百分比与剩余数值，话费显示剩余话费/账户余额）。
-            </Text>
-          }
-        >
-          <Toggle
-            title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
-            value={showRemainRatio}
-            onChanged={setShowRemainRatio}
-          />
         </Section>
       </List>
     </NavigationStack>
