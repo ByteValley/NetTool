@@ -6,6 +6,7 @@ import {
   Button,
   Text,
   Picker,
+  Toggle,
   useState,
 } from "scripting"
 
@@ -27,6 +28,8 @@ const BUILD_DATE = "2025-12-08"
 type ChinaMobileSettings = {
   // 小组件自动刷新间隔（单位：分钟）
   refreshInterval: number
+  // 统一控制卡片百分比视角：false=已用，true=剩余
+  showRemainRatio: boolean
 }
 
 const SETTINGS_KEY = "chinaMobileSettings"
@@ -45,15 +48,16 @@ const REFRESH_OPTIONS = [
   { label: "30 分钟", value: 30 },
   { label: "1 小时", value: 60 },
   { label: "2 小时", value: 120 },
-  { label: "3 小时", value: 180 },   // 默认
+  { label: "3 小时", value: 180 }, // 默认
   { label: "6 小时", value: 360 },
   { label: "12 小时", value: 720 },
   { label: "24 小时", value: 1440 },
 ]
 
-// 默认配置
+// 默认配置（与 widget.tsx 读取结构保持一致）
 const defaultSettings: ChinaMobileSettings = {
   refreshInterval: 180, // 默认 3 小时
+  showRemainRatio: false,
 }
 
 function SettingsView() {
@@ -63,7 +67,10 @@ function SettingsView() {
     (Storage.get(SETTINGS_KEY) as ChinaMobileSettings | null) ?? defaultSettings
 
   const [refreshInterval, setRefreshInterval] = useState<number>(
-    initialSettings.refreshInterval || 60,
+    initialSettings.refreshInterval || 180,
+  )
+  const [showRemainRatio, setShowRemainRatio] = useState<boolean>(
+    initialSettings.showRemainRatio ?? false,
   )
 
   // About
@@ -125,10 +132,13 @@ function SettingsView() {
     }
   }
 
-  // 保存设置（只存储刷新间隔，关闭页面）
+  // 保存设置（刷新间隔 + 百分比视角）
   const handleSaveSettings = () => {
-    const interval = Number(refreshInterval) || 60
-    const newSettings: ChinaMobileSettings = { refreshInterval: interval }
+    const interval = Number(refreshInterval) || 180
+    const newSettings: ChinaMobileSettings = {
+      refreshInterval: interval,
+      showRemainRatio,
+    }
     Storage.set(SETTINGS_KEY, newSettings)
     dismiss()
   }
@@ -171,19 +181,27 @@ function SettingsView() {
           <Button title="🌀 安装 Egern 模块" action={handleInstallToEgern} />
         </Section>
 
-        {/* 刷新配置 */}
+        {/* 渲染配置（百分比视角 + 刷新间隔） */}
         <Section
           header={
             <Text font="body" fontWeight="semibold">
-              刷新配置
+              渲染配置
             </Text>
           }
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              刷新间隔为小组件自动刷新的最小时间，建议 15 分钟～24 小时。
+              • 百分比含义：作用于流量 / 语音等卡片；
+              关闭＝按已用占比绘制，开启＝按剩余占比绘制。
+              {"\n"}• 刷新间隔为小组件自动刷新的最小时间，建议 15 分钟～24 小时。
             </Text>
           }
         >
+          <Toggle
+            title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
+            value={showRemainRatio}
+            onChanged={setShowRemainRatio}
+          />
+
           <Picker
             title={"刷新间隔"}
             value={refreshInterval}
