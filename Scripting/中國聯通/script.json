@@ -26,7 +26,7 @@
     "url": "https://imarkr.com/api/github/download//ByteValley/NetTool/tree/main/Scripting/中國聯通.zip",
     "autoUpdateInterval": 300
   },
-  "version": "1.0.9",
+  "version": "1.0.0",
   "icon": "antenna.radiowaves.left.and.right",
   "runInApp": false,
   "color": "rgba(238, 92, 98,1)",
