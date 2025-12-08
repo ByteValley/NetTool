@@ -17,7 +17,7 @@ import type { ChinaTelecomSettings } from "./telecomApi"
 declare const Storage: any
 
 const SETTINGS_KEY = "chinaTelecomSettings"
-const VERSION = "1.1.0"
+const VERSION = "2025-12-08R1"
 
 // 默认设置
 const defaultSettings: ChinaTelecomSettings = {
