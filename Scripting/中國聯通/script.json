@@ -26,13 +26,13 @@
     "url": "https://imarkr.com/api/github/download//ByteValley/NetTool/tree/main/Scripting/中國聯通.zip",
     "autoUpdateInterval": 300
   },
-  "version": "2025-12-08R1",
+  "version": "1.0.9",
   "icon": "antenna.radiowaves.left.and.right",
   "runInApp": false,
   "color": "rgba(238, 92, 98,1)",
   "author": {
-    "email": "2753086015@qq.com",
-    "name": "DTZSGHNR",
+    "email": null,
+    "name": "ByteValley",
     "homepage": null
   },
   "description": "",
