@@ -4,17 +4,22 @@ import JSEncrypt from "./module/jsencrypt"
 // 全局对象声明（Scriptable / Scripting 宿主提供）
 declare const Storage: any
 
-// 设置结构（与设置页 / 小组件共享）
+// 设置结构（与设置页 / 小组件 / 组件脚本共享）
 export type ChinaTelecomSettings = {
   mobile: string
   password: string
 
-  // 新增：可选刷新间隔（分钟）
+  // 可选：刷新间隔（分钟）
   refreshInterval?: number
 
-  // 可选：后续如果想配置时间颜色，可以复用
+  // 可选：更新时间文字颜色（预留给组件用）
   refreshTimeDayColor?: string
   refreshTimeNightColor?: string
+
+  // 新增：是否显示“剩余百分比”
+  // false / 未配置：显示已使用百分比
+  // true：显示剩余百分比
+  showRemainRatio?: boolean
 }
 
 const SETTINGS_KEY = "chinaTelecomSettings"
@@ -47,7 +52,7 @@ class Telecom {
       this.password = settings.password || ""
     }
 
-    const stored = Storage.get(this.KEY) as StorageProps
+    const stored = Storage.get(this.KEY) as StorageProps | null
     if (stored) {
       Object.assign(this, stored)
     }
@@ -172,6 +177,7 @@ class Telecom {
     if (data.responseData.resultCode !== "0000") {
       throw new Error(data.responseData.resultDesc)
     }
+
     ; ({
       token: this.token,
       cityCode: this.cityCode,
@@ -333,9 +339,7 @@ class Telecom {
   private transNumber(str: string, encode = true) {
     return [...str]
       .map((c) =>
-        String.fromCharCode(
-          (c.charCodeAt(0) + (encode ? 2 : -2)) & 0xffff,
-        ),
+        String.fromCharCode((c.charCodeAt(0) + (encode ? 2 : -2)) & 0xffff),
       )
       .join("")
   }
@@ -356,7 +360,6 @@ PMpq0/XKBO8lYhN/gwIDAQAB
 
 // 从 Storage 读取设置
 export function getSettings(): ChinaTelecomSettings | null {
-  // 同理，这里也不要用泛型调用
   return Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null
 }
 
