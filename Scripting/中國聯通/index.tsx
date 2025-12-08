@@ -1,21 +1,28 @@
 import {
   Navigation,
   NavigationStack,
-  Form,
+  List,
   Section,
   TextField,
   Button,
   Color,
   useState,
   Text,
-  VStack,
   Toggle,
+  Picker,
 } from "scripting"
 
 declare const Storage: any
 declare const Dialog: any
 
-const VERSION = "2025-12-08R9"
+// 版本号说明（Semantic Versioning）
+// MAJOR：破坏性变更或配置结构调整（不兼容旧版）
+// MINOR：新增功能、兼容性增强（兼容旧版）
+// PATCH：修复 Bug、UI 微调、文案修改等小改动
+const VERSION = "1.0.0"
+
+// 构建日期：YYYY-MM-DD
+const BUILD_DATE = "2025-12-08"
 
 // 联通 BoxJS 订阅 & 模块地址
 const UNICOM_BOXJS_SUB_URL =
@@ -23,6 +30,18 @@ const UNICOM_BOXJS_SUB_URL =
 
 const UNICOM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/DataCollection/ChinaUnicom.module"
+
+// 刷新间隔选项（单位：分钟）
+const REFRESH_OPTIONS = [
+  { label: "15 分钟", value: 15 },
+  { label: "30 分钟", value: 30 },
+  { label: "1 小时", value: 60 },
+  { label: "2 小时", value: 120 },
+  { label: "3 小时", value: 180 }, // 默认
+  { label: "6 小时", value: 360 },
+  { label: "12 小时", value: 720 },
+  { label: "24 小时", value: 1440 },
+]
 
 // 设置结构
 type ChinaUnicomSettings = {
@@ -33,7 +52,7 @@ type ChinaUnicomSettings = {
   descNightColor: Color
   refreshTimeDayColor: Color
   refreshTimeNightColor: Color
-  refreshInterval: number
+  refreshInterval: number // 以分钟为单位
   showFlow: boolean
   showOtherFlow: boolean
   otherFlowMatchType: "flowType" | "addupItemCode"
@@ -55,7 +74,8 @@ const defaultSettings: ChinaUnicomSettings = {
   descNightColor: "#FFFFFF",
   refreshTimeDayColor: "#999999",
   refreshTimeNightColor: "#AAAAAA",
-  refreshInterval: 15,
+  // 默认刷新间隔：3 小时
+  refreshInterval: 180,
   showFlow: true,
   showOtherFlow: true,
   otherFlowMatchType: "flowType",
@@ -80,7 +100,7 @@ function SettingsView() {
   const [refreshTimeDayColor] = useState(initialSettings.refreshTimeDayColor)
   const [refreshTimeNightColor] = useState(initialSettings.refreshTimeNightColor)
   const [refreshInterval, setRefreshInterval] = useState(
-    initialSettings.refreshInterval,
+    initialSettings.refreshInterval || 180,
   )
   const [showFlow, setShowFlow] = useState(initialSettings.showFlow ?? true)
   const [showOtherFlow, setShowOtherFlow] = useState(
@@ -125,8 +145,9 @@ function SettingsView() {
       title: "联通余量组件",
       message:
         `作者：©ByteValley\n` +
-        `版本：v${VERSION}`,
-      buttonLabel: "好",
+        `版本：v${VERSION}（${BUILD_DATE}）\n` +
+        `致谢：@DTZSGHNR`,
+      buttonLabel: "关闭",
     })
   }
 
@@ -151,54 +172,91 @@ function SettingsView() {
   }
 
   return (
-    <VStack
-      spacing={0}
-      navigationTitle={"联通余量组件"}
-      navigationBarTitleDisplayMode={"inline"}
-      toolbar={{
-        topBarLeading: [
-          <Button title={"关闭"} action={dismiss} />,
-        ],
-        topBarTrailing: [
-          <Button title={"完成"} action={handleSave} />,
-        ],
-        bottomBar: [
-          // 用一个正式的按钮来承载版权 & 版本信息
-          <Button
-            systemImage="info.circle"
-            title="关于本组件"
-            action={handleAbout}
-            foregroundStyle="secondaryLabel"
-          />,
-        ],
-      }}
-      background={"clear"}
-    >
-      {/* 表单本身让系统按默认 grouped 样式铺满 */}
-      <Form>
-        <Section title="组件模块一键安装">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 6 }}
-          >
-            使用前建议按顺序完成以下步骤：
-            {"\n"}1）在 BoxJS 中订阅配置（可同步 Cookie 等信息）
-            {"\n"}2）安装中国联通余量查询模块到支持的客户端
-          </Text>
+    <NavigationStack>
+      <List
+        navigationTitle={"联通余量组件"}
+        navigationBarTitleDisplayMode={"inline"}
+        toolbar={{
+          topBarLeading: [<Button title={"关闭"} action={dismiss} />],
+          topBarTrailing: [<Button title={"完成"} action={handleSave} />],
+          bottomBar: [
+            <Button
+              systemImage="info.circle"
+              title="关于本组件"
+              action={handleAbout}
+              foregroundStyle="secondaryLabel"
+            />,
+          ],
+        }}
+      >
+        {/* 组件模块 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              组件模块
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              使用前建议按顺序完成：
+              {"\n"}1）在 BoxJS 中订阅配置（可同步 Cookie 等信息）
+              {"\n"}2）安装中国联通余量查询模块到支持的客户端
+            </Text>
+          }
+        >
           <Button title="📦 添加 BoxJS 订阅" action={handleOpenUnicomBoxJsSub} />
           <Button title="⚡ 安装 Surge 模块" action={handleInstallToSurge} />
           <Button title="🌀 安装 Egern 模块" action={handleInstallToEgern} />
         </Section>
 
-        <Section title="登录凭证">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 4 }}
-          >
-            建议通过重写或 BoxJs 抓取 10010 App 登录态 Cookie 后粘贴到此处。
-          </Text>
+        {/* BoxJs 配置 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              BoxJs 配置
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              • 开启后优先从 BoxJs 读取联通 Cookie；
+              未配置或读取失败时，再使用下方「登录凭证」中的手动 Cookie。
+              {"\n"}• BoxJs地址，例如：https://boxjs.com 或 http://192.168.1.5:9999
+            </Text>
+          }
+        >
+          <Toggle
+            title="启用 BoxJs 读取 Cookie"
+            value={enableBoxJs}
+            onChanged={(value) => {
+              setEnableBoxJs(value)
+              // 开启时如果地址为空，自动填入 boxjs.com
+              if (value && !boxJsUrl) {
+                setBoxJsUrl("https://boxjs.com")
+              }
+            }}
+          />
+          {enableBoxJs ? (
+            <TextField
+              title="BoxJs 地址"
+              value={boxJsUrl}
+              onChanged={setBoxJsUrl}
+            />
+          ) : null}
+        </Section>
+
+        {/* 登录凭证 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              登录凭证
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              建议通过重写抓取中国联通客端登录态 Cookie 后粘贴到此处。
+            </Text>
+          }
+        >
           <TextField
             title="Cookie"
             value={cookie}
@@ -207,49 +265,56 @@ function SettingsView() {
           />
         </Section>
 
-        <Section title="刷新设置">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 4 }}
-          >
-            控制组件自动刷新的最小间隔时间，建议 5–60 分钟。
-          </Text>
-          <TextField
-            title="刷新间隔 (分钟)"
-            value={String(refreshInterval)}
-            prompt="例如：15"
-            onChanged={(text) => {
-              const v = parseInt(text, 10)
-              setRefreshInterval(isNaN(v) ? 0 : v)
-            }}
-          />
-        </Section>
-
-        <Section title="面板渲染设置">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 4 }}
-          >
-            作用于通用流量 / 定向流量 / 语音三个圆环：
-            关闭＝按已用占比绘制；开启＝按剩余占比绘制。
-          </Text>
+        {/* 渲染配置（合并刷新配置） */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              渲染配置
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              • 百分比含义：作用于通用流量 / 定向流量 / 语音三个圆环；
+              关闭＝按已用占比绘制，开启＝按剩余占比绘制。
+              {"\n"}• 刷新间隔为组件自动刷新的最小时间，建议 15 分钟～24 小时。
+            </Text>
+          }
+        >
           <Toggle
             title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
             value={showRemainRatio}
             onChanged={setShowRemainRatio}
           />
+
+          <Picker
+            title={"刷新间隔"}
+            value={refreshInterval}
+            onChanged={(value: number) => {
+              setRefreshInterval(Number(value))
+            }}
+            pickerStyle={"menu"}
+          >
+            {REFRESH_OPTIONS.map((opt) => (
+              <Text key={opt.value} tag={opt.value as any}>
+                {opt.label}
+              </Text>
+            ))}
+          </Picker>
         </Section>
 
-        <Section title="通用流量显示">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 4 }}
-          >
-            关闭后将隐藏绿色「通用流量」卡片，仅保留其它卡片。
-          </Text>
+        {/* 通用流量配置 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              通用流量配置
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              关闭后将隐藏绿色「通用流量」卡片，仅保留其它卡片。
+            </Text>
+          }
+        >
           <Toggle
             title="显示通用流量卡片"
             value={showFlow}
@@ -257,15 +322,20 @@ function SettingsView() {
           />
         </Section>
 
-        <Section title="定向/其它流量">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 4 }}
-          >
-            默认按 flowType=&quot;3&quot; 聚合定向、省内、闲时等其它流量。
-            如需精确到某个套餐，可改用 addupItemCode（例如 40026）。
-          </Text>
+        {/* 定向流量配置 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              定向流量配置
+            </Text>
+          }
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              默认按 flowType="3" 聚合定向、省内、闲时等其它流量。
+              如需精确到某个套餐，可改用 addupItemCode（例如 40026）。
+            </Text>
+          }
+        >
           <Toggle
             title="显示定向/其它流量卡片"
             value={showOtherFlow}
@@ -293,43 +363,14 @@ function SettingsView() {
             </>
           ) : null}
         </Section>
-
-        <Section title="BoxJs 配置">
-          <Text
-            font="caption2"
-            foregroundStyle="secondaryLabel"
-            padding={{ bottom: 4 }}
-          >
-            开启后优先从 BoxJs 的
-            DataCollection.ChinaUnicom.Settings.Cookie 读取联通 Cookie；
-            未配置或读取失败时退回到上方手动粘贴的 Cookie。
-          </Text>
-          <Toggle
-            title="启用 BoxJs 读取 Cookie"
-            value={enableBoxJs}
-            onChanged={setEnableBoxJs}
-          />
-          {enableBoxJs ? (
-            <TextField
-              title="BoxJs 地址"
-              value={boxJsUrl}
-              prompt="例如：http://boxjs.com 或 http://192.168.1.5:9999"
-              onChanged={setBoxJsUrl}
-            />
-          ) : null}
-        </Section>
-      </Form>
-    </VStack>
+      </List>
+    </NavigationStack>
   )
 }
 
 async function run() {
   await Navigation.present({
-    element: (
-      <NavigationStack>
-        <SettingsView />
-      </NavigationStack>
-    ),
+    element: <SettingsView />,
   })
 }
 
