@@ -1,0 +1,48 @@
+# 📌 NetTool — 中国三大运营商话费/流量查询组件
+
+> ✨ 基于 **Scripting App** 的电信运营商账户信息展示脚本  
+> 支持中国移动 / 中国联通 / 中国电信  
+> 显示话费、流量、语音剩余等关键信息  
+> 支持自定义样式、自动刷新、BoxJS 同步配置  
+> iOS 主屏幕小组件一键查看剩余资源
+
+---
+
+## 🚀 一键导入脚本（建议从 Safari 打开）
+
+| 运营商 | 一键导入 |
+|-------|---------|
+| 🇨🇳 中国移动 | [点我导入](scripting://import_scripts?urls=https%3A%2F%2Fraw.githubusercontent.com%2FByteValley%2FNetTool%2Fmain%2FScripting%2FRelease%2F%25E4%25B8%25AD%25E5%259C%258B%25E7%25A7%25BB%25E5%258B%2595.scripting) |
+| 🇨🇳 中国联通 | [点我导入](scripting://import_scripts?urls=https%3A%2F%2Fraw.githubusercontent.com%2FByteValley%2FNetTool%2Fmain%2FScripting%2FRelease%2F%25E4%25B8%25AD%25E5%259C%258B%25E8%2581%25AF%25E9%2580%259A.scripting) |
+| 🇨🇳 中国电信 | [点我导入](scripting://import_scripts?urls=https%3A%2F%2Fraw.githubusercontent.com%2FByteValley%2FNetTool%2Fmain%2FScripting%2FRelease%2F%25E4%25B8%25AD%25E5%259C%258B%25E9%259B%25BB%25E4%25BF%25A1.scripting) |
+
+> 如脚本未自动启动，请确保已安装 Scripting App  
+> App Store: https://apps.apple.com/app/id6450691918
+
+---
+
+## 🧩 使用步骤
+
+1. 点击上方链接导入到 Scripting
+2. 首次打开脚本 → 配置账号（或通过 BoxJS 自动同步）
+3. 添加为 iOS 小组件（选择对应运营商脚本）
+4. 若不显示数据，请点击组件刷新或重新登录
+
+---
+
+## ✨ 功能特点
+
+| 特性 | 说明 |
+|------|------|
+| 📡 实时查询 | 话费 / 流量 / 语音剩余一目了然 |
+| 🔐 多账户支持 | 可同时管理多个手机号数据 |
+| 🔄 自动刷新缓存 | 避免频繁请求导致风控 |
+| 🎨 多组件样式 | 小号/中号布局切换，自适应展示 |
+| 📦 BoxJS 同步 | 保存账号及设置，换设备无压力 |
+| 🧱 API 可拓展 | 支持自定义接口源  
+
+---
+
+## 🔑 BoxJS 配置（可选）
+
+如你使用 BoxJS 管理 Cookie，可导入以下订阅地址：
