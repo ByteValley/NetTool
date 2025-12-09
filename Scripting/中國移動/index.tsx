@@ -23,7 +23,7 @@ declare const FileManager: any
 const VERSION = "1.0.0"
 
 // 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-08"
+const BUILD_DATE = "2025-12-09"
 
 // 和 widget.tsx 对应的设置结构
 type ChinaMobileSettings = {
@@ -34,6 +34,8 @@ type ChinaMobileSettings = {
 }
 
 const SETTINGS_KEY = "chinaMobileSettings"
+// 单独存储设置页打开方式：true=全屏，false=弹层
+const FULLSCREEN_KEY = "chinaMobileSettingsFullscreen"
 
 // 中国移动模块地址（Surge / Egern 共用）
 const CM_MODULE_URL =
@@ -61,6 +63,22 @@ const defaultSettings: ChinaMobileSettings = {
   showRemainRatio: false,
 }
 
+// ===== 页面 / 弹层 打开方式偏好 =====
+
+function getFullscreenPref(): boolean {
+  try {
+    const v = Storage.get(FULLSCREEN_KEY)
+    if (typeof v === "boolean") return v
+  } catch { }
+  return true // 默认全屏
+}
+
+function setFullscreenPref(value: boolean) {
+  try {
+    Storage.set(FULLSCREEN_KEY, value)
+  } catch { }
+}
+
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
 
@@ -72,6 +90,11 @@ function SettingsView() {
   )
   const [showRemainRatio, setShowRemainRatio] = useState<boolean>(
     initialSettings.showRemainRatio ?? false,
+  )
+
+  // 页面 / 弹层 偏好
+  const [fullscreenPref, setFullscreenPrefState] = useState<boolean>(
+    getFullscreenPref(),
   )
 
   // About
@@ -144,6 +167,23 @@ function SettingsView() {
     dismiss()
   }
 
+  // 切换「页面 / 弹层」打开方式
+  const handleToggleFullscreen = async () => {
+    const next = !fullscreenPref
+    setFullscreenPrefState(next)
+    setFullscreenPref(next)
+
+    try {
+      await Dialog.alert({
+        title: "显示模式已更新",
+        message: `已切换为「${next ? "页面（全屏）" : "弹层弹出"}」模式，下次打开设置时生效。`,
+        buttonLabel: "好的",
+      })
+    } catch {
+      // 环境不支持 Dialog 时忽略
+    }
+  }
+
   return (
     <NavigationStack>
       <List
@@ -151,7 +191,19 @@ function SettingsView() {
         navigationBarTitleDisplayMode={"inline"}
         toolbar={{
           topBarLeading: [<Button title={"关闭"} action={dismiss} />],
-          topBarTrailing: [<Button title={"完成"} action={handleSaveSettings} />],
+          // ✅ 在完成按钮左侧加一个「页面/弹层」切换按钮
+          topBarTrailing: [
+            <Button
+              title={fullscreenPref ? "页面" : "弹层"}
+              systemImage={
+                fullscreenPref
+                  ? "rectangle.arrowtriangle.2.outward"
+                  : "rectangle"
+              }
+              action={handleToggleFullscreen}
+            />,
+            <Button title={"完成"} action={handleSaveSettings} />,
+          ],
           bottomBar: [
             <Button
               systemImage="info.circle"
@@ -247,16 +299,17 @@ type AppProps = {
 }
 
 function App(_props: AppProps) {
-  // 如果以后你想做全局 dismiss，可以在这里用 Navigation.useDismiss()
-  // const dismiss = Navigation.useDismiss()
   return <SettingsView />
 }
 
 // ========= 入口 =========
 
 async function run() {
+  const fullscreen = getFullscreenPref()
+
   await Navigation.present({
     element: <App interactiveDismissDisabled />,
+    ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
   })
   Script.exit()
 }
