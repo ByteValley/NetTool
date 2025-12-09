@@ -4,7 +4,6 @@ import {
   HStack,
   Text,
   Image,
-  Color,
   Spacer,
   fetch,
   DynamicShapeStyle,
