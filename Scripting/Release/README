@@ -12,9 +12,9 @@
 
 | 运营商 | 一键导入 |
 |-------|---------|
-| 🇨🇳 中国移动 | [点我导入](https://bytevalley.github.io/NetTool/cm/) |
-| 🇨🇳 中国联通 | [点我导入](https://bytevalley.github.io/NetTool/cu/) |
-| 🇨🇳 中国电信 | [点我导入](https://bytevalley.github.io/NetTool/ct/) |
+| 🇨🇳 中国移动 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaMobile/) |
+| 🇨🇳 中国联通 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaMobile/) |
+| 🇨🇳 中国电信 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaMobile/) |
 > 如脚本未自动启动，请确保已安装 Scripting App  
 > App Store: https://apps.apple.com/tw/app/scripting/id6479691128
 
