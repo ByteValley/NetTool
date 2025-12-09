@@ -49,6 +49,5 @@ jobs:
             Scripting/Release/中國移動.zip
             Scripting/Release/中國聯通.zip
             Scripting/Release/中國電信.zip
-            Scripting/Release/*.scripting
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
