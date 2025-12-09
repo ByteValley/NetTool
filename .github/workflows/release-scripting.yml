@@ -41,14 +41,13 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "NetTool Scripting ${github.ref_name}"
+          tag_name: ${{ github.ref_name }}   # 这里在 tag 场景下会是 v1.0.0 之类
+          name: "NetTool Scripting ${{ github.ref_name }}"
           draft: false
           prerelease: false
           files: |
             Scripting/Release/中國移動.zip
             Scripting/Release/中國聯通.zip
             Scripting/Release/中國電信.zip
-            Scripting/Release/*.scripting
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
