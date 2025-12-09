@@ -44,8 +44,6 @@
 
 ## 🔑 BoxJS 配置（可选）
 
-如你使用 BoxJS 管理 Cookie，可导入以下订阅地址：
-https://boxjs.com/subscription/NetTool.boxjs.json
 > 若未使用 BoxJS，可直接在脚本内登录运营商账号
 
 ---
