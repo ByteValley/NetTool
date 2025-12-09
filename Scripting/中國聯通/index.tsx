@@ -24,7 +24,7 @@ declare const Safari: any
 const VERSION = "1.0.0"
 
 // 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-08"
+const BUILD_DATE = "2025-12-09"
 
 // 联通 BoxJS 订阅 & 模块地址
 const UNICOM_BOXJS_SUB_URL =
@@ -67,6 +67,8 @@ type ChinaUnicomSettings = {
   boxJsUrl: string
   // 统一控制圆环百分比：false=已用，true=剩余
   showRemainRatio: boolean
+  // 设置页打开方式：true = 页面（全屏），false = 弹层
+  fullscreen?: boolean
 }
 
 const SETTINGS_KEY = "chinaUnicomSettings"
@@ -87,6 +89,27 @@ const defaultSettings: ChinaUnicomSettings = {
   enableBoxJs: false,
   boxJsUrl: "",
   showRemainRatio: false,
+  fullscreen: true,
+}
+
+// ======== 全屏偏好读写（共用 settings 存储） ========
+
+function getFullscreenPref(): boolean {
+  try {
+    const raw = Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null
+    if (raw && typeof raw === "object" && typeof raw.fullscreen === "boolean") {
+      return raw.fullscreen
+    }
+  } catch {}
+  return true
+}
+
+function setFullscreenPref(value: boolean) {
+  try {
+    const raw = (Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null) ?? defaultSettings
+    const next: ChinaUnicomSettings = { ...raw, fullscreen: value }
+    Storage.set(SETTINGS_KEY, next)
+  } catch {}
 }
 
 function SettingsView() {
@@ -95,7 +118,7 @@ function SettingsView() {
   const initialSettings =
     (Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null) ?? defaultSettings
 
-  // 计算初始匹配类型索引（内部用 number，保存时再映射回 "flowType" | "addupItemCode"）
+  // 计算初始匹配类型索引
   const initialMatchType =
     initialSettings.otherFlowMatchType ?? defaultSettings.otherFlowMatchType
   const initialMatchIndex = Math.max(
@@ -123,6 +146,11 @@ function SettingsView() {
   const [showRemainRatio, setShowRemainRatio] = useState(
     initialSettings.showRemainRatio ?? false,
   )
+  const [fullscreenPref, setFullscreenPrefState] = useState<boolean>(
+    typeof initialSettings.fullscreen === "boolean"
+      ? initialSettings.fullscreen
+      : getFullscreenPref(),
+  )
 
   // 当前匹配类型（由索引映射得到）
   const currentMatchType: "flowType" | "addupItemCode" =
@@ -143,6 +171,7 @@ function SettingsView() {
       enableBoxJs,
       boxJsUrl,
       showRemainRatio,
+      fullscreen: fullscreenPref,
     }
     Storage.set(SETTINGS_KEY, newSettings)
     dismiss()
@@ -179,6 +208,23 @@ function SettingsView() {
     await Safari.openURL(egernUrl)
   }
 
+  // 切换「页面 / 弹层」打开方式
+  const handleToggleFullscreen = async () => {
+    const next = !fullscreenPref
+    setFullscreenPrefState(next)
+    setFullscreenPref(next)
+
+    try {
+      await Dialog.alert({
+        title: "显示模式已更新",
+        message: `已切换为「${next ? "页面（全屏）" : "弹层弹出"}」模式，下次打开设置时生效。`,
+        buttonLabel: "好的",
+      })
+    } catch {
+      // 环境不支持 Dialog 时忽略
+    }
+  }
+
   return (
     <NavigationStack>
       <List
@@ -186,7 +232,19 @@ function SettingsView() {
         navigationBarTitleDisplayMode={"inline"}
         toolbar={{
           topBarLeading: [<Button title={"关闭"} action={dismiss} />],
-          topBarTrailing: [<Button title={"完成"} action={handleSave} />],
+          // ✅ 在完成按钮左侧增加页面 / 弹层切换
+          topBarTrailing: [
+            <Button
+              title={fullscreenPref ? "页面" : "弹层"}
+              systemImage={
+                fullscreenPref
+                  ? "rectangle.arrowtriangle.2.outward"
+                  : "rectangle"
+              }
+              action={handleToggleFullscreen}
+            />,
+            <Button title={"完成"} action={handleSave} />,
+          ],
           bottomBar: [
             <Button
               systemImage="info.circle"
@@ -347,8 +405,8 @@ function SettingsView() {
             value={otherFlowMatchValue}
             prompt={
               currentMatchType === "flowType"
-                ? '例如：3（定向/专属/其它流量）'
-                : '例如：40008（联通王卡专属 30G）'
+                ? "例如：3（定向/专属/其它流量）"
+                : "例如：40008（联通王卡专属 30G）"
             }
             onChanged={setOtherFlowMatchValue}
           />
@@ -365,16 +423,17 @@ type AppProps = {
 }
 
 function App(_props: AppProps) {
-  // 如果以后你想做全局 dismiss，可以在这里用 Navigation.useDismiss()
-  // const dismiss = Navigation.useDismiss()
   return <SettingsView />
 }
 
 // ========= 入口 =========
 
 async function run() {
+  const fullscreen = getFullscreenPref()
+
   await Navigation.present({
     element: <App interactiveDismissDisabled />,
+    ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
   })
   Script.exit()
 }
