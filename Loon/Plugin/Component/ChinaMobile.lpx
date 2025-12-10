@@ -1,0 +1,29 @@
+#!name=移动余量
+#!desc=查询套餐内通话与流量、供小组件使用的查询服务（包含参数捕获与定时查询）
+#!author=ByteValley
+#!tag=组件服务
+#!icon=https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/92/8b/03/928b0371-20fc-288b-e4e4-05f48b7082c2/AppIcon-0-0-1x_U007emarketing-0-7-0-0-85-220.png/120x120.png
+#!homepage=https://github.com/ChinaTelecomOperators/ChinaMobile
+#!date=2024-11-14 16:00:00
+
+[Argument]
+enable_capture=switch,"false","true",tag = 捕获参数, desc = 此开关控制插件是否开启获取参数重写
+debug=switch,"false","true",tag = 调试模式, desc = 此开关控制插件是否开启调试模式, 调试模式下日志会增多
+cron=input, "0 9 * * *",tag = 执行时间, desc = 遵循CRON表达式, 具体请参考 https://tool.lu/crontab/
+phonenumber=input, "",tag = 手机号码, desc = 抓取参数对应的手机号码
+bark_key=input, "",tag = Bark推送Key, desc = 优先级高于代理通知，填写后将只使用 Bark 推送
+silent=switch,"false","true",tag = 静默模式, desc = 此开关控制插件是否开启静默模式，静默模式下不发送系统通知
+service=switch,"false","true",tag = Scriptable服务模式, desc = 此开关控制插件是否开启 Scriptable 服务模式，不用组件者请无视
+
+[Script]
+# 捕获并重写移动客户端登录/取参，用于后续定时查询与小组件（需要开启 enable_capture）
+http-request ^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/[LD]N\/uam(onekey|randcode)login\/autoLogin script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, requires-body=true, tag=移动获取参数, enable={enable_capture}
+
+# 定时查询（cron 调度），用于日常余量/套餐状态查询（会把参数数组传入脚本）
+cron "{cron}" script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, timeout=60, tag=移动余量查询, argument="[{phonenumber},{bark_key},{debug},{silent},{service}]"
+
+# 对外查询接口（供小组件/第三方调用，需配合参数使用）
+http-request ^https?:\/\/api\.example\.com\/10086\/query script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, requires-body=true, timeout=60, tag=移动查询接口
+
+[MITM]
+hostname = client.app.coc.10086.cn, api.example.com

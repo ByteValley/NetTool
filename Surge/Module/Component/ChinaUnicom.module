@@ -1,0 +1,12 @@
+#!name=中国联通
+#!desc=获取中国联通cookie
+#!category=数据采集
+#!author=ByteValley
+
+[Script]
+联通组件 = type=http-request, pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/DataCollection/ChinaUnicom.js, requires-body=true, max-size=0, script-update-interval=0
+
+index = type=http-request, pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/DataCollection/ChinaUnicom.js
+
+[MITM]
+hostname = %APPEND% m.client.10010.com
