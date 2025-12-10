@@ -45,6 +45,26 @@ const CM_MODULE_URL =
 const BOXJS_SUB_URL =
   "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/boxjs.json"
 
+// 其他脚本与说明（GitHub）
+const GITHUB_RELEASE_URL =
+  "https://github.com/ChinaTelecomOperators/ChinaMobile/releases/tag/Prerelease-Alpha"
+
+// 新订阅地址
+const NEW_RELEASE_URL = "https://bytevalley.github.io/NetTool/Scripting/Release/ChinaMobile/"
+
+// 新订阅提示：只弹一次；如需再次弹出，改一下 KEY 即可
+const NEW_RELEASE_NOTICE_KEY = "chinaMobileNewReleaseNoticeShown@2025-12-10"
+
+// 新订阅提示文案（弹窗内容）
+const NEW_RELEASE_MESSAGE =
+  "本脚本的订阅地址已迁移至新的发布页，后续请优先通过新地址获取更新。\n\n" +
+  "新的订阅发布页：\n" +
+  `${NEW_RELEASE_URL}\n\n` +
+  "建议操作：\n" +
+  "1）点击“确认”跳转至 Safari 打开；\n" +
+  "2）在 Safari 中点击打开返回 Scriptable；\n" +
+  "3）返回所有脚本页汇入新的脚本。"
+
 // 刷新间隔选项（单位：分钟）
 const REFRESH_OPTIONS = [
   { label: "15 分钟", value: 15 },
@@ -61,6 +81,43 @@ const REFRESH_OPTIONS = [
 const defaultSettings: ChinaMobileSettings = {
   refreshInterval: 180, // 默认 3 小时
   showRemainRatio: false,
+}
+
+// ======== 新订阅地址提示：打开设置前弹一次 ========
+
+async function showNewReleaseNoticeIfNeeded() {
+  try {
+    const alreadyShown = Storage.get(NEW_RELEASE_NOTICE_KEY)
+    // if (alreadyShown) return
+
+    let openNow = false
+
+    // 如果支持 Dialog.confirm，用“打开新地址 / 稍后再说”二选一
+    if (Dialog && typeof Dialog.confirm === "function") {
+      openNow = await Dialog.confirm({
+        title: "订阅更新",
+        message: NEW_RELEASE_MESSAGE,
+        okLabel: "确认",
+        cancelLabel: "稍后",
+      })
+    } else {
+      // 回退：用 alert 提示，按钮文案就是“打开新地址”
+      await Dialog.alert({
+        title: "订阅更新",
+        message: NEW_RELEASE_MESSAGE,
+        buttonLabel: "打开新地址",
+      })
+      openNow = true
+    }
+
+    Storage.set(NEW_RELEASE_NOTICE_KEY, true)
+
+    if (openNow) {
+      await Safari.openURL(NEW_RELEASE_URL)
+    }
+  } catch {
+    // 弹窗失败就静默忽略，不影响后续打开设置页
+  }
 }
 
 // ===== 页面 / 弹层 打开方式偏好 =====
@@ -129,6 +186,16 @@ function SettingsView() {
     await Safari.openURL(egernUrl)
   }
 
+  // 打开 GitHub 仓库 Release 页面
+  const handleOpenGithubRelease = async () => {
+    await Safari.openURL(GITHUB_RELEASE_URL)
+  }
+
+  // 打开新的订阅地址
+  const handleOpenNewRelease = async () => {
+    await Safari.openURL(NEW_RELEASE_URL)
+  }
+
   // 清除缓存文件
   const handleClearCache = async () => {
     try {
@@ -191,7 +258,6 @@ function SettingsView() {
         navigationBarTitleDisplayMode={"inline"}
         toolbar={{
           topBarLeading: [<Button title={"关闭"} action={dismiss} />],
-          // ✅ 在完成按钮左侧加一个「页面/弹层」切换按钮
           topBarTrailing: [
             <Button
               title={fullscreenPref ? "页面" : "弹层"}
@@ -232,6 +298,14 @@ function SettingsView() {
           <Button title="📦 添加 BoxJS 订阅" action={handleOpenBoxJsSub} />
           <Button title="⚡ 安装 Surge 模块" action={handleInstallToSurge} />
           <Button title="🌀 安装 Egern 模块" action={handleInstallToEgern} />
+          <Button
+            title="📂 其余脚本与说明（GitHub）"
+            action={handleOpenGithubRelease}
+          />
+          <Button
+            title="⚓️ 本脚本新订阅地址（点击跳转后返回所有脚本页汇入）"
+            action={handleOpenNewRelease}
+          />
         </Section>
 
         {/* 渲染配置（百分比视角 + 刷新间隔） */}
@@ -305,6 +379,8 @@ function App(_props: AppProps) {
 // ========= 入口 =========
 
 async function run() {
+  await showNewReleaseNoticeIfNeeded()
+
   const fullscreen = getFullscreenPref()
 
   await Navigation.present({

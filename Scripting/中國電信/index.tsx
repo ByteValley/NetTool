@@ -31,6 +31,22 @@ const SETTINGS_KEY = "chinaTelecomSettings"
 // 单独存储设置页打开方式，避免改动 ChinaTelecomSettings 结构
 const FULLSCREEN_KEY = "chinaTelecomSettingsFullscreen"
 
+// 新订阅地址
+const NEW_RELEASE_URL = "https://bytevalley.github.io/NetTool/Scripting/Release/ChinaTelecom/"
+
+// 新订阅提示：只弹一次；如需再次弹出，改一下 KEY 即可
+const NEW_RELEASE_NOTICE_KEY = "chinaTelecomNewReleaseNoticeShown@2025-12-10"
+
+// 新订阅提示文案（弹窗内容）
+const NEW_RELEASE_MESSAGE =
+  "本脚本的订阅地址已迁移至新的发布页，后续请优先通过新地址获取更新。\n\n" +
+  "新的订阅发布页：\n" +
+  `${NEW_RELEASE_URL}\n\n` +
+  "建议操作：\n" +
+  "1）点击“确认”跳转至 Safari 打开；\n" +
+  "2）在 Safari 中点击打开返回 Scriptable；\n" +
+  "3）返回所有脚本页汇入新的脚本。"
+
 // 刷新间隔选项（单位：分钟）
 const REFRESH_OPTIONS = [
   { label: "15 分钟", value: 15 },
@@ -54,6 +70,43 @@ const defaultSettings: ChinaTelecomSettings = {
   refreshInterval: 180,
   // 默认显示“已使用百分比”
   showRemainRatio: false,
+}
+
+// ======== 新订阅地址提示：打开设置前弹一次 ========
+
+async function showNewReleaseNoticeIfNeeded() {
+  try {
+    const alreadyShown = Storage.get(NEW_RELEASE_NOTICE_KEY)
+    // if (alreadyShown) return
+
+    let openNow = false
+
+    // 如果支持 Dialog.confirm，用“打开新地址 / 稍后再说”二选一
+    if (Dialog && typeof Dialog.confirm === "function") {
+      openNow = await Dialog.confirm({
+        title: "订阅更新",
+        message: NEW_RELEASE_MESSAGE,
+        okLabel: "确认",
+        cancelLabel: "稍后",
+      })
+    } else {
+      // 回退：用 alert 提示，按钮文案就是“打开新地址”
+      await Dialog.alert({
+        title: "订阅更新",
+        message: NEW_RELEASE_MESSAGE,
+        buttonLabel: "打开新地址",
+      })
+      openNow = true
+    }
+
+    Storage.set(NEW_RELEASE_NOTICE_KEY, true)
+
+    if (openNow) {
+      await Safari.openURL(NEW_RELEASE_URL)
+    }
+  } catch {
+    // 弹窗失败就静默忽略，不影响后续打开设置页
+  }
 }
 
 // ========== 页面 / 弹层 打开方式偏好 ==========
@@ -96,6 +149,11 @@ function SettingsView() {
   const [showRemainRatio, setShowRemainRatio] = useState(
     initialSettings.showRemainRatio ?? false,
   )
+
+  // 打开新的订阅地址
+  const handleOpenNewRelease = async () => {
+    await Safari.openURL(NEW_RELEASE_URL)
+  }
 
   // 页面 / 弹层 偏好（单独存储）
   const [fullscreenPref, setFullscreenPrefState] = useState<boolean>(
@@ -174,7 +232,20 @@ function SettingsView() {
             />,
           ],
         }}
-      >
+      >{/* 脚本地址 */}
+        <Section
+          header={
+            <Text font="body" fontWeight="semibold">
+              组件模块
+            </Text>
+          }
+        >
+          <Button
+            title="⚓️ 本脚本新订阅地址（点击跳转后返回所有脚本页汇入）"
+            action={handleOpenNewRelease}
+          />
+        </Section>
+
         {/* 账号设置 */}
         <Section
           header={
@@ -257,6 +328,8 @@ function App(_props: AppProps) {
 // ========= 入口 =========
 
 async function run() {
+  await showNewReleaseNoticeIfNeeded()
+
   const fullscreen = getFullscreenPref()
 
   await Navigation.present({

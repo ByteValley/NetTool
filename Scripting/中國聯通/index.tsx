@@ -33,6 +33,13 @@ const UNICOM_BOXJS_SUB_URL =
 const UNICOM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/DataCollection/ChinaUnicom.module"
 
+// 其他脚本与说明（GitHub）
+const GITHUB_RELEASE_URL =
+  "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/tag/Prerelease-Alpha"
+
+// 新订阅地址
+const NEW_RELEASE_URL = "https://bytevalley.github.io/NetTool/Scripting/Release/ChinaUnicom/"
+
 // 刷新间隔选项（单位：分钟）
 const REFRESH_OPTIONS = [
   { label: "15 分钟", value: 15 },
@@ -100,7 +107,7 @@ function getFullscreenPref(): boolean {
     if (raw && typeof raw === "object" && typeof raw.fullscreen === "boolean") {
       return raw.fullscreen
     }
-  } catch {}
+  } catch { }
   return true
 }
 
@@ -109,7 +116,7 @@ function setFullscreenPref(value: boolean) {
     const raw = (Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null) ?? defaultSettings
     const next: ChinaUnicomSettings = { ...raw, fullscreen: value }
     Storage.set(SETTINGS_KEY, next)
-  } catch {}
+  } catch { }
 }
 
 function SettingsView() {
@@ -208,6 +215,16 @@ function SettingsView() {
     await Safari.openURL(egernUrl)
   }
 
+  // 打开 GitHub 仓库 Release 页面
+  const handleOpenGithubRelease = async () => {
+    await Safari.openURL(GITHUB_RELEASE_URL)
+  }
+
+    // 打开新订阅链接
+  const handleOpenNewRelease = async () => {
+    await Safari.openURL(NEW_RELEASE_URL)
+  }
+
   // 切换「页面 / 弹层」打开方式
   const handleToggleFullscreen = async () => {
     const next = !fullscreenPref
@@ -273,6 +290,14 @@ function SettingsView() {
           <Button title="📦 添加 BoxJS 订阅" action={handleOpenUnicomBoxJsSub} />
           <Button title="⚡ 安装 Surge 模块" action={handleInstallToSurge} />
           <Button title="🌀 安装 Egern 模块" action={handleInstallToEgern} />
+          <Button
+            title="📂 其余脚本与说明（GitHub）"
+            action={handleOpenGithubRelease}
+          />
+          <Button
+            title="📂 新订阅地址（fan h）"
+            action={handleOpenNewRelease}
+          />
         </Section>
 
         {/* BoxJs 配置 */}
