@@ -2,7 +2,7 @@
 #!desc=查询套餐内通话与流量、供小组件使用的查询服务（包含参数捕获与定时查询）
 #!author=ByteValley
 #!tag=组件服务
-#!icon=https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/92/8b/03/928b0371-20fc-288b-e4e4-05f48b7082c2/AppIcon-0-0-1x_U007emarketing-0-7-0-0-85-220.png/120x120.png
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/ChinaMobile.png
 #!homepage=https://github.com/ChinaTelecomOperators/ChinaMobile
 #!date=2024-11-14 16:00:00
 
