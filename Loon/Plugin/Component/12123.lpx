@@ -1,0 +1,11 @@
+#!name=交管12123
+#!desc=【交管12123】Token/Cookie 自动抓取，支持组件服务（Surge 原生 / Quantumult-X 需配合资源解析器）。\n使用方法：打开交管12123「支付宝小程序」并登录，即可自动抓取 Token。资源解析器：https://t.me/QuanXNews/110
+#!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1032.png
+#!tag=组件服务
+
+[Script]
+# 模块分类 · 交管组件服务参数获取
+http-request ^https:\/\/miniappcsfw\.122\.gov\.cn:8443\/openapi\/invokeApi\/business\/biz script-path=https://raw.githubusercontent.com/95du/scripts/main/rewrite/getToken_12123.js, requires-body=true, timeout=10, tag=交管12123·参数获取
+
+[MITM]
+hostname = miniappcsfw.122.gov.cn
