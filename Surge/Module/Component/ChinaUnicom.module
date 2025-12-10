@@ -1,6 +1,6 @@
 #!name=中国联通
 #!desc=获取中国联通cookie
-#!category=数据采集
+#!category=组件服务
 #!author=ByteValley
 
 [Script]
