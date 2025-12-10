@@ -1,7 +1,7 @@
 #!name=中国联通
 #!desc=获取中国联通cookie
 #!author=ByteValley
-#!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1037.png
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/ChinaUnicom.png
 #!tag=组件服务
 
 [Script]
