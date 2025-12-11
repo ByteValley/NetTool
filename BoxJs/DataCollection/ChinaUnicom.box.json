@@ -32,6 +32,20 @@
           "desc": "脚本会自动写入完整的 Cookie 字符串。如需重置，可先清空此字段，再在联通 App 中重新触发抓取流程。"
         }
       ]
-    }
+    },
+      {
+        "id": "12123",
+        "name": "交管12123 Token",
+        "keys": [
+          "12123.token"
+        ],
+        "descs_html": [
+          "<h4 align=\"center\">点击查看抓取到的 12123 Token</h4>"
+        ],
+        "icons": [
+          "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png",
+          "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png"
+        ]
+      }
   ]
 }
