@@ -105,15 +105,28 @@
     {
       "id": "ComponentService.12123",
       "name": "交管12123",
-      "keys": [
-        "@ComponentService.12123.token"
-      ],
       "descs_html": [
-        "<h4 align=\"center\">点击查看抓取到的 12123 Token</h4>"
+        "用于保存交管12123抓取到的 <code>Token</code>，供 Scriptable / 面板组件 / 其他脚本复用。",
+        "<b>获取方式：</b><br/>1）打开 <b>支付宝小程序 交管12123</b>；<br/>2）进入交管12123会触发；<br/>3）确保重写与脚本已启用，触发一次请求后，脚本会自动写入变量 <code>ComponentService.12123.Settings.token</code>。",
+        "<b>说明：</b><br/>• 推荐通过脚本自动抓取，手动填写仅用于调试或紧急情况。"
       ],
       "icons": [
         "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png",
         "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png"
+      ],
+      "keys": [
+        "@ComponentService.12123.Settings",
+        "@ComponentService.12123.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@ComponentService.12123.Settings.token",
+          "name": "交管 12123 token（完整字符串）",
+          "type": "text",
+          "val": "",
+          "placeholder": "建议通过脚本自动抓取，无需手动填写",
+          "desc": "脚本会自动写入完整 token 字符串。如需重置，可先清空此字段，再重新触发抓取流程。"
+        }
       ]
     }
   ]
