@@ -11,7 +11,7 @@
       "name": "中国联通",
       "descs_html": [
         "用于保存中国联通 App 抓取到的 <code>Cookie</code>，供 Scriptable / 面板组件 / 其他脚本复用。",
-        "<b>获取方式：</b><br/>1）打开 <b>中国联通 官方 App</b>；<br/>2）进入首页「流量查询」或其他会触发 <code>/smartwisdomCommon</code> 接口的页面；<br/>3）确保重写与脚本已启用，触发一次请求后，脚本会自动写入变量 <code>ComponentService.ChinaUnicom.Cookie</code>。",
+        "<b>获取方式：</b><br/>1）打开 <b>中国联通 官方 App</b>；<br/>2）进入首页「流量查询」或其他会触发 <code>/smartwisdomCommon</code> 接口的页面；<br/>3）确保重写与脚本已启用，触发一次请求后，脚本会自动写入变量 <code>@ComponentService.ChinaUnicom.Settings.Cookie</code>。",
         "<b>说明：</b><br/>• 本条仅存储 Cookie 完整字符串（包含 JSESSIONID 等），不拆分字段；<br/>• 推荐通过脚本自动抓取，手动填写仅用于调试或紧急情况。"
       ],
       "icons": [
@@ -19,12 +19,12 @@
         "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/icon.png"
       ],
       "keys": [
-        "@ComponentService.ChinaUnicom.Cookie",
+        "@ComponentService.ChinaUnicom.Settings",
         "@ComponentService.ChinaUnicom.Caches"
       ],
       "settings": [
         {
-          "id": "@ComponentService.ChinaUnicom.Cookie",
+          "id": "@ComponentService.ChinaUnicom.Settings.Cookie",
           "name": "联通 Cookie（完整字符串）",
           "type": "text",
           "val": "",
@@ -34,47 +34,46 @@
       ]
     },
     {
-      "id": "ComponentService.SGCC",
-      "name": "网上国网（95598）",
-      "descs_html": [
-        "<b>用途：</b>为组件/小组件提供电费、电量等数据。<br/>",
-        "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。"
-      ],
-      "keys": [
-        "@ComponentService.SGCC.logDebug",
-        "@ComponentService.SGCC.phoneNum",
-        "@ComponentService.SGCC.password"
-      ],
-      "settings": [
-        {
-          "id": "@ComponentService.SGCC.logDebug",
-          "name": "是否输出调试日志",
-          "val": false,
-          "type": "boolean",
-          "desc": "打开后日志会更详细（排查登录/授权码失败时有用）。"
-        },
-        {
-          "id": "@ComponentService.SGCC.phoneNum",
-          "name": "账号（手机号）",
-          "val": "",
-          "type": "text",
-          "rows": 1,
-          "desc": "网上国网登录手机号"
-        },
-        {
-          "id": "@ComponentService.SGCC.password",
-          "name": "密码",
-          "val": "",
-          "type": "text",
-          "rows": 1,
-          "desc": "网上国网登录密码"
-        }
-      ],
-      "icons": [
-        "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
-        "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png"
-      ]
+  "id": "ComponentService.SGCC",
+  "name": "网上国网（95598）",
+  "descs_html": [
+    "<b>用途：</b>为组件/小组件提供电费、电量等数据。<br/>",
+    "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。"
+  ],
+  "keys": [
+    "@ComponentService.SGCC.Settings",
+    "@ComponentService.SGCC.Caches"
+  ],
+  "settings": [
+    {
+      "id": "@ComponentService.SGCC.Settings.logDebug",
+      "name": "是否输出调试日志",
+      "val": false,
+      "type": "boolean",
+      "desc": "打开后日志会更详细（排查登录/授权码失败时有用）。"
     },
+    {
+      "id": "@ComponentService.SGCC.Settings.phoneNum",
+      "name": "账号（手机号）",
+      "val": "",
+      "type": "text",
+      "rows": 1,
+      "desc": "网上国网登录手机号"
+    },
+    {
+      "id": "@ComponentService.SGCC.Settings.password",
+      "name": "密码",
+      "val": "",
+      "type": "text",
+      "rows": 1,
+      "desc": "网上国网登录密码"
+    }
+  ],
+  "icons": [
+    "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
+    "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png"
+  ]
+},
     {
       "id": "ComponentService.12123",
       "name": "交管12123",
