@@ -11,6 +11,9 @@
  * ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all
  ******************************************/
 
+/* ===========================
+ *  环境识别
+ * =========================== */
 const ENV = (() => {
     if (typeof $environment !== "undefined" && $environment["surge-version"]) return "Surge"
     if (typeof $environment !== "undefined" && $environment["stash-version"]) return "Stash"
@@ -22,7 +25,11 @@ const ENV = (() => {
 })()
 
 const isQX = ENV === "QuantumultX"
+const isNode = ENV === "Node"
 
+/* ===========================
+ *  存储（关键修复：@Key 与 Root JSON）
+ * =========================== */
 class Store {
     constructor(namespace = "ComponentService") {
         this.namespace = namespace
@@ -33,23 +40,76 @@ class Store {
         }
     }
 
-    get(key) {
+    readRaw(key) {
+        const k = String(key || "")
+        const k2 = k.startsWith("@") ? k.slice(1) : k // ✅ 自动去掉 @ 再读一次
         switch (this.env) {
             case "Surge":
             case "Loon":
             case "Stash":
-            case "Shadowrocket":
-                return $persistentStore.read(key)
-            case "QuantumultX":
-                return $prefs.valueForKey(key)
+            case "Shadowrocket": {
+                const v1 = $persistentStore.read(k)
+                if (v1 != null && v1 !== "") return v1
+                return $persistentStore.read(k2)
+            }
+            case "QuantumultX": {
+                const v1 = $prefs.valueForKey(k)
+                if (v1 != null && v1 !== "") return v1
+                return $prefs.valueForKey(k2)
+            }
             case "Node":
-                return this.localStorage.getItem(key)
+                return this.localStorage.getItem(k) || this.localStorage.getItem(k2)
             default:
                 return null
         }
     }
 }
 
+function safeJsonParse(s, fallback = null) {
+    try {
+        return JSON.parse(s)
+    } catch {
+        return fallback
+    }
+}
+
+function safeJsonStringify(o) {
+    try {
+        return JSON.stringify(o)
+    } catch {
+        return String(o)
+    }
+}
+
+function readByPath(store, fullKey) {
+    // fullKey like "@ComponentService.SGCC.Settings.phoneNum"
+    const key = String(fullKey || "")
+    const keyNoAt = key.startsWith("@") ? key.slice(1) : key
+    const parts = keyNoAt.split(".").filter(Boolean)
+    if (parts.length < 2) return ""
+
+    // ✅ BoxJs 实际落盘通常是根 Key：ComponentService（不带 @）
+    const rootKey = parts[0] // "ComponentService"
+    const rootRaw = store.readRaw(rootKey)
+    const rootObj = safeJsonParse(rootRaw, null)
+
+    if (rootObj && typeof rootObj === "object") {
+        let cur = rootObj
+        for (let i = 1; i < parts.length; i++) {
+            if (cur == null) return ""
+            cur = cur[parts[i]]
+        }
+        return cur == null ? "" : String(cur)
+    }
+
+    // 如果根 JSON 不存在，才尝试“平铺 key”
+    const flat = store.readRaw(key)
+    return flat == null ? "" : String(flat)
+}
+
+/* ===========================
+ *  日志/通知
+ * =========================== */
 class Logger {
     constructor(prefix, debug = false) {
         this.prefix = prefix;
@@ -90,16 +150,22 @@ function notify(title = "", sub = "", body = "", opts = {}) {
 }
 
 function done(payload = {}) {
+    if (ENV === "Node") process.exit(0)
     $done(payload)
 }
 
+/* ===========================
+ *  HTTP
+ * =========================== */
 async function http(request) {
     const method = (request.method || "GET").toUpperCase()
     const lower = method.toLowerCase()
+
     if (request.headers) {
         delete request.headers["Content-Length"]
         delete request.headers["content-length"]
     }
+
     if (ENV === "QuantumultX") {
         return $task.fetch(request).then(
             (r) => {
@@ -110,6 +176,16 @@ async function http(request) {
             (e) => Promise.reject(e.error || e)
         )
     }
+
+    if (ENV === "Node") {
+        const got = require("got")
+        const {url, ...opt} = request
+        return got[lower](url, opt).then(
+            (r) => ({status: r.statusCode, ok: /^2\d\d$/.test(String(r.statusCode)), body: r.body}),
+            (e) => Promise.reject(e.message || e)
+        )
+    }
+
     return new Promise((resolve, reject) => {
         $httpClient[lower](request, (err, resp, data) => {
             if (err) return reject(err)
@@ -121,38 +197,9 @@ async function http(request) {
     })
 }
 
-function safeJsonParse(s, fallback = null) {
-    try {
-        return JSON.parse(s)
-    } catch {
-        return fallback
-    }
-}
-
-function safeJsonStringify(o) {
-    try {
-        return JSON.stringify(o)
-    } catch {
-        return String(o)
-    }
-}
-
-function getUrlParams(url) {
-    const q = (url.split("?")[1] || "").trim()
-    if (!q) return {}
-    const out = {}
-    q.split("&").forEach((kv) => {
-        const [k, v = ""] = kv.split("=")
-        if (!k) return
-        out[decodeURIComponent(k)] = decodeURIComponent(v)
-    })
-    return out
-}
-
 /* ===========================
  *  业务配置
  * =========================== */
-
 const SCRIPTNAME = "网上国网"
 const store = new Store("ComponentService")
 
@@ -161,53 +208,27 @@ const KEY_PHONE = "@ComponentService.SGCC.Settings.phoneNum"
 const KEY_PASS = "@ComponentService.SGCC.Settings.password"
 const KEY_DEBUG = "@ComponentService.SGCC.Settings.logDebug"
 
-// ✅ BoxJs 常见“总 Key = 大 JSON”存储（你现在就是这种）
-const ROOT_KEY_1 = "ComponentService"
-const ROOT_KEY_2 = "@ComponentService"
-
-function getByPath(obj, path) {
-    if (!obj || !path) return null
-    return path.split(".").reduce((acc, k) => (acc && acc[k] != null ? acc[k] : null), obj)
-}
-
-/**
- * 优先读扁平新 Key；读不到就从 Root JSON 里按路径拿（兼容 BoxJs 大 JSON）
- * rootPath 示例：SGCC.Settings.phoneNum
- */
-function readSetting(flatKey, rootPath) {
-    const v1 = store.get(flatKey)
-    if (v1 != null && String(v1).trim() !== "") return String(v1)
-
-    const raw = store.get(ROOT_KEY_1) || store.get(ROOT_KEY_2)
-    if (!raw) return ""
-
-    const root = safeJsonParse(raw, null)
-    if (!root) return ""
-
-    // 你现在结构里同时有 SGCC.phoneNum 和 SGCC.Settings.phoneNum，这里都兜底
-    const v2 =
-        getByPath(root, rootPath) ??
-        getByPath(root, rootPath.replace(".Settings.", "."))
-
-    return v2 == null ? "" : String(v2)
-}
-
-const DEBUG_RAW = readSetting(KEY_DEBUG, "SGCC.Settings.logDebug").trim()
-const DEBUG = DEBUG_RAW === "true" || DEBUG_RAW === "1"
+const DEBUG = (() => {
+    const v = readByPath(store, KEY_DEBUG)
+    return v === "true" || v === "1"
+})()
 const log = new Logger(SCRIPTNAME, DEBUG)
 
-const USERNAME = readSetting(KEY_PHONE, "SGCC.Settings.phoneNum").trim()
-const PASSWORD = readSetting(KEY_PASS, "SGCC.Settings.password").trim()
+// ✅ 从根 JSON 解析
+const USERNAME = (readByPath(store, KEY_PHONE) || "").trim()
+const PASSWORD = (readByPath(store, KEY_PASS) || "").trim()
 
-// 🔎 方便排障：到底从哪里读到的
-log.debug("ENV =", ENV)
-log.debug("Flat phone =", store.get(KEY_PHONE) ? "[SET]" : "[EMPTY]")
-log.debug("Flat pass  =", store.get(KEY_PASS) ? "[SET]" : "[EMPTY]")
-log.debug("Root JSON  =", (store.get(ROOT_KEY_1) || store.get(ROOT_KEY_2)) ? "[SET]" : "[EMPTY]")
-log.debug("Resolved phone =", USERNAME ? "[OK]" : "[EMPTY]")
-log.debug("Resolved pass  =", PASSWORD ? "[OK]" : "[EMPTY]")
+log.debug(`ENV = ${ENV}`)
+log.debug(`Resolved phone = ${USERNAME ? "[OK]" : "[EMPTY]"}`)
+log.debug(`Resolved pass  = ${PASSWORD ? "[OK]" : "[EMPTY]"}`)
 
-const SERVER_HOST = "https://api.120399.xyz"
+// 这套加解密/识别码服务来自原脚本思路（第三方服务不可控）
+// ✅ 做成列表，支持故障切换（你也可以只留一个）
+const SERVER_HOSTS = [
+    "https://api.120399.xyz"
+    // "https://<your-backup-domain>"
+]
+
 const BASE_URL = "https://www.95598.cn"
 
 const API = {
@@ -258,111 +279,16 @@ const CFG = {
     }
 }
 
-function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms))
-}
-
-/* ===========================
- *  加解密请求封装（增强：失败信息 + 重试）
- * =========================== */
-
-async function Encrypt(config) {
-    const r = await http(config)
-    const j = safeJsonParse(r.body, null)
-    if (!j || !j.data || !j.data.url) throw new Error("Encrypt: invalid response")
-    j.data.url = BASE_URL + j.data.url
-    j.data.body = safeJsonStringify(j.data.data)
-    delete j.data.data
-    return j.data
-}
-
-async function Decrypt(config) {
-    const r = await http(config)
-    const j = safeJsonParse(r.body, null)
-    if (!j || !j.data) {
-        // 兜底：把原始 body 打出来
-        throw new Error(`Decrypt: invalid response: ${String(r.body || "").slice(0, 200)}`)
-    }
-
-    const {code, message, data} = j.data
-    if (String(code) === "1") return data
-
-    // ✅ 关键：把 code/message 都带出来，debug 时更好判断
-    const msg = message || "Decrypt failed"
-    throw new Error(`${msg}${code ? `（code=${code}）` : ""}`)
-}
-
-async function request95598(reqCfg) {
-    const encCfg = {
-        url: `${SERVER_HOST}/wsgw/encrypt`,
-        method: "POST",
-        headers: {"content-type": "application/json"},
-        body: safeJsonStringify({yuheng: reqCfg})
-    }
-    const enc = await Encrypt(encCfg)
-
-    const res = await http(enc)
-    let parsed = safeJsonParse(res.body, null)
-    if (!parsed) parsed = res.body
-
-    const payload = {config: {...reqCfg}, data: parsed}
-    if (reqCfg.url === "/api" + API.getKeyCode) payload.config.headers = {encryptKey: enc.encryptKey}
-
-    const decCfg = {
-        url: `${SERVER_HOST}/wsgw/decrypt`,
-        method: "POST",
-        headers: {"content-type": "application/json"},
-        body: safeJsonStringify({yuheng: payload})
-    }
-    return Decrypt(decCfg)
-}
-
-// ✅ 新增：对 GB002/系统繁忙类错误做重试
-async function request95598WithRetry(reqCfg, opt = {}) {
-    const {
-        retries = 3,
-        baseDelayMs = 450,
-        jitterMs = 250
-    } = opt
-
-    let lastErr = null
-    for (let i = 0; i <= retries; i++) {
-        try {
-            // 轻微随机抖动，避免踩相同风控窗口
-            if (i > 0) await sleep(baseDelayMs * i + Math.floor(Math.random() * jitterMs))
-            return await request95598(reqCfg)
-        } catch (e) {
-            const msg = String(e && e.message ? e.message : e)
-            lastErr = e
-
-            // 只对“值得重试”的错误重试
-            const retryable =
-                msg.includes("GB002") ||
-                msg.includes("系统繁忙") ||
-                msg.includes("网络") ||
-                msg.includes("超时") ||
-                msg.includes("请求异常")
-
-            log.warn(`request95598 failed [${i + 1}/${retries + 1}]`, msg)
-
-            if (!retryable) break
-            if (i === retries) break
-        }
-    }
-    throw lastErr || new Error("request95598WithRetry failed")
-}
-
-async function recognizeCaptcha(canvasSrc) {
-    const cfg = {
-        url: `${SERVER_HOST}/wsgw/get_x`,
-        method: "POST",
-        headers: {"content-type": "application/json"},
-        body: safeJsonStringify({yuheng: canvasSrc})
-    }
-    const r = await http(cfg)
-    const j = safeJsonParse(r.body, null)
-    if (!j || !j.data) throw new Error("验证码识别失败")
-    return j.data
+function getUrlParams(url) {
+    const q = (url.split("?")[1] || "").trim()
+    if (!q) return {}
+    const out = {}
+    q.split("&").forEach((kv) => {
+        const [k, v = ""] = kv.split("=")
+        if (!k) return
+        out[decodeURIComponent(k)] = decodeURIComponent(v)
+    })
+    return out
 }
 
 function getBeforeDate(days) {
@@ -372,9 +298,92 @@ function getBeforeDate(days) {
 }
 
 /* ===========================
+ *  加解密封装（带 failover + 重试）
+ * =========================== */
+async function Encrypt(serverHost, config) {
+    const r = await http({...config, url: `${serverHost}/wsgw/encrypt`})
+    const j = safeJsonParse(r.body, null)
+    if (!j || !j.data || !j.data.url) throw new Error("Encrypt: invalid response")
+    j.data.url = BASE_URL + j.data.url
+    j.data.body = safeJsonStringify(j.data.data)
+    delete j.data.data
+    return j.data
+}
+
+async function Decrypt(serverHost, config) {
+    const r = await http({...config, url: `${serverHost}/wsgw/decrypt`})
+    const j = safeJsonParse(r.body, null)
+    if (!j || !j.data) throw new Error("Decrypt: invalid response")
+    const {code, message, data} = j.data
+    if (String(code) === "1") return data
+
+    // ✅ 统一把 GB002 这类提示标出来：不是账号密码，而是中转服务异常/被风控
+    const msg = message || "Decrypt failed"
+    const err = new Error(msg)
+    err._wsgw_code = code
+    throw err
+}
+
+async function request95598(reqCfg) {
+    const maxTry = 5
+    let lastErr = null
+
+    for (let hostIndex = 0; hostIndex < SERVER_HOSTS.length; hostIndex++) {
+        const SERVER_HOST = SERVER_HOSTS[hostIndex]
+
+        for (let i = 1; i <= maxTry; i++) {
+            try {
+                // 1) encrypt
+                const enc = await Encrypt(SERVER_HOST, {
+                    method: "POST",
+                    headers: {"content-type": "application/json"},
+                    body: safeJsonStringify({yuheng: reqCfg})
+                })
+
+                // 2) request real 95598
+                const res = await http(enc)
+                let parsed = safeJsonParse(res.body, null)
+                if (!parsed) parsed = res.body
+
+                // 3) decrypt
+                const payload = {config: {...reqCfg}, data: parsed}
+                if (reqCfg.url === "/api" + API.getKeyCode) payload.config.headers = {encryptKey: enc.encryptKey}
+
+                return await Decrypt(SERVER_HOST, {
+                    method: "POST",
+                    headers: {"content-type": "application/json"},
+                    body: safeJsonStringify({yuheng: payload})
+                })
+            } catch (e) {
+                lastErr = e
+                const code = e && e._wsgw_code ? `（code=${e._wsgw_code}）` : ""
+                log.warn(`request95598 failed [host ${hostIndex + 1}/${SERVER_HOSTS.length} | ${i}/${maxTry}] ${String(e)}${code}`)
+                // 轻微退避
+                await new Promise(r => setTimeout(r, 300 * i))
+            }
+        }
+
+        log.warn(`当前中转服务不可用，切换到下一个：${SERVER_HOST}`)
+    }
+
+    throw lastErr || new Error("request95598: all hosts failed")
+}
+
+async function recognizeCaptcha(serverHost, canvasSrc) {
+    const r = await http({
+        url: `${serverHost}/wsgw/get_x`,
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: safeJsonStringify({yuheng: canvasSrc})
+    })
+    const j = safeJsonParse(r.body, null)
+    if (!j || !j.data) throw new Error("验证码识别失败")
+    return j.data
+}
+
+/* ===========================
  *  登录链路
  * =========================== */
-
 let requestKey = null
 let bizrt = null
 let authorizecode = ""
@@ -383,61 +392,48 @@ let bindInfo = null
 
 async function getKeyCode() {
     log.info("⏳ 获取 keyCode/publicKey ...")
-    requestKey = await request95598WithRetry(
-        {url: `/api${API.getKeyCode}`, method: "POST", headers: {}},
-        {retries: 2}
-    )
+    requestKey = await request95598({url: `/api${API.getKeyCode}`, method: "POST", headers: {}})
 }
 
 async function getVerifyCode() {
     log.info("⏳ 获取验证码凭证 ...")
-    const r = await request95598WithRetry(
-        {
-            url: `/api${API.loginVerifyCodeNew}`,
-            method: "POST",
-            headers: {...requestKey},
-            data: {password: PASSWORD, account: USERNAME, canvasHeight: 200, canvasWidth: 310}
-        },
-        {retries: 4, baseDelayMs: 500}
-    )
+    const r = await request95598({
+        url: `/api${API.loginVerifyCodeNew}`,
+        method: "POST",
+        headers: {...requestKey},
+        data: {password: PASSWORD, account: USERNAME, canvasHeight: 200, canvasWidth: 310}
+    })
+    if (!r || !r.ticket || !r.canvasSrc) throw new Error("验证码凭证为空")
 
-    if (!r || !r.ticket || !r.canvasSrc) {
-        log.warn("verifyCode resp:", safeJsonStringify(r).slice(0, 200))
-        throw new Error("验证码凭证为空")
-    }
-
-    const code = await recognizeCaptcha(r.canvasSrc)
+    // ✅ 识别码也走 failover：用第一个 host（或你可以做更复杂的选择）
+    const code = await recognizeCaptcha(SERVER_HOSTS[0], r.canvasSrc)
     return {ticket: r.ticket, code}
 }
 
 async function login(ticket, code) {
     log.info("⏳ 登录中 ...")
-    const r = await request95598WithRetry(
-        {
-            url: `/api${API.loginTestCodeNew}`,
-            method: "POST",
-            headers: {...requestKey},
-            data: {
-                loginKey: ticket,
-                code,
-                params: {
-                    uscInfo: {devciceIp: "", tenant: "state_grid", member: "0902", devciceId: ""},
-                    quInfo: {
-                        optSys: "android",
-                        pushId: "000000",
-                        addressProvince: "110100",
-                        addressRegion: "110101",
-                        addressCity: "330100",
-                        password: PASSWORD,
-                        account: USERNAME
-                    }
-                },
-                Channels: "web"
-            }
-        },
-        {retries: 2, baseDelayMs: 600}
-    )
-
+    const r = await request95598({
+        url: `/api${API.loginTestCodeNew}`,
+        method: "POST",
+        headers: {...requestKey},
+        data: {
+            loginKey: ticket,
+            code,
+            params: {
+                uscInfo: {devciceIp: "", tenant: "state_grid", member: "0902", devciceId: ""},
+                quInfo: {
+                    optSys: "android",
+                    pushId: "000000",
+                    addressProvince: "110100",
+                    addressRegion: "110101",
+                    addressCity: "330100",
+                    password: PASSWORD,
+                    account: USERNAME
+                }
+            },
+            Channels: "web"
+        }
+    })
     if (!r || !r.bizrt || !(r.bizrt.userInfo && r.bizrt.userInfo.length)) {
         throw new Error("登录失败：账号/密码/验证码可能不正确")
     }
@@ -491,7 +487,6 @@ async function getBindInfo() {
 /* ===========================
  *  数据查询
  * =========================== */
-
 async function getElcFee(index) {
     const o = bindInfo.powerUserList[index]
     const [u] = bizrt.userInfo
@@ -625,7 +620,7 @@ async function getStepElecQuantity(index, monthOverride) {
     const now = new Date()
     const year = now.getFullYear()
     const m0 = (typeof monthOverride === "number" ? monthOverride : now.getMonth()) // 0-11
-    const m1 = Math.max(1, Math.min(12, m0 + 1)) // 1-12
+    const m1 = Math.max(1, Math.min(12, m0 + 1))
     const queryDate = `${year}-${String(m1).padStart(2, "0")}`
 
     const apiPath =
@@ -695,13 +690,12 @@ async function getDataSourceByParams(index) {
 /* ===========================
  *  主流程
  * =========================== */
-
 ;(async () => {
     if (!USERNAME || !PASSWORD) {
         notify(
             SCRIPTNAME,
             "请先在 BoxJs 配置账号密码",
-            `需要：${KEY_PHONE} / ${KEY_PASS}`,
+            `需要：${KEY_PHONE} / ${KEY_PASS}\n（注意：脚本会从根 Key「ComponentService」读取 Settings）`,
             {url: "http://boxjs.com/#/app"}
         )
         throw new Error("账号密码未配置")
@@ -751,7 +745,17 @@ async function getDataSourceByParams(index) {
     }
     done(isQX ? resp : {response: resp})
 })().catch((e) => {
-    log.error(String(e))
+    const msg = String(e || "")
+    // ✅ GB002/10004：明确提示是中转/加解密服务异常
+    if (msg.includes("GB002") || msg.includes("10004")) {
+        notify(
+            SCRIPTNAME,
+            "中转/加解密服务异常（非账号密码）",
+            "错误：GB002 / 10004\n建议：\n1) 换网络/关代理重试；\n2) 等一会再试（服务不稳定）；\n3) 配置备用 SERVER_HOST（自建或可用的镜像服务）。"
+        )
+    }
+
+    log.error(msg)
     const resp = {
         status: isQX ? "HTTP/1.1 200" : 200,
         headers: {"content-type": "application/json;charset=utf-8"},
