@@ -38,7 +38,8 @@
       "name": "网上国网（95598）",
       "descs_html": [
         "<b>用途：</b>为组件/小组件提供电费、电量、阶梯等数据。<br/>",
-        "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。"
+        "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。<br/>",
+        "<b>缓存：</b>脚本会将登录凭证缓存到 <code>ComponentService.SGCC.Caches.bizrt</code>，用于减少重复登录。"
       ],
       "icons": [
         "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
@@ -71,6 +72,33 @@
           "type": "text",
           "rows": 1,
           "desc": "网上国网登录密码"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.notifyType",
+          "name": "通知类型（notifyType）",
+          "val": "all",
+          "type": "text",
+          "rows": 1,
+          "placeholder": "all / arrears / change / none（建议 all）",
+          "desc": "通知策略（脚本可读取该字段决定是否推送）。常见值：all=全部；arrears=仅欠费；change=仅电费变化；none=不通知。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.recentElcFee",
+          "name": "电费变动阈值（recentElcFee）",
+          "val": 0,
+          "type": "number",
+          "rows": 1,
+          "placeholder": "例如 5（元）",
+          "desc": "当 notifyType=change 时，可用于控制电费变化超过该阈值才通知；0 表示不设阈值。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Caches.bizrt",
+          "name": "缓存（bizrt）",
+          "type": "textarea",
+          "rows": 6,
+          "val": "{}",
+          "placeholder": "脚本自动写入，无需手动修改；需要强制重新登录可清空为 {}",
+          "desc": "脚本自动写入登录凭证缓存（token/userInfo 等）。如遇登录异常/频繁失效，可清空此字段后重新触发脚本。"
         }
       ]
     },
