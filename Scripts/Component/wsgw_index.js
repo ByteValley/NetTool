@@ -129,11 +129,51 @@ const KEY_PHONE = "@ComponentService.SGCC.Settings.phoneNum"
 const KEY_PASS  = "@ComponentService.SGCC.Settings.password"
 const KEY_DEBUG = "@ComponentService.SGCC.Settings.logDebug"
 
-const DEBUG = store.get(KEY_DEBUG) === "true" || store.get(KEY_DEBUG) === "1"
+// ✅ BoxJs 常见“总 Key = 大 JSON”存储（你现在就是这种）
+const ROOT_KEY_1 = "ComponentService"
+const ROOT_KEY_2 = "@ComponentService"
+
+function getByPath(obj, path) {
+  if (!obj || !path) return null
+  return path.split(".").reduce((acc, k) => (acc && acc[k] != null ? acc[k] : null), obj)
+}
+
+/**
+ * 优先读扁平新 Key；读不到就从 Root JSON 里按路径拿（兼容 BoxJs 大 JSON）
+ * rootPath 示例：SGCC.Settings.phoneNum
+ */
+function readSetting(flatKey, rootPath) {
+  const v1 = store.get(flatKey)
+  if (v1 != null && String(v1).trim() !== "") return String(v1)
+
+  const raw = store.get(ROOT_KEY_1) || store.get(ROOT_KEY_2)
+  if (!raw) return ""
+
+  const root = safeJsonParse(raw, null)
+  if (!root) return ""
+
+  // 你现在结构里同时有 SGCC.phoneNum 和 SGCC.Settings.phoneNum，这里都兜底
+  const v2 =
+    getByPath(root, rootPath) ??
+    getByPath(root, rootPath.replace(".Settings.", "."))
+
+  return v2 == null ? "" : String(v2)
+}
+
+const DEBUG_RAW = readSetting(KEY_DEBUG, "SGCC.Settings.logDebug").trim()
+const DEBUG = DEBUG_RAW === "true" || DEBUG_RAW === "1"
 const log = new Logger(SCRIPTNAME, DEBUG)
 
-const USERNAME = (store.get(KEY_PHONE) || "").trim()
-const PASSWORD = (store.get(KEY_PASS) || "").trim()
+const USERNAME = readSetting(KEY_PHONE, "SGCC.Settings.phoneNum").trim()
+const PASSWORD = readSetting(KEY_PASS,  "SGCC.Settings.password").trim()
+
+// 🔎 方便排障：到底从哪里读到的
+log.debug("ENV =", ENV)
+log.debug("Flat phone =", store.get(KEY_PHONE) ? "[SET]" : "[EMPTY]")
+log.debug("Flat pass  =", store.get(KEY_PASS) ? "[SET]" : "[EMPTY]")
+log.debug("Root JSON  =", (store.get(ROOT_KEY_1) || store.get(ROOT_KEY_2)) ? "[SET]" : "[EMPTY]")
+log.debug("Resolved phone =", USERNAME ? "[OK]" : "[EMPTY]")
+log.debug("Resolved pass  =", PASSWORD ? "[OK]" : "[EMPTY]")
 
 const SERVER_HOST = "https://api.120399.xyz"
 const BASE_URL = "https://www.95598.cn"
