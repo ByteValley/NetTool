@@ -1,4 +1,4 @@
-#!name=交管12123
+#!name=交管12123组件服务
 #!desc=【交管12123】Token/Cookie 自动抓取，支持组件服务（Surge 原生 / Quantumult-X 需配合资源解析器）。\n使用方法：打开交管12123「支付宝小程序」并登录，即可自动抓取 Token。资源解析器：https://t.me/QuanXNews/110
 #!category=组件服务
 
