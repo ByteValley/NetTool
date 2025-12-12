@@ -16,52 +16,65 @@
 
 const $ = new Env("交管12123");
 
-const TOKEN_KEY = "@ComponentService.12123.Settings.token";
-const DEBUG_KEY = "@ComponentService.12123.Settings.debug";
+const KEY_TOKEN = "@ComponentService.12123.Settings.token";
+const KEY_DEBUG = "@ComponentService.12123.Settings.debug";
 
-!(async () => {
-    if (typeof $request === "undefined") return $.done();
-
-    const body = $request.body;
-    if (!body || !body.includes("sign")) return $.done();
-
+(async () => {
     try {
+        if (typeof $request === "undefined") return;
+
+        const body = $request.body || "";
+        if (!body || !body.includes("sign")) return;
+
+        // body 形如：params=xxxxxx(encodeURIComponent)
         const raw = decodeURIComponent(body).replace(/^params=/, "");
-        const json = JSON.parse(raw);
+        let data;
+        try {
+            data = JSON.parse(raw);
+        } catch (e) {
+            debug("JSON.parse 失败，raw=\n" + raw);
+            throw e;
+        }
 
-        debug(JSON.stringify(json, null, 2));
+        debug("捕获 params：\n" + JSON.stringify(data, null, 2));
 
-        // 仅处理订阅接口
-        if (json.api !== "biz.user.msg.subscribe") return $.done();
-        if (!json.authToken) return $.done();
+        // 仅处理订阅接口（Nanako 原逻辑）
+        if (data.api !== "biz.user.msg.subscribe") return;
+        if (!data.authToken) {
+            debug("未发现 authToken，跳过");
+            return;
+        }
 
-        const tokenData = {
-            authToken: json.authToken,
-            accessTime: json.accessTime,
-            sign: json.sign,
-            appId: json.appId,
-            api: json.api,
+        const tokenObj = {
+            authToken: data.authToken,
+            accessTime: data.accessTime,
+            sign: data.sign,
+            appId: data.appId,
+            api: data.api,
             updateTime: Date.now(),
         };
 
-        const oldStr = $.getdata(TOKEN_KEY);
-        const old = oldStr ? JSON.parse(oldStr) : {};
+        // 避免重复写入
+        const oldStr = $.getdata(KEY_TOKEN);
+        const oldObj = oldStr ? safeJsonParse(oldStr, {}) : {};
+        if (oldObj && oldObj.sign && oldObj.sign === tokenObj.sign) {
+            debug("sign 未变化，跳过写入");
+            return;
+        }
 
-        if (old.sign === tokenData.sign) return $.done();
-
-        $.setdata(JSON.stringify(tokenData), TOKEN_KEY);
+        $.setdata(JSON.stringify(tokenObj), KEY_TOKEN);
 
         $.msg(
             $.name,
-            "✅ 12123 Token 获取成功",
-            "authToken 已写入 BoxJs",
+            "✅ Token 抓取成功",
+            "已写入 @ComponentService.12123.Settings.token",
             {
                 "media-url":
                     "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png",
             }
         );
 
-        console.log("[12123] Token 写入成功\n" + JSON.stringify(tokenData, null, 2));
+        console.log("[12123] 写入成功：\n" + JSON.stringify(tokenObj, null, 2));
     } catch (e) {
         $.logErr(e);
     } finally {
@@ -70,13 +83,22 @@ const DEBUG_KEY = "@ComponentService.12123.Settings.debug";
 })();
 
 function debug(msg) {
-    if ($.getdata(DEBUG_KEY) === "true") {
+    if ($.getdata(KEY_DEBUG) === "true") {
         console.log("[DEBUG]", msg);
     }
 }
 
+function safeJsonParse(str, fallback) {
+    try {
+        return JSON.parse(str);
+    } catch {
+        return fallback;
+    }
+}
+
 /* =======================
- * Env（稳定版）
+ * Env（稳定实现：支持 @root.path 写入/读取）
+ * Surge / Loon / QuanX
  * ======================= */
 function Env(name) {
     return new (class {
@@ -85,75 +107,98 @@ function Env(name) {
         }
 
         isSurge() {
-            return typeof $httpClient !== "undefined";
-        }
-
-        isQuanX() {
-            return typeof $task !== "undefined";
+            return typeof $httpClient !== "undefined" && typeof $loon === "undefined";
         }
 
         isLoon() {
             return typeof $loon !== "undefined";
         }
 
-        getdata(key) {
-            if (!key.startsWith("@")) {
-                return this._read(key);
-            }
-            const [, root, path] = key.match(/^@(.*?)\.(.*)$/);
-            const raw = this._read(root);
-            if (!raw) return "";
-            try {
-                return path.split(".").reduce((o, k) => o?.[k], JSON.parse(raw)) ?? "";
-            } catch {
-                return "";
-            }
+        isQuanX() {
+            return typeof $task !== "undefined";
         }
 
-        setdata(val, key) {
-            if (!key.startsWith("@")) {
-                return this._write(val, key);
-            }
-            const [, root, path] = key.match(/^@(.*?)\.(.*)$/);
-            let obj = {};
-            const raw = this._read(root);
-            if (raw) {
-                try {
-                    obj = JSON.parse(raw);
-                } catch {
-                }
-            }
-            const keys = path.split(".");
-            let cur = obj;
-            for (let i = 0; i < keys.length - 1; i++) {
-                if (typeof cur[keys[i]] !== "object") cur[keys[i]] = {};
-                cur = cur[keys[i]];
-            }
-            cur[keys[keys.length - 1]] = JSON.parse(val);
-            return this._write(JSON.stringify(obj), root);
-        }
-
-        _read(key) {
+        getval(key) {
             if (this.isSurge() || this.isLoon()) return $persistentStore.read(key);
             if (this.isQuanX()) return $prefs.valueForKey(key);
             return null;
         }
 
-        _write(val, key) {
-            if (this.isSurge() || this.isLoon())
-                return $persistentStore.write(val, key);
+        setval(val, key) {
+            if (this.isSurge() || this.isLoon()) return $persistentStore.write(val, key);
             if (this.isQuanX()) return $prefs.setValueForKey(val, key);
             return false;
         }
 
-        msg(title, sub, body, opt) {
-            if (this.isSurge() || this.isLoon())
-                $notification.post(title, sub, body, opt);
-            if (this.isQuanX()) $notify(title, sub, body, opt);
+        getdata(key) {
+            if (!key || typeof key !== "string") return "";
+            if (!key.startsWith("@")) return this.getval(key) || "";
+
+            const m = key.match(/^@([^\.]+)\.(.+)$/);
+            if (!m) return "";
+            const rootKey = m[1];
+            const path = m[2];
+
+            const rootStr = this.getval(rootKey);
+            if (!rootStr) return "";
+
+            let rootObj;
+            try {
+                rootObj = JSON.parse(rootStr);
+            } catch {
+                return "";
+            }
+            return path.split(".").reduce((o, k) => (o && o[k] !== undefined ? o[k] : ""), rootObj) ?? "";
+        }
+
+        setdata(val, key) {
+            if (!key || typeof key !== "string") return false;
+            if (!key.startsWith("@")) return this.setval(val, key);
+
+            const m = key.match(/^@([^\.]+)\.(.+)$/);
+            if (!m) return false;
+            const rootKey = m[1];
+            const path = m[2];
+
+            // root 读取/初始化
+            let rootObj = {};
+            const rootStr = this.getval(rootKey);
+            if (rootStr) {
+                try {
+                    rootObj = JSON.parse(rootStr) || {};
+                } catch {
+                    rootObj = {};
+                }
+            }
+
+            // 这里 val 我们约定是 JSON 字符串（tokenObj）
+            let valueObj = val;
+            try {
+                valueObj = JSON.parse(val);
+            } catch {
+                // 如果不是 JSON，就当字符串写
+            }
+
+            // lodash-set（安全）
+            const keys = path.split(".");
+            let cur = rootObj;
+            for (let i = 0; i < keys.length - 1; i++) {
+                const k = keys[i];
+                if (typeof cur[k] !== "object" || cur[k] === null) cur[k] = {};
+                cur = cur[k];
+            }
+            cur[keys[keys.length - 1]] = valueObj;
+
+            return this.setval(JSON.stringify(rootObj), rootKey);
+        }
+
+        msg(title, sub, body, opts) {
+            if (this.isSurge() || this.isLoon()) $notification.post(title, sub, body, opts);
+            if (this.isQuanX()) $notify(title, sub, body, opts);
         }
 
         logErr(e) {
-            console.log("❗️", e);
+            console.log("❗️", e && e.stack ? e.stack : e);
         }
 
         done() {
