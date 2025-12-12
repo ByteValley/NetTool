@@ -34,46 +34,46 @@
       ]
     },
     {
-  "id": "ComponentService.SGCC",
-  "name": "网上国网（95598）",
-  "descs_html": [
-    "<b>用途：</b>为组件/小组件提供电费、电量等数据。<br/>",
-    "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。"
-  ],
-  "keys": [
-    "@ComponentService.SGCC.Settings",
-    "@ComponentService.SGCC.Caches"
-  ],
-  "settings": [
-    {
-      "id": "@ComponentService.SGCC.Settings.logDebug",
-      "name": "是否输出调试日志",
-      "val": false,
-      "type": "boolean",
-      "desc": "打开后日志会更详细（排查登录/授权码失败时有用）。"
+      "id": "ComponentService.SGCC",
+      "name": "网上国网（95598）",
+      "descs_html": [
+        "<b>用途：</b>为组件/小组件提供电费、电量等数据。<br/>",
+        "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。"
+      ],
+      "keys": [
+        "@ComponentService.SGCC.Settings",
+        "@ComponentService.SGCC.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@ComponentService.SGCC.Settings.logDebug",
+          "name": "是否输出调试日志",
+          "val": false,
+          "type": "boolean",
+          "desc": "打开后日志会更详细（排查登录/授权码失败时有用）。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.phoneNum",
+          "name": "账号（手机号）",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "网上国网登录手机号"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.password",
+          "name": "密码",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "网上国网登录密码"
+        }
+      ],
+      "icons": [
+        "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
+        "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png"
+      ]
     },
-    {
-      "id": "@ComponentService.SGCC.Settings.phoneNum",
-      "name": "账号（手机号）",
-      "val": "",
-      "type": "text",
-      "rows": 1,
-      "desc": "网上国网登录手机号"
-    },
-    {
-      "id": "@ComponentService.SGCC.Settings.password",
-      "name": "密码",
-      "val": "",
-      "type": "text",
-      "rows": 1,
-      "desc": "网上国网登录密码"
-    }
-  ],
-  "icons": [
-    "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
-    "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png"
-  ]
-},
     {
       "id": "ComponentService.12123",
       "name": "交管12123",
