@@ -24,7 +24,7 @@
       ],
       "settings": [
         {
-          "id": "ComponentService.ChinaUnicom.Cookie",
+          "id": "@ComponentService.ChinaUnicom.Cookie",
           "name": "联通 Cookie（完整字符串）",
           "type": "text",
           "val": "",
@@ -47,14 +47,14 @@
       ],
       "settings": [
         {
-          "id": "ComponentService.SGCC.logDebug",
+          "id": "@ComponentService.SGCC.logDebug",
           "name": "是否输出调试日志",
           "val": false,
           "type": "boolean",
           "desc": "打开后日志会更详细（排查登录/授权码失败时有用）。"
         },
         {
-          "id": "ComponentService.SGCC.phoneNum",
+          "id": "@ComponentService.SGCC.phoneNum",
           "name": "账号（手机号）",
           "val": "",
           "type": "text",
@@ -62,7 +62,7 @@
           "desc": "网上国网登录手机号"
         },
         {
-          "id": "ComponentService.SGCC.password",
+          "id": "@ComponentService.SGCC.password",
           "name": "密码",
           "val": "",
           "type": "text",
