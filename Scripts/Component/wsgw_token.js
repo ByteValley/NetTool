@@ -1,11 +1,13 @@
 /******************************************
- * @name 网上国网（95598）组件服务 - 数据接口（登录态版｜Authorization 兜底）
- * @description 使用官方 App 抓取到的 token/acctoken/userId（或 Authorization），聚合电费/电量/阶梯等数据
+ * @name 网上国网（95598）组件服务 - 数据接口（登录态版）
+ * @description 使用官方 App 抓取到的 authorization/token/acctoken/userId，聚合电费/电量/阶梯等数据
  *
  * BoxJs Keys（仅新 Key｜全带 @｜Settings 风格）:
+ * - @ComponentService.SGCC.Settings.authorization
  * - @ComponentService.SGCC.Settings.token
  * - @ComponentService.SGCC.Settings.acctoken
  * - @ComponentService.SGCC.Settings.userId
+ * - @ComponentService.SGCC.Settings.lastHit
  * - @ComponentService.SGCC.Settings.logDebug
  *
  * Rewrite:
@@ -48,24 +50,6 @@ class Store {
                 return this.localStorage.getItem(key)
             default:
                 return null
-        }
-    }
-
-    set(key, val) {
-        const v = val == null ? "" : String(val)
-        switch (this.env) {
-            case "Surge":
-            case "Loon":
-            case "Stash":
-            case "Shadowrocket":
-                return $persistentStore.write(v, key)
-            case "QuantumultX":
-                return $prefs.setValueForKey(v, key)
-            case "Node":
-                this.localStorage.setItem(key, v)
-                return true
-            default:
-                return false
         }
     }
 }
@@ -134,15 +118,6 @@ async function http(request) {
         )
     }
 
-    if (ENV === "Node") {
-        const got = require("got")
-        const {url, ...opt} = request
-        return got[lower](url, opt).then(
-            (r) => ({status: r.statusCode, ok: /^2\d\d$/.test(String(r.statusCode)), body: r.body}),
-            (e) => Promise.reject(e.message || e)
-        )
-    }
-
     return new Promise((resolve, reject) => {
         $httpClient[lower](request, (err, resp, data) => {
             if (err) return reject(err)
@@ -204,75 +179,36 @@ function readSetting(pathKey) {
     return v == null ? "" : String(v)
 }
 
-function stripBearer(v) {
-    const s = String(v || "").trim()
-    if (!s) return ""
-    return s.replace(/^Bearer\s+/i, "").trim()
-}
-
-function base64UrlDecode(input) {
-    try {
-        let s = String(input || "")
-        s = s.replace(/-/g, "+").replace(/_/g, "/")
-        const pad = s.length % 4
-        if (pad) s += "=".repeat(4 - pad)
-        const raw = (typeof atob !== "undefined") ? atob(s) : Buffer.from(s, "base64").toString("binary")
-        let out = ""
-        for (let i = 0; i < raw.length; i++) out += String.fromCharCode(raw.charCodeAt(i))
-        try {
-            return decodeURIComponent(escape(out))
-        } catch {
-            return out
-        }
-    } catch {
-        return ""
-    }
-}
-
-function tryDecodeJwtUserId(token) {
-    const t = stripBearer(token)
-    const parts = t.split(".")
-    if (parts.length < 2) return ""
-    const payloadText = base64UrlDecode(parts[1])
-    const payload = safeJsonParse(payloadText, null)
-    if (!payload || typeof payload !== "object") return ""
-    const cand = ["userId", "userid", "user_id", "uid", "memberId", "acctId", "sub"]
-    for (const k of cand) {
-        if (payload[k] != null && String(payload[k]).trim() !== "") return String(payload[k])
-    }
-    return ""
-}
-
 /* ===========================
  *  业务配置
  * =========================== */
 
 const SCRIPTNAME = "网上国网"
 
+const KEY_AUTH = "@ComponentService.SGCC.Settings.authorization"
 const KEY_TOKEN = "@ComponentService.SGCC.Settings.token"
 const KEY_ACCTOKEN = "@ComponentService.SGCC.Settings.acctoken"
 const KEY_USERID = "@ComponentService.SGCC.Settings.userId"
+const KEY_LASTHIT = "@ComponentService.SGCC.Settings.lastHit"
+const KEY_DEBUG = "@ComponentService.SGCC.Settings.logDebug"
 
 const DEBUG = readSetting("logDebug") === "true" || readSetting("logDebug") === "1"
 const log = new Logger(SCRIPTNAME, DEBUG)
 
 log.debug(`ENV = ${ENV}`)
 
-let TOKEN = stripBearer(readSetting("token"))
-let ACCTOKEN = stripBearer(readSetting("acctoken"))
-let USERID = String(readSetting("userId") || "").trim()
+const AUTH = (readSetting("authorization") || "").trim()
+let TOKEN = (readSetting("token") || "").trim()
+const ACCTOKEN = (readSetting("acctoken") || "").trim()
+const USERID = (readSetting("userId") || "").trim()
+const LASTHIT = (readSetting("lastHit") || "").trim()
 
-// ✅ 兜底：很多情况下只有 Authorization（token）——那就 token=acctoken=Authorization
-if (!ACCTOKEN && TOKEN) ACCTOKEN = TOKEN
-if (!TOKEN && ACCTOKEN) TOKEN = ACCTOKEN
-if (!USERID && TOKEN) {
-    const uid = tryDecodeJwtUserId(TOKEN)
-    if (uid) USERID = uid
-}
+// 优先用 Authorization 作为 token（很多接口只认这个）
+if (AUTH && !TOKEN) TOKEN = AUTH
 
-log.debug(`token=${TOKEN ? "[SET]" : "[EMPTY]"} acctoken=${ACCTOKEN ? "[SET]" : "[EMPTY]"} userId=${USERID ? "[SET]" : "[EMPTY]"}`)
+log.debug(`authorization=${AUTH ? "[SET]" : "[EMPTY]"} token=${TOKEN ? "[SET]" : "[EMPTY]"} acctoken=${ACCTOKEN ? "[SET]" : "[EMPTY]"} userId=${USERID ? "[SET]" : "[EMPTY]"}`)
 
-// 第三方加解密服务（不可控：但原链路需要）
+// 第三方加解密服务（不可控：但沿用你当前链路）
 const SERVER_HOST = "https://api.120399.xyz"
 const BASE_URL = "https://www.95598.cn"
 
@@ -340,7 +276,9 @@ async function Decrypt(config) {
     if (!j || !j.data) throw new Error("Decrypt: invalid response")
     const {code, message, data} = j.data
     if (String(code) === "1") return data
-    throw new Error(message || "Decrypt failed")
+    const err = new Error(message || "Decrypt failed")
+    err._code = code
+    throw err
 }
 
 async function request95598(reqCfg) {
@@ -601,12 +539,16 @@ async function getDataSourceByParams(index) {
     return out
 }
 
+/* ===========================
+ *  启动
+ * =========================== */
+
 ;(async () => {
     if (!TOKEN || !ACCTOKEN || !USERID) {
         notify(
             SCRIPTNAME,
             "请先从官方 App 抓取登录态",
-            `需要：${KEY_TOKEN} / ${KEY_ACCTOKEN} / ${KEY_USERID}\n现状：token=${TOKEN ? "OK" : "EMPTY"} acctoken=${ACCTOKEN ? "OK" : "EMPTY"} userId=${USERID ? "OK" : "EMPTY"}\n操作：打开网上国网 App 登录后，多点首页/账单/我的触发请求`,
+            `需要：${KEY_AUTH} / ${KEY_TOKEN} / ${KEY_ACCTOKEN} / ${KEY_USERID}\n建议：打开网上国网 App 的「我的/账单/户号管理」等页面触发业务接口（不要只停留在地图页）`,
             {url: "http://boxjs.com/#/app"}
         )
         throw new Error("登录态未配置")
@@ -650,9 +592,22 @@ async function getDataSourceByParams(index) {
         headers: {"content-type": "application/json;charset=utf-8"},
         body: safeJsonStringify(result)
     }
+
     done(isQX ? resp : {response: resp})
 })().catch((e) => {
-    log.error(String(e))
+    const msg = String(e || "")
+    log.error(msg)
+
+    // GB002 的时候给更明确的定位信息
+    if (/GB002/i.test(msg)) {
+        notify(
+            SCRIPTNAME,
+            "登录态已抓到，但不是 95598 链路可用的那套",
+            `当前抓取来源(lastHit)：${LASTHIT || "未知"}\n建议：在网上国网 App 打开「我的/账单/户号管理/缴费记录」触发真实业务接口，再重试数据接口。`,
+            {url: "http://boxjs.com/#/app"}
+        )
+    }
+
     const resp = {
         status: isQX ? "HTTP/1.1 200" : 200,
         headers: {"content-type": "application/json;charset=utf-8"},

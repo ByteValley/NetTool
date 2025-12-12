@@ -82,6 +82,14 @@
           "desc": "优先从请求头读取；若只有 JWT Authorization，会尝试解码补齐。"
         },
         {
+          "id": "@ComponentService.SGCC.Settings.authorization",
+          "name": "Authorization（自动抓取）",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "优先从请求头抓取（通常是 Bearer ...）。很多接口只认这个。"
+        },
+        {
           "id": "@ComponentService.SGCC.Settings.lastUpdate",
           "name": "登录态更新时间（只读）",
           "val": "",

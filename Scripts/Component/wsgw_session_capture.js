@@ -1,12 +1,17 @@
 /******************************************
- * @name 网上国网（95598）组件服务 - 登录态抓取（Request Header 优先版）
- * @description 优先从 http-request 的 headers 捕获 Authorization/token/acctoken/userId；兼容 http-response JSON 扫描
+ * @name 网上国网（95598）组件服务 - 登录态抓取（精准版）
+ * @description
+ * 1) http-request：优先抓 Authorization / token / acctoken / userId（通常在 headers）
+ * 2) http-response：仅当响应是 JSON 且疑似登录态/业务接口时，递归解析 token 字段补齐
+ * 3) 自动去重：同一 URL 短时间只打印一次日志
  *
  * 写入 Keys（全带 @｜Settings 风格）:
+ * - @ComponentService.SGCC.Settings.authorization
  * - @ComponentService.SGCC.Settings.token
  * - @ComponentService.SGCC.Settings.acctoken
  * - @ComponentService.SGCC.Settings.userId
  * - @ComponentService.SGCC.Settings.lastUpdate
+ * - @ComponentService.SGCC.Settings.lastHit
  ******************************************/
 
 const ENV = (() => {
@@ -88,149 +93,138 @@ function writeRootJSON(j) {
 }
 
 function setSetting(key, value) {
-    store.set(`@ComponentService.SGCC.Settings.${key}`, value)
+    const v = value == null ? "" : String(value)
 
+    // 直读 Key（脚本读取）
+    store.set(`@ComponentService.SGCC.Settings.${key}`, v)
+
+    // root JSON（BoxJs UI 展示）
     const root = readRootJSON()
     root.SGCC = root.SGCC || {}
     root.SGCC.Settings = root.SGCC.Settings || {}
-    root.SGCC.Settings[key] = String(value)
+    root.SGCC.Settings[key] = v
     writeRootJSON(root)
 }
 
-function pickHeader(headers, names) {
-    if (!headers) return ""
-    const lowerMap = {}
-    for (const k of Object.keys(headers)) lowerMap[k.toLowerCase()] = headers[k]
-    for (const n of names) {
-        const v = lowerMap[n.toLowerCase()]
+function pickFirst(obj, keys) {
+    for (const k of keys) {
+        if (!obj) continue
+        const v = obj[k]
         if (v != null && String(v).trim() !== "") return String(v)
     }
     return ""
 }
 
-function stripBearer(v) {
+function isLikelyAuthValue(v) {
     const s = String(v || "").trim()
-    if (!s) return ""
-    return s.replace(/^Bearer\s+/i, "").trim()
+    if (!s) return false
+    // 太短的 token 基本没意义（避免 map 的“token=1”这类噪声）
+    return s.length >= 16
 }
 
-function base64UrlDecode(input) {
-    try {
-        let s = String(input || "")
-        s = s.replace(/-/g, "+").replace(/_/g, "/")
-        const pad = s.length % 4
-        if (pad) s += "=".repeat(4 - pad)
-        const raw = (typeof atob !== "undefined") ? atob(s) : Buffer.from(s, "base64").toString("binary")
-        let out = ""
-        for (let i = 0; i < raw.length; i++) out += String.fromCharCode(raw.charCodeAt(i))
-        try {
-            return decodeURIComponent(escape(out))
-        } catch {
-            return out
-        }
-    } catch {
-        return ""
-    }
+function shouldIgnoreURL(url) {
+    const u = String(url || "")
+    // 典型瓦片/静态：你现在命中的 aegis.SGAnchor/*.sg 就属于这种
+    if (/\/v1\/aegis\./i.test(u)) return true
+    if (/\.(?:png|jpg|jpeg|gif|webp|svg|mp4|m3u8|ts|css|js|map|sg)(?:\?|$)/i.test(u)) return true
+    return false
 }
 
-function tryDecodeJwtUserId(token) {
-    const t = stripBearer(token)
-    const parts = t.split(".")
-    if (parts.length < 2) return ""
-    const payloadText = base64UrlDecode(parts[1])
-    const payload = safeJsonParse(payloadText, null)
-    if (!payload || typeof payload !== "object") return ""
-    const cand = ["userId", "userid", "user_id", "uid", "memberId", "acctId", "sub"]
-    for (const k of cand) {
-        if (payload[k] != null && String(payload[k]).trim() !== "") return String(payload[k])
-    }
-    return ""
+// 只对“像业务/登录态”的路径更积极（否则宁可不抓，也不要误抓）
+function isLikelySessionAPI(url) {
+    const u = String(url || "")
+    return /(oauth|token|acctoken|login|auth|session|user|member|account|refresh)/i.test(u)
 }
 
-// 递归扫 JSON（兼容 response body 里带 token 的情况）
-function scanJson(obj, out) {
+// 递归扫 JSON：只在“像 token 的值”时才采纳
+function scan(obj, out) {
     if (!obj || typeof obj !== "object") return
+
     const cand = [
-        ["token", ["token", "Token", "authorization", "Authorization", "x-token", "X-Token"]],
+        ["token", ["token", "Token", "x-token", "X-Token"]],
         ["acctoken", ["acctoken", "accToken", "access_token", "accessToken", "AccessToken"]],
         ["userId", ["userId", "userid", "UserId", "user_id", "uid", "memberId", "acctId"]]
     ]
+
     for (const [name, keys] of cand) {
         if (!out[name]) {
-            for (const k of keys) {
-                if (obj[k] != null && String(obj[k]).trim() !== "") {
-                    out[name] = String(obj[k])
-                    break
-                }
-            }
+            const v = pickFirst(obj, keys)
+            if (isLikelyAuthValue(v)) out[name] = String(v)
         }
     }
+
     for (const k of Object.keys(obj)) {
         const v = obj[k]
-        if (v && typeof v === "object") scanJson(v, out)
+        if (v && typeof v === "object") scan(v, out)
     }
 }
 
+// --- 去重：同一 URL 2 秒内只打印一次 ---
+function dedupHit(url) {
+    const key = "@ComponentService.SGCC.Settings.__dedup"
+    const lastRaw = store.get(key) || ""
+    const now = Date.now()
+    const prev = safeJsonParse(lastRaw, {})
+    const last = prev[url] || 0
+    if (now - last < 2000) return false
+    prev[url] = now
+    store.set(key, safeJsonStringify(prev))
+    return true
+}
+
 ;(function main() {
-    const url = ($request && $request.url) ? String($request.url) : (($response && $response.url) ? String($response.url) : "")
-    const out = {token: "", acctoken: "", userId: ""}
+    const url = ($request && $request.url) ? String($request.url) : ""
+    const isReq = typeof $request !== "undefined" && $request && $request.headers
+    const isResp = typeof $response !== "undefined" && $response
 
-    const hasReq = (typeof $request !== "undefined") && $request && $request.headers
-    const hasResp = (typeof $response !== "undefined") && $response && $response.headers
+    if (!url) return done({})
+    if (shouldIgnoreURL(url)) return done({})
 
-    // ========== 1) http-request：只读 $request ==========
-    if (hasReq) {
+    const out = {authorization: "", token: "", acctoken: "", userId: ""}
+
+    // 1) request headers 优先
+    if (isReq) {
         const h = $request.headers || {}
-        const authorization = pickHeader(h, ["Authorization", "authorization"])
-        const token = pickHeader(h, ["token", "Token", "x-token", "X-Token"])
-        const acctoken = pickHeader(h, ["acctoken", "accToken", "access_token", "accessToken"])
-        const userId = pickHeader(h, ["userId", "userid", "x-userid", "X-UserId", "uid"])
+        out.authorization = pickFirst(h, ["Authorization", "authorization"])
+        out.token = pickFirst(h, ["token", "Token", "x-token", "X-Token"])
+        out.acctoken = pickFirst(h, ["acctoken", "accToken", "x-acctoken", "X-Acctoken"])
+        out.userId = pickFirst(h, ["userId", "UserId", "x-userid", "X-UserId"])
 
-        const authToken = stripBearer(authorization)
-        out.token = stripBearer(token) || authToken
-        out.acctoken = stripBearer(acctoken) || ""
-        out.userId = String(userId || "").trim()
-
-        if (!out.userId && authToken) {
-            const uid = tryDecodeJwtUserId(authToken)
-            if (uid) out.userId = uid
-        }
+        if (out.authorization && !isLikelyAuthValue(out.authorization)) out.authorization = ""
+        if (out.token && !isLikelyAuthValue(out.token)) out.token = ""
+        if (out.acctoken && !isLikelyAuthValue(out.acctoken)) out.acctoken = ""
+        if (out.userId && !isLikelyAuthValue(out.userId)) out.userId = ""
     }
 
-    // ========== 2) http-response：只在存在 $response 时处理 ==========
-    if (hasResp) {
-        const h = $response.headers || {}
-        const authorization = pickHeader(h, ["Authorization", "authorization"])
-        const token = pickHeader(h, ["token", "Token", "x-token", "X-Token"])
-        const acctoken = pickHeader(h, ["acctoken", "accToken", "access_token", "accessToken"])
-        const userId = pickHeader(h, ["userId", "userid", "x-userid", "X-UserId", "uid"])
-
-        const authToken = stripBearer(authorization)
-        out.token = out.token || stripBearer(token) || authToken
-        out.acctoken = out.acctoken || stripBearer(acctoken)
-        out.userId = out.userId || String(userId || "").trim()
-
+    // 2) response body 仅在 JSON 且疑似接口时补充
+    if (isResp) {
+        const h = ($response && $response.headers) ? $response.headers : {}
+        const ct = pickFirst(h, ["Content-Type", "content-type"])
         const body = ($response && $response.body) ? String($response.body) : ""
-        const j = safeJsonParse(body, null)
-        if (j) scanJson(j, out)
 
-        if (!out.userId && authToken) {
-            const uid = tryDecodeJwtUserId(authToken)
-            if (uid) out.userId = uid
+        const looksJson = /json/i.test(ct) || /^[\s\r\n]*[{\[]/.test(body)
+        if (looksJson && (isLikelySessionAPI(url) || out.authorization || out.token)) {
+            const j = safeJsonParse(body, null)
+            if (j) {
+                scan(j, out)
+            }
         }
     }
 
-    // ========== 3) 兜底 ==========
-    if (!out.acctoken && out.token) out.acctoken = out.token
-
-    // ========== 4) 写入 ==========
+    // 3) 写入（只写“像样”的）
+    if (out.authorization) setSetting("authorization", out.authorization)
     if (out.token) setSetting("token", out.token)
     if (out.acctoken) setSetting("acctoken", out.acctoken)
     if (out.userId) setSetting("userId", out.userId)
-    setSetting("lastUpdate", nowISO())
 
-    console.log(`[网上国网] 捕获命中：${url}`)
-    console.log(`[网上国网] token=${out.token ? "[SET]" : "[EMPTY]"} acctoken=${out.acctoken ? "[SET]" : "[EMPTY]"} userId=${out.userId ? "[SET]" : "[EMPTY]"}`)
+    setSetting("lastUpdate", nowISO())
+    setSetting("lastHit", url)
+
+    // 4) 关键日志（去重后才打印）
+    if (dedupHit(url)) {
+        console.log(`[网上国网] 捕获命中：${url}`)
+        console.log(`[网上国网] authorization=${out.authorization ? "[SET]" : "[EMPTY]"} token=${out.token ? "[SET]" : "[EMPTY]"} acctoken=${out.acctoken ? "[SET]" : "[EMPTY]"} userId=${out.userId ? "[SET]" : "[EMPTY]"}`)
+    }
 
     done({})
 })()
