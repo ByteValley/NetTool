@@ -3,9 +3,9 @@
  * @description 通过网上国网账号密码登录，聚合电费/电量/阶梯等数据，供小组件读取
  *
  * BoxJs Keys:
- * - ComponentService.SGCC.phoneNum
- * - ComponentService.SGCC.password
- * - ComponentService.SGCC.logDebug
+ * - @ComponentService.SGCC.phoneNum
+ * - @ComponentService.SGCC.password
+ * - @ComponentService.SGCC.logDebug
  *
  * Rewrite:
  * ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all
@@ -186,9 +186,9 @@ function getUrlParams(url) {
 const SCRIPTNAME = "网上国网"
 const store = new Store("ComponentService")
 
-const KEY_PHONE = "ComponentService.SGCC.phoneNum"
-const KEY_PASS  = "ComponentService.SGCC.password"
-const KEY_DEBUG = "ComponentService.SGCC.logDebug"
+const KEY_PHONE = "@ComponentService.SGCC.phoneNum"
+const KEY_PASS  = "@ComponentService.SGCC.password"
+const KEY_DEBUG = "@ComponentService.SGCC.logDebug"
 
 const DEBUG = store.get(KEY_DEBUG) === "true" || store.get(KEY_DEBUG) === "1"
 const log = new Logger(SCRIPTNAME, DEBUG)
