@@ -172,14 +172,14 @@ function scanJson(obj, out) {
 }
 
 ;(function main() {
-    const url = ($request && $request.url) ? String($request.url) : ""
-    const isReq = !!($request && $request.headers)
-    const isResp = !!($response && $response.headers)
-
+    const url = ($request && $request.url) ? String($request.url) : (($response && $response.url) ? String($response.url) : "")
     const out = {token: "", acctoken: "", userId: ""}
 
-    // 1) 优先抓 http-request headers（你 HAR 里关键就是 Authorization）
-    if (isReq) {
+    const hasReq = (typeof $request !== "undefined") && $request && $request.headers
+    const hasResp = (typeof $response !== "undefined") && $response && $response.headers
+
+    // ========== 1) http-request：只读 $request ==========
+    if (hasReq) {
         const h = $request.headers || {}
         const authorization = pickHeader(h, ["Authorization", "authorization"])
         const token = pickHeader(h, ["token", "Token", "x-token", "X-Token"])
@@ -188,7 +188,7 @@ function scanJson(obj, out) {
 
         const authToken = stripBearer(authorization)
         out.token = stripBearer(token) || authToken
-        out.acctoken = stripBearer(acctoken) || "" // 先不兜底，后面统一兜
+        out.acctoken = stripBearer(acctoken) || ""
         out.userId = String(userId || "").trim()
 
         if (!out.userId && authToken) {
@@ -197,8 +197,8 @@ function scanJson(obj, out) {
         }
     }
 
-    // 2) 兼容 http-response：headers + JSON body
-    if (isResp) {
+    // ========== 2) http-response：只在存在 $response 时处理 ==========
+    if (hasResp) {
         const h = $response.headers || {}
         const authorization = pickHeader(h, ["Authorization", "authorization"])
         const token = pickHeader(h, ["token", "Token", "x-token", "X-Token"])
@@ -220,16 +220,15 @@ function scanJson(obj, out) {
         }
     }
 
-    // 3) acctoken 兜底：抓不到就用 token（很多 App 就一个 Authorization）
+    // ========== 3) 兜底 ==========
     if (!out.acctoken && out.token) out.acctoken = out.token
 
-    // 4) 写入（只写非空；更新时间必写）
+    // ========== 4) 写入 ==========
     if (out.token) setSetting("token", out.token)
     if (out.acctoken) setSetting("acctoken", out.acctoken)
     if (out.userId) setSetting("userId", out.userId)
     setSetting("lastUpdate", nowISO())
 
-    // 关键日志：确保你“看得见它干活了”
     console.log(`[网上国网] 捕获命中：${url}`)
     console.log(`[网上国网] token=${out.token ? "[SET]" : "[EMPTY]"} acctoken=${out.acctoken ? "[SET]" : "[EMPTY]"} userId=${out.userId ? "[SET]" : "[EMPTY]"}`)
 
