@@ -4,7 +4,7 @@
 #!tag=组件服务
 
 [Script]
-http-request ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all script-path=https://raw.githubusercontent.com/dompling/Script/master/wsgw/index.js, requires-body=true, timeout=60, tag=接口重写
+http-request ^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/wsgw_index.js, requires-body=true, timeout=60, tag=接口重写
 
 [MITM]
 hostname = api.wsgw-rewrite.com
