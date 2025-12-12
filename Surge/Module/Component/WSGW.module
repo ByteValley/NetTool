@@ -1,9 +1,10 @@
-#!name =网上国网组件服务
+#!name=网上国网组件服务
 #!category=组件服务
-#!desc=95598 
+#!desc=95598 电费/电量聚合接口（bill/all）
 
 [Script]
-接口重写 = type=http-request, pattern=^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all, script-path=https://raw.githubusercontent.com/dompling/Script/master/wsgw/index.js, requires-body=true, max-size=-1, timeout=60
+# 模块分类 · 网上国网组件服务接口重写
+网上国网·接口重写 = type=http-request,pattern=^https?:\/\/api\.wsgw-rewrite\.com\/electricity\/bill\/all,requires-body=0,max-size=-1,timeout=60,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/wsgw_index.js
 
 [MITM]
 hostname = %APPEND% api.wsgw-rewrite.com
