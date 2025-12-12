@@ -16,66 +16,52 @@
 
 const $ = new Env("交管12123");
 
-// ========================
-// 配置
-// ========================
 const TOKEN_KEY = "@ComponentService.12123.Settings.token";
 const DEBUG_KEY = "@ComponentService.12123.Settings.debug";
 
-// ========================
-// 主逻辑
-// ========================
 !(async () => {
     if (typeof $request === "undefined") return $.done();
 
-    const req = $request;
-    if (!req.body || !req.body.includes("sign")) return $.done();
+    const body = $request.body;
+    if (!body || !body.includes("sign")) return $.done();
 
     try {
-        const raw = decodeURIComponent(req.body).replace(/^params=/, "");
+        const raw = decodeURIComponent(body).replace(/^params=/, "");
         const json = JSON.parse(raw);
 
-        debug("RAW BODY:\n" + JSON.stringify(json, null, 2));
+        debug(JSON.stringify(json, null, 2));
 
-        // 只处理订阅接口
+        // 仅处理订阅接口
         if (json.api !== "biz.user.msg.subscribe") return $.done();
+        if (!json.authToken) return $.done();
 
-        if (!json.authToken) {
-            debug("未发现 authToken，跳过");
-            return $.done();
-        }
-
-        const newToken = {
+        const tokenData = {
             authToken: json.authToken,
             accessTime: json.accessTime,
             sign: json.sign,
             appId: json.appId,
             api: json.api,
-            updateTime: Date.now()
+            updateTime: Date.now(),
         };
 
-        const oldTokenStr = $.getdata(TOKEN_KEY);
-        const oldToken = oldTokenStr ? JSON.parse(oldTokenStr) : {};
+        const oldStr = $.getdata(TOKEN_KEY);
+        const old = oldStr ? JSON.parse(oldStr) : {};
 
-        // 避免重复写入
-        if (oldToken.sign === newToken.sign) {
-            debug("Token 未变化，跳过写入");
-            return $.done();
-        }
+        if (old.sign === tokenData.sign) return $.done();
 
-        $.setdata(JSON.stringify(newToken), TOKEN_KEY);
+        $.setdata(JSON.stringify(tokenData), TOKEN_KEY);
 
         $.msg(
             $.name,
             "✅ 12123 Token 获取成功",
-            `authToken 已写入 BoxJs`,
+            "authToken 已写入 BoxJs",
             {
                 "media-url":
-                    "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png"
+                    "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png",
             }
         );
 
-        console.log("✅ 写入 Token：\n" + JSON.stringify(newToken, null, 2));
+        console.log("[12123] Token 写入成功\n" + JSON.stringify(tokenData, null, 2));
     } catch (e) {
         $.logErr(e);
     } finally {
@@ -83,9 +69,6 @@ const DEBUG_KEY = "@ComponentService.12123.Settings.debug";
     }
 })();
 
-// ========================
-// Debug
-// ========================
 function debug(msg) {
     if ($.getdata(DEBUG_KEY) === "true") {
         console.log("[DEBUG]", msg);
@@ -93,112 +76,88 @@ function debug(msg) {
 }
 
 /* =======================
- * Env 工具（原样保留）
+ * Env（稳定版）
  * ======================= */
-
-// prettier-ignore
-function Env(t, e) {
-    class s {
-        constructor(t) {
-            this.env = t
-        }
-
-        send(t, e = "GET") {
-            t = "string" == typeof t ? {url: t} : t;
-            let s = this.get;
-            return "POST" === e && (s = this.post), new Promise((e, i) => {
-                s.call(this, t, (t, s, r) => {
-                    t ? i(t) : e(s)
-                })
-            })
-        }
-
-        get(t) {
-            return this.send.call(this.env, t)
-        }
-
-        post(t) {
-            return this.send.call(this.env, t, "POST")
-        }
-    }
-
-    return new class {
-        constructor(t, e) {
-            this.name = t, this.http = new s(this), this.data = null, this.dataFile = "box.dat", this.logs = [], this.isMute = !1, this.isNeedRewrite = !1, this.logSeparator = "\n", this.encoding = "utf-8", this.startTime = (new Date).getTime(), Object.assign(this, e), this.log("", `🔔${this.name}, 开始!`)
-        }
-
-        isNode() {
-            return "undefined" != typeof module && !!module.exports
-        }
-
-        isQuanX() {
-            return "undefined" != typeof $task
+function Env(name) {
+    return new (class {
+        constructor() {
+            this.name = name;
         }
 
         isSurge() {
-            return "undefined" != typeof $httpClient && "undefined" == typeof $loon
+            return typeof $httpClient !== "undefined";
+        }
+
+        isQuanX() {
+            return typeof $task !== "undefined";
         }
 
         isLoon() {
-            return "undefined" != typeof $loon
+            return typeof $loon !== "undefined";
         }
 
-        isShadowrocket() {
-            return "undefined" != typeof $rocket
+        getdata(key) {
+            if (!key.startsWith("@")) {
+                return this._read(key);
+            }
+            const [, root, path] = key.match(/^@(.*?)\.(.*)$/);
+            const raw = this._read(root);
+            if (!raw) return "";
+            try {
+                return path.split(".").reduce((o, k) => o?.[k], JSON.parse(raw)) ?? "";
+            } catch {
+                return "";
+            }
         }
 
-        isStash() {
-            return "undefined" != typeof $environment && $environment["stash-version"]
-        }
-
-        getdata(t) {
-            let e = this.getval(t);
-            if (/^@/.test(t)) {
-                const [, s, i] = /^@(.*?)\.(.*?)$/.exec(t), r = s ? this.getval(s) : "";
-                if (r) try {
-                    const t = JSON.parse(r);
-                    e = t ? i.split(".").reduce((t, e) => t?.[e], t) ?? "" : e
+        setdata(val, key) {
+            if (!key.startsWith("@")) {
+                return this._write(val, key);
+            }
+            const [, root, path] = key.match(/^@(.*?)\.(.*)$/);
+            let obj = {};
+            const raw = this._read(root);
+            if (raw) {
+                try {
+                    obj = JSON.parse(raw);
                 } catch {
-                    e = ""
                 }
             }
-            return e
+            const keys = path.split(".");
+            let cur = obj;
+            for (let i = 0; i < keys.length - 1; i++) {
+                if (typeof cur[keys[i]] !== "object") cur[keys[i]] = {};
+                cur = cur[keys[i]];
+            }
+            cur[keys[keys.length - 1]] = JSON.parse(val);
+            return this._write(JSON.stringify(obj), root);
         }
 
-        setdata(t, e) {
-            let s = !1;
-            if (/^@/.test(e)) {
-                const [, i, r] = /^@(.*?)\.(.*?)$/.exec(e), o = this.getval(i) || "{}";
-                try {
-                    const e = JSON.parse(o);
-                    r.split(".").reduce((t, e, s, a) => (t[e] = s === a.length - 1 ? JSON.parse(t[e] ?? "null") || t[e] || t[e] : t[e] || {}), e), s = this.setval(JSON.stringify(e), i)
-                } catch {
-                    const o = {};
-                    r.split(".").reduce((t, e, s, a) => (t[e] = s === a.length - 1 ? t[e] = t : t[e] || {}), o), s = this.setval(JSON.stringify(o), i)
-                }
-            } else s = this.setval(t, e);
-            return s
+        _read(key) {
+            if (this.isSurge() || this.isLoon()) return $persistentStore.read(key);
+            if (this.isQuanX()) return $prefs.valueForKey(key);
+            return null;
         }
 
-        getval(t) {
-            return this.isSurge() || this.isLoon() ? $persistentStore.read(t) : this.isQuanX() ? $prefs.valueForKey(t) : this.isNode() ? (this.data = this.data || {}, this.data[t]) : null
+        _write(val, key) {
+            if (this.isSurge() || this.isLoon())
+                return $persistentStore.write(val, key);
+            if (this.isQuanX()) return $prefs.setValueForKey(val, key);
+            return false;
         }
 
-        setval(t, e) {
-            return this.isSurge() || this.isLoon() ? $persistentStore.write(t, e) : this.isQuanX() ? $prefs.setValueForKey(t, e) : this.isNode() ? (this.data = this.data || {}, this.data[e] = t, !0) : null
+        msg(title, sub, body, opt) {
+            if (this.isSurge() || this.isLoon())
+                $notification.post(title, sub, body, opt);
+            if (this.isQuanX()) $notify(title, sub, body, opt);
         }
 
-        msg(e = t, s = "", i = "", r) {
-            const o = t => "string" == typeof t ? (this.isQuanX() ? {"open-url": t} : {url: t}) : t;
-            (this.isSurge() || this.isLoon()) && $notification.post(e, s, i, o(r)), this.isQuanX() && $notify(e, s, i, o(r))
-        }
-
-        logErr(t) {
-            console.log("❗️", t)
+        logErr(e) {
+            console.log("❗️", e);
         }
 
         done() {
-            $done()
+            $done();
         }
-    }(t, e)
+    })();
 }
