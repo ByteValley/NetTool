@@ -3,10 +3,13 @@
  * @description 网上国网电费查询
  * @channel https://t.me/yqc_123/
  * @feedback https://t.me/NobyDa_Chat
- * @author 小白脸|𝐎𝐍𝐙𝟑𝐕
+ * @author 小白脸｜𝐎𝐍𝐙𝟑𝐕｜ByteValley
  *
  * BoxJs订阅地址:
- * https://raw.githubusercontent.com/Yuheng0101/X/main/Tasks/boxjs.json
+ * https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/ComponentService.boxjs.json
+ *
+ * 原脚本地址：
+ * https://raw.githubusercontent.com/dompling/Script/master/wsgw/index.js
  *
  * 根 JSON（驼峰）：
  * ComponentService = {
