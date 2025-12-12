@@ -19,8 +19,8 @@
         "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/icon.png"
       ],
       "keys": [
-        "ComponentService.ChinaUnicom.Cookie",
-        "ComponentService.ChinaUnicom.Caches"
+        "@ComponentService.ChinaUnicom.Cookie",
+        "@ComponentService.ChinaUnicom.Caches"
       ],
       "settings": [
         {
@@ -41,9 +41,9 @@
         "<b>提示：</b>此脚本需要账号密码登录（部分地区可能触发验证码/滑块等风控）。"
       ],
       "keys": [
-        "ComponentService.SGCC.logDebug",
-        "ComponentService.SGCC.phoneNum",
-        "ComponentService.SGCC.password"
+        "@ComponentService.SGCC.logDebug",
+        "@ComponentService.SGCC.phoneNum",
+        "@ComponentService.SGCC.password"
       ],
       "settings": [
         {
@@ -79,7 +79,7 @@
       "id": "ComponentService.12123",
       "name": "交管12123",
       "keys": [
-        "ComponentService.12123.token"
+        "@ComponentService.12123.token"
       ],
       "descs_html": [
         "<h4 align=\"center\">点击查看抓取到的 12123 Token</h4>"
