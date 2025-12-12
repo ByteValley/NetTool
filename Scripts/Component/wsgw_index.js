@@ -203,8 +203,12 @@ const CFG = {
   stepelect: { channelCode: "0902", funcCode: "WEBALIPAY_01", promotType: "1", clearCache: "09", serviceCode: "BCP_000026", source: "app" }
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
 /* ===========================
- *  加解密请求封装
+ *  加解密请求封装（增强：失败信息 + 重试）
  * =========================== */
 
 async function Encrypt(config) {
@@ -220,10 +224,17 @@ async function Encrypt(config) {
 async function Decrypt(config) {
   const r = await http(config)
   const j = safeJsonParse(r.body, null)
-  if (!j || !j.data) throw new Error("Decrypt: invalid response")
+  if (!j || !j.data) {
+    // 兜底：把原始 body 打出来
+    throw new Error(`Decrypt: invalid response: ${String(r.body || "").slice(0, 200)}`)
+  }
+
   const { code, message, data } = j.data
   if (String(code) === "1") return data
-  throw new Error(message || "Decrypt failed")
+
+  // ✅ 关键：把 code/message 都带出来，debug 时更好判断
+  const msg = message || "Decrypt failed"
+  throw new Error(`${msg}${code ? `（code=${code}）` : ""}`)
 }
 
 async function request95598(reqCfg) {
@@ -249,6 +260,41 @@ async function request95598(reqCfg) {
     body: safeJsonStringify({ yuheng: payload })
   }
   return Decrypt(decCfg)
+}
+
+// ✅ 新增：对 GB002/系统繁忙类错误做重试
+async function request95598WithRetry(reqCfg, opt = {}) {
+  const {
+    retries = 3,
+    baseDelayMs = 450,
+    jitterMs = 250
+  } = opt
+
+  let lastErr = null
+  for (let i = 0; i <= retries; i++) {
+    try {
+      // 轻微随机抖动，避免踩相同风控窗口
+      if (i > 0) await sleep(baseDelayMs * i + Math.floor(Math.random() * jitterMs))
+      return await request95598(reqCfg)
+    } catch (e) {
+      const msg = String(e && e.message ? e.message : e)
+      lastErr = e
+
+      // 只对“值得重试”的错误重试
+      const retryable =
+        msg.includes("GB002") ||
+        msg.includes("系统繁忙") ||
+        msg.includes("网络") ||
+        msg.includes("超时") ||
+        msg.includes("请求异常")
+
+      log.warn(`request95598 failed [${i + 1}/${retries + 1}]`, msg)
+
+      if (!retryable) break
+      if (i === retries) break
+    }
+  }
+  throw lastErr || new Error("request95598WithRetry failed")
 }
 
 async function recognizeCaptcha(canvasSrc) {
@@ -282,47 +328,64 @@ let bindInfo = null
 
 async function getKeyCode() {
   log.info("⏳ 获取 keyCode/publicKey ...")
-  requestKey = await request95598({ url: `/api${API.getKeyCode}`, method: "POST", headers: {} })
+  requestKey = await request95598WithRetry(
+    { url: `/api${API.getKeyCode}`, method: "POST", headers: {} },
+    { retries: 2 }
+  )
 }
 
 async function getVerifyCode() {
   log.info("⏳ 获取验证码凭证 ...")
-  const r = await request95598({
-    url: `/api${API.loginVerifyCodeNew}`,
-    method: "POST",
-    headers: { ...requestKey },
-    data: { password: PASSWORD, account: USERNAME, canvasHeight: 200, canvasWidth: 310 }
-  })
-  if (!r || !r.ticket || !r.canvasSrc) throw new Error("验证码凭证为空")
+  const r = await request95598WithRetry(
+    {
+      url: `/api${API.loginVerifyCodeNew}`,
+      method: "POST",
+      headers: { ...requestKey },
+      data: { password: PASSWORD, account: USERNAME, canvasHeight: 200, canvasWidth: 310 }
+    },
+    { retries: 4, baseDelayMs: 500 }
+  )
+
+  if (!r || !r.ticket || !r.canvasSrc) {
+    log.warn("verifyCode resp:", safeJsonStringify(r).slice(0, 200))
+    throw new Error("验证码凭证为空")
+  }
+
   const code = await recognizeCaptcha(r.canvasSrc)
   return { ticket: r.ticket, code }
 }
 
 async function login(ticket, code) {
   log.info("⏳ 登录中 ...")
-  const r = await request95598({
-    url: `/api${API.loginTestCodeNew}`,
-    method: "POST",
-    headers: { ...requestKey },
-    data: {
-      loginKey: ticket,
-      code,
-      params: {
-        uscInfo: { devciceIp: "", tenant: "state_grid", member: "0902", devciceId: "" },
-        quInfo: {
-          optSys: "android",
-          pushId: "000000",
-          addressProvince: "110100",
-          addressRegion: "110101",
-          addressCity: "330100",
-          password: PASSWORD,
-          account: USERNAME
-        }
-      },
-      Channels: "web"
-    }
-  })
-  if (!r || !r.bizrt || !(r.bizrt.userInfo && r.bizrt.userInfo.length)) throw new Error("登录失败：账号/密码/验证码可能不正确")
+  const r = await request95598WithRetry(
+    {
+      url: `/api${API.loginTestCodeNew}`,
+      method: "POST",
+      headers: { ...requestKey },
+      data: {
+        loginKey: ticket,
+        code,
+        params: {
+          uscInfo: { devciceIp: "", tenant: "state_grid", member: "0902", devciceId: "" },
+          quInfo: {
+            optSys: "android",
+            pushId: "000000",
+            addressProvince: "110100",
+            addressRegion: "110101",
+            addressCity: "330100",
+            password: PASSWORD,
+            account: USERNAME
+          }
+        },
+        Channels: "web"
+      }
+    },
+    { retries: 2, baseDelayMs: 600 }
+  )
+
+  if (!r || !r.bizrt || !(r.bizrt.userInfo && r.bizrt.userInfo.length)) {
+    throw new Error("登录失败：账号/密码/验证码可能不正确")
+  }
   bizrt = r.bizrt
 }
 
