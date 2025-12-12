@@ -1,0 +1,109 @@
+{
+  "id": "ByteValley.ComponentService",
+  "name": "组件服务",
+  "author": "@ByteValley",
+  "description": "各类组件服务数据采集脚本（运营商、App 登录态等）",
+  "icon": "https://github.com/ByteValley/Icon/blob/main/server/DataManagement1.png",
+  "repo": "https://github.com/ByteValley/NetTool",
+  "apps": [
+    {
+      "id": "ComponentService.ChinaUnicom",
+      "name": "中国联通",
+      "descs_html": [
+        "用于保存中国联通 App 抓取到的 <code>Cookie</code>，供 Scriptable / 面板组件 / 其他脚本复用。",
+        "<b>获取方式：</b><br/>1）打开 <b>中国联通 官方 App</b>；<br/>2）进入首页「流量查询」或其他会触发 <code>/smartwisdomCommon</code> 接口的页面；<br/>3）确保重写与脚本已启用，触发一次请求后，脚本会自动写入变量 <code>@ComponentService.ChinaUnicom.Settings.Cookie</code>。",
+        "<b>说明：</b><br/>• 本条仅存储 Cookie 完整字符串（包含 JSESSIONID 等），不拆分字段；<br/>• 推荐通过脚本自动抓取，手动填写仅用于调试或紧急情况。"
+      ],
+      "icons": [
+        "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/icon.png",
+        "https://github.com/ChinaTelecomOperators/ChinaUnicom/releases/download/Prerelease-Alpha/icon.png"
+      ],
+      "keys": [
+        "@ComponentService.ChinaUnicom.Settings",
+        "@ComponentService.ChinaUnicom.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@ComponentService.ChinaUnicom.Settings.Cookie",
+          "name": "联通 Cookie（完整字符串）",
+          "type": "text",
+          "val": "",
+          "placeholder": "建议通过脚本自动抓取，无需手动填写",
+          "desc": "脚本会自动写入完整 Cookie 字符串。如需重置，可先清空此字段，再在联通 App 中重新触发抓取流程。"
+        }
+      ]
+    },
+    {
+      "id": "ComponentService.SGCC",
+      "name": "网上国网（95598）",
+      "descs_html": [
+        "<b>用途：</b>为组件/小组件提供电费、电量等数据。<br/>",
+        "<b>登录方式：</b>不使用账号密码（风控极严），改为从 <b>官方 App</b> 抓取登录态：<code>token / acctoken / userId</code>。<br/>",
+        "<b>获取方式：</b><br/>1）开启 Surge 模块里的「网上国网·登录态抓取」脚本；<br/>2）打开网上国网 App 正常登录；<br/>3）随便点进首页/账单等页面触发请求；<br/>4）BoxJs 会自动出现 token/acctoken/userId。"
+      ],
+      "icons": [
+        "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
+        "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png"
+      ],
+      "keys": [
+        "@ComponentService.SGCC.Settings",
+        "@ComponentService.SGCC.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@ComponentService.SGCC.Settings.logDebug",
+          "name": "是否输出调试日志",
+          "val": false,
+          "type": "boolean",
+          "desc": "打开后日志会更详细（排查登录态是否失效、绑定户号是否为空时有用）。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.token",
+          "name": "token（自动抓取）",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "从官方 App 自动抓取。若为空，请打开 App 多点几下首页/我的/账单触发请求。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.acctoken",
+          "name": "acctoken（自动抓取）",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "从官方 App 自动抓取。一般会在 getWebToken 接口返回。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.userId",
+          "name": "userId（自动抓取）",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "从官方 App 自动抓取/补齐。用于查询绑定户号与后续数据接口。"
+        },
+        {
+          "id": "@ComponentService.SGCC.Settings.lastUpdate",
+          "name": "登录态更新时间（只读）",
+          "val": "",
+          "type": "text",
+          "rows": 1,
+          "desc": "脚本抓取登录态时写入，用于判断是否过期。"
+        }
+      ]
+    },
+    {
+      "id": "ComponentService.12123",
+      "name": "交管12123",
+      "keys": [
+        "@ComponentService.12123.token"
+      ],
+      "descs_html": [
+        "<h4 align=\"center\">点击查看抓取到的 12123 Token</h4>"
+      ],
+      "icons": [
+        "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png",
+        "https://raw.githubusercontent.com/Nanako718/Scripting/main/images/12123.png"
+      ]
+    }
+  ]
+}
