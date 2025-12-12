@@ -38,8 +38,8 @@
       "name": "网上国网（95598）",
       "descs_html": [
         "<b>用途：</b>为组件/小组件提供电费、电量等数据。<br/>",
-        "<b>登录方式：</b>不使用账号密码（风控极严），改为从 <b>官方 App</b> 抓取登录态：<code>token / acctoken / userId</code>。<br/>",
-        "<b>获取方式：</b><br/>1）开启 Surge 模块里的「网上国网·登录态抓取」脚本；<br/>2）打开网上国网 App 正常登录；<br/>3）随便点进首页/账单等页面触发请求；<br/>4）BoxJs 会自动出现 token/acctoken/userId。"
+        "<b>登录方式：</b>不使用账号密码（风控极严），改为从 <b>官方 App</b> 抓取登录态：<code>Authorization / token / acctoken / userId</code>。<br/>",
+        "<b>获取方式：</b><br/>1）开启 Surge 模块里的「网上国网·登录态抓取」脚本；<br/>2）打开网上国网 App 正常登录；<br/>3）随便点进首页/账单等页面触发请求；<br/>4）BoxJs 会自动出现 token/acctoken/userId（或 Authorization）。"
       ],
       "icons": [
         "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/83/d8/8a/83d88a92-5a4d-7a2f-118c-80d795e7a9f6/AppIcon-0-0-1x_U007emarketing-0-5-0-0-sRGB-85-220.png/144x144.png",
@@ -55,7 +55,7 @@
           "name": "是否输出调试日志",
           "val": false,
           "type": "boolean",
-          "desc": "打开后日志会更详细（排查登录态是否失效、绑定户号是否为空时有用）。"
+          "desc": "打开后日志会更详细（排查登录态是否抓到/是否失效时有用）。"
         },
         {
           "id": "@ComponentService.SGCC.Settings.token",
@@ -63,7 +63,7 @@
           "val": "",
           "type": "text",
           "rows": 1,
-          "desc": "从官方 App 自动抓取。若为空，请打开 App 多点几下首页/我的/账单触发请求。"
+          "desc": "优先从请求头 token/Authorization 自动抓取。"
         },
         {
           "id": "@ComponentService.SGCC.Settings.acctoken",
@@ -71,15 +71,15 @@
           "val": "",
           "type": "text",
           "rows": 1,
-          "desc": "从官方 App 自动抓取。一般会在 getWebToken 接口返回。"
+          "desc": "若抓不到，会自动用 token/Authorization 兜底。"
         },
         {
           "id": "@ComponentService.SGCC.Settings.userId",
-          "name": "userId（自动抓取）",
+          "name": "userId（自动补齐）",
           "val": "",
           "type": "text",
           "rows": 1,
-          "desc": "从官方 App 自动抓取/补齐。用于查询绑定户号与后续数据接口。"
+          "desc": "优先从请求头读取；若只有 JWT Authorization，会尝试解码补齐。"
         },
         {
           "id": "@ComponentService.SGCC.Settings.lastUpdate",

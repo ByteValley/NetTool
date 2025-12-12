@@ -1,6 +1,6 @@
 /******************************************
- * @name 网上国网（95598）组件服务 - 登录态抓取（新域名广域版）
- * @description 命中 map.sgcc.com.cn / csc-*.sgcc.com.cn 响应就尝试从 JSON 中提取 token/acctoken/userId
+ * @name 网上国网（95598）组件服务 - 登录态抓取（Request Header 优先版）
+ * @description 优先从 http-request 的 headers 捕获 Authorization/token/acctoken/userId；兼容 http-response JSON 扫描
  *
  * 写入 Keys（全带 @｜Settings 风格）:
  * - @ComponentService.SGCC.Settings.token
@@ -10,133 +10,228 @@
  ******************************************/
 
 const ENV = (() => {
-  if (typeof $environment !== "undefined" && $environment["surge-version"]) return "Surge"
-  if (typeof $environment !== "undefined" && $environment["stash-version"]) return "Stash"
-  if (typeof $loon !== "undefined") return "Loon"
-  if (typeof $task !== "undefined") return "QuantumultX"
-  if (typeof $rocket !== "undefined") return "Shadowrocket"
-  return "Unknown"
+    if (typeof $environment !== "undefined" && $environment["surge-version"]) return "Surge"
+    if (typeof $environment !== "undefined" && $environment["stash-version"]) return "Stash"
+    if (typeof $loon !== "undefined") return "Loon"
+    if (typeof $task !== "undefined") return "QuantumultX"
+    if (typeof $rocket !== "undefined") return "Shadowrocket"
+    return "Unknown"
 })()
 
 class Store {
-  get(key) {
-    switch (ENV) {
-      case "Surge":
-      case "Loon":
-      case "Stash":
-      case "Shadowrocket":
-        return $persistentStore.read(key)
-      case "QuantumultX":
-        return $prefs.valueForKey(key)
-      default:
-        return null
+    get(key) {
+        switch (ENV) {
+            case "Surge":
+            case "Loon":
+            case "Stash":
+            case "Shadowrocket":
+                return $persistentStore.read(key)
+            case "QuantumultX":
+                return $prefs.valueForKey(key)
+            default:
+                return null
+        }
     }
-  }
-  set(key, val) {
-    const v = val == null ? "" : String(val)
-    switch (ENV) {
-      case "Surge":
-      case "Loon":
-      case "Stash":
-      case "Shadowrocket":
-        return $persistentStore.write(v, key)
-      case "QuantumultX":
-        return $prefs.setValueForKey(v, key)
-      default:
-        return false
+
+    set(key, val) {
+        const v = val == null ? "" : String(val)
+        switch (ENV) {
+            case "Surge":
+            case "Loon":
+            case "Stash":
+            case "Shadowrocket":
+                return $persistentStore.write(v, key)
+            case "QuantumultX":
+                return $prefs.setValueForKey(v, key)
+            default:
+                return false
+        }
     }
-  }
 }
+
 const store = new Store()
 
-function done(x = {}) { $done(x) }
-function safeJsonParse(s, fallback = null) { try { return JSON.parse(s) } catch { return fallback } }
-function safeJsonStringify(o) { try { return JSON.stringify(o) } catch { return String(o) } }
+function done(x = {}) {
+    $done(x)
+}
+
+function safeJsonParse(s, fallback = null) {
+    try {
+        return JSON.parse(s)
+    } catch {
+        return fallback
+    }
+}
+
+function safeJsonStringify(o) {
+    try {
+        return JSON.stringify(o)
+    } catch {
+        return String(o)
+    }
+}
 
 function nowISO() {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    const d = new Date()
+    const pad = (n) => String(n).padStart(2, "0")
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function readRootJSON() {
-  const raw = store.get("ComponentService")
-  const j = safeJsonParse(raw, null)
-  return j && typeof j === "object" ? j : {}
+    const raw = store.get("ComponentService")
+    const j = safeJsonParse(raw, null)
+    return j && typeof j === "object" ? j : {}
 }
+
 function writeRootJSON(j) {
-  store.set("ComponentService", safeJsonStringify(j))
+    store.set("ComponentService", safeJsonStringify(j))
 }
 
 function setSetting(key, value) {
-  // 直读 Key（脚本读取）
-  store.set(`@ComponentService.SGCC.Settings.${key}`, value)
+    store.set(`@ComponentService.SGCC.Settings.${key}`, value)
 
-  // root JSON（BoxJs UI 展示）
-  const root = readRootJSON()
-  root.SGCC = root.SGCC || {}
-  root.SGCC.Settings = root.SGCC.Settings || {}
-  root.SGCC.Settings[key] = String(value)
-  writeRootJSON(root)
+    const root = readRootJSON()
+    root.SGCC = root.SGCC || {}
+    root.SGCC.Settings = root.SGCC.Settings || {}
+    root.SGCC.Settings[key] = String(value)
+    writeRootJSON(root)
 }
 
-function pickFirst(obj, keys) {
-  for (const k of keys) {
-    if (obj && obj[k] != null && String(obj[k]).trim() !== "") return String(obj[k])
-  }
-  return ""
-}
-
-// 递归扫 JSON：把可能的 token 字段都捞出来
-function scan(obj, out) {
-  if (!obj || typeof obj !== "object") return
-  const cand = [
-    // token 类
-    ["token", ["token", "Token", "x-token", "X-Token"]],
-    ["acctoken", ["acctoken", "accToken", "access_token", "accessToken", "AccessToken", "acctokenValue"]],
-    ["userId", ["userId", "userid", "UserId", "user_id", "userID", "uid", "memberId", "acctId"]]
-  ]
-
-  for (const [name, keys] of cand) {
-    if (!out[name]) {
-      const v = pickFirst(obj, keys)
-      if (v) out[name] = v
+function pickHeader(headers, names) {
+    if (!headers) return ""
+    const lowerMap = {}
+    for (const k of Object.keys(headers)) lowerMap[k.toLowerCase()] = headers[k]
+    for (const n of names) {
+        const v = lowerMap[n.toLowerCase()]
+        if (v != null && String(v).trim() !== "") return String(v)
     }
-  }
+    return ""
+}
 
-  for (const k of Object.keys(obj)) {
-    const v = obj[k]
-    if (v && typeof v === "object") scan(v, out)
-  }
+function stripBearer(v) {
+    const s = String(v || "").trim()
+    if (!s) return ""
+    return s.replace(/^Bearer\s+/i, "").trim()
+}
+
+function base64UrlDecode(input) {
+    try {
+        let s = String(input || "")
+        s = s.replace(/-/g, "+").replace(/_/g, "/")
+        const pad = s.length % 4
+        if (pad) s += "=".repeat(4 - pad)
+        const raw = (typeof atob !== "undefined") ? atob(s) : Buffer.from(s, "base64").toString("binary")
+        let out = ""
+        for (let i = 0; i < raw.length; i++) out += String.fromCharCode(raw.charCodeAt(i))
+        try {
+            return decodeURIComponent(escape(out))
+        } catch {
+            return out
+        }
+    } catch {
+        return ""
+    }
+}
+
+function tryDecodeJwtUserId(token) {
+    const t = stripBearer(token)
+    const parts = t.split(".")
+    if (parts.length < 2) return ""
+    const payloadText = base64UrlDecode(parts[1])
+    const payload = safeJsonParse(payloadText, null)
+    if (!payload || typeof payload !== "object") return ""
+    const cand = ["userId", "userid", "user_id", "uid", "memberId", "acctId", "sub"]
+    for (const k of cand) {
+        if (payload[k] != null && String(payload[k]).trim() !== "") return String(payload[k])
+    }
+    return ""
+}
+
+// 递归扫 JSON（兼容 response body 里带 token 的情况）
+function scanJson(obj, out) {
+    if (!obj || typeof obj !== "object") return
+    const cand = [
+        ["token", ["token", "Token", "authorization", "Authorization", "x-token", "X-Token"]],
+        ["acctoken", ["acctoken", "accToken", "access_token", "accessToken", "AccessToken"]],
+        ["userId", ["userId", "userid", "UserId", "user_id", "uid", "memberId", "acctId"]]
+    ]
+    for (const [name, keys] of cand) {
+        if (!out[name]) {
+            for (const k of keys) {
+                if (obj[k] != null && String(obj[k]).trim() !== "") {
+                    out[name] = String(obj[k])
+                    break
+                }
+            }
+        }
+    }
+    for (const k of Object.keys(obj)) {
+        const v = obj[k]
+        if (v && typeof v === "object") scanJson(v, out)
+    }
 }
 
 ;(function main() {
-  const url = ($request && $request.url) ? String($request.url) : ""
-  const body = ($response && $response.body) ? String($response.body) : ""
+    const url = ($request && $request.url) ? String($request.url) : ""
+    const isReq = !!($request && $request.headers)
+    const isResp = !!($response && $response.headers)
 
-  // 只处理 JSON（不是 JSON 直接退出，避免噪声）
-  const j = safeJsonParse(body, null)
-  if (!j) return done({})
+    const out = {token: "", acctoken: "", userId: ""}
 
-  const out = { token: "", acctoken: "", userId: "" }
+    // 1) 优先抓 http-request headers（你 HAR 里关键就是 Authorization）
+    if (isReq) {
+        const h = $request.headers || {}
+        const authorization = pickHeader(h, ["Authorization", "authorization"])
+        const token = pickHeader(h, ["token", "Token", "x-token", "X-Token"])
+        const acctoken = pickHeader(h, ["acctoken", "accToken", "access_token", "accessToken"])
+        const userId = pickHeader(h, ["userId", "userid", "x-userid", "X-UserId", "uid"])
 
-  // 1) 先从 headers 捞（有些接口把 token 放 header）
-  const h = ($response && $response.headers) ? $response.headers : {}
-  out.token = pickFirst(h, ["token", "Token", "x-token", "X-Token"]) || out.token
-  out.userId = pickFirst(h, ["userId", "UserId", "x-userid", "X-UserId"]) || out.userId
+        const authToken = stripBearer(authorization)
+        out.token = stripBearer(token) || authToken
+        out.acctoken = stripBearer(acctoken) || "" // 先不兜底，后面统一兜
+        out.userId = String(userId || "").trim()
 
-  // 2) 再递归扫 body
-  scan(j, out)
+        if (!out.userId && authToken) {
+            const uid = tryDecodeJwtUserId(authToken)
+            if (uid) out.userId = uid
+        }
+    }
 
-  // 3) 写入（只写非空）
-  if (out.token) setSetting("token", out.token)
-  if (out.acctoken) setSetting("acctoken", out.acctoken)
-  if (out.userId) setSetting("userId", out.userId)
-  setSetting("lastUpdate", nowISO())
+    // 2) 兼容 http-response：headers + JSON body
+    if (isResp) {
+        const h = $response.headers || {}
+        const authorization = pickHeader(h, ["Authorization", "authorization"])
+        const token = pickHeader(h, ["token", "Token", "x-token", "X-Token"])
+        const acctoken = pickHeader(h, ["acctoken", "accToken", "access_token", "accessToken"])
+        const userId = pickHeader(h, ["userId", "userid", "x-userid", "X-UserId", "uid"])
 
-  // 打一条关键日志（你说“没反应”，我们就让它必然可见）
-  console.log(`[网上国网] 捕获命中：${url}`)
-  console.log(`[网上国网] token=${out.token ? "[SET]" : "[EMPTY]"} acctoken=${out.acctoken ? "[SET]" : "[EMPTY]"} userId=${out.userId ? "[SET]" : "[EMPTY]"}`)
+        const authToken = stripBearer(authorization)
+        out.token = out.token || stripBearer(token) || authToken
+        out.acctoken = out.acctoken || stripBearer(acctoken)
+        out.userId = out.userId || String(userId || "").trim()
 
-  done({})
+        const body = ($response && $response.body) ? String($response.body) : ""
+        const j = safeJsonParse(body, null)
+        if (j) scanJson(j, out)
+
+        if (!out.userId && authToken) {
+            const uid = tryDecodeJwtUserId(authToken)
+            if (uid) out.userId = uid
+        }
+    }
+
+    // 3) acctoken 兜底：抓不到就用 token（很多 App 就一个 Authorization）
+    if (!out.acctoken && out.token) out.acctoken = out.token
+
+    // 4) 写入（只写非空；更新时间必写）
+    if (out.token) setSetting("token", out.token)
+    if (out.acctoken) setSetting("acctoken", out.acctoken)
+    if (out.userId) setSetting("userId", out.userId)
+    setSetting("lastUpdate", nowISO())
+
+    // 关键日志：确保你“看得见它干活了”
+    console.log(`[网上国网] 捕获命中：${url}`)
+    console.log(`[网上国网] token=${out.token ? "[SET]" : "[EMPTY]"} acctoken=${out.acctoken ? "[SET]" : "[EMPTY]"} userId=${out.userId ? "[SET]" : "[EMPTY]"}`)
+
+    done({})
 })()

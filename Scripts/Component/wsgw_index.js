@@ -1,10 +1,11 @@
 /******************************************
- * @name 网上国网（95598）组件服务 - 数据接口
- * @description 通过网上国网账号密码登录，聚合电费/电量/阶梯等数据，供小组件读取
+ * @name 网上国网（95598）组件服务 - 数据接口（登录态版｜Authorization 兜底）
+ * @description 使用官方 App 抓取到的 token/acctoken/userId（或 Authorization），聚合电费/电量/阶梯等数据
  *
  * BoxJs Keys（仅新 Key｜全带 @｜Settings 风格）:
- * - @ComponentService.SGCC.Settings.phoneNum
- * - @ComponentService.SGCC.Settings.password
+ * - @ComponentService.SGCC.Settings.token
+ * - @ComponentService.SGCC.Settings.acctoken
+ * - @ComponentService.SGCC.Settings.userId
  * - @ComponentService.SGCC.Settings.logDebug
  *
  * Rewrite:
@@ -22,6 +23,7 @@ const ENV = (() => {
 })()
 
 const isQX = ENV === "QuantumultX"
+const isNode = ENV === "Node"
 
 class Store {
     constructor(namespace = "ComponentService") {
@@ -46,6 +48,24 @@ class Store {
                 return this.localStorage.getItem(key)
             default:
                 return null
+        }
+    }
+
+    set(key, val) {
+        const v = val == null ? "" : String(val)
+        switch (this.env) {
+            case "Surge":
+            case "Loon":
+            case "Stash":
+            case "Shadowrocket":
+                return $persistentStore.write(v, key)
+            case "QuantumultX":
+                return $prefs.setValueForKey(v, key)
+            case "Node":
+                this.localStorage.setItem(key, v)
+                return true
+            default:
+                return false
         }
     }
 }
@@ -90,16 +110,19 @@ function notify(title = "", sub = "", body = "", opts = {}) {
 }
 
 function done(payload = {}) {
+    if (ENV === "Node") process.exit(0)
     $done(payload)
 }
 
 async function http(request) {
     const method = (request.method || "GET").toUpperCase()
     const lower = method.toLowerCase()
+
     if (request.headers) {
         delete request.headers["Content-Length"]
         delete request.headers["content-length"]
     }
+
     if (ENV === "QuantumultX") {
         return $task.fetch(request).then(
             (r) => {
@@ -110,6 +133,16 @@ async function http(request) {
             (e) => Promise.reject(e.error || e)
         )
     }
+
+    if (ENV === "Node") {
+        const got = require("got")
+        const {url, ...opt} = request
+        return got[lower](url, opt).then(
+            (r) => ({status: r.statusCode, ok: /^2\d\d$/.test(String(r.statusCode)), body: r.body}),
+            (e) => Promise.reject(e.message || e)
+        )
+    }
+
     return new Promise((resolve, reject) => {
         $httpClient[lower](request, (err, resp, data) => {
             if (err) return reject(err)
@@ -150,72 +183,101 @@ function getUrlParams(url) {
 }
 
 /* ===========================
+ *  BoxJs 读值：直读 @Key + 读 root JSON 双通道
+ * =========================== */
+
+const store = new Store("ComponentService")
+
+function readRootJSON() {
+    const raw = store.get("ComponentService")
+    const j = safeJsonParse(raw, null)
+    return j && typeof j === "object" ? j : {}
+}
+
+function readSetting(pathKey) {
+    const flatKey = `@ComponentService.SGCC.Settings.${pathKey}`
+    const flat = store.get(flatKey)
+    if (flat != null && String(flat).trim() !== "") return String(flat)
+
+    const root = readRootJSON()
+    const v = root && root.SGCC && root.SGCC.Settings ? root.SGCC.Settings[pathKey] : null
+    return v == null ? "" : String(v)
+}
+
+function stripBearer(v) {
+    const s = String(v || "").trim()
+    if (!s) return ""
+    return s.replace(/^Bearer\s+/i, "").trim()
+}
+
+function base64UrlDecode(input) {
+    try {
+        let s = String(input || "")
+        s = s.replace(/-/g, "+").replace(/_/g, "/")
+        const pad = s.length % 4
+        if (pad) s += "=".repeat(4 - pad)
+        const raw = (typeof atob !== "undefined") ? atob(s) : Buffer.from(s, "base64").toString("binary")
+        let out = ""
+        for (let i = 0; i < raw.length; i++) out += String.fromCharCode(raw.charCodeAt(i))
+        try {
+            return decodeURIComponent(escape(out))
+        } catch {
+            return out
+        }
+    } catch {
+        return ""
+    }
+}
+
+function tryDecodeJwtUserId(token) {
+    const t = stripBearer(token)
+    const parts = t.split(".")
+    if (parts.length < 2) return ""
+    const payloadText = base64UrlDecode(parts[1])
+    const payload = safeJsonParse(payloadText, null)
+    if (!payload || typeof payload !== "object") return ""
+    const cand = ["userId", "userid", "user_id", "uid", "memberId", "acctId", "sub"]
+    for (const k of cand) {
+        if (payload[k] != null && String(payload[k]).trim() !== "") return String(payload[k])
+    }
+    return ""
+}
+
+/* ===========================
  *  业务配置
  * =========================== */
 
 const SCRIPTNAME = "网上国网"
-const store = new Store("ComponentService")
 
-// ✅ 统一 Settings 风格 Key（全带 @）
-const KEY_PHONE = "@ComponentService.SGCC.Settings.phoneNum"
-const KEY_PASS = "@ComponentService.SGCC.Settings.password"
-const KEY_DEBUG = "@ComponentService.SGCC.Settings.logDebug"
+const KEY_TOKEN = "@ComponentService.SGCC.Settings.token"
+const KEY_ACCTOKEN = "@ComponentService.SGCC.Settings.acctoken"
+const KEY_USERID = "@ComponentService.SGCC.Settings.userId"
 
-// ✅ BoxJs 常见“总 Key = 大 JSON”存储（你现在就是这种）
-const ROOT_KEY_1 = "ComponentService"
-const ROOT_KEY_2 = "@ComponentService"
-
-function getByPath(obj, path) {
-    if (!obj || !path) return null
-    return path.split(".").reduce((acc, k) => (acc && acc[k] != null ? acc[k] : null), obj)
-}
-
-/**
- * 优先读扁平新 Key；读不到就从 Root JSON 里按路径拿（兼容 BoxJs 大 JSON）
- * rootPath 示例：SGCC.Settings.phoneNum
- */
-function readSetting(flatKey, rootPath) {
-    const v1 = store.get(flatKey)
-    if (v1 != null && String(v1).trim() !== "") return String(v1)
-
-    const raw = store.get(ROOT_KEY_1) || store.get(ROOT_KEY_2)
-    if (!raw) return ""
-
-    const root = safeJsonParse(raw, null)
-    if (!root) return ""
-
-    // 你现在结构里同时有 SGCC.phoneNum 和 SGCC.Settings.phoneNum，这里都兜底
-    const v2 =
-        getByPath(root, rootPath) ??
-        getByPath(root, rootPath.replace(".Settings.", "."))
-
-    return v2 == null ? "" : String(v2)
-}
-
-const DEBUG_RAW = readSetting(KEY_DEBUG, "SGCC.Settings.logDebug").trim()
-const DEBUG = DEBUG_RAW === "true" || DEBUG_RAW === "1"
+const DEBUG = readSetting("logDebug") === "true" || readSetting("logDebug") === "1"
 const log = new Logger(SCRIPTNAME, DEBUG)
 
-const USERNAME = readSetting(KEY_PHONE, "SGCC.Settings.phoneNum").trim()
-const PASSWORD = readSetting(KEY_PASS, "SGCC.Settings.password").trim()
+log.debug(`ENV = ${ENV}`)
 
-// 🔎 方便排障：到底从哪里读到的
-log.debug("ENV =", ENV)
-log.debug("Flat phone =", store.get(KEY_PHONE) ? "[SET]" : "[EMPTY]")
-log.debug("Flat pass  =", store.get(KEY_PASS) ? "[SET]" : "[EMPTY]")
-log.debug("Root JSON  =", (store.get(ROOT_KEY_1) || store.get(ROOT_KEY_2)) ? "[SET]" : "[EMPTY]")
-log.debug("Resolved phone =", USERNAME ? "[OK]" : "[EMPTY]")
-log.debug("Resolved pass  =", PASSWORD ? "[OK]" : "[EMPTY]")
+let TOKEN = stripBearer(readSetting("token"))
+let ACCTOKEN = stripBearer(readSetting("acctoken"))
+let USERID = String(readSetting("userId") || "").trim()
 
+// ✅ 兜底：很多情况下只有 Authorization（token）——那就 token=acctoken=Authorization
+if (!ACCTOKEN && TOKEN) ACCTOKEN = TOKEN
+if (!TOKEN && ACCTOKEN) TOKEN = ACCTOKEN
+if (!USERID && TOKEN) {
+    const uid = tryDecodeJwtUserId(TOKEN)
+    if (uid) USERID = uid
+}
+
+log.debug(`token=${TOKEN ? "[SET]" : "[EMPTY]"} acctoken=${ACCTOKEN ? "[SET]" : "[EMPTY]"} userId=${USERID ? "[SET]" : "[EMPTY]"}`)
+
+// 第三方加解密服务（不可控：但原链路需要）
 const SERVER_HOST = "https://api.120399.xyz"
 const BASE_URL = "https://www.95598.cn"
 
 const API = {
     getKeyCode: "/oauth2/outer/c02/f02",
-    loginVerifyCodeNew: "/osg-web0004/open/c44/f05",
-    loginTestCodeNew: "/osg-web0004/open/c44/f06",
-    getAuth: "/oauth2/oauth/authorize",
-    getWebToken: "/oauth2/outer/getWebToken",
     searchUser: "/osg-open-uc0001/member/c9/f02",
     accapi: "/osg-open-bc0001/member/c05/f01",
     busInfoApi: "/osg-web0004/member/c24/f01",
@@ -258,12 +320,8 @@ const CFG = {
     }
 }
 
-function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms))
-}
-
 /* ===========================
- *  加解密请求封装（增强：失败信息 + 重试）
+ *  加解密请求封装
  * =========================== */
 
 async function Encrypt(config) {
@@ -279,17 +337,10 @@ async function Encrypt(config) {
 async function Decrypt(config) {
     const r = await http(config)
     const j = safeJsonParse(r.body, null)
-    if (!j || !j.data) {
-        // 兜底：把原始 body 打出来
-        throw new Error(`Decrypt: invalid response: ${String(r.body || "").slice(0, 200)}`)
-    }
-
+    if (!j || !j.data) throw new Error("Decrypt: invalid response")
     const {code, message, data} = j.data
     if (String(code) === "1") return data
-
-    // ✅ 关键：把 code/message 都带出来，debug 时更好判断
-    const msg = message || "Decrypt failed"
-    throw new Error(`${msg}${code ? `（code=${code}）` : ""}`)
+    throw new Error(message || "Decrypt failed")
 }
 
 async function request95598(reqCfg) {
@@ -317,54 +368,6 @@ async function request95598(reqCfg) {
     return Decrypt(decCfg)
 }
 
-// ✅ 新增：对 GB002/系统繁忙类错误做重试
-async function request95598WithRetry(reqCfg, opt = {}) {
-    const {
-        retries = 3,
-        baseDelayMs = 450,
-        jitterMs = 250
-    } = opt
-
-    let lastErr = null
-    for (let i = 0; i <= retries; i++) {
-        try {
-            // 轻微随机抖动，避免踩相同风控窗口
-            if (i > 0) await sleep(baseDelayMs * i + Math.floor(Math.random() * jitterMs))
-            return await request95598(reqCfg)
-        } catch (e) {
-            const msg = String(e && e.message ? e.message : e)
-            lastErr = e
-
-            // 只对“值得重试”的错误重试
-            const retryable =
-                msg.includes("GB002") ||
-                msg.includes("系统繁忙") ||
-                msg.includes("网络") ||
-                msg.includes("超时") ||
-                msg.includes("请求异常")
-
-            log.warn(`request95598 failed [${i + 1}/${retries + 1}]`, msg)
-
-            if (!retryable) break
-            if (i === retries) break
-        }
-    }
-    throw lastErr || new Error("request95598WithRetry failed")
-}
-
-async function recognizeCaptcha(canvasSrc) {
-    const cfg = {
-        url: `${SERVER_HOST}/wsgw/get_x`,
-        method: "POST",
-        headers: {"content-type": "application/json"},
-        body: safeJsonStringify({yuheng: canvasSrc})
-    }
-    const r = await http(cfg)
-    const j = safeJsonParse(r.body, null)
-    if (!j || !j.data) throw new Error("验证码识别失败")
-    return j.data
-}
-
 function getBeforeDate(days) {
     const d = new Date()
     d.setDate(d.getDate() - days)
@@ -372,144 +375,54 @@ function getBeforeDate(days) {
 }
 
 /* ===========================
- *  登录链路
+ *  登录态版主流程
  * =========================== */
 
 let requestKey = null
-let bizrt = null
-let authorizecode = ""
-let accessToken = ""
 let bindInfo = null
 
 async function getKeyCode() {
     log.info("⏳ 获取 keyCode/publicKey ...")
-    requestKey = await request95598WithRetry(
-        {url: `/api${API.getKeyCode}`, method: "POST", headers: {}},
-        {retries: 2}
-    )
-}
-
-async function getVerifyCode() {
-    log.info("⏳ 获取验证码凭证 ...")
-    const r = await request95598WithRetry(
-        {
-            url: `/api${API.loginVerifyCodeNew}`,
-            method: "POST",
-            headers: {...requestKey},
-            data: {password: PASSWORD, account: USERNAME, canvasHeight: 200, canvasWidth: 310}
-        },
-        {retries: 4, baseDelayMs: 500}
-    )
-
-    if (!r || !r.ticket || !r.canvasSrc) {
-        log.warn("verifyCode resp:", safeJsonStringify(r).slice(0, 200))
-        throw new Error("验证码凭证为空")
-    }
-
-    const code = await recognizeCaptcha(r.canvasSrc)
-    return {ticket: r.ticket, code}
-}
-
-async function login(ticket, code) {
-    log.info("⏳ 登录中 ...")
-    const r = await request95598WithRetry(
-        {
-            url: `/api${API.loginTestCodeNew}`,
-            method: "POST",
-            headers: {...requestKey},
-            data: {
-                loginKey: ticket,
-                code,
-                params: {
-                    uscInfo: {devciceIp: "", tenant: "state_grid", member: "0902", devciceId: ""},
-                    quInfo: {
-                        optSys: "android",
-                        pushId: "000000",
-                        addressProvince: "110100",
-                        addressRegion: "110101",
-                        addressCity: "330100",
-                        password: PASSWORD,
-                        account: USERNAME
-                    }
-                },
-                Channels: "web"
-            }
-        },
-        {retries: 2, baseDelayMs: 600}
-    )
-
-    if (!r || !r.bizrt || !(r.bizrt.userInfo && r.bizrt.userInfo.length)) {
-        throw new Error("登录失败：账号/密码/验证码可能不正确")
-    }
-    bizrt = r.bizrt
-}
-
-async function getAuthcode() {
-    log.info("⏳ 获取授权码 ...")
-    const r = await request95598({
-        url: `/api${API.getAuth}`,
-        method: "POST",
-        headers: {...requestKey, token: bizrt.token}
-    })
-    const redirect = r && r.redirect_url
-    if (!redirect || redirect.indexOf("code=") === -1) throw new Error("授权码获取失败：redirect_url 异常")
-    authorizecode = redirect.split("code=")[1]
-}
-
-async function getAccessToken() {
-    log.info("⏳ 获取 accessToken ...")
-    const r = await request95598({
-        url: `/api${API.getWebToken}`,
-        method: "POST",
-        headers: {...requestKey, token: bizrt.token, authorizecode}
-    })
-    accessToken = r && r.access_token
-    if (!accessToken) throw new Error("accessToken 为空")
+    requestKey = await request95598({url: `/api${API.getKeyCode}`, method: "POST", headers: {}})
 }
 
 async function getBindInfo() {
     log.info("⏳ 查询绑定户号 ...")
-    const [u] = bizrt.userInfo
     const r = await request95598({
         url: `/api${API.searchUser}`,
         method: "POST",
-        headers: {...requestKey, token: bizrt.token, acctoken: accessToken},
+        headers: {...requestKey, token: TOKEN, acctoken: ACCTOKEN},
         data: {
             serviceCode: CFG.userInformServiceCode,
             source: CFG.source,
             target: CFG.target,
             uscInfo: CFG.uscInfo,
-            quInfo: {userId: u.userId},
-            token: bizrt.token,
+            quInfo: {userId: USERID},
+            token: TOKEN,
             Channels: "web"
         }
     })
     bindInfo = r && r.bizrt
-    if (!bindInfo || !bindInfo.powerUserList || !bindInfo.powerUserList.length) throw new Error("未获取到绑定户号")
+    if (!bindInfo || !bindInfo.powerUserList || !bindInfo.powerUserList.length) throw new Error("未获取到绑定户号（登录态可能已失效）")
 }
-
-/* ===========================
- *  数据查询
- * =========================== */
 
 async function getElcFee(index) {
     const o = bindInfo.powerUserList[index]
-    const [u] = bizrt.userInfo
     const r = await request95598({
         url: `/api${API.accapi}`,
         method: "POST",
-        headers: {...requestKey, token: bizrt.token, acctoken: accessToken},
+        headers: {...requestKey, token: TOKEN, acctoken: ACCTOKEN},
         data: {
             data: {
                 srvCode: "",
                 serialNo: "",
                 channelCode: API.accountFunc.channelCode,
                 funcCode: API.accountFunc.funcCode,
-                acctId: u.userId,
-                userName: u.loginAccount || u.nickname,
+                acctId: USERID,
+                userName: "",
                 promotType: "1",
                 promotCode: "1",
-                userAccountId: u.userId,
+                userAccountId: USERID,
                 list: [{
                     consNoSrc: o.consNo_dst,
                     proCode: o.proNo,
@@ -528,26 +441,25 @@ async function getElcFee(index) {
 
 async function getDayElecQuantity(index, days = 6) {
     const o = bindInfo.powerUserList[index]
-    const [u] = bizrt.userInfo
     const startTime = getBeforeDate(days)
     const endTime = getBeforeDate(1)
 
     return request95598({
         url: `/api${API.busInfoApi}`,
         method: "POST",
-        headers: {...requestKey, token: bizrt.token, acctoken: accessToken},
+        headers: {...requestKey, token: TOKEN, acctoken: ACCTOKEN},
         data: {
             params1: {
                 serviceCode: "",
                 source: CFG.source,
                 target: CFG.target,
                 uscInfo: CFG.uscInfo,
-                quInfo: {userId: u.userId},
-                token: bizrt.token
+                quInfo: {userId: USERID},
+                token: TOKEN
             },
             params3: {
                 data: {
-                    acctId: u.userId,
+                    acctId: USERID,
                     consNo: o.consNo_dst,
                     consType: (o.constType === "02" ? "02" : "01"),
                     endTime,
@@ -557,7 +469,7 @@ async function getDayElecQuantity(index, days = 6) {
                     serialNo: "",
                     srvCode: "",
                     startTime,
-                    userName: u.nickname || u.loginAccount,
+                    userName: "",
                     funcCode: API.getdayFunc.funcCode,
                     channelCode: API.getdayFunc.channelCode,
                     clearCache: API.getdayFunc.clearCache,
@@ -575,25 +487,24 @@ async function getDayElecQuantity(index, days = 6) {
 
 async function getMonthElecQuantity(index, yearOffset = 0) {
     const o = bindInfo.powerUserList[index]
-    const [u] = bizrt.userInfo
     const queryYear = String(new Date().getFullYear() + yearOffset)
 
     return request95598({
         url: `/api${API.busInfoApi}`,
         method: "POST",
-        headers: {...requestKey, token: bizrt.token, acctoken: accessToken},
+        headers: {...requestKey, token: TOKEN, acctoken: ACCTOKEN},
         data: {
             params1: {
                 serviceCode: "",
                 source: CFG.source,
                 target: CFG.target,
                 uscInfo: CFG.uscInfo,
-                quInfo: {userId: u.userId},
-                token: bizrt.token
+                quInfo: {userId: USERID},
+                token: TOKEN
             },
             params3: {
                 data: {
-                    acctId: u.userId,
+                    acctId: USERID,
                     consNo: o.consNo_dst,
                     consType: (o.constType === "02" ? "02" : "01"),
                     orgNo: o.orgNo,
@@ -602,7 +513,7 @@ async function getMonthElecQuantity(index, yearOffset = 0) {
                     queryYear,
                     serialNo: "",
                     srvCode: "",
-                    userName: u.nickname || u.loginAccount,
+                    userName: "",
                     funcCode: API.mouthOutFunc.funcCode,
                     channelCode: API.mouthOutFunc.channelCode,
                     clearCache: API.mouthOutFunc.clearCache,
@@ -620,12 +531,10 @@ async function getMonthElecQuantity(index, yearOffset = 0) {
 
 async function getStepElecQuantity(index, monthOverride) {
     const o = bindInfo.powerUserList[index]
-    const [u] = bizrt.userInfo
-
     const now = new Date()
     const year = now.getFullYear()
-    const m0 = (typeof monthOverride === "number" ? monthOverride : now.getMonth()) // 0-11
-    const m1 = Math.max(1, Math.min(12, m0 + 1)) // 1-12
+    const m0 = (typeof monthOverride === "number" ? monthOverride : now.getMonth())
+    const m1 = Math.max(1, Math.min(12, m0 + 1))
     const queryDate = `${year}-${String(m1).padStart(2, "0")}`
 
     const apiPath =
@@ -636,7 +545,7 @@ async function getStepElecQuantity(index, monthOverride) {
     const r = await request95598({
         url: `/api${apiPath}`,
         method: "POST",
-        headers: {...requestKey, token: bizrt.token, acctoken: accessToken},
+        headers: {...requestKey, token: TOKEN, acctoken: ACCTOKEN},
         data: {
             data: {
                 channelCode: CFG.stepelect.channelCode,
@@ -649,11 +558,11 @@ async function getStepElecQuantity(index, monthOverride) {
                 queryDate,
                 provinceCode: o.proNo || o.provinceId,
                 consType: o.constType || o.consSortCode,
-                userAccountId: u.userId,
+                userAccountId: USERID,
                 serialNo: "",
                 srvCode: "",
-                userName: u.nickname || u.loginAccount,
-                acctId: u.userId
+                userName: "",
+                acctId: USERID
             },
             serviceCode: CFG.stepelect.serviceCode,
             source: CFG.stepelect.source,
@@ -692,26 +601,18 @@ async function getDataSourceByParams(index) {
     return out
 }
 
-/* ===========================
- *  主流程
- * =========================== */
-
 ;(async () => {
-    if (!USERNAME || !PASSWORD) {
+    if (!TOKEN || !ACCTOKEN || !USERID) {
         notify(
             SCRIPTNAME,
-            "请先在 BoxJs 配置账号密码",
-            `需要：${KEY_PHONE} / ${KEY_PASS}`,
+            "请先从官方 App 抓取登录态",
+            `需要：${KEY_TOKEN} / ${KEY_ACCTOKEN} / ${KEY_USERID}\n现状：token=${TOKEN ? "OK" : "EMPTY"} acctoken=${ACCTOKEN ? "OK" : "EMPTY"} userId=${USERID ? "OK" : "EMPTY"}\n操作：打开网上国网 App 登录后，多点首页/账单/我的触发请求`,
             {url: "http://boxjs.com/#/app"}
         )
-        throw new Error("账号密码未配置")
+        throw new Error("登录态未配置")
     }
 
     await getKeyCode()
-    const {ticket, code} = await getVerifyCode()
-    await login(ticket, code)
-    await getAuthcode()
-    await getAccessToken()
     await getBindInfo()
 
     const list = bindInfo.powerUserList || []
