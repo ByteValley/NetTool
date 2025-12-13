@@ -56,21 +56,6 @@
 
     /* ───────────────── 通用工具函数 ───────────────── */
 
-    function z2(n) {
-      n = String(n);
-      return n.length < 2 ? ("0" + n) : n;
-    }
-
-    function now() {
-      var d = new Date();
-      var mm = z2(d.getMonth() + 1);
-      var dd = z2(d.getDate());
-      var hh = z2(d.getHours());
-      var mi = z2(d.getMinutes());
-      var ss = z2(d.getSeconds());
-      return mm + "-" + dd + " " + hh + ":" + mi + ":" + ss;
-    }
-
     // 日期差：end - start（按天）
     const dateDiff = (start, end) => {
         const s = start.split("-");
@@ -835,11 +820,9 @@
         lineIntl
     ].join(gapBetween);
 
-    const runAtLine = `⏱ 执行时间：${now()}`;
-
     const content = almanacDetail
-        ? `${runAtLine}\n${almanacDetail}\n\n${blockFest}`
-        : `${runAtLine}\n\n${blockFest}`;
+        ? `${almanacDetail}\n\n${blockFest}`
+        : blockFest;
 
     /* ───────────────── 播报模式（Cron / 无参数） ───────────────── */
 
