@@ -554,14 +554,31 @@ function fetchInfo(url, resetDayRaw, title, index) {
         blocks.push(block);
     }
 
+    // ===== 顶部执行时间（全局一次）=====
+    function pad2(n) {
+      return String(n).padStart(2, "0");
+    }
+    function runAtLine() {
+      const d = new Date();
+      const MM = pad2(d.getMonth() + 1);
+      const DD = pad2(d.getDate());
+      const hh = pad2(d.getHours());
+      const mm = pad2(d.getMinutes());
+      const ss = pad2(d.getSeconds());
+      return `⏱ 执行时间：${MM}-${DD} ${hh}:${mm}:${ss}`;
+    }
+
     const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
+    // ✅ 顶部加一行执行时间（空一行再接正文）
+    const content = `${runAtLine()}\n\n${contentAll}`;
+
     log("final blocks count:", blocks.length);
-    log("final content:\n" + contentAll);
+    log("final content:\n" + content);
 
     $done({
-        title: "订阅信息",
-        content: contentAll,
-        icon: defaultIcon,
-        iconColor: defaultColor
+      title: "订阅信息",
+      content,
+      icon: defaultIcon,
+      iconColor: defaultColor
     });
 })();
