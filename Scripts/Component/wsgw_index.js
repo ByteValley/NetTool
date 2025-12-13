@@ -35,24 +35,35 @@ function getUrlParams(url) {
 }
 
 const getEnv = () =>
-    "undefined" != typeof $environment && $environment["surge-version"]
-        ? "Surge"
-        : "undefined" != typeof $environment && $environment["stash-version"]
-            ? "Stash"
-            : eval('typeof process !== "undefined"')
-                ? "Node.js"
-                : "undefined" != typeof $task
-                    ? "Quantumult X"
-                    : "undefined" != typeof $loon
-                        ? "Loon"
-                        : "undefined" != typeof $rocket
-                            ? "Shadowrocket"
-                            : void 0;
+  typeof $environment !== "undefined" && $environment["surge-version"]
+    ? "Surge"
+    : typeof $environment !== "undefined" && $environment["egern-version"]
+    ? "Egern"
+    : typeof $environment !== "undefined" && $environment["stash-version"]
+    ? "Stash"
+    : eval('typeof process !== "undefined"')
+    ? "Node.js"
+    : typeof $task !== "undefined"
+    ? "Quantumult X"
+    : typeof $loon !== "undefined"
+    ? "Loon"
+    : typeof $rocket !== "undefined"
+    ? "Shadowrocket"
+    : void 0;
 
-const isQuanX = () => "Quantumult X" === getEnv();
-const isLoon = () => "Loon" === getEnv();
-const isStash = () => "Stash" === getEnv();
-const isNode = () => "Node.js" === getEnv();
+const ENV = getEnv();
+
+const isSurge  = () => ENV === "Surge";
+const isEgern  = () => ENV === "Egern";
+const isQuanX  = () => ENV === "Quantumult X";
+const isLoon   = () => ENV === "Loon";
+const isStash  = () => ENV === "Stash";
+const isShadow = () => ENV === "Shadowrocket";
+const isNode   = () => ENV === "Node.js";
+
+// 把 Surge / Egern / Stash / Loon / Shadowrocket 归为 “$httpClient 系”
+const isHttpClientLike = () =>
+  ENV === "Surge" || ENV === "Egern" || ENV === "Stash" || ENV === "Loon" || ENV === "Shadowrocket";
 
 class Logger {
     constructor(e = "日志输出", o = "info") {
@@ -95,170 +106,165 @@ class Logger {
 }
 
 const request$1 = async (request = {} || "", option = {}) => {
-    switch (request.constructor) {
-        case Object:
-            request = {...request, ...option};
-            break;
-        case String:
-            request = {url: request, ...option};
-    }
-    request.method ||
+  switch (request.constructor) {
+    case Object:
+      request = { ...request, ...option };
+      break;
+    case String:
+      request = { url: request, ...option };
+  }
+
+  request.method ||
     ((request.method = "GET"),
-    (request.body ?? request.bodyBytes) && (request.method = "POST")),
-        delete request.headers?.["Content-Length"],
-        delete request.headers?.["content-length"];
+    (request.body ?? request.bodyBytes) && (request.method = "POST"));
 
-    const method = request.method.toLocaleLowerCase();
+  delete request.headers?.["Content-Length"];
+  delete request.headers?.["content-length"];
 
-    switch (getEnv()) {
-        case "Loon":
-        case "Surge":
-        case "Stash":
-        case "Shadowrocket":
+  const method = request.method.toLocaleLowerCase();
+
+  switch (ENV) {
+    case "Loon":
+    case "Surge":
+    case "Egern":         // ✅ 新增
+    case "Stash":
+    case "Shadowrocket":
+    default:
+      return (
+        delete request.id,
+        request.policy &&
+          (isLoon() && (request.node = request.policy),
+          isStash() &&
+            (request.headers || (request.headers = {}),
+            (request.headers["X-Stash-Selected-Proxy"] = encodeURI(request.policy)))),
+        ArrayBuffer.isView(request.body) && (request["binary-mode"] = !0),
+        await new Promise((resolve, reject) => {
+          $httpClient[method](request, (err, resp, body) => {
+            err
+              ? reject(err)
+              : ((resp.ok = /^2\d\d$/.test(resp.status)),
+                (resp.statusCode = resp.status),
+                body &&
+                  ((resp.body = body),
+                  1 == request["binary-mode"] && (resp.bodyBytes = body)),
+                resolve(resp));
+          });
+        })
+      );
+
+    case "Quantumult X":
+      switch (
+        (delete request.scheme,
+        delete request.sessionIndex,
+        delete request.charset,
+        request.policy &&
+          (request.opts || (request.opts = {}), (request.opts.policy = request.policy)),
+        (request?.headers?.["Content-Type"] ?? request?.headers?.["content-type"])?.split(";")?.[0])
+      ) {
         default:
-            return (
-                delete request.id,
-                request.policy &&
-                (isLoon() && (request.node = request.policy),
-                isStash() &&
-                (request.headers || (request.headers = {}),
-                    (request.headers["X-Stash-Selected-Proxy"] = encodeURI(
-                        request.policy
-                    )))),
-                ArrayBuffer.isView(request.body) && (request["binary-mode"] = !0),
-                    await new Promise((e, o) => {
-                        $httpClient[method](request, (r, s, n) => {
-                            r
-                                ? o(r)
-                                : ((s.ok = /^2\d\d$/.test(s.status)),
-                                    (s.statusCode = s.status),
-                                n &&
-                                ((s.body = n),
-                                1 == request["binary-mode"] && (s.bodyBytes = n)),
-                                    e(s));
-                        });
-                    })
-            );
+          delete request.bodyBytes;
+          break;
+        case "application/protobuf":
+        case "application/x-protobuf":
+        case "application/vnd.google.protobuf":
+        case "application/grpc":
+        case "application/grpc+proto":
+        case "application/octet-stream":
+          delete request.body,
+            ArrayBuffer.isView(request.bodyBytes) &&
+              (request.bodyBytes = request.bodyBytes.buffer.slice(
+                request.bodyBytes.byteOffset,
+                request.bodyBytes.byteLength + request.bodyBytes.byteOffset
+              ));
+        case void 0:
+      }
+      return await $task.fetch(request).then(
+        (res) => ((res.ok = /^2\d\d$/.test(res.statusCode)), (res.status = res.statusCode), res),
+        (e) => Promise.reject(e.error)
+      );
 
-        case "Quantumult X":
-            switch (
-                (delete request.scheme,
-                    delete request.sessionIndex,
-                    delete request.charset,
-                request.policy &&
-                (request.opts || (request.opts = {}),
-                    (request.opts.policy = request.policy)),
-                    (
-                        request?.headers?.["Content-Type"] ??
-                        request?.headers?.["content-type"]
-                    )?.split(";")?.[0])
-                ) {
-                default:
-                    delete request.bodyBytes;
-                    break;
-                case "application/protobuf":
-                case "application/x-protobuf":
-                case "application/vnd.google.protobuf":
-                case "application/grpc":
-                case "application/grpc+proto":
-                case "application/octet-stream":
-                    delete request.body,
-                    ArrayBuffer.isView(request.bodyBytes) &&
-                    (request.bodyBytes = request.bodyBytes.buffer.slice(
-                        request.bodyBytes.byteOffset,
-                        request.bodyBytes.byteLength + request.bodyBytes.byteOffset
-                    ));
-                case void 0:
-            }
-            return await $task.fetch(request).then(
-                (e) => (
-                    (e.ok = /^2\d\d$/.test(e.statusCode)), (e.status = e.statusCode), e
-                ),
-                (e) => Promise.reject(e.error)
-            );
-
-        case "Node.js":
-            const got = eval('require("got")');
-            let iconv = eval('require("iconv-lite")');
-            const {url: url, ...option2} = request;
-            return await got[method](url, option2).then(
-                (e) => (
-                    (e.statusCode = e.status),
-                        (e.body = iconv.decode(e.rawBody, request?.encoding || "utf-8")),
-                        (e.bodyBytes = e.rawBody),
-                        e
-                ),
-                (e) => {
-                    if (e.response && 500 === e.response.statusCode)
-                        return Promise.reject(e.response.body);
-                    Promise.reject(e.message);
-                }
-            );
-    }
+    case "Node.js":
+      const got = eval('require("got")');
+      let iconv = eval('require("iconv-lite")');
+      const { url, ...option2 } = request;
+      return await got[method](url, option2).then(
+        (res) => (
+          (res.statusCode = res.status),
+          (res.body = iconv.decode(res.rawBody, request?.encoding || "utf-8")),
+          (res.bodyBytes = res.rawBody),
+          res
+        ),
+        (e) => {
+          if (e.response && 500 === e.response.statusCode) return Promise.reject(e.response.body);
+          return Promise.reject(e.message);
+        }
+      );
+  }
 };
 
 class Store {
-    constructor(NAMESPACE) {
-        if (
-            ((this.env = getEnv()),
-                (this.Store = "./store"),
-            NAMESPACE && (this.Store = `./store/${NAMESPACE}`),
-            "Node.js" === this.env)
-        ) {
-            const {LocalStorage: LocalStorage} = eval(
-                'require("node-localstorage")'
-            );
-            this.localStorage = new LocalStorage(this.Store);
-        }
+  constructor(NAMESPACE) {
+    this.env = ENV;
+    this.Store = "./store";
+    if (NAMESPACE) this.Store = `./store/${NAMESPACE}`;
+    if (this.env === "Node.js") {
+      const { LocalStorage } = eval('require("node-localstorage")');
+      this.localStorage = new LocalStorage(this.Store);
     }
+  }
 
-    get(e) {
-        switch (this.env) {
-            case "Surge":
-            case "Loon":
-            case "Stash":
-            case "Shadowrocket":
-                return $persistentStore.read(e);
-            case "Quantumult X":
-                return $prefs.valueForKey(e);
-            case "Node.js":
-                return this.localStorage.getItem(e);
-            default:
-                return null;
-        }
+  get(key) {
+    switch (this.env) {
+      case "Surge":
+      case "Egern":
+      case "Loon":
+      case "Stash":
+      case "Shadowrocket":
+        return $persistentStore.read(key);
+      case "Quantumult X":
+        return $prefs.valueForKey(key);
+      case "Node.js":
+        return this.localStorage.getItem(key);
+      default:
+        return null;
     }
+  }
 
-    set(e, o) {
-        switch (this.env) {
-            case "Surge":
-            case "Loon":
-            case "Stash":
-            case "Shadowrocket":
-                return $persistentStore.write(o, e);
-            case "Quantumult X":
-                return $prefs.setValueForKey(o, e);
-            case "Node.js":
-                return this.localStorage.setItem(e, o), !0;
-            default:
-                return null;
-        }
+  set(key, val) {
+    switch (this.env) {
+      case "Surge":
+      case "Egern":
+      case "Loon":
+      case "Stash":
+      case "Shadowrocket":
+        return $persistentStore.write(val, key);
+      case "Quantumult X":
+        return $prefs.setValueForKey(val, key);
+      case "Node.js":
+        this.localStorage.setItem(key, val);
+        return true;
+      default:
+        return null;
     }
+  }
 
-    clear(e) {
-        switch (this.env) {
-            case "Surge":
-            case "Loon":
-            case "Stash":
-            case "Shadowrocket":
-                return $persistentStore.write(null, e);
-            case "Quantumult X":
-                return $prefs.removeValueForKey(e);
-            case "Node.js":
-                return this.localStorage.removeItem(e), !0;
-            default:
-                return null;
-        }
+  clear(key) {
+    switch (this.env) {
+      case "Surge":
+      case "Egern":
+      case "Loon":
+      case "Stash":
+      case "Shadowrocket":
+        return $persistentStore.write(null, key);
+      case "Quantumult X":
+        return $prefs.removeValueForKey(key);
+      case "Node.js":
+        this.localStorage.removeItem(key);
+        return true;
+      default:
+        return null;
     }
+  }
 }
 
 const notify = (e = "", o = "", r = "", s = {}) => {
@@ -270,6 +276,7 @@ const notify = (e = "", o = "", r = "", s = {}) => {
             case "string":
                 switch (getEnv()) {
                     case "Surge":
+                    case "Egern":
                     case "Stash":
                     default:
                         return {url: e2};
@@ -284,6 +291,7 @@ const notify = (e = "", o = "", r = "", s = {}) => {
             case "object":
                 switch (getEnv()) {
                     case "Surge":
+                    case "Egern":
                     case "Stash":
                     case "Shadowrocket":
                     default: {
@@ -359,6 +367,7 @@ const notify = (e = "", o = "", r = "", s = {}) => {
 
     switch (getEnv()) {
         case "Surge":
+        case "Egern":
         case "Loon":
         case "Stash":
         case "Shadowrocket":
@@ -376,6 +385,7 @@ const notify = (e = "", o = "", r = "", s = {}) => {
 const done = (e = {}) => {
     switch (getEnv()) {
         case "Surge":
+        case "Egern":
         case "Loon":
         case "Stash":
         case "Shadowrocket":
@@ -389,13 +399,13 @@ const done = (e = {}) => {
 };
 
 /* =======================
- * SafeDone：避免多次 $done 导致 Egern/部分内核无响应
+ * SafeDone：避免多次 $done 导致部分内核无响应
  * ======================= */
 let __finished = false;
-const safeDone = (payload = {}) => {
-    if (__finished) return;
-    __finished = true;
-    done(payload);
+const safeDone = (payload) => {
+  if (__finished) return;
+  __finished = true;
+  done(payload);
 };
 
 const SERVER_HOST = "https://api.120399.xyz";
@@ -1350,6 +1360,8 @@ function getDataSource(idx) {
 }
 
 (async () => {
+    console.log(`✅ WSGW 脚本已触发 | ENV=${ENV} | url=${typeof $request !== "undefined" ? $request.url : "no $request"}`);
+
     await showNotice();
 
     // 仅提示：notifyType / recentElcFee 你要在 BoxJs 配；脚本逻辑里暂不强制使用
@@ -1417,22 +1429,24 @@ function getDataSource(idx) {
         body: jsonStr(result),
     };
 
-    safeDone(isQuanX() ? resp : { response: resp });
-})()
-    .catch((e) => {
+      safeDone(isQuanX() ? resp : { response: resp });
+    })()
+      .catch((e) => {
         const err = String(e);
 
         /无效|失效|过期|重新获取|请求异常/.test(err) &&
-            (clearCache("bizrt"), console.log("✅ 清理缓存 bizrt 成功"));
+          (clearCache("bizrt"), console.log("✅ 清理缓存 bizrt 成功"));
 
         log.error(err);
 
-        // 失败也返回一个 JSON，避免 Egern 一直挂起看起来“没反应”
         const resp = {
-            status: isQuanX() ? "HTTP/1.1 500" : 500,
-            headers: { "content-type": "application/json;charset=utf8" },
-            body: jsonStr({ ok: false, error: err }),
+          status: isQuanX() ? "HTTP/1.1 500" : 500,
+          headers: { "content-type": "application/json;charset=utf8" },
+          body: jsonStr({ ok: false, error: err }),
         };
         safeDone(isQuanX() ? resp : { response: resp });
-    })
-    .finally(() => safeDone());
+      })
+      .finally(() => {
+        // ✅ 这里只做收尾日志，不再 safeDone，避免二次 done
+        console.log("🔚 WSGW 脚本结束");
+      });
