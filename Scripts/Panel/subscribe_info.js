@@ -100,6 +100,21 @@ function toReversePercent(used, total) {
     return `${(((total - used) / total) * 100).toFixed(2)}%`;
 }
 
+function pad2(n: number) {
+    return String(n).padStart(2, "0")
+}
+
+// 12-13 21:07:05（月-日 时:分:秒）
+function nowMDHMS() {
+    const d = new Date()
+    const MM = pad2(d.getMonth() + 1)
+    const DD = pad2(d.getDate())
+    const hh = pad2(d.getHours())
+    const mm = pad2(d.getMinutes())
+    const ss = pad2(d.getSeconds())
+    return `${MM}-${DD} ${hh}:${mm}:${ss}`
+}
+
 function formatDate(ts) {
     const d = new Date(ts);
     const y = d.getFullYear();
@@ -554,7 +569,10 @@ function fetchInfo(url, resetDayRaw, title, index) {
         blocks.push(block);
     }
 
-    const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
+    const runAtLine = `⏱ 执行时间：${formatRunAt(new Date())}`;
+    const contentAll = blocks.length
+        ? `${runAtLine}\n\n${blocks.join("\n\n")}`
+        : `${runAtLine}\n\n未配置订阅参数`;
     log("final blocks count:", blocks.length);
     log("final content:\n" + contentAll);
 
