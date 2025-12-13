@@ -56,6 +56,18 @@
 
     /* ───────────────── 通用工具函数 ───────────────── */
 
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    // 12-13 21:07:05（月-日 时:分:秒）
+    const formatMDHMS = (d) => {
+      const MM = pad2(d.getMonth() + 1);
+      const DD = pad2(d.getDate());
+      const hh = pad2(d.getHours());
+      const mm = pad2(d.getMinutes());
+      const ss = pad2(d.getSeconds());
+      return `${MM}-${DD} ${hh}:${mm}:${ss}`;
+    };
+
     // 日期差：end - start（按天）
     const dateDiff = (start, end) => {
         const s = start.split("-");
@@ -820,9 +832,11 @@
         lineIntl
     ].join(gapBetween);
 
+    const runAtLine = `⏱ 执行时间：${formatMDHMS(now)}`;
+
     const content = almanacDetail
-        ? `${almanacDetail}\n\n${blockFest}`
-        : blockFest;
+      ? `${runAtLine}\n${almanacDetail}\n\n${blockFest}`
+      : `${runAtLine}\n\n${blockFest}`;
 
     /* ───────────────── 播报模式（Cron / 无参数） ───────────────── */
 

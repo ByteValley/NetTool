@@ -593,7 +593,19 @@ const IPV6_RE = new RegExp(`^${IPV6_SRC}$`);
 function isIPv4(ip) { return IPV4_RE.test(ip || ""); }
 function isIPv6(ip) { return IPV6_RE.test(ip || ""); }
 
-function now() { return new Date().toTimeString().split(" ")[0]; }
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function now() {
+  const d = new Date();
+  const MM = pad2(d.getMonth() + 1);
+  const DD = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+  const ss = pad2(d.getSeconds());
+  return `${MM}-${DD} ${hh}:${mm}:${ss}`;
+}
 
 function maskIP(ip) {
   if (!ip || !MASK_IP) return ip || "";

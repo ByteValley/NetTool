@@ -1015,13 +1015,17 @@ const IPV6_SRC = [
 ].join('');
 const IPV6_RE = new RegExp(`^${IPV6_SRC}$`);
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
 function now() {
   const d = new Date();
-  const MM = String(d.getMonth() + 1).padStart(2, '0');
-  const DD = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const ss = String(d.getSeconds()).padStart(2, '0');
+  const MM = pad2(d.getMonth() + 1);
+  const DD = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+  const ss = pad2(d.getSeconds());
   return `${MM}-${DD} ${hh}:${mm}:${ss}`;
 }
 
