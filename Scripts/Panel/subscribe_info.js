@@ -100,21 +100,6 @@ function toReversePercent(used, total) {
     return `${(((total - used) / total) * 100).toFixed(2)}%`;
 }
 
-function pad2(n: number) {
-    return String(n).padStart(2, "0")
-}
-
-// 12-13 21:07:05（月-日 时:分:秒）
-function nowMDHMS() {
-    const d = new Date()
-    const MM = pad2(d.getMonth() + 1)
-    const DD = pad2(d.getDate())
-    const hh = pad2(d.getHours())
-    const mm = pad2(d.getMinutes())
-    const ss = pad2(d.getSeconds())
-    return `${MM}-${DD} ${hh}:${mm}:${ss}`
-}
-
 function formatDate(ts) {
     const d = new Date(ts);
     const y = d.getFullYear();
@@ -523,72 +508,60 @@ function fetchInfo(url, resetDayRaw, title, index) {
 
 // ===== 主流程 =====
 (async () => {
-    try {
-        log("script start");
+    log("script start");
 
-        const defaultIcon = pickStr(
-            "defaultIcon",
-            "DefaultIcon",
-            "antenna.radiowaves.left.and.right.circle.fill",
-            "antenna.radiowaves.left.and.right.circle.fill"
+    const defaultIcon = pickStr(
+        "defaultIcon",
+        "DefaultIcon",
+        "antenna.radiowaves.left.and.right.circle.fill",   // 脚本默认值 = 模块默认 arguments
+        "antenna.radiowaves.left.and.right.circle.fill"
+    );
+    const defaultColor = pickStr(
+        "defaultIconColor",
+        "DefaultIconColor",
+        "#00E28F",   // 脚本默认值 = 模块默认 arguments
+        "#00E28F"
+    );
+
+    const blocks = [];
+    for (let i = 1; i <= 10; i++) {
+        // URL：默认 arguments=“订阅链接”，逻辑默认值=null
+        const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
+        const url = normalizeUrl(rawUrl, "url" + i);
+
+        // 标题：默认 arguments=“机场名称”，逻辑默认值=null，再用“机场N”兜底
+        const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
+        const title = rawTitle || `机场${i}`;
+
+        // 重置：默认 arguments=“重置日期”，逻辑默认值=null
+        const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
+
+        log(
+            "slot", i,
+            "| rawUrl:", rawUrl,
+            "| url:", url,
+            "| title:", title,
+            "| reset:", reset
         );
-        const defaultColor = pickStr(
-            "defaultIconColor",
-            "DefaultIconColor",
-            "#00E28F",
-            "#00E28F"
-        );
 
-        const blocks = [];
-        for (let i = 1; i <= 10; i++) {
-            const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
-            const url = normalizeUrl(rawUrl, "url" + i);
-
-            const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
-            const title = rawTitle || `机场${i}`;
-
-            const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
-
-            log(
-                "slot", i,
-                "| rawUrl:", rawUrl,
-                "| url:", url,
-                "| title:", title,
-                "| reset:", reset
-            );
-
-            if (!url || !isHttpUrl(url)) {
-                log("slot", i, "no valid url, skip request");
-                continue;
-            }
-
-            const block = await fetchInfo(url, reset, title, i);
-            blocks.push(block);
+        // 没有 URL/无效 URL：不发请求
+        if (!url || !isHttpUrl(url)) {
+            log("slot", i, "no valid url, skip request");
+            continue;
         }
 
-        const runAtLine = `⏱ 执行时间：${formatRunAt(RUN_AT)}`;
-        const body = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
-        const contentAll = `${runAtLine}\n\n${body}`;
-
-        log("final blocks count:", blocks.length);
-        log("final content:\n" + contentAll);
-
-        $done({
-            title: "订阅信息",
-            content: contentAll,
-            icon: defaultIcon,
-            iconColor: defaultColor,
-            "icon-color": defaultColor // 兼容 Surge 面板字段
-        });
-    } catch (e) {
-        const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
-        log("fatal error:", msg);
-        $done({
-            title: "订阅信息",
-            content: "脚本执行异常：\n" + msg,
-            icon: "xmark.circle",
-            iconColor: "#FF3B30",
-            "icon-color": "#FF3B30"
-        });
+        const block = await fetchInfo(url, reset, title, i);
+        blocks.push(block);
     }
+
+    const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
+    log("final blocks count:", blocks.length);
+    log("final content:\n" + contentAll);
+
+    $done({
+        title: "订阅信息",
+        content: contentAll,
+        icon: defaultIcon,
+        iconColor: defaultColor
+    });
 })();
