@@ -388,6 +388,16 @@ const done = (e = {}) => {
     }
 };
 
+/* =======================
+ * SafeDone：避免多次 $done 导致 Egern/部分内核无响应
+ * ======================= */
+let __finished = false;
+const safeDone = (payload = {}) => {
+    if (__finished) return;
+    __finished = true;
+    done(payload);
+};
+
 const SERVER_HOST = "https://api.120399.xyz";
 const BASE_URL = "https://www.95598.cn";
 
@@ -1346,7 +1356,7 @@ function getDataSource(idx) {
     log.debug(`⚙️ notifyType=${NOTIFY_TYPE} recentElcFee=${RECENT_ELC_FEE}`);
 
     if (!USERNAME || !PASSWORD) {
-        return sendMsg(
+        await sendMsg(
             SCRIPTNAME,
             "请先在 BoxJs 配置 phoneNum/password!",
             "点击前往BoxJs配置",
@@ -1355,6 +1365,13 @@ function getDataSource(idx) {
                     "http://boxjs.com/#/sub/add/https%3A%2F%2Fraw.githubusercontent.com%2FYuheng0101%2FX%2Fmain%2FTasks%2Fboxjs.json",
             }
         );
+
+        const resp = {
+            status: isQuanX() ? "HTTP/1.1 200" : 200,
+            headers: { "content-type": "application/json;charset=utf8" },
+            body: jsonStr({ ok: false, error: "Missing phoneNum/password" }),
+        };
+        return safeDone(isQuanX() ? resp : { response: resp });
     }
 
     await getKeyCode();
@@ -1396,15 +1413,26 @@ function getDataSource(idx) {
 
     const resp = {
         status: isQuanX() ? "HTTP/1.1 200" : 200,
-        headers: {"content-type": "application/json;charset=utf8"},
+        headers: { "content-type": "application/json;charset=utf8" },
         body: jsonStr(result),
     };
 
-    done(isQuanX() ? resp : {response: resp});
+    safeDone(isQuanX() ? resp : { response: resp });
 })()
     .catch((e) => {
-        /无效|失效|过期|重新获取|请求异常/.test(String(e)) &&
-        (clearCache("bizrt"), console.log("✅ 清理缓存 bizrt 成功"));
-        log.error(e);
+        const err = String(e);
+
+        /无效|失效|过期|重新获取|请求异常/.test(err) &&
+            (clearCache("bizrt"), console.log("✅ 清理缓存 bizrt 成功"));
+
+        log.error(err);
+
+        // 失败也返回一个 JSON，避免 Egern 一直挂起看起来“没反应”
+        const resp = {
+            status: isQuanX() ? "HTTP/1.1 500" : 500,
+            headers: { "content-type": "application/json;charset=utf8" },
+            body: jsonStr({ ok: false, error: err }),
+        };
+        safeDone(isQuanX() ? resp : { response: resp });
     })
-    .finally(done);
+    .finally(() => safeDone());
