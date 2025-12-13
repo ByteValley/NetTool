@@ -569,7 +569,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
         blocks.push(block);
     }
 
-    const runAtLine = `⏱ 执行时间：${formatRunAt(new Date())}`;
+    const runAtLine = `执行时间：${formatRunAt(new Date())}`;
     const contentAll = blocks.length
         ? `${runAtLine}\n\n${blocks.join("\n\n")}`
         : `${runAtLine}\n\n未配置订阅参数`;

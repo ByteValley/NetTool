@@ -837,7 +837,7 @@
         lineIntl
     ].join(gapBetween);
 
-    const runAtLine = `⏱ 执行时间：${nowMDHMS(now)}`;
+    const runAtLine = `执行时间：${nowMDHMS(now)}`;
 
     const content = almanacDetail
         ? `${runAtLine}\n${almanacDetail}\n\n${blockFest}`

@@ -933,25 +933,8 @@ log('debug', 'BoxSettings(BOX)', BOX);
 
   const title = netTypeLine() || t('unknownNet');
 
-  function pad2(n: number) {
-    return String(n).padStart(2, "0")
-  }
-
-  // 12-13 21:07:05（月-日 时:分:秒）
-  function nowMDHMS() {
-    const d = new Date()
-    const MM = pad2(d.getMonth() + 1)
-    const DD = pad2(d.getDate())
-    const hh = pad2(d.getHours())
-    const mm = pad2(d.getMinutes())
-    const ss = pad2(d.getSeconds())
-    return `${MM}-${DD} ${hh}:${mm}:${ss}`
-  }
-
-  const runAtLine = `⏱ 执行时间：${nowMDHMS(now)}`;
-
   const parts = [];
-  parts.push(`${t("runAt")}: ${runAtLine}`)
+  parts.push(`${t('runAt')}: ${now()}`);
   parts.push(`${t('policy')}: ${policyName || '-'}`);
 
   pushGroupTitle(parts, '本地');
