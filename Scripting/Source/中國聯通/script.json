@@ -1,46 +1,46 @@
 {
-  "author" : {
-    "name" : "ByteValley",
-    "email" : null,
-    "homepage" : null
+  "localizedDescriptions" : {
+    "en" : "",
+    "ja" : "",
+    "de" : "",
+    "it" : "",
+    "pt" : "",
+    "ru" : "",
+    "es" : "",
+    "fr" : "",
+    "zh" : ""
   },
   "localizedNames" : {
-    "es" : "",
-    "en" : "",
-    "it" : "",
-    "ja" : "",
-    "fr" : "",
     "ru" : "",
-    "zh" : "",
+    "fr" : "",
     "pt" : "",
+    "it" : "",
+    "zh" : "",
+    "en" : "",
+    "ja" : "",
+    "es" : "",
     "de" : ""
   },
-  "color" : "rgba(238, 92, 98,1)",
+  "author" : {
+    "homepage" : null,
+    "name" : "ByteValley",
+    "email" : null
+  },
   "contributors" : [
 
   ],
-  "runInApp" : false,
-  "description" : "",
+  "name" : "中國聯通",
   "version" : "1.0.0",
-  "remoteResource" : {
-    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國聯通.scripting",
-    "autoUpdateInterval" : 300,
-    "hash" : "d48f832c89682e8daf8f41bf36ada380"
-  },
-  "localizedDescriptions" : {
-    "es" : "",
-    "fr" : "",
-    "zh" : "",
-    "de" : "",
-    "it" : "",
-    "ru" : "",
-    "ja" : "",
-    "en" : "",
-    "pt" : ""
-  },
-  "icon" : "antenna.radiowaves.left.and.right",
   "intentInputTypes" : [
 
   ],
-  "name" : "中國聯通"
+  "description" : "",
+  "icon" : "antenna.radiowaves.left.and.right",
+  "color" : "rgba(238, 92, 98,1)",
+  "remoteResource" : {
+    "autoUpdateInterval" : 300,
+    "hash" : "cf9a90be825baf83d460cb144a4bc1fe",
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國聯通.scripting"
+  },
+  "runInApp" : false
 }

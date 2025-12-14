@@ -1,46 +1,46 @@
 {
   "icon" : "antenna.radiowaves.left.and.right",
-  "remoteResource" : {
-    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國電信.scripting",
-    "hash" : "42fc9989474fe950866fb8b28bb0c75f",
-    "autoUpdateInterval" : 300
-  },
-  "localizedNames" : {
-    "fr" : "",
-    "en" : "",
-    "it" : "",
-    "ja" : "",
-    "pt" : "",
-    "zh" : "",
-    "es" : "",
-    "ru" : "",
-    "de" : ""
-  },
-  "name" : "中國電信",
-  "localizedDescriptions" : {
-    "it" : "",
-    "fr" : "",
-    "pt" : "",
-    "zh" : "",
-    "ja" : "",
-    "es" : "",
-    "en" : "",
-    "ru" : "",
-    "de" : ""
-  },
-  "runInApp" : false,
   "color" : "rgba(28, 140, 255,1)",
+  "description" : "",
+  "version" : "1.0.0",
+  "author" : {
+    "email" : null,
+    "homepage" : null,
+    "name" : "ByteValley"
+  },
   "contributors" : [
 
   ],
+  "remoteResource" : {
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國電信.scripting",
+    "autoUpdateInterval" : 300,
+    "hash" : "4aace0a228cee4d349572a1ab04bc3d0"
+  },
+  "name" : "中國電信",
+  "runInApp" : false,
   "intentInputTypes" : [
 
   ],
-  "author" : {
-    "email" : null,
-    "name" : "ByteValley",
-    "homepage" : null
+  "localizedDescriptions" : {
+    "ru" : "",
+    "fr" : "",
+    "ja" : "",
+    "es" : "",
+    "pt" : "",
+    "it" : "",
+    "de" : "",
+    "en" : "",
+    "zh" : ""
   },
-  "description" : "",
-  "version" : "1.0.0"
+  "localizedNames" : {
+    "ru" : "",
+    "it" : "",
+    "ja" : "",
+    "en" : "",
+    "es" : "",
+    "zh" : "",
+    "fr" : "",
+    "pt" : "",
+    "de" : ""
+  }
 }
