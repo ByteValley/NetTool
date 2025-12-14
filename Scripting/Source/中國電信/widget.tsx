@@ -24,10 +24,8 @@ import { queryImportantData } from "./telecomApi"
 
 const SETTINGS_KEY = TELECOM_SETTINGS_KEY
 
-// 中国电信 Logo（可 filePath / URL）
-// 这里保留你原来的「下载并缓存到本地」逻辑
-const LOGO_URL =
-  "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10000.png"
+const LOGO_URL = "https://raw.githubusercontent.com/Nanako718/Scripting/refs/heads/main/images/10000.png"
+
 const LOGO_CACHE_KEY = "chinaTelecom_logo_path"
 
 // ================== Logo 缓存 ==================

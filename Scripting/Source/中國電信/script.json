@@ -1,46 +1,46 @@
 {
+  "icon" : "antenna.radiowaves.left.and.right",
+  "remoteResource" : {
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國電信.scripting",
+    "hash" : "42fc9989474fe950866fb8b28bb0c75f",
+    "autoUpdateInterval" : 300
+  },
+  "localizedNames" : {
+    "fr" : "",
+    "en" : "",
+    "it" : "",
+    "ja" : "",
+    "pt" : "",
+    "zh" : "",
+    "es" : "",
+    "ru" : "",
+    "de" : ""
+  },
+  "name" : "中國電信",
+  "localizedDescriptions" : {
+    "it" : "",
+    "fr" : "",
+    "pt" : "",
+    "zh" : "",
+    "ja" : "",
+    "es" : "",
+    "en" : "",
+    "ru" : "",
+    "de" : ""
+  },
+  "runInApp" : false,
+  "color" : "rgba(28, 140, 255,1)",
   "contributors" : [
 
   ],
-  "description" : "",
-  "localizedDescriptions" : {
-    "en" : "",
-    "pt" : "",
-    "zh" : "",
-    "it" : "",
-    "ja" : "",
-    "fr" : "",
-    "de" : "",
-    "es" : "",
-    "ru" : ""
-  },
   "intentInputTypes" : [
 
   ],
-  "version" : "1.0.0",
-  "name" : "中國電信",
   "author" : {
-    "name" : "ByteValley",
     "email" : null,
+    "name" : "ByteValley",
     "homepage" : null
   },
-  "icon" : "antenna.radiowaves.left.and.right",
-  "remoteResource" : {
-    "autoUpdateInterval" : 300,
-    "hash" : "1d55563ac812b2a166a90a7fc5111026",
-    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國電信.scripting"
-  },
-  "color" : "rgba(28, 140, 255,1)",
-  "localizedNames" : {
-    "en" : "",
-    "es" : "",
-    "ru" : "",
-    "fr" : "",
-    "ja" : "",
-    "pt" : "",
-    "de" : "",
-    "it" : "",
-    "zh" : ""
-  },
-  "runInApp" : false
+  "description" : "",
+  "version" : "1.0.0"
 }

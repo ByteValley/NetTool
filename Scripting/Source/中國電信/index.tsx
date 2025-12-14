@@ -1,4 +1,4 @@
-// index.tsx（中国电信）
+// index.tsx（中国电信
 
 import {
   Navigation,
@@ -20,85 +20,125 @@ import {
   type ChinaTelecomSettings,
   TELECOM_SETTINGS_KEY,
 } from "./telecom/settings"
-import { TelecomRenderConfigSection } from "./telecom/index/renderConfigSection"
+import { RenderConfigSection } from "./telecom/index/renderConfigSection"
 import type { SmallCardStyle } from "./telecom/cards/small"
 import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
 
+// ==================== 版本信息 ====================
 // 版本号说明（Semantic Versioning）
 // MAJOR：破坏性变更或配置结构调整（不兼容旧版）
 // MINOR：新增功能、兼容性增强（兼容旧版）
 // PATCH：修复 Bug、UI 微调、文案修改等小改动
-const VERSION = "1.0.0"
+const VERSION = "1.0.1"
 
 // 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-12"
+const BUILD_DATE = "2025-12-14"
 
 const SETTINGS_KEY = TELECOM_SETTINGS_KEY
 const FULLSCREEN_KEY = "chinaTelecomSettingsFullscreen"
 
-// 默认设置
+// ==================== 小工具 ====================
+
+function toSafeIntMinutes(v: unknown, fallback: number): number {
+  let n: number
+  if (typeof v === "number") n = v
+  else if (typeof v === "string") n = parseInt(v, 10)
+  else n = fallback
+
+  if (!Number.isFinite(n)) n = fallback
+  n = Math.round(n)
+
+  if (n < 15) n = 15
+  if (n > 1440) n = 1440
+  return n
+}
+
+// ==================== 默认设置 ====================
+
 const defaultSettings: ChinaTelecomSettings = {
   mobile: "",
   password: "",
+
   refreshTimeDayColor: "#999999",
   refreshTimeNightColor: "#AAAAAA",
   refreshInterval: 180,
+
   showRemainRatio: false,
   mediumCardStyle: "four",
   includeDirectionalInTotal: true,
-  // 小号组件默认样式
+
+  // 小号组件（新体系）
   smallCardStyle: "summary",
+
+  // ✅ 仅作用于「紧凑清单 / 进度清单」
+  // true  = 总流量 + 语音（2 行）
+  // false = 通用 + 定向 + 语音（3 行）
+  smallMiniBarUseTotalFlow: false,
 }
 
-// ===== 设置页面 =====
+// ==================== 设置页面 ====================
 
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
-
-  // ⭐ 用通用 Hook 读取/切换「页面/弹层」偏好
-  const { fullscreenPref, toggleFullscreen } = useFullscreenPref(FULLSCREEN_KEY)
+  const { fullscreenPref, toggleFullscreen } =
+    useFullscreenPref(FULLSCREEN_KEY)
 
   const stored = Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null
   const initial: ChinaTelecomSettings = stored ?? defaultSettings
 
+  // ==================== State ====================
+
   const [mobile, setMobile] = useState(initial.mobile || "")
   const [password, setPassword] = useState(initial.password || "")
 
-  // 刷新时间颜色只透传，不在设置页改
+  // 颜色字段仅透传
   const refreshTimeDayColor =
     initial.refreshTimeDayColor ?? defaultSettings.refreshTimeDayColor
   const refreshTimeNightColor =
     initial.refreshTimeNightColor ?? defaultSettings.refreshTimeNightColor
 
   const [refreshInterval, setRefreshInterval] = useState(
-    initial.refreshInterval ?? 180,
+    toSafeIntMinutes(initial.refreshInterval, 180),
   )
+
   const [showRemainRatio, setShowRemainRatio] = useState(
     initial.showRemainRatio ?? false,
   )
+
   const [mediumCardStyle, setMediumCardStyle] = useState<"four" | "three">(
     initial.mediumCardStyle ?? "four",
   )
+
   const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
     useState<boolean>(initial.includeDirectionalInTotal ?? true)
 
-  // 小号组件样式 state
   const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(
     (initial.smallCardStyle as SmallCardStyle) ?? "summary",
   )
+
+  // ✅ 紧凑清单 / 进度清单 2行 / 3行 联动
+  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
+    useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
+
+  // ==================== 保存 ====================
 
   const handleSave = () => {
     const newSettings: ChinaTelecomSettings = {
       mobile: mobile.trim(),
       password: password.trim(),
+
       refreshTimeDayColor,
       refreshTimeNightColor,
-      refreshInterval,
-      showRemainRatio,
+      refreshInterval: toSafeIntMinutes(refreshInterval, 180),
+
+      showRemainRatio: !!showRemainRatio,
       mediumCardStyle,
-      includeDirectionalInTotal,
+      includeDirectionalInTotal: !!includeDirectionalInTotal,
+
       smallCardStyle,
+      smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
     }
+
     Storage.set(SETTINGS_KEY, newSettings)
     dismiss()
   }
@@ -113,6 +153,8 @@ function SettingsView() {
       buttonLabel: "关闭",
     })
   }
+
+  // ==================== UI ====================
 
   return (
     <NavigationStack>
@@ -166,12 +208,14 @@ function SettingsView() {
           />
         </Section>
 
-        {/* 渲染配置（公共 Section + 小号样式） */}
-        <TelecomRenderConfigSection
+        {/* 渲染配置 */}
+        <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
           showRemainRatio={showRemainRatio}
           setShowRemainRatio={setShowRemainRatio}
+          smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
+          setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
           mediumCardStyle={mediumCardStyle}
           setMediumCardStyle={setMediumCardStyle}
           includeDirectionalInTotal={includeDirectionalInTotal}
@@ -184,7 +228,7 @@ function SettingsView() {
   )
 }
 
-// ===== App / 入口 =====
+// ==================== App / Run ====================
 
 type AppProps = { interactiveDismissDisabled?: boolean }
 
@@ -192,7 +236,6 @@ function App(_props: AppProps) {
   return <SettingsView />
 }
 
-// run 里只需要读一次 Storage，不用 Hook
 function readFullscreenPrefForRun(): boolean {
   try {
     const v = Storage.get(FULLSCREEN_KEY)

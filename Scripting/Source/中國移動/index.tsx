@@ -1,4 +1,5 @@
 // index.tsx（中国移动）
+
 import {
   Navigation,
   NavigationStack,
@@ -8,7 +9,6 @@ import {
   Text,
   Script,
   useState,
-  useEffect,
 } from "scripting"
 
 declare const Storage: any
@@ -20,19 +20,20 @@ import {
   type ChinaMobileSettings,
   MOBILE_SETTINGS_KEY,
 } from "./telecom/settings"
-import { TelecomRenderConfigSection } from "./telecom/index/renderConfigSection"
+import { RenderConfigSection } from "./telecom/index/renderConfigSection"
 import type { SmallCardStyle } from "./telecom/cards/small"
 import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
 import { TelecomModuleSection } from "./telecom/index/moduleSection"
 
+// ==================== 版本信息 ====================
 // 版本号说明（Semantic Versioning）
 // MAJOR：破坏性变更或配置结构调整（不兼容旧版）
 // MINOR：新增功能、兼容性增强（兼容旧版）
 // PATCH：修复 Bug、UI 微调、文案修改等小改动
-const VERSION = "1.0.0"
+const VERSION = "1.0.1"
 
 // 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-12"
+const BUILD_DATE = "2025-12-14"
 
 const SETTINGS_KEY = MOBILE_SETTINGS_KEY
 const FULLSCREEN_KEY = "chinaMobileSettingsFullscreen"
@@ -40,21 +41,29 @@ const FULLSCREEN_KEY = "chinaMobileSettingsFullscreen"
 // ✅ 给「组件模块折叠」单独一个 key（避免别的运营商串）
 const MODULE_COLLAPSE_KEY = "chinaMobileModuleSectionCollapsed"
 
+// ==================== 默认设置 ====================
+
 const defaultSettings: ChinaMobileSettings = {
   refreshInterval: 180,
   showRemainRatio: false,
   mediumCardStyle: "four",
   includeDirectionalInTotal: true,
+
+  // 小号组件（新体系）
   smallCardStyle: "summary",
+
+  // ✅ 仅作用于「紧凑清单 / 进度清单」：
+  // true  = 总流量 + 语音（2 行）
+  // false = 通用 + 定向 + 语音（3 行）
+  smallMiniBarUseTotalFlow: false,
 }
 
-// 链接
+// ==================== 链接 ====================
+
 const CM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Component/ChinaMobile.module"
-
 const CM_LOON_PLUGIN_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/Component/ChinaMobile.lpx"
-
 const CM_QX_REWRITE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/QuantumultX/Rewrite/Component/ChinaMobile.conf"
 
@@ -63,9 +72,10 @@ const BOXJS_SUB_URL =
 
 const GITHUB_URL1 =
   "https://github.com/ChinaTelecomOperators/ChinaMobile/releases/tag/Prerelease-Alpha"
-
 const GITHUB_URL2 =
   "https://github.com/Yuheng0101/X/tree/main/Scripts/ChinaMobile"
+
+// ==================== 设置页面 ====================
 
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
@@ -74,15 +84,19 @@ function SettingsView() {
   const stored = Storage.get(SETTINGS_KEY) as ChinaMobileSettings | null
   const initial: ChinaMobileSettings = stored ?? defaultSettings
 
+  // ==================== State ====================
+
   const [refreshInterval, setRefreshInterval] = useState(
     initial.refreshInterval ?? 180,
   )
   const [showRemainRatio, setShowRemainRatio] = useState(
     initial.showRemainRatio ?? false,
   )
+
   const [mediumCardStyle, setMediumCardStyle] = useState<"four" | "three">(
     initial.mediumCardStyle ?? "four",
   )
+
   const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
     useState<boolean>(initial.includeDirectionalInTotal ?? true)
 
@@ -90,26 +104,31 @@ function SettingsView() {
     (initial.smallCardStyle as SmallCardStyle) ?? "summary",
   )
 
-  // ✅ 实时持久化：任何一项变更都立刻写回 Storage
-  useEffect(() => {
+  // ✅ 紧凑清单 / 进度清单 联动开关
+  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
+    useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
+
+  // ==================== 保存（对齐联通：点击完成才写入 Storage） ====================
+
+  const handleSave = () => {
     const interval = Number(refreshInterval) || 180
+
     const newSettings: ChinaMobileSettings = {
       refreshInterval: interval,
-      showRemainRatio,
+      showRemainRatio: !!showRemainRatio,
       mediumCardStyle,
-      includeDirectionalInTotal,
+      includeDirectionalInTotal: !!includeDirectionalInTotal,
+
       smallCardStyle,
+      smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
     }
+
     try {
       Storage.set(SETTINGS_KEY, newSettings)
     } catch { }
-  }, [
-    refreshInterval,
-    showRemainRatio,
-    mediumCardStyle,
-    includeDirectionalInTotal,
-    smallCardStyle,
-  ])
+
+    dismiss()
+  }
 
   const handleAbout = async () => {
     await Dialog.alert({
@@ -121,6 +140,8 @@ function SettingsView() {
       buttonLabel: "关闭",
     })
   }
+
+  // ==================== 安装 / 跳转 ====================
 
   const handleOpenBoxJsSub = async () => Safari.openURL(BOXJS_SUB_URL)
 
@@ -150,9 +171,12 @@ function SettingsView() {
   const handleOpenGithub1 = async () => Safari.openURL(GITHUB_URL1)
   const handleOpenGithub2 = async () => Safari.openURL(GITHUB_URL2)
 
+  // ==================== 缓存管理 ====================
+
   const handleClearCache = async () => {
     try {
-      const path = FileManager.appGroupDocumentsDirectory + "/cm_data_cache.json"
+      const path =
+        FileManager.appGroupDocumentsDirectory + "/cm_data_cache.json"
       if (FileManager.existsSync(path)) {
         FileManager.removeSync(path)
         await Dialog.alert({
@@ -176,8 +200,7 @@ function SettingsView() {
     }
   }
 
-  // ✅ 现在「完成」只负责关闭；因为已经实时保存了
-  const handleDone = () => dismiss()
+  // ==================== UI ====================
 
   return (
     <NavigationStack>
@@ -196,7 +219,7 @@ function SettingsView() {
               }
               action={toggleFullscreen}
             />,
-            <Button title="完成" action={handleDone} />,
+            <Button title="完成" action={handleSave} />,
           ],
           bottomBar: [
             <Button
@@ -228,11 +251,13 @@ function SettingsView() {
           extraTitle2="📂 Yuheng0101 仓库"
         />
 
-        <TelecomRenderConfigSection
+        <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
           showRemainRatio={showRemainRatio}
           setShowRemainRatio={setShowRemainRatio}
+          smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
+          setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
           mediumCardStyle={mediumCardStyle}
           setMediumCardStyle={setMediumCardStyle}
           includeDirectionalInTotal={includeDirectionalInTotal}
@@ -255,6 +280,8 @@ function SettingsView() {
     </NavigationStack>
   )
 }
+
+// ==================== App / Run ====================
 
 type AppProps = { interactiveDismissDisabled?: boolean }
 function App(_props: AppProps) {

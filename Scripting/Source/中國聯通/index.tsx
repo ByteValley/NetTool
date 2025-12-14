@@ -23,16 +23,21 @@ import {
   type ChinaUnicomSettings,
   UNICOM_SETTINGS_KEY,
 } from "./telecom/settings"
-import { TelecomRenderConfigSection } from "./telecom/index/renderConfigSection"
+import { RenderConfigSection } from "./telecom/index/renderConfigSection"
 import type { SmallCardStyle } from "./telecom/cards/small"
 import { TelecomModuleSection } from "./telecom/index/moduleSection"
 import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
 import { showNoticeOnce } from "./telecom/utils/noticeOnce"
 
 // ==================== 版本信息 ====================
+// 版本号说明（Semantic Versioning）
+// MAJOR：破坏性变更或配置结构调整（不兼容旧版）
+// MINOR：新增功能、兼容性增强（兼容旧版）
+// PATCH：修复 Bug、UI 微调、文案修改等小改动
+const VERSION = "1.0.1"
 
-const VERSION = "1.1.0"
-const BUILD_DATE = "2025-12-13"
+// 构建日期：YYYY-MM-DD
+const BUILD_DATE = "2025-12-14"
 
 const SETTINGS_KEY = UNICOM_SETTINGS_KEY
 const FULLSCREEN_KEY = "chinaUnicomSettingsFullscreen"
@@ -78,10 +83,12 @@ const defaultSettings: ChinaUnicomSettings = {
   mediumCardStyle: "four",
   includeDirectionalInTotal: true,
 
-  // 小号组件
+  // 小号组件样式
   smallCardStyle: "summary",
 
-  // ✅ 新增：简洁 / 胶囊 是否使用「总流量 + 语音」
+  // ✅ 仅作用于「紧凑清单 / 进度清单」：
+  // true  = 总流量 + 语音（2 行）
+  // false = 通用 + 定向 + 语音（3 行）
   smallMiniBarUseTotalFlow: false,
 }
 
@@ -104,7 +111,7 @@ function SettingsView() {
     refreshTimeNightColor: initial.refreshTimeNightColor,
   }
 
-  // 匹配类型
+  // 匹配类型 index
   const initialMatchType =
     initial.otherFlowMatchType ?? defaultSettings.otherFlowMatchType
   const initialMatchIndex = Math.max(
@@ -119,16 +126,12 @@ function SettingsView() {
     initial.refreshInterval ?? 180,
   )
 
-  const [matchTypeIndex, setMatchTypeIndex] =
-    useState<number>(initialMatchIndex)
-
+  const [matchTypeIndex, setMatchTypeIndex] = useState<number>(initialMatchIndex)
   const [otherFlowMatchValue, setOtherFlowMatchValue] = useState(
     initial.otherFlowMatchValue ?? "2",
   )
 
-  const [enableBoxJs, setEnableBoxJs] = useState(
-    initial.enableBoxJs ?? false,
-  )
+  const [enableBoxJs, setEnableBoxJs] = useState(initial.enableBoxJs ?? false)
   const [boxJsUrl, setBoxJsUrl] = useState(initial.boxJsUrl ?? "")
 
   const [showRemainRatio, setShowRemainRatio] = useState(
@@ -146,11 +149,9 @@ function SettingsView() {
     (initial.smallCardStyle as SmallCardStyle) ?? "summary",
   )
 
-  // ✅ 新增：mini / bar 联动开关
+  // ✅ 紧凑/进度清单 2行/3行联动
   const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
-    useState<boolean>(
-      initial.smallMiniBarUseTotalFlow ?? false,
-    )
+    useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
 
   const currentMatchType: "flowType" | "addupItemCode" =
     MATCH_TYPE_OPTIONS[matchTypeIndex]?.value ?? "flowType"
@@ -161,21 +162,21 @@ function SettingsView() {
     const newSettings: ChinaUnicomSettings = {
       ...colorFields,
 
-      cookie,
-      refreshInterval,
+      cookie: (cookie ?? "").trim(),
+      refreshInterval: Number(refreshInterval) || 180,
 
       otherFlowMatchType: currentMatchType,
-      otherFlowMatchValue,
+      otherFlowMatchValue: (otherFlowMatchValue ?? "").trim(),
 
-      enableBoxJs,
-      boxJsUrl,
+      enableBoxJs: !!enableBoxJs,
+      boxJsUrl: (boxJsUrl ?? "").trim(),
 
-      showRemainRatio,
+      showRemainRatio: !!showRemainRatio,
       mediumCardStyle,
-      includeDirectionalInTotal,
+      includeDirectionalInTotal: !!includeDirectionalInTotal,
 
       smallCardStyle,
-      smallMiniBarUseTotalFlow, // ✅ 保存
+      smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
     }
 
     Storage.set(SETTINGS_KEY, newSettings)
@@ -195,9 +196,7 @@ function SettingsView() {
 
   // ==================== 安装 / 跳转 ====================
 
-  const handleOpenUnicomBoxJsSub = async () => {
-    await Safari.openURL(UNICOM_BOXJS_SUB_URL)
-  }
+  const handleOpenUnicomBoxJsSub = async () => Safari.openURL(UNICOM_BOXJS_SUB_URL)
 
   const handleInstallToSurge = async () => {
     const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
@@ -263,9 +262,7 @@ function SettingsView() {
         />
 
         {/* BoxJs */}
-        <Section
-          header={<Text font="body" fontWeight="semibold">BoxJs 配置</Text>}
-        >
+        <Section header={<Text font="body" fontWeight="semibold">BoxJs 配置</Text>}>
           <Toggle
             title="启用 BoxJs 读取 Cookie"
             value={enableBoxJs}
@@ -275,18 +272,12 @@ function SettingsView() {
             }}
           />
           {enableBoxJs ? (
-            <TextField
-              title="BoxJs 地址"
-              value={boxJsUrl}
-              onChanged={setBoxJsUrl}
-            />
+            <TextField title="BoxJs 地址" value={boxJsUrl} onChanged={setBoxJsUrl} />
           ) : null}
         </Section>
 
         {/* 登录凭证 */}
-        <Section
-          header={<Text font="body" fontWeight="semibold">登录凭证</Text>}
-        >
+        <Section header={<Text font="body" fontWeight="semibold">登录凭证</Text>}>
           <TextField
             title="Cookie"
             value={cookie}
@@ -296,16 +287,13 @@ function SettingsView() {
         </Section>
 
         {/* 渲染配置 */}
-        <TelecomRenderConfigSection
+        <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
           showRemainRatio={showRemainRatio}
           setShowRemainRatio={setShowRemainRatio}
-
-          // ✅ 新增联动
           smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
-
           mediumCardStyle={mediumCardStyle}
           setMediumCardStyle={setMediumCardStyle}
           includeDirectionalInTotal={includeDirectionalInTotal}
@@ -315,9 +303,7 @@ function SettingsView() {
         />
 
         {/* 定向流量配置 */}
-        <Section
-          header={<Text font="body" fontWeight="semibold">定向流量配置</Text>}
-        >
+        <Section header={<Text font="body" fontWeight="semibold">定向流量配置</Text>}>
           <Picker
             title="匹配类型"
             value={matchTypeIndex}
