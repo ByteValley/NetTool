@@ -1,110 +1,51 @@
+// widget.tsx
+// 业务逻辑层：只负责拉数据 + 解析 + 转成 TelecomData，然后交给 TelecomWidgetRoot 渲染。
+
 import {
   Widget,
   VStack,
-  HStack,
   Text,
-  Image,
-  Spacer,
-  fetch,
-  DynamicShapeStyle,
   WidgetReloadPolicy,
-  ZStack,
-  Gauge,
+  fetch,
 } from "scripting"
 
-// ================= 基础设置 =================
+declare const FileManager: any
 
-type ChinaMobileSettings = {
-  refreshInterval: number
-  // 圆环百分比含义：false = 已用百分比；true = 剩余百分比
-  showRemainRatio?: boolean
-}
+import { TelecomWidgetRoot, TelecomData } from "./telecom/widgetRoot"
+import { nowHHMM, safeNum } from "./telecom/utils/telecomUtils"
+import {
+  MOBILE_SETTINGS_KEY,
+  loadChinaMobileSettings,
+  resolveRefreshInterval,
+} from "./telecom/settings"
 
-const SETTINGS_KEY = "chinaMobileSettings"
+// ================ 常量定义 ================
+
+const SETTINGS_KEY = MOBILE_SETTINGS_KEY
 const REWRITE_URL = "https://api.example.com/10086/query"
 const CACHE_FILE = "cm_data_cache.json"
 
-// 组件数据结构（用于 UI 显示）
-type MobileData = {
-  fee: { title: string; balance: string; unit: string; plan?: string }
-  voice: { title: string; balance: string; unit: string; used?: number; total?: number }
-  flow: { title: string; balance: string; unit: string; used?: number; total?: number }
-  flowDir?: { title: string; balance: string; unit: string; used?: number; total?: number }
-  updateTime: string
+// 中国移动 Logo（用于话费卡大图标）
+const MOBILE_LOGO_URL =
+  "https://raw.githubusercontent.com/anker1209/icon/main/zgyd.png"
+
+// ================ 重写返回的数据结构（解析用） ================
+
+type ParsedData = {
+  ok: boolean
+  fee: { val: string; unit: string; plan: string }
+  flowGen: { total: string; used: string; remain: string; unit: string }
+  flowDir: { total: string; used: string; remain: string; unit: string }
+  voice: { total: string; used: string; remain: string; unit: string }
+  source?: string
+  refreshInterval?: number
+  small_style?: any
+  medium_style?: any
+  user_boxjs_url?: string
+  updateTime?: string
 }
 
-// ================= 工具函数 =================
-
-function clamp01(x: number): number {
-  if (!isFinite(x)) return 0
-  if (x < 0) return 0
-  if (x > 1) return 1
-  return x
-}
-
-function percentText(r: number): string {
-  return (clamp01(r) * 100).toFixed(2)
-}
-
-function nowHHMM(): string {
-  const d = new Date()
-  const h = d.getHours().toString().padStart(2, "0")
-  const m = d.getMinutes().toString().padStart(2, "0")
-  return `${h}:${m}`
-}
-
-// 根据开关计算比例：true = 剩余 / total；false = 已用 / total
-function calcRatio(total: number, remain: number, showRemainRatio: boolean): number {
-  if (total <= 0) return 0
-  const remainRatio = remain / total
-  const usedRatio = (total - remain) / total
-  const r = showRemainRatio ? remainRatio : usedRatio
-  return clamp01(r)
-}
-
-// 按单位格式化数值：GB 保留 2 位，MB 取整
-function formatByUnit(value: number, unit: string): string {
-  if (!isFinite(value)) value = 0
-  if (unit === "GB") return value.toFixed(2)
-  return value.toFixed(0)
-}
-
-// ================= 数据转换 =================
-
-function convertToMobileData(parsed: any): MobileData {
-  return {
-    fee: {
-      title: "剩余话费",
-      balance: parsed.fee.val,
-      unit: parsed.fee.unit,
-      plan: parsed.fee.plan,
-    },
-    flow: {
-      title: "通用流量",
-      balance: parsed.flowGen.remain,
-      unit: parsed.flowGen.unit,
-      used: parseFloat(parsed.flowGen.used),
-      total: parseFloat(parsed.flowGen.total),
-    },
-    flowDir: {
-      title: "定向流量",
-      balance: parsed.flowDir.remain,
-      unit: parsed.flowDir.unit,
-      used: parseFloat(parsed.flowDir.used),
-      total: parseFloat(parsed.flowDir.total),
-    },
-    voice: {
-      title: "剩余语音",
-      balance: parsed.voice.remain,
-      unit: parsed.voice.unit,
-      used: parseFloat(parsed.voice.used),
-      total: parseFloat(parsed.voice.total),
-    },
-    updateTime: typeof parsed.updateTime === "string" ? parsed.updateTime : nowHHMM(),
-  }
-}
-
-// ================= 数据获取 & 缓存 =================
+// ================ 数据获取 & 缓存 ================
 
 async function loadFromRewriteApi(): Promise<any> {
   try {
@@ -151,23 +92,9 @@ function saveToCache(data: any) {
   }
 }
 
-// ================= 原逻辑数据解析 =================
+// ================ 原逻辑数据解析（保持不变） ================
 
-function parseData(
-  res: any
-): {
-  ok: boolean
-  fee: any
-  flowGen: any
-  flowDir: any
-  voice: any
-  source?: string
-  refreshInterval?: number
-  small_style?: any
-  medium_style?: any
-  user_boxjs_url?: string
-  updateTime?: string
-} | null {
+function parseData(res: any): ParsedData {
   try {
     let fee = "0"
     let planFee = "0"
@@ -193,15 +120,14 @@ function parseData(
       }
 
       for (let item of list) {
-        let unitMult = 1
-
-        let t = parseFloat(item.flowSumNum || 0) * unitMult
-        let u = parseFloat(item.flowUsdNum || 0) * unitMult
-        let r = parseFloat(item.flowRemainNum || 0) * unitMult
+        let t = parseFloat(item.flowSumNum || 0)
+        let u = parseFloat(item.flowUsdNum || 0)
+        let r = parseFloat(item.flowRemainNum || 0)
 
         if (u === 0 && t > r) u = t - r
         if (t === 0) t = u + r
 
+        // flowtype==1 这里原脚本视作「定向」，其余视作「通用」
         let type: "gen" | "dir" = item.flowtype == "1" ? "dir" : "gen"
         buckets[type].t += t
         buckets[type].u += u
@@ -233,9 +159,11 @@ function parseData(
     }
 
     if (res.plan && res.plan.planRemianVoiceListRes) {
-      const vList = res.plan.planRemianVoiceListRes.planRemianVoiceInfoRes || []
+      const vList =
+        res.plan.planRemianVoiceListRes.planRemianVoiceInfoRes || []
       let item =
-        vList.find((i: any) => i.voicetype === "0") || (vList.length > 0 ? vList[0] : null)
+        vList.find((i: any) => i.voicetype === "0") ||
+        (vList.length > 0 ? vList[0] : null)
       if (item) {
         let t = parseFloat(item.voiceSumNum || 0)
         let u = parseFloat(item.voiceUsdNum || 0)
@@ -276,413 +204,94 @@ function parseData(
   }
 }
 
-// ================= 刷新间隔 =================
+// ================ 核心：ParsedData -> TelecomData ================
 
-function getRefreshInterval(): number {
-  const DEFAULT = 60
-
-  let settings: ChinaMobileSettings | null = null
-  try {
-    settings = Storage.get<ChinaMobileSettings>(SETTINGS_KEY) ?? null
-  } catch (_) { }
-
-  const cache = loadFromCache() || {}
-
-  const fromSettings =
-    settings && typeof settings.refreshInterval === "number"
-      ? settings.refreshInterval
-      : undefined
-  const fromCache =
-    cache && typeof cache.refreshInterval === "number"
-      ? cache.refreshInterval
-      : undefined
-
-  let raw = fromSettings ?? fromCache ?? DEFAULT
-
-  if (!isFinite(raw)) raw = DEFAULT
-  raw = Math.round(raw)
-  if (raw < 5) raw = 5
-  if (raw > 360) raw = 360
-
-  return raw
-}
-
-// ================= 样式定义 =================
-
-// 外层大卡底
-const outerCardBg: DynamicShapeStyle = {
-  light: "rgba(255,255,255,0.98)",
-  dark: "rgba(0, 0, 0, 0.90)",
-}
-
-// 每格浅色背景 + 主题色
-const ringCardThemes = {
-  fee: {
-    tint: { light: "#0080CB", dark: "#66adff" } as DynamicShapeStyle,
-    icon: "bolt.horizontal.circle.fill",
-    bg: {
-      light: "rgba(0,128,203,0.06)",
-      dark: "rgba(5, 16, 32, 0.96)",
-    } as DynamicShapeStyle,
-  },
-  flow: {
-    tint: { light: "#32CD32", dark: "#63e08f" } as DynamicShapeStyle,
-    icon: "antenna.radiowaves.left.and.right",
-    bg: {
-      light: "rgba(50,205,50,0.08)",
-      dark: "rgba(3, 9, 28, 1.0)",
-    } as DynamicShapeStyle,
-  },
-  flowDir: {
-    tint: { light: "#8A6EFF", dark: "#c59bff" } as DynamicShapeStyle,
-    icon: "wifi",
-    bg: {
-      light: "rgba(138,110,255,0.10)",
-      dark: "rgba(8, 6, 24, 0.96)",
-    } as DynamicShapeStyle,
-  },
-  voice: {
-    tint: { light: "#F86527", dark: "#ffb07a" } as DynamicShapeStyle,
-    icon: "phone.badge.waveform.fill",
-    bg: {
-      light: "rgba(248,101,39,0.10)",
-      dark: "rgba(13, 10, 34, 1.0)",
-    } as DynamicShapeStyle,
-  },
-}
-
-const labelStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.55)",
-  dark: "rgba(255,255,255,0.65)",
-}
-
-const valueStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.92)",
-  dark: "rgba(255,255,255,0.96)",
-}
-
-const timeStyle: DynamicShapeStyle = {
-  light: "rgba(0, 0, 0, 0.55)",
-  dark: "rgba(255,255,255,0.65)",
-}
-
-// ================= UI 组件 =================
-
-// 左侧话费块（不参与已用/剩余切换）
-function FeeCard({
-  title,
-  valueText,
-  theme,
-  logoPath,
-  updateTime,
-}: {
-  title: string
-  valueText: string
-  theme: typeof ringCardThemes.fee
-  logoPath?: string | null
-  updateTime: string
-}) {
-  const isUrlLogo =
-    !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
-
-  const LogoImage = ({ size }: { size: number }) =>
-    logoPath ? (
-      isUrlLogo ? (
-        <Image imageUrl={logoPath} resizable frame={{ width: size, height: size }} />
-      ) : (
-        <Image filePath={logoPath} resizable frame={{ width: size, height: size }} />
-      )
-    ) : (
-      <Image
-        systemName={theme.icon}
-        font={size}
-        fontWeight="semibold"
-        foregroundStyle={theme.tint}
-      />
-    )
-
-  return (
-    <VStack
-      alignment="center"
-      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: theme.bg,
-        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
-      }}
-    >
-      <Spacer minLength={2} />
-      <HStack alignment="center">
-        <Spacer />
-        <LogoImage size={40} />
-        <Spacer />
-      </HStack>
-
-      <Spacer minLength={4} />
-      <HStack alignment="center" spacing={3}>
-        <Spacer />
-        <Image
-          systemName="arrow.triangle.2.circlepath"
-          font={5}
-          foregroundStyle={timeStyle}
-        />
-        <Text
-          font={11}
-          foregroundStyle={timeStyle}
-          lineLimit={1}
-          minScaleFactor={0.5}
-        >
-          {updateTime}
-        </Text>
-        <Spacer />
-      </HStack>
-
-      <Spacer minLength={6} />
-      <Text
-        font={15}
-        fontWeight="semibold"
-        foregroundStyle={theme.tint}
-        lineLimit={1}
-        minScaleFactor={0.7}
-      >
-        {valueText}
-      </Text>
-      <Spacer minLength={2} />
-      <Text
-        font={10}
-        fontWeight="semibold"
-        foregroundStyle={theme.tint}
-        lineLimit={1}
-        minScaleFactor={0.7}
-      >
-        {title}
-      </Text>
-      <Spacer minLength={4} />
-    </VStack>
-  )
-}
-
-// 圆环卡
-function RingStatCard({
-  title,
-  valueText,
-  theme,
-  ratio,
-}: {
-  title: string
-  valueText: string
-  theme: typeof ringCardThemes.flow
-  ratio?: number
-}) {
-  const r = clamp01(ratio ?? 0)
-
-  return (
-    <VStack
-      alignment="center"
-      padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
-      frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: theme.bg,
-        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
-      }}
-    >
-      <Spacer minLength={2} />
-      <ZStack frame={{ width: 56, height: 56 }}>
-        <Gauge
-          value={r}
-          min={0}
-          max={1}
-          label={<Text font={1}> </Text>}
-          currentValueLabel={<Text font={1}> </Text>}
-          gaugeStyle="accessoryCircularCapacity"
-          tint={theme.tint}
-        />
-        <VStack alignment="center">
-          <Spacer minLength={4} />
-          <Image
-            systemName={theme.icon}
-            font={12}
-            fontWeight="semibold"
-            foregroundStyle={theme.tint}
-          />
-          <Spacer minLength={2} />
-          <Text font={11} fontWeight="semibold" foregroundStyle={theme.tint}>
-            {percentText(r)}
-          </Text>
-          <Text font={9} foregroundStyle={timeStyle}>
-            %
-          </Text>
-          <Spacer minLength={4} />
-        </VStack>
-      </ZStack>
-
-      <Spacer minLength={6} />
-      <Text
-        font={15}
-        fontWeight="semibold"
-        foregroundStyle={theme.tint}
-        lineLimit={1}
-        minScaleFactor={0.7}
-      >
-        {valueText}
-      </Text>
-      <Spacer minLength={2} />
-      <Text
-        font={10}
-        fontWeight="semibold"
-        foregroundStyle={theme.tint}
-        lineLimit={1}
-        minScaleFactor={0.7}
-      >
-        {title}
-      </Text>
-      <Spacer minLength={4} />
-    </VStack>
-  )
-}
-
-// 主视图
-function WidgetView({ data, showRemainRatio }: { data: MobileData; showRemainRatio: boolean }) {
-  const logoPath = "https://raw.githubusercontent.com/anker1209/icon/main/zgyd.png"
-
-  // ===== 语音（分钟）=====
-  const voiceTotal =
-    typeof data.voice.total === "number"
-      ? data.voice.total
-      : parseFloat(String(data.voice.total ?? "0"))
-  const voiceUsed =
-    typeof data.voice.used === "number"
-      ? data.voice.used
-      : 0
-  const voiceRemain = Math.max(voiceTotal - voiceUsed, 0)
-
-  const voiceRatio = calcRatio(voiceTotal, voiceRemain, showRemainRatio)
-
-  const voiceRemainText = `${voiceRemain.toFixed(0)}${data.voice.unit}`
-  const voiceUsedText = `${formatByUnit(voiceUsed, "分钟")}${data.voice.unit}`
-  const voiceValueText = showRemainRatio ? voiceRemainText : voiceUsedText
-  const voiceTitle = showRemainRatio ? "剩余语音" : "已用语音"
-
-  // ===== 通用流量 =====
-  const flowTotal =
-    typeof data.flow.total === "number"
-      ? data.flow.total
-      : parseFloat(String(data.flow.total ?? "0"))
-  const flowUsed =
-    typeof data.flow.used === "number"
-      ? data.flow.used
-      : 0
-  const flowRemain = Math.max(flowTotal - flowUsed, 0)
-
-  const flowRatio = calcRatio(flowTotal, flowRemain, showRemainRatio)
-
-  const flowRemainText = `${formatByUnit(flowRemain, data.flow.unit)}${data.flow.unit}`
-  const flowUsedText = `${formatByUnit(flowUsed, data.flow.unit)}${data.flow.unit}`
-  const flowValueText = showRemainRatio ? flowRemainText : flowUsedText
-  const flowTitle = showRemainRatio ? "通用流量" : "已用通用流量"
-
-  // ===== 定向流量（无则补 0）=====
-  const flowDirRaw =
-    data.flowDir ?? ({
-      title: "定向流量",
-      balance: "0",
-      unit: "MB",
-      used: 0,
-      total: 0,
-    } as MobileData["flowDir"])
-
-  const dirUnit = flowDirRaw?.unit ?? "MB"
-  const dirTotal =
-    typeof flowDirRaw?.total === "number"
-      ? (flowDirRaw?.total as number)
-      : parseFloat(String(flowDirRaw?.total ?? "0"))
-  const dirUsed =
-    typeof flowDirRaw?.used === "number"
-      ? (flowDirRaw?.used as number)
-      : 0
-  const dirRemain = Math.max(dirTotal - dirUsed, 0)
-
-  const dirRatio = calcRatio(dirTotal, dirRemain, showRemainRatio)
-
-  const dirRemainText = `${formatByUnit(dirRemain, dirUnit)}${dirUnit}`
-  const dirUsedText = `${formatByUnit(dirUsed, dirUnit)}${dirUnit}`
-  const dirValueText = showRemainRatio ? dirRemainText : dirUsedText
-  const dirTitle = showRemainRatio ? "定向流量" : "已用定向流量"
-
-  // 小号组件：只展示话费卡
-  if (Widget.family === "systemSmall") {
-    return (
-      <VStack
-        alignment="center"
-        padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
-      >
-        <FeeCard
-          title={data.fee.title}
-          valueText={`${data.fee.balance}${data.fee.unit}`}
-          theme={ringCardThemes.fee}
-          logoPath={logoPath}
-          updateTime={data.updateTime}
-        />
-      </VStack>
-    )
+function convertToTelecomData(parsed: ParsedData): TelecomData {
+  // ===== 通用流量：转成 MB =====
+  const gen = parsed.flowGen || {
+    total: "0",
+    used: "0",
+    remain: "0",
+    unit: "MB",
   }
+  const genUnit = gen.unit || "MB"
+  const genTotalRaw = safeNum(gen.total)
+  const genUsedRaw = safeNum(gen.used)
+  const genFactor = genUnit === "GB" ? 1024 : 1
+  const genTotalMB = genTotalRaw * genFactor
+  const genUsedMB = genUsedRaw * genFactor
 
-  // 中 / 大号组件
-  return (
-    <VStack
-      alignment="center"
-      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={{
-        style: outerCardBg,
-        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
-      }}
-    >
-      <HStack alignment="center" spacing={10}>
-        <FeeCard
-          title={data.fee.title}
-          valueText={`${data.fee.balance}${data.fee.unit}`}
-          theme={ringCardThemes.fee}
-          logoPath={logoPath}
-          updateTime={data.updateTime}
-        />
+  // ===== 定向流量：同样转成 MB =====
+  const dir = parsed.flowDir || {
+    total: "0",
+    used: "0",
+    remain: "0",
+    unit: "MB",
+  }
+  const dirUnit = dir.unit || "MB"
+  const dirTotalRaw = safeNum(dir.total)
+  const dirUsedRaw = safeNum(dir.used)
+  const dirFactor = dirUnit === "GB" ? 1024 : 1
+  const dirTotalMB = dirTotalRaw * dirFactor
+  const dirUsedMB = dirUsedRaw * dirFactor
 
-        <RingStatCard
-          title={flowTitle}
-          valueText={flowValueText}
-          theme={ringCardThemes.flow}
-          ratio={flowRatio}
-        />
+  // ===== 语音：分钟 =====
+  const voiceTotal = safeNum(parsed.voice.total)
+  const voiceUsed = safeNum(parsed.voice.used)
+  const voiceRemain = safeNum(parsed.voice.remain)
 
-        <RingStatCard
-          title={dirTitle}
-          valueText={dirValueText}
-          theme={ringCardThemes.flowDir}
-          ratio={dirRatio}
-        />
-
-        <RingStatCard
-          title={voiceTitle}
-          valueText={voiceValueText}
-          theme={ringCardThemes.voice}
-          ratio={voiceRatio}
-        />
-      </HStack>
-    </VStack>
-  )
+  return {
+    fee: {
+      title: "剩余话费",
+      balance: parsed.fee.val,
+      unit: parsed.fee.unit,
+    },
+    // balance/unit 只是信息保留，展示时由 UI 统一格式化
+    flow: {
+      title: "通用流量",
+      balance: gen.remain,
+      unit: gen.unit,
+      used: genUsedMB,      // ✅ 统一用 MB
+      total: genTotalMB,
+    },
+    otherFlow: {
+      title: "定向流量",
+      balance: dir.remain,
+      unit: dir.unit,
+      used: dirUsedMB,      // ✅ 统一用 MB
+      total: dirTotalMB,
+    },
+    voice: {
+      title: "剩余语音",
+      balance: voiceRemain.toFixed(0),
+      unit: parsed.voice.unit || "分钟",
+      used: voiceUsed,
+      total: voiceTotal,
+    },
+    updateTime:
+      typeof parsed.updateTime === "string"
+        ? parsed.updateTime
+        : nowHHMM(),
+  }
 }
 
-// ================= 主渲染入口 =================
+// ================ 主渲染入口 ================
 
 async function render() {
+  // 只读一遍缓存，用于：
+  //  - 继承 small_style / medium_style
+  //  - 如果设置里没有刷新间隔，可以用缓存里的 refreshInterval 兜底
   const oldCache = loadFromCache() || {}
-  const refreshInterval = getRefreshInterval()
+  const settings = loadChinaMobileSettings()
 
-  let settings: ChinaMobileSettings | null = null
-  try {
-    settings = Storage.get<ChinaMobileSettings>(SETTINGS_KEY) ?? null
-  } catch (_) { }
+  const rawIntervalCandidate =
+    typeof settings?.refreshInterval === "number"
+      ? settings.refreshInterval
+      : typeof oldCache.refreshInterval === "number"
+        ? oldCache.refreshInterval
+        : undefined
 
-  const showRemainRatio = settings?.showRemainRatio ?? false
+  const refreshInterval = resolveRefreshInterval(rawIntervalCandidate, 180)
 
   const nextUpdate = new Date(Date.now() + refreshInterval * 60 * 1000)
   const reloadPolicy: WidgetReloadPolicy = {
@@ -690,6 +299,7 @@ async function render() {
     date: nextUpdate,
   }
 
+  // ========== 优先走 API ==========
   try {
     const apiData = await loadFromRewriteApi()
     if (apiData && apiData.fee) {
@@ -697,6 +307,8 @@ async function render() {
       if (pData && pData.ok) {
         pData.source = "API"
         pData.refreshInterval = refreshInterval
+
+        // 保留旧缓存里的样式配置
         if (oldCache.small_style) pData.small_style = oldCache.small_style
         if (oldCache.medium_style) pData.medium_style = oldCache.medium_style
         if (!pData.updateTime && oldCache.updateTime) {
@@ -705,30 +317,40 @@ async function render() {
 
         saveToCache(pData)
 
-        const mobileData = convertToMobileData(pData)
+        const mobileTelecomData = convertToTelecomData(pData)
         Widget.present(
-          <WidgetView data={mobileData} showRemainRatio={showRemainRatio} />,
+          <TelecomWidgetRoot
+            data={mobileTelecomData}
+            settingsKey={SETTINGS_KEY}
+            logoPath={MOBILE_LOGO_URL}
+          />,
           reloadPolicy,
         )
         return
       }
     }
   } catch (e) {
-    console.error("[中国移动] API 读取失败")
+    console.error("[中国移动] API 读取失败", e)
   }
 
-  const cache = loadFromCache()
+  // ========== 回退到缓存 ==========
+  const cache = oldCache
   if (cache && cache.ok && cache.fee) {
     cache.usingCache = true
     cache.source = "Cache"
-    const mobileData = convertToMobileData(cache)
+    const mobileTelecomData = convertToTelecomData(cache)
     Widget.present(
-      <WidgetView data={mobileData} showRemainRatio={showRemainRatio} />,
+      <TelecomWidgetRoot
+        data={mobileTelecomData}
+        settingsKey={SETTINGS_KEY}
+        logoPath={MOBILE_LOGO_URL}
+      />,
       reloadPolicy,
     )
     return
   }
 
+  // ========== 最终兜底：错误提示 ==========
   console.error("[中国移动] 获取数据失败")
   Widget.present(
     <VStack spacing={8} padding={16} alignment="center">
@@ -737,7 +359,7 @@ async function render() {
         请确保已安装重写规则
       </Text>
       <Text font="caption" foregroundStyle="secondaryLabel">
-        请在主应用中点击“安装重写规则”按钮
+        请在主应用中点击「安装重写规则」按钮
       </Text>
     </VStack>,
     reloadPolicy,

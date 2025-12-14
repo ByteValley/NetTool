@@ -1,26 +1,26 @@
 {
-  "icon" : "antenna.radiowaves.left.and.right",
-  "author" : {
-    "email" : null,
-    "homepage" : null,
-    "name" : "ByteValley"
-  },
+  "localizedNames" : null,
   "version" : "1.0.0",
+  "remoteResource" : {
+    "autoUpdateInterval" : 300,
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國移動.scripting",
+    "hash" : "c3b5b56e08645debd5d0accd91342e47"
+  },
   "name" : "中國移動",
   "color" : "rgba(28, 140, 255,1)",
-  "runInApp" : false,
   "intentInputTypes" : [
 
   ],
+  "author" : {
+    "homepage" : null,
+    "email" : null,
+    "name" : "ByteValley"
+  },
   "contributors" : [
 
   ],
-  "remoteResource" : {
-    "autoUpdateInterval" : 600,
-    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國移動.scripting",
-    "hash" : "c11a46baefd8227ad77a9255ba88bee1"
-  },
-  "localizedNames" : null,
+  "icon" : "antenna.radiowaves.left.and.right",
   "description" : null,
+  "runInApp" : false,
   "localizedDescriptions" : null
 }

@@ -1,3 +1,5 @@
+// index.tsx（中国电信）
+
 import {
   Navigation,
   NavigationStack,
@@ -7,16 +9,20 @@ import {
   Text,
   TextField,
   SecureField,
-  Toggle,
-  Picker,
   Script,
   useState,
 } from "scripting"
-import type { ChinaTelecomSettings } from "./telecomApi"
 
-// 宿主提供的 Storage / Dialog
 declare const Storage: any
 declare const Dialog: any
+
+import {
+  type ChinaTelecomSettings,
+  TELECOM_SETTINGS_KEY,
+} from "./telecom/settings"
+import { TelecomRenderConfigSection } from "./telecom/index/renderConfigSection"
+import type { SmallCardStyle } from "./telecom/cards/small"
+import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
 
 // 版本号说明（Semantic Versioning）
 // MAJOR：破坏性变更或配置结构调整（不兼容旧版）
@@ -25,84 +31,62 @@ declare const Dialog: any
 const VERSION = "1.0.0"
 
 // 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-09"
+const BUILD_DATE = "2025-12-12"
 
-const SETTINGS_KEY = "chinaTelecomSettings"
-// 单独存储设置页打开方式，避免改动 ChinaTelecomSettings 结构
+const SETTINGS_KEY = TELECOM_SETTINGS_KEY
 const FULLSCREEN_KEY = "chinaTelecomSettingsFullscreen"
 
-// 刷新间隔选项（单位：分钟）
-const REFRESH_OPTIONS = [
-  { label: "15 分钟", value: 15 },
-  { label: "30 分钟", value: 30 },
-  { label: "1 小时", value: 60 },
-  { label: "2 小时", value: 120 },
-  { label: "3 小时", value: 180 }, // 默认
-  { label: "6 小时", value: 360 },
-  { label: "12 小时", value: 720 },
-  { label: "24 小时", value: 1440 },
-]
-
-// 默认设置（与 telecomApi 中结构保持一致）
+// 默认设置
 const defaultSettings: ChinaTelecomSettings = {
   mobile: "",
   password: "",
-  // 刷新时间颜色（预留给组件用）
   refreshTimeDayColor: "#999999",
   refreshTimeNightColor: "#AAAAAA",
-  // 默认刷新间隔 3 小时
   refreshInterval: 180,
-  // 默认显示“已使用百分比”
   showRemainRatio: false,
+  mediumCardStyle: "four",
+  includeDirectionalInTotal: true,
+  // 小号组件默认样式
+  smallCardStyle: "summary",
 }
 
-// ========== 页面 / 弹层 打开方式偏好 ==========
-
-function getFullscreenPref(): boolean {
-  try {
-    const v = Storage.get(FULLSCREEN_KEY)
-    if (typeof v === "boolean") return v
-  } catch { }
-  return true // 默认全屏
-}
-
-function setFullscreenPref(value: boolean) {
-  try {
-    Storage.set(FULLSCREEN_KEY, value)
-  } catch { }
-}
+// ===== 设置页面 =====
 
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
 
-  // 读取本地配置
-  const initialSettings =
-    (Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null) ??
-    defaultSettings
+  // ⭐ 用通用 Hook 读取/切换「页面/弹层」偏好
+  const { fullscreenPref, toggleFullscreen } = useFullscreenPref(FULLSCREEN_KEY)
 
-  // 表单状态
-  const [mobile, setMobile] = useState(initialSettings.mobile || "")
-  const [password, setPassword] = useState(initialSettings.password || "")
-  // 颜色目前仅作为占位存储，不暴露在 UI 中
-  const [refreshTimeDayColor] = useState(
-    initialSettings.refreshTimeDayColor ?? "#999999",
-  )
-  const [refreshTimeNightColor] = useState(
-    initialSettings.refreshTimeNightColor ?? "#AAAAAA",
-  )
+  const stored = Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null
+  const initial: ChinaTelecomSettings = stored ?? defaultSettings
+
+  const [mobile, setMobile] = useState(initial.mobile || "")
+  const [password, setPassword] = useState(initial.password || "")
+
+  // 刷新时间颜色只透传，不在设置页改
+  const refreshTimeDayColor =
+    initial.refreshTimeDayColor ?? defaultSettings.refreshTimeDayColor
+  const refreshTimeNightColor =
+    initial.refreshTimeNightColor ?? defaultSettings.refreshTimeNightColor
+
   const [refreshInterval, setRefreshInterval] = useState(
-    initialSettings.refreshInterval || 15,
+    initial.refreshInterval ?? 180,
   )
   const [showRemainRatio, setShowRemainRatio] = useState(
-    initialSettings.showRemainRatio ?? false,
+    initial.showRemainRatio ?? false,
+  )
+  const [mediumCardStyle, setMediumCardStyle] = useState<"four" | "three">(
+    initial.mediumCardStyle ?? "four",
+  )
+  const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
+    useState<boolean>(initial.includeDirectionalInTotal ?? true)
+
+  // 小号组件样式 state
+  const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(
+    (initial.smallCardStyle as SmallCardStyle) ?? "summary",
   )
 
-  // 页面 / 弹层 偏好（单独存储）
-  const [fullscreenPref, setFullscreenPrefState] = useState<boolean>(
-    getFullscreenPref(),
-  )
-
-  // 保存设置
   const handleSave = () => {
     const newSettings: ChinaTelecomSettings = {
       mobile: mobile.trim(),
@@ -111,8 +95,10 @@ function SettingsView() {
       refreshTimeNightColor,
       refreshInterval,
       showRemainRatio,
+      mediumCardStyle,
+      includeDirectionalInTotal,
+      smallCardStyle,
     }
-
     Storage.set(SETTINGS_KEY, newSettings)
     dismiss()
   }
@@ -128,31 +114,13 @@ function SettingsView() {
     })
   }
 
-  // 切换「页面 / 弹层」打开方式
-  const handleToggleFullscreen = async () => {
-    const next = !fullscreenPref
-    setFullscreenPrefState(next)
-    setFullscreenPref(next)
-
-    try {
-      await Dialog.alert({
-        title: "显示模式已更新",
-        message: `已切换为「${next ? "页面（全屏）" : "弹层弹出"}」模式，下次打开设置时生效。`,
-        buttonLabel: "好的",
-      })
-    } catch {
-      // 环境不支持 Dialog 时忽略
-    }
-  }
-
   return (
     <NavigationStack>
       <List
         navigationTitle={"电信余量组件"}
         navigationBarTitleDisplayMode={"inline"}
         toolbar={{
-          topBarLeading: [<Button title={"关闭"} action={dismiss} />],
-          // ✅ 在完成按钮左侧加一个「页面/弹层」切换按钮
+          topBarLeading: [<Button title="关闭" action={dismiss} />],
           topBarTrailing: [
             <Button
               title={fullscreenPref ? "页面" : "弹层"}
@@ -161,9 +129,9 @@ function SettingsView() {
                   ? "rectangle.arrowtriangle.2.outward"
                   : "rectangle"
               }
-              action={handleToggleFullscreen}
+              action={toggleFullscreen}
             />,
-            <Button title={"完成"} action={handleSave} />,
+            <Button title="完成" action={handleSave} />,
           ],
           bottomBar: [
             <Button
@@ -177,11 +145,7 @@ function SettingsView() {
       >
         {/* 账号设置 */}
         <Section
-          header={
-            <Text font="body" fontWeight="semibold">
-              账号设置
-            </Text>
-          }
+          header={<Text font="body" fontWeight="semibold">账号设置</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
               使用官方接口查询数据，账号信息仅保存在本机，不上传到任何第三方服务器。
@@ -202,62 +166,43 @@ function SettingsView() {
           />
         </Section>
 
-        {/* 渲染配置（合并刷新配置） */}
-        <Section
-          header={
-            <Text font="body" fontWeight="semibold">
-              渲染配置
-            </Text>
-          }
-          footer={
-            <Text font="caption2" foregroundStyle="secondaryLabel">
-              • 百分比含义：统一控制卡片的「已用 / 剩余」视角。
-              {"\n\t"}1）关闭＝查看已使用（流量/语音显示已用百分比和已用数值，话费优先显示实时费用）；
-              {"\n\t"}2）开启＝查看剩余（流量/语音显示剩余百分比和剩余数值，话费显示剩余话费/账户余额）。
-              {"\n"}• 刷新间隔为组件自动刷新的最小时间，建议 15 分钟～24 小时。
-            </Text>
-          }
-        >
-          <Toggle
-            title={showRemainRatio ? "当前：显示剩余百分比" : "当前：显示已使用百分比"}
-            value={showRemainRatio}
-            onChanged={setShowRemainRatio}
-          />
-
-          <Picker
-            title={"刷新间隔"}
-            value={refreshInterval}
-            onChanged={(value: number) => {
-              setRefreshInterval(Number(value))
-            }}
-            pickerStyle={"menu"}
-          >
-            {REFRESH_OPTIONS.map((opt) => (
-              <Text key={opt.value} tag={opt.value as any}>
-                {opt.label}
-              </Text>
-            ))}
-          </Picker>
-        </Section>
+        {/* 渲染配置（公共 Section + 小号样式） */}
+        <TelecomRenderConfigSection
+          smallCardStyle={smallCardStyle}
+          setSmallCardStyle={setSmallCardStyle}
+          showRemainRatio={showRemainRatio}
+          setShowRemainRatio={setShowRemainRatio}
+          mediumCardStyle={mediumCardStyle}
+          setMediumCardStyle={setMediumCardStyle}
+          includeDirectionalInTotal={includeDirectionalInTotal}
+          setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
+          refreshInterval={refreshInterval}
+          setRefreshInterval={setRefreshInterval}
+        />
       </List>
     </NavigationStack>
   )
 }
 
-// ========= App 包装：用于 interactiveDismissDisabled =========
+// ===== App / 入口 =====
 
-type AppProps = {
-  interactiveDismissDisabled?: boolean
-}
+type AppProps = { interactiveDismissDisabled?: boolean }
 
 function App(_props: AppProps) {
   return <SettingsView />
 }
 
-// ========= 入口 =========
+// run 里只需要读一次 Storage，不用 Hook
+function readFullscreenPrefForRun(): boolean {
+  try {
+    const v = Storage.get(FULLSCREEN_KEY)
+    if (typeof v === "boolean") return v
+  } catch { }
+  return true
+}
 
 async function run() {
-  const fullscreen = getFullscreenPref()
+  const fullscreen = readFullscreenPrefForRun()
 
   await Navigation.present({
     element: <App interactiveDismissDisabled />,

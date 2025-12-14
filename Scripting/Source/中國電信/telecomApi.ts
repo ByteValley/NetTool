@@ -1,28 +1,13 @@
+// telecomApi.ts
 import { fetch } from "scripting"
 import JSEncrypt from "./module/jsencrypt"
+import {
+  type ChinaTelecomSettings,
+  loadChinaTelecomSettings,
+} from "./telecom/settings"
 
 // 全局对象声明（Scriptable / Scripting 宿主提供）
 declare const Storage: any
-
-// 设置结构（与设置页 / 小组件 / 组件脚本共享）
-export type ChinaTelecomSettings = {
-  mobile: string
-  password: string
-
-  // 可选：刷新间隔（分钟）
-  refreshInterval?: number
-
-  // 可选：更新时间文字颜色（预留给组件用）
-  refreshTimeDayColor?: string
-  refreshTimeNightColor?: string
-
-  // 新增：是否显示“剩余百分比”
-  // false / 未配置：显示已使用百分比
-  // true：显示剩余百分比
-  showRemainRatio?: boolean
-}
-
-const SETTINGS_KEY = "chinaTelecomSettings"
 
 type StorageProps = {
   phonenum: string
@@ -45,8 +30,8 @@ class Telecom {
   private headers = { "Content-Type": "application/json; charset=UTF-8" }
 
   constructor() {
-    // 这里不能用 Storage.get<ChinaTelecomSettings>，改成先 get 再 as
-    const settings = Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null
+    // 从统一 settings 模块读取配置
+    const settings = loadChinaTelecomSettings()
     if (settings) {
       this.phonenum = settings.mobile || ""
       this.password = settings.password || ""
@@ -58,7 +43,7 @@ class Telecom {
     }
   }
 
-  // --- Endpoint --- //
+  // --- Endpoint: 登录 --- //
 
   private async login() {
     const uuid = String(Math.floor(Math.random() * 9e15 + 1e15))
@@ -82,7 +67,7 @@ class Telecom {
       },
       headerInfos: {
         code: "userLoginNormal",
-        clientType: "#12.2.0#channel50#iPhone 14 Pro#",
+        clientType: this.client_type,
         timestamp: ts,
         shopId: "20002",
         source: "110003",
@@ -107,16 +92,18 @@ class Telecom {
 
       if (data.responseData?.resultCode !== "0000") {
         const errMsg = data.responseData?.resultDesc || "登录失败"
-        console.error("登录失败:", errMsg)
+        console.error("[ChinaTelecom] 登录失败:", errMsg)
         throw new Error(errMsg)
       }
 
       return data
     } catch (error) {
-      console.error("登录异常:", error)
+      console.error("[ChinaTelecom] 登录异常:", error)
       throw error
     }
   }
+
+  // --- Endpoint: 重要数据 --- //
 
   private async fetch_important_data() {
     const ts = this.getBeijingTimestamp()
@@ -158,12 +145,12 @@ class Telecom {
       const data = JSON.parse(responseText)
       return data
     } catch (error) {
-      console.error("查询异常:", error)
+      console.error("[ChinaTelecom] 查询异常:", error)
       throw error
     }
   }
 
-  // --- util --- //
+  // --- 外部主入口 --- //
 
   async fetch_data() {
     const body = await this.fetch_important_data()
@@ -188,12 +175,14 @@ class Telecom {
     // 重新查询
     const newBody = await this.fetch_important_data()
     if (!newBody.responseData) {
-      console.error("查询失败:", JSON.stringify(newBody))
+      console.error("[ChinaTelecom] 查询失败:", JSON.stringify(newBody))
       throw new Error(JSON.stringify(newBody))
     }
     this.formatAndLogData(newBody)
     return newBody
   }
+
+  // --- 日志输出（调试用） --- //
 
   private formatAndLogData(data: any) {
     const responseData = data.responseData?.data
@@ -236,7 +225,6 @@ class Telecom {
     const totalFlowUsedMB = commonUsedMB + specialUsedMB
     const totalFlowBalanceMB = commonBalanceMB + specialBalanceMB
 
-    // 控制台输出（调试）
     console.log("=".repeat(50))
     console.log("余额信息:")
     console.log("  账户余额:", balance.toFixed(2), "元")
@@ -314,6 +302,8 @@ class Telecom {
     console.log("=".repeat(50))
   }
 
+  // --- 持久化 / 工具 --- //
+
   save() {
     Storage.set(this.KEY, {
       phonenum: this.phonenum,
@@ -325,7 +315,6 @@ class Telecom {
   }
 
   private getBeijingTimestamp() {
-    // 北京时间（按原逻辑）
     const bjDate = new Date(Date.now() + 8 * 3600 * 1000)
     const yyyy = String(bjDate.getFullYear())
     const MM = String(bjDate.getMonth() + 1).padStart(2, "0")
@@ -358,14 +347,16 @@ PMpq0/XKBO8lYhN/gwIDAQAB
   }
 }
 
-// 从 Storage 读取设置
+// ================== 对外导出 ==================
+
+// 统一的设置读取（给 index.tsx 等使用）
 export function getSettings(): ChinaTelecomSettings | null {
-  return Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null
+  return loadChinaTelecomSettings()
 }
 
-// 查询重要数据接口（使用官方接口）
+// 查询重要数据接口（给 widget.tsx 使用）
 export async function queryImportantData(): Promise<any> {
-  const settings = getSettings()
+  const settings = loadChinaTelecomSettings()
   if (!settings) {
     throw new Error("未找到配置，请在设置中配置手机号和密码")
   }
