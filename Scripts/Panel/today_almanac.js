@@ -626,11 +626,30 @@
         } catch (e) {
             log("fetchAlmanacDetail error:", String(e));
         }
+        
+                // ====== 宜忌语义仲裁：修正「忌：诸事不宜」但仍有宜的矛盾 ======
+        const normText = (s) => String(s ?? "").trim();
+        const isEmptyLike = (s) => {
+            const t = normText(s);
+            return !t || t === "——" || t === "-" || t === "无" || t === "暂无";
+        };
 
-        const lineYi = `✅ 宜：${yi}`;
-        const lineJi = `❎ 忌：${ji}`;
+        yi = normText(yi);
+        ji = normText(ji);
+
+        // 统一：接口里常见「诸事不宜」/「诸事不宜。」/「諸事不宜」
+        const isAllBad = (s) => /诸事不宜|諸事不宜/.test(normText(s));
+
+        // 关键修正：有「宜」时，把「诸事不宜」降级为“其余不宜”
+        if (!isEmptyLike(yi) && isAllBad(ji)) {
+            ji = "其余诸事不宜";
+            // 你也可以换成更黄历的： ji = "除以上外诸事不宜";
+        }
+
+        const lineYi = `✅ 宜：${isEmptyLike(yi) ? "——" : yi}`;
+        const lineJi = `❎ 忌：${isEmptyLike(ji) ? "——" : ji}`;
         const block = `${header}\n${lineYi}\n${lineJi}`;
-
+        
         log("almanac block:", block.replace(/\n/g, "\\n"));
         return block;
     };
