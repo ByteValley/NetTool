@@ -1997,7 +1997,7 @@ log("debug", "BoxSettings(BOX)", BOX);
     if (px.isp) parts.push(`${t("isp")}: ${fmtISP(px.isp, px.loc)}`);
   
     // 风险/家宽/原生/VPN（落地维度）
-    parts.push(`网络类型: ${risk.isHomeBroadband} / ${risk.isNative}`);
+    parts.push(`网络类型: ${risk.isHomeBroadband} · ${risk.isNative};
     parts.push(`VPN 状态: ${risk.vpnStatus}`);
     
     let riskWarn = "";
@@ -2005,7 +2005,7 @@ log("debug", "BoxSettings(BOX)", BOX);
     else if (risk.riskValue >= 50) riskWarn = " ⚠️";
     
     parts.push(
-      `网络: ${risk.isHomeBroadband} · ${risk.isNative} · VPN${risk.vpnStatus} · 风险值: ${risk.riskValue}%${riskWarn}`
+      `风险值: ${risk.riskValue}%${riskWarn}`
     );
   }
 
