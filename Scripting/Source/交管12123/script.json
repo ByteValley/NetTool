@@ -1,0 +1,22 @@
+{
+  "icon" : "car.fill",
+  "remoteResource" : {
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/交管12123.scripting",
+    "autoUpdateInterval" : 300,
+    "hash" : "8b62a6b5e845fb86bf026b69b76bf75d"
+  },
+  "description" : null,
+  "intentInputTypes" : [
+
+  ],
+  "name" : "交管12123",
+  "localizedDescriptions" : null,
+  "author" : null,
+  "localizedNames" : null,
+  "runInApp" : false,
+  "color" : "rgba(28, 140, 255,1)",
+  "contributors" : [
+
+  ],
+  "version" : "1.0.0"
+}

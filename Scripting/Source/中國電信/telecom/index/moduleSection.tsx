@@ -3,36 +3,30 @@ import { Section, Text, Button, useState } from "scripting"
 
 declare const Storage: any
 
-export type TelecomModuleSectionProps = {
-  footerLines: string[]
+export type ModuleAction = {
+  title: string
+  action: () => void | Promise<void>
+
+  // 可选：右侧 SF Symbol
+  systemImage?: string
+
+  // 可选：弱化显示（比如“相关仓库/说明”这种）
+  foregroundStyle?: any
+
+  // 可选：条件隐藏
+  hidden?: boolean
+}
+
+export type ModuleSectionProps = {
+  headerTitle?: string
+  footerLines?: string[]
 
   collapsible?: boolean
   collapseStorageKey?: string
   defaultCollapsed?: boolean
 
-  onOpenBoxJsSub?: () => void | Promise<void>
-  boxJsTitle?: string
-
-  onInstallSurge?: () => void | Promise<void>
-  surgeTitle?: string
-
-  onInstallEgern?: () => void | Promise<void>
-  egernTitle?: string
-
-  onInstallLoon?: () => void | Promise<void>
-  loonTitle?: string
-
-  onInstallQx?: () => void | Promise<void>
-  qxTitle?: string
-
-  onOpenExtra?: () => void | Promise<void>
-  extraTitle?: string
-
-  onOpenExtra1?: () => void | Promise<void>
-  extraTitle1?: string
-
-  onOpenExtra2?: () => void | Promise<void>
-  extraTitle2?: string
+  // ✅ actions 配置驱动
+  actions: ModuleAction[]
 }
 
 function readBool(key: string, fallback: boolean): boolean {
@@ -49,44 +43,23 @@ function writeBool(key: string, value: boolean) {
   } catch { }
 }
 
-export function TelecomModuleSection(props: TelecomModuleSectionProps) {
+export function ModuleSection(props: ModuleSectionProps) {
   const {
-    footerLines,
+    headerTitle = "组件模块",
+    footerLines = [],
 
     collapsible = true,
     collapseStorageKey = "telecomModuleSectionCollapsed",
     defaultCollapsed = true,
 
-    onOpenBoxJsSub,
-    boxJsTitle = "📦 添加 BoxJS 订阅",
-
-    onInstallSurge,
-    surgeTitle = "⚡ 安装 Surge 模块",
-
-    onInstallEgern,
-    egernTitle = "🌀 安装 Egern 模块",
-
-    onInstallLoon,
-    loonTitle = "🧩 安装 Loon 插件",
-
-    onInstallQx,
-    qxTitle = "🧾 安装 Quantumult X 重写",
-
-    onOpenExtra,
-    extraTitle = "📂 相关脚本与说明",
-
-    onOpenExtra1,
-    extraTitle1 = "📂 相关脚本与说明（1）",
-
-    onOpenExtra2,
-    extraTitle2 = "📂 相关脚本与说明（2）",
+    actions,
   } = props
 
-  const footerText = footerLines.join("\n")
+  const footerText = footerLines.filter(Boolean).join("\n")
 
   const [expanded, setExpanded] = useState(() => {
     if (!collapsible) return true
-    // defaultCollapsed=true => expanded=false
+    // Storage 里存的是 collapsed（true=收起）
     const collapsed = readBool(collapseStorageKey, defaultCollapsed)
     return !collapsed
   })
@@ -94,21 +67,25 @@ export function TelecomModuleSection(props: TelecomModuleSectionProps) {
   const toggleExpanded = async () => {
     if (!collapsible) return
     const nextExpanded = !expanded
-    setExpanded(nextExpanded)                 // ✅ 立刻生效
-    writeBool(collapseStorageKey, !nextExpanded) // ✅ 存“collapsed”
+    setExpanded(nextExpanded) // ✅ 立刻生效
+    writeBool(collapseStorageKey, !nextExpanded) // ✅ 存 collapsed
   }
+
+  const visibleActions = (actions ?? []).filter((a) => !a?.hidden)
 
   return (
     <Section
       header={
         <Text font="body" fontWeight="semibold">
-          组件模块
+          {headerTitle}
         </Text>
       }
       footer={
-        <Text font="caption2" foregroundStyle="secondaryLabel">
-          {footerText}
-        </Text>
+        footerText ? (
+          <Text font="caption2" foregroundStyle="secondaryLabel">
+            {footerText}
+          </Text>
+        ) : undefined
       }
     >
       {collapsible ? (
@@ -118,20 +95,19 @@ export function TelecomModuleSection(props: TelecomModuleSectionProps) {
           foregroundStyle="secondaryLabel"
           action={toggleExpanded}
         />
-      ) : null}
+      ) : undefined}
 
-      {expanded ? (
-        <>
-          {onOpenBoxJsSub ? <Button title={boxJsTitle} action={onOpenBoxJsSub} /> : null}
-          {onInstallSurge ? <Button title={surgeTitle} action={onInstallSurge} /> : null}
-          {onInstallEgern ? <Button title={egernTitle} action={onInstallEgern} /> : null}
-          {onInstallLoon ? <Button title={loonTitle} action={onInstallLoon} /> : null}
-          {onInstallQx ? <Button title={qxTitle} action={onInstallQx} /> : null}
-          {onOpenExtra ? <Button title={extraTitle} action={onOpenExtra} /> : null}
-          {onOpenExtra1 ? <Button title={extraTitle1} action={onOpenExtra1} /> : null}
-          {onOpenExtra2 ? <Button title={extraTitle2} action={onOpenExtra2} /> : null}
-        </>
-      ) : null}
+      {expanded
+        ? visibleActions.map((item, idx) => (
+          <Button
+            key={`${idx}-${item.title}`}
+            title={item.title}
+            systemImage={item.systemImage}
+            foregroundStyle={item.foregroundStyle}
+            action={item.action}
+          />
+        ))
+        : undefined}
     </Section>
   )
 }

@@ -1,31 +1,65 @@
 // telecom/settings.ts
 import type { Color } from "scripting"
-import type { SmallCardStyle, SmallStyleKey } from "./cards/small"
+import type { SmallCardStyle } from "./cards/small"
 
 declare const Storage: any
 
-export type TelecomUiSettings = {
+// ==================== UI Settings（新结构，无兼容） ====================
+
+export type MediumStyleKey = "FullRing" | "DialRing"
+export type MediumCardLayout = "three" | "four"
+
+export type UiSettings = {
   showRemainRatio: boolean
-  mediumCardStyle: "three" | "four"
+
+  /** 中号样式：全圆环 / 仪表盘 */
+  mediumStyle: MediumStyleKey
+
+  /**
+   * 中号布局开关（推荐用它做 UI 开关）
+   * true  = 三卡（总/通用联动）
+   * false = 四卡（默认）
+   */
+  mediumUseThreeLayout: boolean
+
+  /**
+   * 中号布局派生值（给旧渲染逻辑用）
+   * - 由 mediumUseThreeLayout 计算得到
+   */
+  mediumCardLayout: MediumCardLayout
+
+  /** 三卡时：总流量是否包含定向 */
   includeDirectionalInTotal: boolean
+
+  /** 小号样式 */
   smallCardStyle: SmallCardStyle
 
-  // ✅ 仅作用于小号组件的「紧凑清单 / 进度清单」：
-  // true  = 总流量 + 语音（2 行）
-  // false = 通用 + 定向 + 语音（3 行）
+  /**
+   * 仅作用于小号的「紧凑清单 / 进度清单」：
+   * true  = 总流量 + 语音（2 行）
+   * false = 通用 + 定向 + 语音（3 行）
+   */
   smallMiniBarUseTotalFlow: boolean
 }
 
-export type TelecomUiSwitchSource = {
-  showRemainRatio?: boolean
-  mediumCardStyle?: "three" | "four"
-  includeDirectionalInTotal?: boolean
-  smallCardStyle?: SmallCardStyle | string // 这里允许脏数据进来，我们会做校验
+/**
+ * 允许上层传入不完整的“开关源”，但不再兼容历史字段名
+ * （你要的是“清理旧结构”）
+ */
+export type UiSwitchSource = Partial<UiSettings> & {
+  // 小号样式允许脏数据进来，下面会 normalize
+  smallCardStyle?: SmallCardStyle | string
 
-  smallMiniBarUseTotalFlow?: boolean
+  // 允许旧字段“mediumCardLayout”作为兜底输入（如果你还有存量数据）
+  mediumCardLayout?: MediumCardLayout | string
+
+  // ✅ 新字段：给配置页做开关用
+  mediumUseThreeLayout?: boolean
 }
 
-export type ChinaUnicomSettings = TelecomUiSwitchSource & {
+// ==================== Operator Settings ====================
+
+export type ChinaUnicomSettings = UiSwitchSource & {
   cookie: string
   titleDayColor: Color
   titleNightColor: Color
@@ -41,11 +75,11 @@ export type ChinaUnicomSettings = TelecomUiSwitchSource & {
   boxJsUrl?: string
 }
 
-export type ChinaMobileSettings = TelecomUiSwitchSource & {
+export type ChinaMobileSettings = UiSwitchSource & {
   refreshInterval: number
 }
 
-export type ChinaTelecomSettings = TelecomUiSwitchSource & {
+export type ChinaTelecomSettings = UiSwitchSource & {
   mobile: string
   password: string
   refreshInterval?: number
@@ -56,6 +90,8 @@ export type ChinaTelecomSettings = TelecomUiSwitchSource & {
 export const UNICOM_SETTINGS_KEY = "chinaUnicomSettings"
 export const MOBILE_SETTINGS_KEY = "chinaMobileSettings"
 export const TELECOM_SETTINGS_KEY = "chinaTelecomSettings"
+
+// ==================== Normalizers ====================
 
 // ✅ 小号样式白名单：summary + 你的 SmallStyleKey
 const VALID_SMALL_STYLE_SET = new Set<string>([
@@ -76,14 +112,56 @@ function normalizeSmallCardStyle(v: unknown): SmallCardStyle {
   return "summary"
 }
 
-export function pickTelecomUiSettings(
-  raw: TelecomUiSwitchSource | null | undefined,
-): TelecomUiSettings {
+function normalizeMediumStyle(v: unknown): MediumStyleKey {
+  return v === "DialRing" ? "DialRing" : "FullRing"
+}
+
+/** 旧字段兜底：不是 "three" 就当四卡 */
+function normalizeMediumCardLayout(v: unknown): MediumCardLayout {
+  return v === "three" ? "three" : "four"
+}
+
+/**
+ * ✅ 新逻辑：优先用 mediumUseThreeLayout（开关）
+ * - 有这个字段：true=>three / false=>four
+ * - 没这个字段：回退到旧字段 mediumCardLayout
+ * - 两者都没有：默认四卡
+ */
+function resolveMediumLayout(src: UiSwitchSource): {
+  mediumUseThreeLayout: boolean
+  mediumCardLayout: MediumCardLayout
+} {
+  if (typeof src.mediumUseThreeLayout === "boolean") {
+    const useThree = src.mediumUseThreeLayout
+    return {
+      mediumUseThreeLayout: useThree,
+      mediumCardLayout: useThree ? "three" : "four",
+    }
+  }
+
+  const layout = normalizeMediumCardLayout((src as any).mediumCardLayout)
+  return {
+    mediumUseThreeLayout: layout === "three",
+    mediumCardLayout: layout,
+  }
+}
+
+export function pickUiSettings(
+  raw: UiSwitchSource | null | undefined,
+): UiSettings {
   const src = raw ?? {}
+
+  const { mediumUseThreeLayout, mediumCardLayout } = resolveMediumLayout(src)
 
   return {
     showRemainRatio: !!src.showRemainRatio,
-    mediumCardStyle: src.mediumCardStyle === "three" ? "three" : "four",
+
+    mediumStyle: normalizeMediumStyle((src as any).mediumStyle),
+
+    // ✅ 开关 + 派生值（默认四卡）
+    mediumUseThreeLayout,
+    mediumCardLayout,
+
     includeDirectionalInTotal:
       typeof src.includeDirectionalInTotal === "boolean"
         ? src.includeDirectionalInTotal
@@ -91,7 +169,6 @@ export function pickTelecomUiSettings(
 
     smallCardStyle: normalizeSmallCardStyle(src.smallCardStyle),
 
-    // ✅ 默认 false：保持你现在的行为（默认 3 行）
     smallMiniBarUseTotalFlow:
       typeof src.smallMiniBarUseTotalFlow === "boolean"
         ? src.smallMiniBarUseTotalFlow
@@ -99,11 +176,12 @@ export function pickTelecomUiSettings(
   }
 }
 
-export function loadTelecomUiSettings(settingsKey: string): TelecomUiSettings {
-  const raw = (Storage?.get?.(settingsKey) ?? null) as TelecomUiSwitchSource | null
-  return pickTelecomUiSettings(raw)
+export function loadUiSettings(settingsKey: string): UiSettings {
+  const raw = (Storage?.get?.(settingsKey) ?? null) as UiSwitchSource | null
+  return pickUiSettings(raw)
 }
 
+// 这三个保持不变：读取“运营商完整设置”
 export function loadChinaUnicomSettings(): ChinaUnicomSettings | null {
   const raw = Storage?.get?.(UNICOM_SETTINGS_KEY) ?? null
   return (raw ?? null) as ChinaUnicomSettings | null

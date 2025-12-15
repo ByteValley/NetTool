@@ -1,5 +1,5 @@
-// widget.tsx
-// 业务逻辑层：只负责拉数据 + 解析 + 转成 TelecomData，然后交给 TelecomWidgetRoot 渲染。
+// widget.tsx（中国移动）
+// 业务逻辑层：只负责拉数据 + 解析 + 转成 TelecomData，然后交给 WidgetRoot 渲染。
 
 import {
   Widget,
@@ -11,8 +11,9 @@ import {
 
 declare const FileManager: any
 
-import { TelecomWidgetRoot, TelecomData } from "./telecom/widgetRoot"
+import { WidgetRoot, TelecomData } from "./telecom/widgetRoot"
 import { nowHHMM, safeNum } from "./telecom/utils/telecomUtils"
+import { ensureImageFilePath } from "./telecom/utils/imageCache"
 import {
   MOBILE_SETTINGS_KEY,
   loadChinaMobileSettings,
@@ -299,6 +300,31 @@ async function render() {
     date: nextUpdate,
   }
 
+  // ================== Logo 本地缓存（对齐联通：避免 imageUrl 直链） ==================
+  let logoFilePath: string | null = null
+
+  try {
+    logoFilePath = await Promise.race([
+      ensureImageFilePath({
+        url: MOBILE_LOGO_URL,
+        cacheKey: "telecom_mobile.logo.cache.v1",
+        filePrefix: "mobile_logo",
+        fileExt: "png",
+        forceRefresh: false,
+      }),
+      new Promise<string | null>((r) => setTimeout(() => r(null), 800)),
+    ])
+
+    if (!logoFilePath) {
+      console.log("🖼️ 移动 Logo：首帧跳过下载（避免阻塞渲染）")
+    } else {
+      console.log("🖼️ 移动 Logo：使用本地缓存路径", logoFilePath)
+    }
+  } catch (e) {
+    console.warn("⚠️ 移动 Logo：缓存异常，跳过显示", e)
+    logoFilePath = null
+  }
+
   // ========== 优先走 API ==========
   try {
     const apiData = await loadFromRewriteApi()
@@ -319,10 +345,10 @@ async function render() {
 
         const mobileTelecomData = convertToTelecomData(pData)
         Widget.present(
-          <TelecomWidgetRoot
+          <WidgetRoot
             data={mobileTelecomData}
             settingsKey={SETTINGS_KEY}
-            logoPath={MOBILE_LOGO_URL}
+            logoPath={logoFilePath || ""}
           />,
           reloadPolicy,
         )
@@ -340,10 +366,10 @@ async function render() {
     cache.source = "Cache"
     const mobileTelecomData = convertToTelecomData(cache)
     Widget.present(
-      <TelecomWidgetRoot
+      <WidgetRoot
         data={mobileTelecomData}
         settingsKey={SETTINGS_KEY}
-        logoPath={MOBILE_LOGO_URL}
+        logoPath={logoFilePath || ""}
       />,
       reloadPolicy,
     )

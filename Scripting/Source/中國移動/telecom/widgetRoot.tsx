@@ -1,15 +1,16 @@
 // telecom/widgetRoot.tsx
 
 import { Widget, VStack, HStack } from "scripting"
-import { outerCardBg, telecomRingThemes } from "./theme"
+import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/telecomUtils"
-import { TelecomUiSettings, loadTelecomUiSettings } from "./settings"
-import { TelecomMediumLayout } from "./cards/medium"
-import { TelecomFeeCard } from "./cards/feeCard"
-import { TelecomRingStatCard } from "./cards/ringStatCard"
+import type { UiSettings } from "./settings"
+import { loadUiSettings } from "./settings"
+
+import { MediumLayout } from "./cards/medium"
+import { FeeCard } from "./cards/components/feeCard"
+import { FullRingStatCard } from "./cards/components/fullRingStatCard"
 import { TelecomSmallCard } from "./cards/small"
 import type { SmallCardStyle } from "./cards/small"
-
 
 // 公共数据结构：电信 / 联通 / 移动都可以共用
 export type TelecomData = {
@@ -21,21 +22,29 @@ export type TelecomData = {
 }
 
 // 根 UI：小号 / 中号 / 大号，已用/剩余、是否合并定向流量，全在这里消费
-export function TelecomWidgetRoot(props: {
+export function WidgetRoot(props: {
   data: TelecomData
   settingsKey: string
   logoPath: string
 }) {
   const { data, settingsKey, logoPath } = props
-  const ui: TelecomUiSettings = loadTelecomUiSettings(settingsKey)
+  const ui: UiSettings = loadUiSettings(settingsKey)
 
   const {
     showRemainRatio,
-    mediumCardStyle,
+
+    // ✅ 新结构：中号样式 + 三卡/四卡
+    mediumStyle,       // "FullRing" | "DialRing"
+    mediumUseThreeLayout,
+
     includeDirectionalInTotal,
+
     smallCardStyle,
     smallMiniBarUseTotalFlow,
   } = ui
+
+  // ✅ 新结构：用布局决定“是否走总流量三卡”
+  const useTotalFlow = mediumUseThreeLayout
 
   // ===== 语音 =====
   const voiceStat = buildUsageStat(
@@ -56,7 +65,7 @@ export function TelecomWidgetRoot(props: {
   const flowTitle = showRemainRatio ? "通用流量" : "已用通用流量"
   const flowValueText = `${flowDisplayFormatted.balance}${flowDisplayFormatted.unit}`
 
-  // ===== 定向流量 =====
+  // ===== 定向流量（可空）=====
   const otherRaw =
     data.otherFlow ?? {
       title: "定向流量",
@@ -80,15 +89,14 @@ export function TelecomWidgetRoot(props: {
     flowStat.used + (includeDirectionalInTotal ? otherStat.used : 0)
   const totalTotal =
     flowStat.total + (includeDirectionalInTotal ? otherStat.total : 0)
+
   const totalStat = buildUsageStat(totalTotal, totalUsed, showRemainRatio)
   const totalDisplayFormatted = formatFlowValue(totalStat.display, "MB")
+
   const totalFlowTitle = includeDirectionalInTotal
-    ? showRemainRatio
-      ? "总流量"
-      : "已用总流量"
-    : showRemainRatio
-      ? "通用流量"
-      : "已用通用流量"
+    ? (showRemainRatio ? "总流量" : "已用总流量")
+    : (showRemainRatio ? "通用流量" : "已用通用流量")
+
   const totalFlowValueText = `${totalDisplayFormatted.balance}${totalDisplayFormatted.unit}`
 
   // ===== 小号：summary / CompactList / ProgressList / 其它样式 =====
@@ -102,14 +110,16 @@ export function TelecomWidgetRoot(props: {
         : rawVoiceUnit
 
     // summary 用（总流量可能包含定向）
-    const totalFlowLabel = includeDirectionalInTotal ? "总流量" : "通用流量"
-    const totalFlowUnit = includeDirectionalInTotal
+    const summaryTotalFlowLabel = includeDirectionalInTotal ? "总流量" : "通用流量"
+    const summaryTotalFlowUnit = includeDirectionalInTotal
       ? totalDisplayFormatted.unit
       : flowDisplayFormatted.unit
-    const totalFlowValue = includeDirectionalInTotal
+    const summaryTotalFlowValue = includeDirectionalInTotal
       ? totalDisplayFormatted.balance
       : flowDisplayFormatted.balance
-    const totalFlowRatio = includeDirectionalInTotal ? totalStat.ratio : flowStat.ratio
+    const summaryTotalFlowRatio = includeDirectionalInTotal
+      ? totalStat.ratio
+      : flowStat.ratio
 
     // 通用 / 定向：永远都准备好，具体显示由样式决定
     const commonFlowLabel = "通用流量"
@@ -129,10 +139,10 @@ export function TelecomWidgetRoot(props: {
         updateTime={data.updateTime}
 
         // summary 用
-        totalFlowLabel={totalFlowLabel}
-        totalFlowValue={totalFlowValue}
-        totalFlowUnit={totalFlowUnit}
-        totalFlowRatio={totalFlowRatio}
+        totalFlowLabel={summaryTotalFlowLabel}
+        totalFlowValue={summaryTotalFlowValue}
+        totalFlowUnit={summaryTotalFlowUnit}
+        totalFlowRatio={summaryTotalFlowRatio}
 
         // 通用流量
         flowLabel={commonFlowLabel}
@@ -147,34 +157,37 @@ export function TelecomWidgetRoot(props: {
         otherFlowRatio={otherStat.ratio}
 
         // 语音
-        voiceLabel={"剩余语音"}
+        voiceLabel={showRemainRatio ? "剩余语音" : "已用语音"}
         voiceValue={voiceStat.display.toFixed(0)}
         voiceUnit={voiceUnitLabel}
         voiceRatio={voiceStat.ratio}
 
-        // ✅ 关键：把开关真正传下去，让 CompactList / ProgressList 消费
+        // ✅ CompactList / ProgressList 联动开关
         smallMiniBarUseTotalFlow={!!smallMiniBarUseTotalFlow}
       />
     )
   }
 
-  // ===== 中号：三卡 / 四卡 =====
+  // ===== 中号：三卡 / 四卡（新结构）=====
   if (Widget.family === "systemMedium") {
     return (
-      <TelecomMediumLayout
-        layout={mediumCardStyle}
+      <MediumLayout
+        layout={mediumStyle}
         feeTitle={data.fee.title}
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
         updateTime={data.updateTime}
-        flowTitle={mediumCardStyle === "three" ? totalFlowTitle : flowTitle}
-        flowValueText={
-          mediumCardStyle === "three" ? totalFlowValueText : flowValueText
-        }
-        flowRatio={mediumCardStyle === "three" ? totalStat.ratio : flowStat.ratio}
-        otherTitle={otherTitle}
-        otherValueText={otherValueText}
-        otherRatio={otherStat.ratio}
+
+        // 三卡：这里切总流量；四卡：这里切通用
+        flowTitle={useTotalFlow ? totalFlowTitle : flowTitle}
+        flowValueText={useTotalFlow ? totalFlowValueText : flowValueText}
+        flowRatio={useTotalFlow ? totalStat.ratio : flowStat.ratio}
+
+        // ✅ 三卡：隐藏定向卡（通过传 undefined）
+        otherTitle={useTotalFlow ? undefined : otherTitle}
+        otherValueText={useTotalFlow ? undefined : otherValueText}
+        otherRatio={useTotalFlow ? undefined : otherStat.ratio}
+
         voiceTitle={voiceTitle}
         voiceValueText={voiceValueText}
         voiceRatio={voiceStat.ratio}
@@ -193,32 +206,32 @@ export function TelecomWidgetRoot(props: {
       }}
     >
       <HStack alignment="center" spacing={10}>
-        <TelecomFeeCard
+        <FeeCard
           title={data.fee.title}
           valueText={`${data.fee.balance}${data.fee.unit}`}
-          theme={telecomRingThemes.fee}
+          theme={ringThemes.fee}
           logoPath={logoPath}
           updateTime={data.updateTime}
         />
 
-        <TelecomRingStatCard
+        <FullRingStatCard
           title={flowTitle}
           valueText={flowValueText}
-          theme={telecomRingThemes.flow}
+          theme={ringThemes.flow}
           ratio={flowStat.ratio}
         />
 
-        <TelecomRingStatCard
+        <FullRingStatCard
           title={otherTitle}
           valueText={otherValueText}
-          theme={telecomRingThemes.flowDir}
+          theme={ringThemes.flowDir}
           ratio={otherStat.ratio}
         />
 
-        <TelecomRingStatCard
+        <FullRingStatCard
           title={voiceTitle}
           valueText={voiceValueText}
-          theme={telecomRingThemes.voice}
+          theme={ringThemes.voice}
           ratio={voiceStat.ratio}
         />
       </HStack>

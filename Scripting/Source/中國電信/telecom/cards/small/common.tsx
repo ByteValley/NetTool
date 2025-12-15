@@ -1,18 +1,12 @@
 // telecom/cards/small/common.tsx
-import {
-  Text,
-  Image,
-} from "scripting"
+import { Text, Image } from "scripting"
 import { telecomRingThemes } from "../../theme"
 
 /**
- * 小号组件公用的 props：
- *  - 话费 + logo
- *  - 通用流量 / 定向流量 / 语音
- *  - （可选）更新时间和百分比进度
- * - summary：用 totalFlow + voice
- * - mini：用 flow + otherFlow + voice
- * - bar：用 flow + otherFlow + voice + 各自 ratio
+ * 小号组件通用 Props：
+ *  - 顶部：话费 + logo + 更新时间（可选）
+ *  - 数据：总流量（summary 用）、通用/定向/语音（其它样式用）
+ *  - smallMiniBarUseTotalFlow：仅对 CompactList / ProgressList 生效（2行/3行联动）
  */
 export type SmallCardCommonProps = {
   // 顶部：话费 + logo + 更新时间
@@ -27,7 +21,7 @@ export type SmallCardCommonProps = {
   totalFlowUnit: string
   totalFlowRatio: number
 
-  // 通用流量
+  // 通用流量（其它样式一般用它）
   flowLabel: string
   flowValue: string
   flowUnit: string
@@ -45,7 +39,7 @@ export type SmallCardCommonProps = {
   voiceUnit: string
   voiceRatio: number
 
-  /** 仅作用于 CompactList / ProgressList */
+  /** 仅作用于 CompactList / ProgressList：true=总流量+语音（2行），false=通用+定向+语音（3行） */
   smallMiniBarUseTotalFlow?: boolean
 }
 

@@ -1,30 +1,19 @@
 // telecom/cards/medium/index.tsx
-import type {
-  MediumLayout,
-  TelecomMediumCommonProps,
-} from "./common"
-import { TelecomMediumThreeCard } from "./threeCardStyle"
-import { TelecomMediumFourCard } from "./fourCardStyle"
+import type { MediumCommonProps, MediumStyleKey } from "./common"
 
-export type { MediumLayout, TelecomMediumCommonProps }
+import { DialRingCardStyle } from "./styles/DialRingCardStyle"
+import { FullRingCardStyle } from "./styles/FullRingCardStyle"
 
-/**
- * 对外统一入口：
- *  - layout = "three" → 三卡布局
- *  - layout = "four"  → 四卡布局
- *
- * 调用方（widgetRoot）保持不变：
- *   <TelecomMediumLayout layout={mediumCardStyle} ... />
- */
-export function TelecomMediumLayout(
-  props: TelecomMediumCommonProps & { layout: MediumLayout },
-) {
+export type { MediumCommonProps, MediumStyleKey }
+
+export function MediumLayout(props: MediumCommonProps & { layout: MediumStyleKey }) {
   const { layout, ...rest } = props
-
-  if (layout === "three") {
-    return <TelecomMediumThreeCard {...rest} />
-  }
-
-  // 默认走四卡
-  return <TelecomMediumFourCard {...rest} />
+  return layout === "DialRing"
+    ? <DialRingCardStyle {...rest} />
+    : <FullRingCardStyle {...rest} />
 }
+
+export const MEDIUM_STYLE_OPTIONS: Array<{ key: MediumStyleKey; nameCN: string; nameEN: string }> = [
+  { key: "FullRing", nameCN: "全圆环", nameEN: "FullRing" },
+  { key: "DialRing", nameCN: "仪表盘", nameEN: "DialRing" },
+]

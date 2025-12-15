@@ -2,38 +2,29 @@
 import { VStack, HStack } from "scripting"
 import { outerCardBg } from "../../theme"
 
-export type MediumLayout = "three" | "four"
+export type MediumStyleKey = "FullRing" | "DialRing"
 
-export type TelecomMediumCommonProps = {
+export type MediumCommonProps = {
   feeTitle: string
   feeText: string
   logoPath: string
   updateTime: string
 
-  // 通用 / 总流量
   flowTitle: string
   flowValueText: string
   flowRatio: number
 
-  // 定向流量（四卡可见）
   otherTitle?: string
   otherValueText?: string
   otherRatio?: number
 
-  // 语音
   voiceTitle: string
   voiceValueText: string
   voiceRatio: number
 }
 
-/**
- * 中号卡片公共外壳：
- *  - 白色大圆角卡片
- *  - 内部一行 HStack 放 3 / 4 个 Ring 卡
- */
-export function TelecomMediumOuter(props: { children: any }) {
+export function MediumOuter(props: { children: any }) {
   const { children } = props
-
   return (
     <VStack
       alignment="center"

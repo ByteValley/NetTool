@@ -1,21 +1,19 @@
 // telecom/cards/small/index.tsx
-
 import type { SmallCardCommonProps } from "./common"
 import { TelecomSmallSummaryCard } from "./summaryCardStyle"
 
+// 其它小号样式：统一走 styles 注册表
 import {
   renderSmallCard,
   SMALL_STYLE_OPTIONS,
   type SmallStyleKey,
 } from "./smallCardStyles"
 
-/*
-后续再加样式，只需要：
-1）在 smallCardStyles.tsx 里扩展 SmallStyleKey + 组件
-2）renderSmallCard 里加 case
-3）SMALL_STYLE_OPTIONS 里注册显示名
-*/
-
+/**
+ * 小号组件对外暴露的样式 Key：
+ * - "summary"：固定摘要卡（总流量 + 语音）
+ * - 其它：SmallStyleKey（由 smallCardStyles.tsx 注册）
+ */
 export type SmallCardStyle = "summary" | SmallStyleKey
 
 export type TelecomSmallCardProps = SmallCardCommonProps & {
@@ -25,7 +23,12 @@ export type TelecomSmallCardProps = SmallCardCommonProps & {
 export { SMALL_STYLE_OPTIONS }
 export type { SmallStyleKey }
 
-export function TelecomSmallCard(props: TelecomSmallCardProps) {
+/**
+ * 对外统一入口：
+ *  - style = "summary" → 摘要卡（总流量 + 语音）
+ *  - 其它 style         → smallCardStyles 注册的布局
+ */
+export function SmallLayout(props: TelecomSmallCardProps) {
   const { style, ...rest } = props
 
   if (style === "summary") {
@@ -34,3 +37,6 @@ export function TelecomSmallCard(props: TelecomSmallCardProps) {
 
   return renderSmallCard(style, rest)
 }
+
+// 兼容你现有调用名（如果外面还在用 <TelecomSmallCard />，不需要全局替换）
+export const TelecomSmallCard = SmallLayout

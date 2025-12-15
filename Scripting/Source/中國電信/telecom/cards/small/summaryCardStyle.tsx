@@ -2,8 +2,8 @@
 import { VStack, Spacer } from "scripting"
 
 import type { SmallCardCommonProps } from "./common"
-import { TelecomFeeCard } from "../feeCard"
-import { telecomRingThemes } from "../../theme"
+import { FeeCard } from "../components/feeCard"
+import { ringThemes } from "../../theme"
 
 // summary 样式：直接用 FeeCard 缩小版，只展示话费卡（垂直居中）
 export function TelecomSmallSummaryCard(props: SmallCardCommonProps) {
@@ -15,10 +15,10 @@ export function TelecomSmallSummaryCard(props: SmallCardCommonProps) {
       padding={{ top: 4, leading: 4, bottom: 4, trailing: 4 }}
     >
       <Spacer />
-      <TelecomFeeCard
+      <FeeCard
         title={feeTitle}
         valueText={feeText}
-        theme={telecomRingThemes.fee}
+        theme={ringThemes.fee}
         logoPath={logoPath}
         updateTime={updateTime ?? ""}
       />

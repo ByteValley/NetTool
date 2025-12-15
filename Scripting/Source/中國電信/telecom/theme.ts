@@ -10,7 +10,7 @@ export const outerCardBg: DynamicShapeStyle = {
 }
 
 // 每格浅色背景 + 主题色（三网共用）
-export const telecomRingThemes = {
+export const ringThemes = {
   fee: {
     tint: { light: "#0080CB", dark: "#66adff" } as DynamicShapeStyle,
     icon: "bolt.horizontal.circle.fill",
@@ -46,7 +46,7 @@ export const telecomRingThemes = {
 } as const
 
 export type RingCardTheme =
-  (typeof telecomRingThemes)[keyof typeof telecomRingThemes]
+  (typeof ringThemes)[keyof typeof ringThemes]
 
 // 更新时间颜色
 export const timeStyle: DynamicShapeStyle = {

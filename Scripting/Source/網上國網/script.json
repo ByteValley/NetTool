@@ -1,0 +1,46 @@
+{
+  "description" : "",
+  "localizedNames" : {
+    "en" : "State Grid",
+    "zh" : "",
+    "de" : "",
+    "it" : "",
+    "fr" : "",
+    "ru" : "",
+    "ja" : "",
+    "es" : "",
+    "pt" : ""
+  },
+  "runInApp" : false,
+  "localizedDescriptions" : {
+    "ja" : "",
+    "ru" : "",
+    "pt" : "",
+    "es" : "",
+    "de" : "",
+    "en" : "",
+    "it" : "",
+    "zh" : "",
+    "fr" : ""
+  },
+  "version" : "1.0.0",
+  "remoteResource" : {
+    "autoUpdateInterval" : 600,
+    "hash" : "5b9f987f8eae2663adbbd64c2837a589",
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/網上國網.scripting"
+  },
+  "color" : "rgba(102, 196, 235,1)",
+  "intentInputTypes" : [
+
+  ],
+  "author" : {
+    "homepage" : null,
+    "name" : "ByteValley",
+    "email" : null
+  },
+  "contributors" : [
+
+  ],
+  "name" : "網上國網",
+  "icon" : "bolt.shield"
+}

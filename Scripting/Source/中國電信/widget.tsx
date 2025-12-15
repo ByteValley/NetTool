@@ -1,5 +1,5 @@
-// widget.tsx
-// 电信小组件入口：只负责拉数据 + 解析 + 转成 TelecomData，然后交给 TelecomWidgetRoot 渲染。
+// widget.tsx（中国电信）
+// 电信小组件入口：只负责拉数据 + 解析 + 转成 TelecomData，然后交给 WidgetRoot 渲染。
 
 import {
   Widget,
@@ -11,7 +11,7 @@ import {
 declare const Storage: any
 declare const FileManager: any
 
-import { TelecomWidgetRoot, TelecomData } from "./telecom/widgetRoot"
+import { WidgetRoot, TelecomData } from "./telecom/widgetRoot"
 import { nowHHMM, safeNum, formatFlowValue } from "./telecom/utils/telecomUtils"
 import {
   TELECOM_SETTINGS_KEY,
@@ -330,7 +330,7 @@ async function render() {
     const telecomData = convertToTelecomData(apiData)
 
     Widget.present(
-      <TelecomWidgetRoot
+      <WidgetRoot
         data={telecomData}
         settingsKey={SETTINGS_KEY}
         logoPath={logoPath}

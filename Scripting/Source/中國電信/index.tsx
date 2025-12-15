@@ -1,4 +1,4 @@
-// index.tsx（中国电信
+// index.tsx（中国电信）
 
 import {
   Navigation,
@@ -13,9 +13,6 @@ import {
   useState,
 } from "scripting"
 
-declare const Storage: any
-declare const Dialog: any
-
 import {
   type ChinaTelecomSettings,
   TELECOM_SETTINGS_KEY,
@@ -23,6 +20,9 @@ import {
 import { RenderConfigSection } from "./telecom/index/renderConfigSection"
 import type { SmallCardStyle } from "./telecom/cards/small"
 import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
+
+declare const Storage: any
+declare const Dialog: any
 
 // ==================== 版本信息 ====================
 // 版本号说明（Semantic Versioning）
@@ -64,7 +64,11 @@ const defaultSettings: ChinaTelecomSettings = {
   refreshInterval: 180,
 
   showRemainRatio: false,
-  mediumCardStyle: "four",
+
+  // ✅ 中号：样式 + 三卡开关（关=四卡默认，开=三卡）
+  mediumStyle: "FullRing",
+  mediumUseThreeLayout: false,
+
   includeDirectionalInTotal: true,
 
   // 小号组件（新体系）
@@ -105,8 +109,12 @@ function SettingsView() {
     initial.showRemainRatio ?? false,
   )
 
-  const [mediumCardStyle, setMediumCardStyle] = useState<"four" | "three">(
-    initial.mediumCardStyle ?? "four",
+  // ✅ 中号：样式 + “三卡开关”（关=默认四卡）
+  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(
+    (initial as any).mediumStyle ?? "FullRing",
+  )
+  const [mediumUseThreeLayout, setMediumUseThreeLayout] = useState<boolean>(
+    (initial as any).mediumUseThreeLayout ?? false,
   )
 
   const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
@@ -132,7 +140,11 @@ function SettingsView() {
       refreshInterval: toSafeIntMinutes(refreshInterval, 180),
 
       showRemainRatio: !!showRemainRatio,
-      mediumCardStyle,
+
+      // ✅ 新结构保存：只写 mediumUseThreeLayout + mediumStyle
+      mediumStyle,
+      mediumUseThreeLayout: !!mediumUseThreeLayout,
+
       includeDirectionalInTotal: !!includeDirectionalInTotal,
 
       smallCardStyle,
@@ -208,7 +220,7 @@ function SettingsView() {
           />
         </Section>
 
-        {/* 渲染配置 */}
+        {/* 渲染配置（对齐联通新结构：mediumStyle + mediumUseThreeLayout） */}
         <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
@@ -216,8 +228,10 @@ function SettingsView() {
           setShowRemainRatio={setShowRemainRatio}
           smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
-          mediumCardStyle={mediumCardStyle}
-          setMediumCardStyle={setMediumCardStyle}
+          mediumStyle={mediumStyle}
+          setMediumStyle={setMediumStyle}
+          mediumUseThreeLayout={mediumUseThreeLayout}
+          setMediumUseThreeLayout={setMediumUseThreeLayout}
           includeDirectionalInTotal={includeDirectionalInTotal}
           setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
           refreshInterval={refreshInterval}

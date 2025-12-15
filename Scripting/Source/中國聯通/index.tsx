@@ -1,4 +1,4 @@
-// index.tsx（中国联通）
+// 中國聯通/index.tsx
 
 import {
   Navigation,
@@ -15,19 +15,21 @@ import {
   useState,
 } from "scripting"
 
-declare const Storage: any
-declare const Dialog: any
-declare const Safari: any
-
 import {
   type ChinaUnicomSettings,
   UNICOM_SETTINGS_KEY,
 } from "./telecom/settings"
+
 import { RenderConfigSection } from "./telecom/index/renderConfigSection"
 import type { SmallCardStyle } from "./telecom/cards/small"
-import { TelecomModuleSection } from "./telecom/index/moduleSection"
+import { ModuleSection } from "./telecom/index/moduleSection"
+import type { ModuleLinks } from "./telecom/index/moduleActions"
+import { createModuleHandles, createModuleActions } from "./telecom/index/moduleActions"
 import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
-import { showNoticeOnce } from "./telecom/utils/noticeOnce"
+// import { showNoticeOnce } from "./telecom/utils/noticeOnce"
+
+declare const Storage: any
+declare const Dialog: any
 
 // ==================== 版本信息 ====================
 // 版本号说明（Semantic Versioning）
@@ -41,6 +43,7 @@ const BUILD_DATE = "2025-12-14"
 
 const SETTINGS_KEY = UNICOM_SETTINGS_KEY
 const FULLSCREEN_KEY = "chinaUnicomSettingsFullscreen"
+const MODULE_COLLAPSE_KEY = "chinaUnicomModuleSectionCollapsed"
 
 // ==================== BoxJs / 模块 ====================
 
@@ -51,18 +54,36 @@ const UNICOM_MODULE_URL =
 const UNICOM_LOON_PLUGIN_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/Component/ChinaUnicom.lpx"
 
+const UNICOM_QX_REWRITE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/refs/heads/main/QuantumultX/Rewrite/Component/ChinaUnicom.conf"
+
+// ==================== 安装 / 跳转（抽象） ====================
+
+const links: ModuleLinks = {
+  boxjsSubUrl: UNICOM_BOXJS_SUB_URL,
+  surgeModuleUrl: UNICOM_MODULE_URL,
+  loonPluginUrl: UNICOM_LOON_PLUGIN_URL,
+  qxRewriteUrl: UNICOM_QX_REWRITE_URL,
+  extras: [],
+}
+
+const handles = createModuleHandles(
+  { egernName: "中国联通组件服务" },
+  links,
+)
+
+const moduleActions = createModuleActions(handles, links)
+
 // ==================== 匹配类型 ====================
 
-const MATCH_TYPE_OPTIONS: {
-  label: string
-  value: "flowType" | "addupItemCode"
-}[] = [
+const MATCH_TYPE_OPTIONS: { label: string; value: "flowType" | "addupItemCode" }[] =
+  [
     { label: "flowType 聚合", value: "flowType" },
     { label: "addupItemCode 精确匹配", value: "addupItemCode" },
   ]
 
 // ==================== 默认设置 ====================
-
+// ✅ 不做旧结构兼容：以当前新结构为准
 const defaultSettings: ChinaUnicomSettings = {
   cookie: "",
   titleDayColor: "#666666" as unknown as Color,
@@ -80,15 +101,17 @@ const defaultSettings: ChinaUnicomSettings = {
   boxJsUrl: "",
 
   showRemainRatio: false,
-  mediumCardStyle: "four",
+
+  // ✅ 中号：样式 + 三卡/四卡（默认四卡）
+  mediumStyle: "FullRing",
+  mediumUseThreeLayout: false,
+  // ✅ 三卡时：总流量是否包含定向
   includeDirectionalInTotal: true,
 
-  // 小号组件样式
+  // 小号组件
   smallCardStyle: "summary",
 
-  // ✅ 仅作用于「紧凑清单 / 进度清单」：
-  // true  = 总流量 + 语音（2 行）
-  // false = 通用 + 定向 + 语音（3 行）
+  // ✅ 仅作用于紧凑/进度清单：2行/3行
   smallMiniBarUseTotalFlow: false,
 }
 
@@ -138,10 +161,15 @@ function SettingsView() {
     initial.showRemainRatio ?? false,
   )
 
-  const [mediumCardStyle, setMediumCardStyle] = useState<"four" | "three">(
-    initial.mediumCardStyle ?? "four",
+  // ✅ 中号：样式 + “三卡开关”（关=默认四卡）
+  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(
+    initial.mediumStyle ?? "FullRing",
+  )
+  const [mediumUseThreeLayout, setMediumUseThreeLayout] = useState<boolean>(
+    initial.mediumUseThreeLayout ?? false,
   )
 
+  // ✅ 三卡时的总/通用联动控制
   const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
     useState<boolean>(initial.includeDirectionalInTotal ?? true)
 
@@ -149,7 +177,6 @@ function SettingsView() {
     (initial.smallCardStyle as SmallCardStyle) ?? "summary",
   )
 
-  // ✅ 紧凑/进度清单 2行/3行联动
   const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
     useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
 
@@ -172,7 +199,9 @@ function SettingsView() {
       boxJsUrl: (boxJsUrl ?? "").trim(),
 
       showRemainRatio: !!showRemainRatio,
-      mediumCardStyle,
+
+      mediumStyle,
+      mediumUseThreeLayout: !!mediumUseThreeLayout,
       includeDirectionalInTotal: !!includeDirectionalInTotal,
 
       smallCardStyle,
@@ -192,26 +221,6 @@ function SettingsView() {
         `致谢：@DTZSGHNR`,
       buttonLabel: "关闭",
     })
-  }
-
-  // ==================== 安装 / 跳转 ====================
-
-  const handleOpenUnicomBoxJsSub = async () => Safari.openURL(UNICOM_BOXJS_SUB_URL)
-
-  const handleInstallToSurge = async () => {
-    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
-    await Safari.openURL(`surge:///install-module?url=${encodedUrl}`)
-  }
-
-  const handleInstallToEgern = async () => {
-    const encodedUrl = encodeURIComponent(UNICOM_MODULE_URL)
-    const name = encodeURIComponent("中国联通组件服务")
-    await Safari.openURL(`egern:/modules/new?name=${name}&url=${encodedUrl}`)
-  }
-
-  const handleInstallToLoon = async () => {
-    const encodedUrl = encodeURIComponent(UNICOM_LOON_PLUGIN_URL)
-    await Safari.openURL(`loon://import?plugin=${encodedUrl}`)
   }
 
   // ==================== UI ====================
@@ -245,20 +254,18 @@ function SettingsView() {
           ],
         }}
       >
+
         {/* 组件模块 */}
-        <TelecomModuleSection
+        <ModuleSection
           footerLines={[
             "使用前建议按顺序完成：",
             "1）在 BoxJS 中订阅配置（可同步 Cookie 等信息）",
             "2）安装中国联通余量查询模块到支持的客户端",
           ]}
           collapsible
-          collapseStorageKey="chinaUnicomModuleSectionCollapsed"
+          collapseStorageKey={MODULE_COLLAPSE_KEY}
           defaultCollapsed={true}
-          onOpenBoxJsSub={handleOpenUnicomBoxJsSub}
-          onInstallSurge={handleInstallToSurge}
-          onInstallEgern={handleInstallToEgern}
-          onInstallLoon={handleInstallToLoon}
+          actions={moduleActions}
         />
 
         {/* BoxJs */}
@@ -286,7 +293,7 @@ function SettingsView() {
           />
         </Section>
 
-        {/* 渲染配置 */}
+        {/* 渲染配置（改为开关版） */}
         <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
@@ -294,8 +301,10 @@ function SettingsView() {
           setShowRemainRatio={setShowRemainRatio}
           smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
-          mediumCardStyle={mediumCardStyle}
-          setMediumCardStyle={setMediumCardStyle}
+          mediumStyle={mediumStyle}
+          setMediumStyle={setMediumStyle}
+          mediumUseThreeLayout={mediumUseThreeLayout}
+          setMediumUseThreeLayout={setMediumUseThreeLayout}
           includeDirectionalInTotal={includeDirectionalInTotal}
           setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
           refreshInterval={refreshInterval}
@@ -343,22 +352,22 @@ function readFullscreenPrefForRun(): boolean {
   return true
 }
 
-const FUNCTION_NOTICE_ID = "boxjs-kv-v2"
-const NOTICE_TAG = "2025-12-13"
+/* const FUNCTION_NOTICE_ID = "boxjs-kv-v2"
+const NOTICE_TAG = "2025-12-13" */
 
 async function run() {
-  await showNoticeOnce({
-    scopeKey: SETTINGS_KEY,
-    noticeId: FUNCTION_NOTICE_ID,
-    tag: NOTICE_TAG,
-    title: "BoxJs 配置变更提醒",
-    message:
-      "本次更新调整 BoxJs 键值对。\n\n" +
-      "请重写添加：\n" +
-      "• BoxJs 订阅\n" +
-      "• BoxJs 重写 / 插件 / 模块\n\n" +
-      "否则可能读取不到 Token。",
-  })
+  /*   await showNoticeOnce({
+      scopeKey: SETTINGS_KEY,
+      noticeId: FUNCTION_NOTICE_ID,
+      tag: NOTICE_TAG,
+      title: "BoxJs 配置变更提醒",
+      message:
+        "本次更新调整 BoxJs 键值对。\n\n" +
+        "请重写添加：\n" +
+        "• BoxJs 订阅\n" +
+        "• BoxJs 重写 / 插件 / 模块\n\n" +
+        "否则可能读取不到 Token。",
+    }) */
 
   const fullscreen = readFullscreenPrefForRun()
   await Navigation.present({

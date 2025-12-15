@@ -13,7 +13,6 @@ import {
 
 declare const Storage: any
 declare const Dialog: any
-declare const Safari: any
 declare const FileManager: any
 
 import {
@@ -23,7 +22,13 @@ import {
 import { RenderConfigSection } from "./telecom/index/renderConfigSection"
 import type { SmallCardStyle } from "./telecom/cards/small"
 import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
-import { TelecomModuleSection } from "./telecom/index/moduleSection"
+
+import type { ModuleLinks } from "./telecom/index/moduleActions"
+import { ModuleSection } from "./telecom/index/moduleSection"
+import {
+  createModuleHandles,
+  createModuleActions,
+} from "./telecom/index/moduleActions"
 
 // ==================== 版本信息 ====================
 // 版本号说明（Semantic Versioning）
@@ -46,7 +51,10 @@ const MODULE_COLLAPSE_KEY = "chinaMobileModuleSectionCollapsed"
 const defaultSettings: ChinaMobileSettings = {
   refreshInterval: 180,
   showRemainRatio: false,
-  mediumCardStyle: "four",
+
+  // ✅ 中号：样式 + 三卡/四卡（默认四卡）
+  mediumStyle: "FullRing",
+  mediumUseThreeLayout: false,
   includeDirectionalInTotal: true,
 
   // 小号组件（新体系）
@@ -60,6 +68,9 @@ const defaultSettings: ChinaMobileSettings = {
 
 // ==================== 链接 ====================
 
+const BOXJS_SUB_URL =
+  "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/boxjs.json"
+
 const CM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Component/ChinaMobile.module"
 const CM_LOON_PLUGIN_URL =
@@ -67,13 +78,30 @@ const CM_LOON_PLUGIN_URL =
 const CM_QX_REWRITE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/QuantumultX/Rewrite/Component/ChinaMobile.conf"
 
-const BOXJS_SUB_URL =
-  "http://boxjs.com/#/sub/add/https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/boxjs.json"
-
 const GITHUB_URL1 =
   "https://github.com/ChinaTelecomOperators/ChinaMobile/releases/tag/Prerelease-Alpha"
 const GITHUB_URL2 =
   "https://github.com/Yuheng0101/X/tree/main/Scripts/ChinaMobile"
+
+// ==================== 安装 / 跳转 ====================
+
+const links: ModuleLinks = {
+  boxjsSubUrl: BOXJS_SUB_URL,
+  surgeModuleUrl: CM_MODULE_URL,
+  loonPluginUrl: CM_LOON_PLUGIN_URL,
+  qxRewriteUrl: CM_QX_REWRITE_URL,
+  extras: [
+    { title: "📂 ChinaTelecomOperators 仓库", url: GITHUB_URL1 },
+    { title: "📂 Yuheng0101 仓库", url: GITHUB_URL2 },
+  ],
+}
+
+const handles = createModuleHandles(
+  { egernName: "中国移动余量查询" },
+  links,
+)
+
+const moduleActions = createModuleActions(handles, links)
 
 // ==================== 设置页面 ====================
 
@@ -93,8 +121,12 @@ function SettingsView() {
     initial.showRemainRatio ?? false,
   )
 
-  const [mediumCardStyle, setMediumCardStyle] = useState<"four" | "three">(
-    initial.mediumCardStyle ?? "four",
+  // ✅ 中号：样式 + “三卡开关”（关=默认四卡）
+  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(
+    (initial.mediumStyle as any) ?? "FullRing",
+  )
+  const [mediumUseThreeLayout, setMediumUseThreeLayout] = useState<boolean>(
+    initial.mediumUseThreeLayout ?? false,
   )
 
   const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
@@ -116,7 +148,9 @@ function SettingsView() {
     const newSettings: ChinaMobileSettings = {
       refreshInterval: interval,
       showRemainRatio: !!showRemainRatio,
-      mediumCardStyle,
+
+      mediumStyle,
+      mediumUseThreeLayout: !!mediumUseThreeLayout,
       includeDirectionalInTotal: !!includeDirectionalInTotal,
 
       smallCardStyle,
@@ -140,36 +174,6 @@ function SettingsView() {
       buttonLabel: "关闭",
     })
   }
-
-  // ==================== 安装 / 跳转 ====================
-
-  const handleOpenBoxJsSub = async () => Safari.openURL(BOXJS_SUB_URL)
-
-  const handleInstallToSurge = async () => {
-    const encodedUrl = encodeURIComponent(CM_MODULE_URL)
-    await Safari.openURL(`surge:///install-module?url=${encodedUrl}`)
-  }
-
-  const handleInstallToEgern = async () => {
-    const encodedUrl = encodeURIComponent(CM_MODULE_URL)
-    const name = encodeURIComponent("中国移动余量查询")
-    await Safari.openURL(`egern:/modules/new?name=${name}&url=${encodedUrl}`)
-  }
-
-  const handleInstallToLoon = async () => {
-    const encodedUrl = encodeURIComponent(CM_LOON_PLUGIN_URL)
-    await Safari.openURL(`loon://import?plugin=${encodedUrl}`)
-  }
-
-  const handleInstallToQx = async () => {
-    const encodedUrl = encodeURIComponent(CM_QX_REWRITE_URL)
-    await Safari.openURL(
-      `quantumult-x:///update-configuration?remote-resource=${encodedUrl}`,
-    )
-  }
-
-  const handleOpenGithub1 = async () => Safari.openURL(GITHUB_URL1)
-  const handleOpenGithub2 = async () => Safari.openURL(GITHUB_URL2)
 
   // ==================== 缓存管理 ====================
 
@@ -231,24 +235,17 @@ function SettingsView() {
           ],
         }}
       >
-        <TelecomModuleSection
+
+        <ModuleSection
           collapsible
           collapseStorageKey={MODULE_COLLAPSE_KEY}
-          defaultCollapsed={true}
+          defaultCollapsed
           footerLines={[
             "使用前建议按顺序完成：",
             "1）在 BoxJS 中订阅配置并填写手机号等参数",
             "2）安装中国移动余量查询模块到支持的客户端",
           ]}
-          onOpenBoxJsSub={handleOpenBoxJsSub}
-          onInstallSurge={handleInstallToSurge}
-          onInstallEgern={handleInstallToEgern}
-          onInstallLoon={handleInstallToLoon}
-          onInstallQx={handleInstallToQx}
-          onOpenExtra1={handleOpenGithub1}
-          extraTitle1="📂 ChinaTelecomOperators 仓库"
-          onOpenExtra2={handleOpenGithub2}
-          extraTitle2="📂 Yuheng0101 仓库"
+          actions={moduleActions}
         />
 
         <RenderConfigSection
@@ -258,8 +255,11 @@ function SettingsView() {
           setShowRemainRatio={setShowRemainRatio}
           smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
-          mediumCardStyle={mediumCardStyle}
-          setMediumCardStyle={setMediumCardStyle}
+          // ✅ 对齐联通：中号样式 + 三卡开关
+          mediumStyle={mediumStyle}
+          setMediumStyle={setMediumStyle}
+          mediumUseThreeLayout={mediumUseThreeLayout}
+          setMediumUseThreeLayout={setMediumUseThreeLayout}
           includeDirectionalInTotal={includeDirectionalInTotal}
           setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
           refreshInterval={refreshInterval}

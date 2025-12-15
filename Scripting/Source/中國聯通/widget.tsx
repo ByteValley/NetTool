@@ -1,4 +1,4 @@
-// widget.tsx
+// widget.tsx（中国联通）
 // 业务逻辑层：只负责拉数据 + 解析 + 转成 TelecomData，然后交给 TelecomWidgetRoot 渲染。
 
 import {
@@ -8,7 +8,7 @@ import {
   fetch,
 } from "scripting"
 
-import { TelecomWidgetRoot, TelecomData } from "./telecom/widgetRoot"
+import { WidgetRoot, TelecomData } from "./telecom/widgetRoot"
 import { nowHHMM, formatFlowValue } from "./telecom/utils/telecomUtils"
 import { ensureImageFilePath } from "./telecom/utils/imageCache"
 import {
@@ -631,7 +631,7 @@ async function render() {
   }
 
   Widget.present(
-    <TelecomWidgetRoot
+    <WidgetRoot
       data={mergedData}
       settingsKey={SETTINGS_KEY}
       logoPath={logoFilePath || ""}

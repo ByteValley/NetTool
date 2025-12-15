@@ -2,7 +2,7 @@
 
 import { VStack, HStack, ZStack, Text, Spacer, Image } from "scripting"
 import type { SmallCardCommonProps } from "./common"
-import { telecomRingThemes, timeStyle } from "../../theme"
+import { ringThemes, timeStyle } from "../../theme"
 import type { RingCardTheme } from "../../theme"
 
 // =====================================================================
@@ -123,8 +123,8 @@ function isUrlLogo(logoPath?: string | null) {
 function LogoImage(props: { logoPath?: string | null; size: number; fallbackTheme?: RingCardTheme }) {
   const { logoPath, size, fallbackTheme } = props
   if (!logoPath) {
-    const icon = fallbackTheme?.icon ?? telecomRingThemes.fee.icon
-    const tint = fallbackTheme?.tint ?? telecomRingThemes.fee.tint
+    const icon = fallbackTheme?.icon ?? ringThemes.fee.icon
+    const tint = fallbackTheme?.tint ?? ringThemes.fee.tint
     return <Image systemName={icon} font={size} fontWeight="semibold" foregroundStyle={tint} />
   }
   return isUrlLogo(logoPath) ? (
@@ -388,7 +388,7 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
             </Left>
 
             <HStack alignment="lastTextBaseline" spacing={5} frame={{ minWidth: 0, maxWidth: Infinity }}>
-              <Text font={26} fontWeight="bold" foregroundStyle={telecomRingThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
+              <Text font={26} fontWeight="bold" foregroundStyle={ringThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
                 {fee.balance}
               </Text>
               <Text font={10} fontWeight="semibold" foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
@@ -399,7 +399,7 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
           </VStack>
 
           <VStack spacing={3} alignment="trailing" frame={{ minWidth: 0 }}>
-            <LogoImage logoPath={props.logoPath} size={24} fallbackTheme={telecomRingThemes.fee} />
+            <LogoImage logoPath={props.logoPath} size={24} fallbackTheme={ringThemes.fee} />
             {props.updateTime ? (
               <Text font={9} foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
                 {props.updateTime}
@@ -418,9 +418,9 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
           }}
           frame={{ minWidth: 0, maxWidth: Infinity }}
         >
-          <NeoRow label={flowLabel} value={flowText} theme={telecomRingThemes.flow} />
-          {showOther ? <NeoRow label={String(props.otherFlowLabel)} value={otherText} theme={telecomRingThemes.flowDir} /> : null}
-          <NeoRow label={props.voiceLabel || "剩余语音"} value={voiceText} theme={telecomRingThemes.voice} />
+          <NeoRow label={flowLabel} value={flowText} theme={ringThemes.flow} />
+          {showOther ? <NeoRow label={String(props.otherFlowLabel)} value={otherText} theme={ringThemes.flowDir} /> : null}
+          <NeoRow label={props.voiceLabel || "剩余语音"} value={voiceText} theme={ringThemes.voice} />
         </VStack>
       </VStack>
     </SmallCardSurface>
@@ -454,7 +454,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
             </Left>
 
             <HStack alignment="lastTextBaseline" spacing={5} frame={{ minWidth: 0, maxWidth: Infinity }}>
-              <Text font={26} fontWeight="bold" foregroundStyle={telecomRingThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
+              <Text font={26} fontWeight="bold" foregroundStyle={ringThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
                 {fee.balance}
               </Text>
               <Text font={10} fontWeight="semibold" foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
@@ -465,7 +465,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
           </VStack>
 
           <VStack spacing={3} alignment="trailing" frame={{ minWidth: 0 }}>
-            <LogoImage logoPath={props.logoPath} size={24} fallbackTheme={telecomRingThemes.fee} />
+            <LogoImage logoPath={props.logoPath} size={24} fallbackTheme={ringThemes.fee} />
             {props.updateTime ? (
               <Text font={9} foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
                 {props.updateTime}
@@ -488,7 +488,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
             label={flowLabel}
             value={`${String(flowValue ?? "0")}`}
             unit={String(flowUnit ?? "").toUpperCase() || "GB"}
-            theme={telecomRingThemes.flow}
+            theme={ringThemes.flow}
             ratio={flowRatio}
           />
 
@@ -497,7 +497,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
               label={String(props.otherFlowLabel)}
               value={`${String(props.otherFlowValue ?? "0")}`}
               unit={String(props.otherFlowUnit ?? "").toUpperCase() || "GB"}
-              theme={telecomRingThemes.flowDir}
+              theme={ringThemes.flowDir}
               ratio={props.otherFlowRatio}
             />
           ) : null}
@@ -506,7 +506,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
             label={props.voiceLabel || "剩余语音"}
             value={`${String(props.voiceValue ?? "0")}`}
             unit={"分钟"}
-            theme={telecomRingThemes.voice}
+            theme={ringThemes.voice}
             ratio={props.voiceRatio}
           />
         </VStack>
@@ -543,13 +543,13 @@ export function TripleRowsSmallStyle(props: SmallCardCommonProps) {
     <SmallCardSurface>
       <VStack spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
         <ContentCard>
-          <Row theme={telecomRingThemes.fee} title={props.feeTitle || "剩余话费"} value={fee.balance} unit={fee.unit || "元"} rightLogo />
+          <Row theme={ringThemes.fee} title={props.feeTitle || "剩余话费"} value={fee.balance} unit={fee.unit || "元"} rightLogo />
         </ContentCard>
         <ContentCard>
-          <Row theme={telecomRingThemes.flow} title={props.flowLabel || "剩余流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
+          <Row theme={ringThemes.flow} title={props.flowLabel || "剩余流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
         </ContentCard>
         <ContentCard>
-          <Row theme={telecomRingThemes.voice} title={props.voiceLabel || "剩余语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
+          <Row theme={ringThemes.voice} title={props.voiceLabel || "剩余语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
         </ContentCard>
       </VStack>
     </SmallCardSurface>
@@ -593,15 +593,15 @@ export function IconCellsSmallStyle(props: SmallCardCommonProps) {
     <SmallCardSurface>
       <VStack spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
         <ContentCard padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
-          <Cell theme={telecomRingThemes.fee} title={props.feeTitle || "剩余话费"} value={fee.balance} unit={fee.unit || "元"} leftLogo />
+          <Cell theme={ringThemes.fee} title={props.feeTitle || "剩余话费"} value={fee.balance} unit={fee.unit || "元"} leftLogo />
         </ContentCard>
 
         <ContentCard padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
-          <Cell theme={telecomRingThemes.flow} title={props.flowLabel || "剩余流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
+          <Cell theme={ringThemes.flow} title={props.flowLabel || "剩余流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
         </ContentCard>
 
         <ContentCard padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
-          <Cell theme={telecomRingThemes.voice} title={props.voiceLabel || "剩余语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
+          <Cell theme={ringThemes.voice} title={props.voiceLabel || "剩余语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
         </ContentCard>
       </VStack>
     </SmallCardSurface>
@@ -651,7 +651,7 @@ export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
                 </Left>
 
                 <HStack alignment="lastTextBaseline" spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }}>
-                  <Text font={22} fontWeight="bold" foregroundStyle={telecomRingThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
+                  <Text font={22} fontWeight="bold" foregroundStyle={ringThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
                     {fee.balance}
                   </Text>
                   <Text font={10} fontWeight="semibold" foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
@@ -662,7 +662,7 @@ export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
               </VStack>
 
               <VStack spacing={2} alignment="trailing" frame={{ minWidth: 0 }}>
-                <LogoImage logoPath={props.logoPath} size={22} fallbackTheme={telecomRingThemes.fee} />
+                <LogoImage logoPath={props.logoPath} size={22} fallbackTheme={ringThemes.fee} />
                 {props.updateTime ? (
                   <Text font={9} foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
                     {props.updateTime}
@@ -677,8 +677,8 @@ export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
 
         <HStack alignment="center" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
           <Spacer />
-          <MiniBlock theme={telecomRingThemes.flow} label={props.flowLabel || "通用流量"} value={flowValue} />
-          <MiniBlock theme={telecomRingThemes.voice} label={props.voiceLabel || "剩余语音"} value={voiceValue} />
+          <MiniBlock theme={ringThemes.flow} label={props.flowLabel || "通用流量"} value={flowValue} />
+          <MiniBlock theme={ringThemes.voice} label={props.voiceLabel || "剩余语音"} value={voiceValue} />
           <Spacer />
         </HStack>
       </VStack>
@@ -713,7 +713,7 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
               </Left>
 
               <HStack alignment="center" spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }}>
-                <Text font={22} fontWeight="bold" foregroundStyle={telecomRingThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
+                <Text font={22} fontWeight="bold" foregroundStyle={ringThemes.fee.tint} lineLimit={1} minScaleFactor={0.5}>
                   {fee.balance}
                 </Text>
                 <Text font={10} fontWeight="semibold" foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
@@ -724,7 +724,7 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
             </VStack>
 
             <VStack spacing={2} alignment="trailing" frame={{ minWidth: 0 }}>
-              <LogoImage logoPath={props.logoPath} size={24} fallbackTheme={telecomRingThemes.fee} />
+              <LogoImage logoPath={props.logoPath} size={24} fallbackTheme={ringThemes.fee} />
               {props.updateTime ? (
                 <Text font={9} foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
                   {props.updateTime}
@@ -735,11 +735,11 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
         </ContentCard>
 
         <TintPanel spacing={showOther ? 6 : 7} cornerRadius={16}>
-          <ListRow theme={telecomRingThemes.flow} label={props.flowLabel || "剩余流量"} valueText={flowValueText} unitText={flowUnitText} />
+          <ListRow theme={ringThemes.flow} label={props.flowLabel || "剩余流量"} valueText={flowValueText} unitText={flowUnitText} />
           {showOther ? (
-            <ListRow theme={telecomRingThemes.flowDir} label={String(props.otherFlowLabel)} valueText={otherValueText} unitText={otherUnitText} />
+            <ListRow theme={ringThemes.flowDir} label={String(props.otherFlowLabel)} valueText={otherValueText} unitText={otherUnitText} />
           ) : null}
-          <ListRow theme={telecomRingThemes.voice} label={props.voiceLabel || "剩余语音"} valueText={voiceValueText} unitText={"分钟"} />
+          <ListRow theme={ringThemes.voice} label={props.voiceLabel || "剩余语音"} valueText={voiceValueText} unitText={"分钟"} />
         </TintPanel>
       </VStack>
     </SmallCardSurface>
@@ -794,7 +794,7 @@ export function DualGaugesSmallStyle(props: SmallCardCommonProps) {
         <ContentCard>
           <HStack alignment="center" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
             <Spacer />
-            <LogoImage logoPath={props.logoPath} size={34} fallbackTheme={telecomRingThemes.fee} />
+            <LogoImage logoPath={props.logoPath} size={34} fallbackTheme={ringThemes.fee} />
             <Spacer />
           </HStack>
 
@@ -802,7 +802,7 @@ export function DualGaugesSmallStyle(props: SmallCardCommonProps) {
 
           <HStack alignment="center" spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }}>
             <Spacer />
-            <Text font={22} fontWeight="bold" foregroundStyle={telecomRingThemes.fee.tint} lineLimit={1} minScaleFactor={0.55}>
+            <Text font={22} fontWeight="bold" foregroundStyle={ringThemes.fee.tint} lineLimit={1} minScaleFactor={0.55}>
               {fee.balance}
             </Text>
             <Text font={10} fontWeight="semibold" foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
@@ -824,9 +824,9 @@ export function DualGaugesSmallStyle(props: SmallCardCommonProps) {
         </ContentCard>
 
         <HStack alignment="center" spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }}>
-          <Ring theme={telecomRingThemes.flow} title={props.flowLabel || "流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
+          <Ring theme={ringThemes.flow} title={props.flowLabel || "流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
           <Spacer />
-          <Ring theme={telecomRingThemes.voice} title={props.voiceLabel || "语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
+          <Ring theme={ringThemes.voice} title={props.voiceLabel || "语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
         </HStack>
       </VStack>
     </SmallCardSurface>
@@ -859,9 +859,9 @@ export function TextListSmallStyle(props: SmallCardCommonProps) {
       <VStack spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
         <ContentCard>
           <HStack alignment="center" spacing={8} frame={{ minWidth: 0, maxWidth: Infinity }}>
-            <LogoImage logoPath={props.logoPath} size={22} fallbackTheme={telecomRingThemes.fee} />
+            <LogoImage logoPath={props.logoPath} size={22} fallbackTheme={ringThemes.fee} />
             <Spacer />
-            <Text font={20} fontWeight="bold" foregroundStyle={telecomRingThemes.fee.tint} lineLimit={1} minScaleFactor={0.55}>
+            <Text font={20} fontWeight="bold" foregroundStyle={ringThemes.fee.tint} lineLimit={1} minScaleFactor={0.55}>
               {fee.balance}
             </Text>
             <Text font={10} fontWeight="semibold" foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.65}>
@@ -881,17 +881,17 @@ export function TextListSmallStyle(props: SmallCardCommonProps) {
           ) : null}
         </ContentCard>
 
-        <Line theme={telecomRingThemes.flow} title={props.flowLabel || "流量"} value={`${String(props.flowValue ?? "0")}${String(props.flowUnit ?? "")}`} />
+        <Line theme={ringThemes.flow} title={props.flowLabel || "流量"} value={`${String(props.flowValue ?? "0")}${String(props.flowUnit ?? "")}`} />
 
         {showOther ? (
           <Line
-            theme={telecomRingThemes.flowDir}
+            theme={ringThemes.flowDir}
             title={String(props.otherFlowLabel)}
             value={`${String(props.otherFlowValue ?? "0")}${String(props.otherFlowUnit ?? "")}`}
           />
         ) : null}
 
-        <Line theme={telecomRingThemes.voice} title={props.voiceLabel || "语音"} value={`${String(props.voiceValue ?? "0")}${String(props.voiceUnit ?? "") || "分钟"}`} />
+        <Line theme={ringThemes.voice} title={props.voiceLabel || "语音"} value={`${String(props.voiceValue ?? "0")}${String(props.voiceUnit ?? "") || "分钟"}`} />
       </VStack>
     </SmallCardSurface>
   )

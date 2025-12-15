@@ -4,17 +4,28 @@ import { Section, Text, Toggle, Picker } from "scripting"
 import type { SmallCardStyle } from "../cards/small"
 import { SMALL_STYLE_OPTIONS } from "../cards/small"
 
+// ✅ 中号样式：FullRing / DialRing（新结构）
+export type MediumStyleKey = "FullRing" | "DialRing"
+
 type RenderConfigSectionProps = {
   showRemainRatio: boolean
   setShowRemainRatio: (v: boolean) => void
+
+  // 小号
   smallCardStyle: SmallCardStyle
   setSmallCardStyle: (v: SmallCardStyle) => void
   smallMiniBarUseTotalFlow: boolean
   setSmallMiniBarUseTotalFlow: (v: boolean) => void
 
-  mediumCardStyle: "three" | "four"
-  setMediumCardStyle: (v: "three" | "four") => void
+  // 中号：样式（满圆环 / 仪表盘）
+  mediumStyle: MediumStyleKey
+  setMediumStyle: (v: MediumStyleKey) => void
 
+  // ✅ 中号：三卡开关（true=三卡，false=四卡默认）
+  mediumUseThreeLayout: boolean
+  setMediumUseThreeLayout: (v: boolean) => void
+
+  // 三卡时：总/通用联动
   includeDirectionalInTotal: boolean
   setIncludeDirectionalInTotal: (v: boolean) => void
 
@@ -33,9 +44,9 @@ const REFRESH_OPTIONS = [
   { label: "24 小时", value: 1440 },
 ]
 
-const MEDIUM_LAYOUT_OPTIONS = [
-  { label: "三卡", value: "three" as const },
-  { label: "四卡", value: "four" as const },
+const MEDIUM_STYLE_OPTIONS: Array<{ label: string; value: MediumStyleKey }> = [
+  { label: "全圆环", value: "FullRing" },
+  { label: "仪表盘", value: "DialRing" },
 ]
 
 const SMALL_CARD_OPTIONS: { label: string; value: SmallCardStyle }[] = [
@@ -48,36 +59,45 @@ const SMALL_CARD_OPTIONS: { label: string; value: SmallCardStyle }[] = [
 
 export function RenderConfigSection(props: RenderConfigSectionProps) {
   const {
-    smallCardStyle,
-    setSmallCardStyle,
     showRemainRatio,
     setShowRemainRatio,
 
+    smallCardStyle,
+    setSmallCardStyle,
     smallMiniBarUseTotalFlow,
     setSmallMiniBarUseTotalFlow,
 
-    mediumCardStyle,
-    setMediumCardStyle,
+    mediumStyle,
+    setMediumStyle,
+
+    mediumUseThreeLayout,
+    setMediumUseThreeLayout,
+
     includeDirectionalInTotal,
     setIncludeDirectionalInTotal,
+
     refreshInterval,
     setRefreshInterval,
   } = props
 
-  // ✅ 只对 CompactList / ProgressList 生效的联动开关
+  // ✅ 只对 CompactList / ProgressList 生效的联动开关（保持原逻辑不动）
   const isCompactOrProgress =
     smallCardStyle === ("CompactList" as SmallCardStyle) ||
     smallCardStyle === ("ProgressList" as SmallCardStyle)
+
+  // ✅ 三卡判断现在改为 boolean（唯一真源）
+  const isThreeCard = !!mediumUseThreeLayout
 
   return (
     <Section
       header={<Text font="body" fontWeight="semibold">渲染配置</Text>}
       footer={
         <Text font="caption2" foregroundStyle="secondaryLabel">
-          • 小号组件：摘要 / 紧凑清单 / 进度清单 / 其余 6 种布局可选。
+          • 小号组件：摘要 / 紧凑清单 / 进度清单 / 其余布局可选。
           {"\n"}• “进度清单”会显示条形进度；“紧凑清单”不显示条形，仅显示数值。
           {"\n"}• 百分比含义：作用于通用/定向/语音（或总流量/语音），由「显示剩余/已使用」决定。
-          {"\n"}• 中号组件布局：三卡=话费+总流量+语音；四卡=话费+通用+定向+语音。
+          {"\n"}• 中号组件：样式=全圆环/仪表盘；布局=三卡/四卡（三卡会隐藏定向卡）。
+          {"\n"}• 三卡布局下：可选择“总流量包含定向”或“仅通用流量”。
           {"\n"}• 刷新间隔建议 15 分钟～24 小时（系统调度可能更慢）。
         </Text>
       }
@@ -88,14 +108,19 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
         onChanged={setShowRemainRatio}
       />
 
+      {/* ==================== 小号 ==================== */}
       <Picker
         title={"小号组件样式"}
         value={smallCardStyle}
-        onChanged={(value: string) => setSmallCardStyle((value as SmallCardStyle) || "summary")}
+        onChanged={(value: string) =>
+          setSmallCardStyle((value as SmallCardStyle) || "summary")
+        }
         pickerStyle={"menu"}
       >
         {SMALL_CARD_OPTIONS.map((opt) => (
-          <Text key={opt.value} tag={opt.value as any}>{opt.label}</Text>
+          <Text key={opt.value} tag={opt.value as any}>
+            {opt.label}
+          </Text>
         ))}
       </Picker>
 
@@ -112,18 +137,31 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
         />
       ) : null}
 
+      {/* ==================== 中号 ==================== */}
       <Picker
         title={"中号组件样式"}
-        value={mediumCardStyle}
-        onChanged={(value: string) => setMediumCardStyle((value as "four" | "three") || "four")}
+        value={mediumStyle}
+        onChanged={(value: string) =>
+          setMediumStyle((value as MediumStyleKey) || "FullRing")
+        }
         pickerStyle={"menu"}
       >
-        {MEDIUM_LAYOUT_OPTIONS.map((opt) => (
-          <Text key={opt.value} tag={opt.value as any}>{opt.label}</Text>
+        {MEDIUM_STYLE_OPTIONS.map((opt) => (
+          <Text key={opt.value} tag={opt.value as any}>
+            {opt.label}
+          </Text>
         ))}
       </Picker>
 
-      {mediumCardStyle === "three" ? (
+      {/* ✅ 中号组件布局：boolean 开关（关=默认四卡） */}
+      <Toggle
+        title={isThreeCard ? "中号组件布局：三卡（隐藏定向卡）" : "中号组件布局：四卡（默认）"}
+        value={isThreeCard}
+        onChanged={setMediumUseThreeLayout}
+      />
+
+      {/* ✅ 三卡时才需要“总/通用联动”（联动开关恢复出现） */}
+      {isThreeCard ? (
         <Toggle
           title={includeDirectionalInTotal ? "总流量：包含定向流量" : "总流量：仅统计通用流量"}
           value={includeDirectionalInTotal}
@@ -131,6 +169,7 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
         />
       ) : null}
 
+      {/* ==================== 刷新 ==================== */}
       <Picker
         title={"刷新间隔"}
         value={refreshInterval}
@@ -141,7 +180,9 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
         pickerStyle={"menu"}
       >
         {REFRESH_OPTIONS.map((opt) => (
-          <Text key={opt.value} tag={opt.value as any}>{opt.label}</Text>
+          <Text key={opt.value} tag={opt.value as any}>
+            {opt.label}
+          </Text>
         ))}
       </Picker>
     </Section>
