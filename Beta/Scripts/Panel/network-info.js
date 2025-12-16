@@ -683,136 +683,200 @@ function fmtISP(isp, locStr) {
 }
 
 // 模块分类 · IP 风险评估（家宽/原生/VPN/风险值）
-// 目标：尽量“别把机房当家宽、也别把家宽当机房”——宁可保守一点，也别自信胡说八道。
+// 说明：尽量“更像事实”的家宽判断，需要把信息源堆起来。
+// · 一手信号：ASN / 组织(ORG) / 反向解析(PTR/rDNS)
+// · 二手信号：ISP 名称关键字、国家风险加成
+// · 输出：riskValue(0~100，越高越像机房/代理)、家宽/原生/VPN 状态（面板友好标签）
 const RISK_RULES = Object.freeze({
   // —— 更像“机房/云/VPN/代理”的信号 ——（命中后强烈加分=更风险）
   dataCenterKeywords: [
-    "datacenter", "data center", "hosting", "hosted", "cloud", "cdn", "edge", "vps", "colo", "colocation",
-    "proxy", "vpn", "tunnel", "relay", "compute", "server", "scrubbing", "ddos", "transit", "backbone",
+    "datacenter", "data center", "hosting", "cloud", "cdn", "edge", "vps", "colo", "colocation",
+    "proxy", "vpn", "tunnel", "relay", "compute", "server",
 
-    // 常见云厂商/机房/IDC（尽量用更明确的词）
+    // 常见云厂商/机房（尽量用更明确的词）
     "amazon", "aws", "google", "gcp", "microsoft", "azure", "digitalocean", "linode", "ovh",
-    "hetzner", "vultr", "oracle", "alibaba cloud", "tencent cloud", "huawei cloud",
-    "cloudflare", "fastly", "akamai", "leaseweb", "choopa", "dmit", "racknerd", "cogent", "he.net"
+    "hetzner", "vultr", "oracle", "alibaba cloud", "tencent cloud", "cloudflare", "fastly",
+    "akamai", "leaseweb", "choopa", "dmit", "racknerd"
   ],
 
   // —— 更像“家庭宽带/运营商接入网”的信号 ——（命中后减分=更像家宽）
+  // 注：词表再长也不可能覆盖所有 ISP，所以这里的权重故意比“机房信号”弱。
   homeBroadbandKeywords: [
-    // 中国三家（含常见 ASN 号段提示）
+    // 中国三家 + 常见 ASN 线索
     "china telecom", "chinanet", "ctcc", "as4134", "as4809",
     "china mobile", "cmcc", "cmnet", "cmi", "as9808",
     "china unicom", "unicom", "cucc", "as4837",
+    "cernet", "china education",
 
-    // 中国区域家宽（示例：二级运营商/城域网关键词）
-    "broadband", "ftth", "residential", "home", "fiber", "fibre", "pon", "dsl", "cable",
-
-    // 常见家宽 ISP（示例：美/加/欧）
+    // 美/加/欧家宽 ISP（示例）
     "comcast", "xfinity", "verizon", "at&t", "charter", "spectrum", "cox",
     "rogers", "bell canada", "telus",
     "bt", "virgin media", "sky broadband",
-    "deutsche telekom", "telefonica", "orange", "vodafone"
+    "deutsche telekom", "telefonica", "orange", "vodafone",
+
+    // 通用接入网/家宽词
+    "isp", "broadband", "fiber", "ftth", "residential", "cable", "docsis",
+    // 接入形态/命名习惯（常见于家宽/接入网描述）
+    "pppoe", "dsl", "adsl", "vdsl", "pon", "gpon", "epon", "cpe",
+    "dynamic", "dyn", "pool", "subscriber", "cust", "customer"
   ],
 
-  // 策略名/节点名里常见“代理/VPN/线路类型”提示（不一定准，但常作为“加权证据”）
-  policyHints: [
-    "vpn", "proxy", "wireguard", "wg", "openvpn", "v2ray", "xray", "ss", "ssr", "trojan",
-    "reality", "hysteria", "tuic", "warp", "cloudflare",
-    "iepl", "iplc", "transit", "relay", "tunnel", "exit"
+  // —— 更像“移动网络/蜂窝出口”的信号 ——（不等于机房，但也不算传统家宽）
+  mobileKeywords: [
+    "mobile", "lte", "4g", "5g", "cell", "cellular", "wireless",
+    "epc", "ims", "gprs", "wimax"
   ],
+
+  // —— rDNS（PTR）强信号：常见机房域名后缀 ——（命中后强烈加分）
+  // 说明：PTR 很“诚实”，能直接暴露机房/云的命名体系，但并非所有 IP 都有 PTR。
+  rdnsDatacenterSuffix: [
+    "amazonaws.com", "compute.amazonaws.com",
+    "googleusercontent.com", "cloudapp.azure.com",
+    "digitalocean.com", "linodeusercontent.com",
+    "ovh.net", "kimsufi.com", "online.net",
+    "hetzner.de", "hetzner.com",
+    "vultrusercontent.com",
+    "leaseweb.net", "choopa.net",
+    "cloudflare.com", "cloudflarenet.com",
+    "fastly.net", "akamai.net"
+  ],
+
+  // —— rDNS（PTR）更像家宽/接入网的弱信号 ——（命中后减分）
+  // 说明：这类关键词更“脏”，只能作为辅证，避免被误导。
+  rdnsResidentialKeywords: [
+    "dynamic", "dyn", "pppoe", "dsl", "adsl", "vdsl", "cable", "docsis",
+    "fiber", "ftth", "fios", "broadband", "res", "home",
+    "cust", "customer", "subscriber", "pool", "cpe"
+  ],
+
+  // —— rDNS（PTR）更像移动出口的弱信号 ——
+  rdnsMobileKeywords: ["lte", "5g", "4g", "mobile", "cell", "wireless", "epc"],
 
   // 地缘“风险加成”（归一化）
   highRiskCountries: ["俄罗斯", "russia", "印度", "india", "乌克兰", "ukraine"]
 });
 
-function _normRiskText(x) {
+function parseASNNumber(s) {
+  const str = String(s || "");
+  const m = str.match(/\bAS(\d{1,10})\b/i);
+  if (m) return Number(m[1]) || 0;
+  const m2 = str.match(/\b(\d{1,10})\b/);
+  return m2 ? (Number(m2[1]) || 0) : 0;
+}
+
+function _normStr(x) {
   return String(x || "")
     .replace(/\s+/g, " ")
-    .replace(/[（(].*?[）)]/g, " ")
+    .replace(/[（(].*?[）)]/g, " ") // 去掉括号里噪音
     .trim()
     .toLowerCase();
 }
 
-function _hitAny(hay, list) {
-  const H = _normRiskText(hay);
+function _hasAny(hay, list) {
+  const H = _normStr(hay);
+  if (!H) return false;
   for (const kw of list) {
-    const k = _normRiskText(kw);
-    if (!k) continue;
-    if (H.includes(k)) return k;
+    const k = _normStr(kw);
+    if (k && H.includes(k)) return true;
   }
-  return "";
+  return false;
 }
 
-function _extractASN(hay) {
-  const s = String(hay || "");
-  const m = s.match(/\bAS(\d{1,6})\b/i);
-  if (m) return `AS${m[1]}`;
-  return "";
+function _rdnsLooksDatacenter(ptrHost) {
+  const host = _normStr(ptrHost).replace(/\.$/, "");
+  if (!host) return false;
+  return RISK_RULES.rdnsDatacenterSuffix.some((suf) => host.endsWith(_normStr(suf)));
 }
 
-function calculateRiskValueSafe(isp, org, country, countryCode, policyName) {
-  const ISP = _normRiskText(isp);
-  const ORG = _normRiskText(org);
-  const CTRY = _normRiskText(country || countryCode);
-  const POL = _normRiskText(policyName);
+function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
+  const ISP = _normStr(isp);
+  const ORG = _normStr(org);
+  const CTRY = _normStr(country);
+  const AS = _normStr(asField);
 
-  const hay = `${ISP} | ${ORG}`.trim();
-  const asn = _extractASN(`${isp || ""} ${org || ""}`);
+  const hay = joinNonEmpty([ISP, ORG, AS], " | ");
+  const asn = parseASNNumber(asField);
 
-  // 两条证据链：机房/代理 vs 家宽/接入网
-  const dcHit = _hitAny(hay, RISK_RULES.dataCenterKeywords);
-  const homeHit = _hitAny(hay, RISK_RULES.homeBroadbandKeywords);
-  const polHit = _hitAny(POL, RISK_RULES.policyHints);
+  // 这套判定是“证据加权”，目标是：
+  // - 命中机房证据就果断判非家宽（你说的“标注家宽但检测不是”大多属于这类伪装）
+  // - 家宽证据必须至少出现 2 类（ASN/组织词 + rDNS/命名习惯/接入形态等），才会判成“真家宽”
+  // - 移动网络单独标出来，避免把蜂窝出口当家宽
 
-  const dcScore = dcHit ? 1 : 0;
-  const homeScore = homeHit ? 1 : 0;
+  let riskValue = 0;
 
-  // 初始风险（别从 0 开始，现实世界本来就不确定）
-  let riskValue = 20;
+  // 1) rDNS（PTR）强信号
+  const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost);
+  const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
+  const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.mobileKeywords);
 
-  // 策略名提示：加权证据（不是决定性证据）
-  if (polHit) riskValue += 18;
+  if (rdnsHitDC) riskValue += 75;
+  if (rdnsHitHB) riskValue -= rdnsHitDC ? 6 : 26;
 
-  // 机房/代理强证据
-  if (dcHit) riskValue += 42;
+  // 2) ORG/ASN/ISP 信号
+  const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
+  const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
+  const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
 
-  // 家宽/接入网证据（尽量“抗洗白”：如果同时命中机房证据，只做温和减分）
-  if (homeHit) riskValue -= dcHit ? 8 : 22;
+  if (dcHit) riskValue += 55;
+  if (hbHit) riskValue -= (rdnsHitDC || dcHit) ? 10 : 22;
+  if (mobileHit) riskValue -= (rdnsHitDC || dcHit) ? 0 : 10;
 
-  // ASN 额外线索：出现 ASN 本身不说明问题，但“带 ASN 且无家宽证据”更像机房描述
-  if (asn && !homeHit && dcHit) riskValue += 6;
-
-  // 国家风险加成（归一化后 contains）
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normRiskText(x)))) {
-    riskValue += 28;
+  // 3) 国家风险加成
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
+    riskValue += 18;
   }
 
-  // 信息缺失惩罚：落地源拿不到 ISP/ORG 时，可信度会下降
-  if (!ISP && !ORG) riskValue += 10;
-  else if (!ISP || !ORG) riskValue += 4;
+  // 4) 信息不足惩罚：别轻易给“真家宽”
+  if (!ORG && !AS && ISP.length <= 3) riskValue += 10;
 
   // 收敛到 0~100
   riskValue = Math.max(0, Math.min(100, Math.round(riskValue)));
 
-  // 判定逻辑：宁可保守
-  const isVPN = !!(dcHit || polHit);
-  const isHomeBroadbandBool = !!(homeScore && (!dcScore || riskValue < 55));
-  const isNativeBool = !!(!isVPN && riskValue < 50);
+  // —— 判定：四档 + 单独移动网络 ——
+  // 证据计数：至少 2 类家宽证据才给“真家宽”
+  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (asn ? 1 : 0);
+  const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
+
+  let lineType = "伪家宽";
+  if (mobileHit || rdnsHitMobile) lineType = "移动网络";
+  if (dcEvidence >= 1 && riskValue >= 60) lineType = "机房专线";
+  else if (riskValue >= 55) lineType = "伪家宽";
+  else if (riskValue >= 32) lineType = "疑似家宽";
+  else if (hbEvidence >= 2 && riskValue < 32) lineType = "真家宽";
+
+  // 输出面板可读标签
+  const isHomeBroadband = (lineType === "真家宽") ? "真家宽" : (lineType === "疑似家宽") ? "疑似家宽" : "非家宽";
+  const isNative = (riskValue < 50 && dcEvidence === 0) ? "原生" : "非原生";
+  const vpnStatus = (lineType === "机房专线") ? "已连接" : "未连接";
 
   const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
-  const labelHome = isHant ? (isHomeBroadbandBool ? "家寬" : "非家寬") : (isHomeBroadbandBool ? "家宽" : "非家宽");
-  const labelNative = isHant ? (isNativeBool ? "原生" : "非原生") : (isNativeBool ? "原生" : "非原生");
-  const labelVPN = isHant ? (isVPN ? "已連線" : "未連線") : (isVPN ? "已连接" : "未连接");
+  const zh = (h, t) => isHant ? t : h;
 
   return {
     riskValue,
-    isHomeBroadband: labelHome,
-    isNative: labelNative,
-    vpnStatus: labelVPN,
+    lineType: zh(
+      lineType,
+      (lineType === "真家宽") ? "真家寬" :
+      (lineType === "疑似家宽") ? "疑似家寬" :
+      (lineType === "移动网络") ? "行動網路" :
+      (lineType === "机房专线") ? "機房專線" :
+      "偽家寬"
+    ),
+    isHomeBroadband: zh(isHomeBroadband, (isHomeBroadband === "真家宽") ? "真家寬" : (isHomeBroadband === "疑似家宽") ? "疑似家寬" : "非家寬"),
+    isNative: zh(isNative, (isNative === "原生") ? "原生" : "非原生"),
+    vpnStatus: zh(vpnStatus, (vpnStatus === "已连接") ? "已連線" : "未連線"),
     _raw: {
-      isHomeBroadband: isHomeBroadbandBool,
-      isVPN,
-      hits: {dcHit, homeHit, polHit, asn},
-      norm: {ISP, ORG, CTRY, POL}
+      asn,
+      rdnsHost: rdnsHost || "",
+      dcHit,
+      hbHit,
+      mobileHit,
+      rdnsHitDC,
+      rdnsHitHB,
+      rdnsHitMobile,
+      hbEvidence,
+      dcEvidence,
+      _norm: {ISP, ORG, AS, CTRY}
     }
   };
 }
@@ -949,6 +1013,63 @@ function httpAPI(path = "/v1/requests/recent") {
   });
 }
 
+// 模块分类 · rDNS（PTR）探测（用于“伪家宽/机房”识别）
+// 说明：不是所有 IP 都有 PTR；有的话往往非常有信息量。
+// 数据源：Google DNS-over-HTTPS（DoH）
+// · IPv4: <reversed>.in-addr.arpa
+// · IPv6: <nibbles>.ip6.arpa
+function ipToPtrName(ip) {
+  const s = String(ip || "").trim();
+  if (isIPv4(s)) return s.split(".").reverse().join(".") + ".in-addr.arpa";
+  if (isIPv6(s)) {
+    // 更稳的 IPv6 展开：处理 ::、前导零、以及可能的 zone id（%en0）
+    const raw = s.toLowerCase().split("%")[0];
+    const halves = raw.split("::");
+    const left = (halves[0] || "").split(":").filter(Boolean);
+    const right = (halves[1] || "").split(":").filter(Boolean);
+    const leftN = left.length;
+    const rightN = (halves.length === 2) ? right.length : 0;
+    const missing = (halves.length === 2) ? Math.max(0, 8 - (leftN + rightN)) : 0;
+    const groups = [];
+    for (const g of left) groups.push(g.padStart(4, "0"));
+    for (let i = 0; i < missing; i++) groups.push("0000");
+    for (const g of right) groups.push(g.padStart(4, "0"));
+    while (groups.length < 8) groups.push("0000");
+    const hex32 = groups.slice(0, 8).join("");
+    const nibbles = hex32.split("").reverse().join(".");
+    return nibbles + ".ip6.arpa";
+  }
+  return "";
+}
+
+async function queryPTR(ip) {
+  const name = ipToPtrName(ip);
+  if (!name) return "";
+  const url = "https://dns.google/resolve?name=" + encodeURIComponent(name) + "&type=PTR";
+  const to = Math.min(900, capByBudget(900));
+  const r = await httpGet(url, {"Accept": "application/dns-json"}, to, true)
+    .then((x) => ({ok: true, status: x.status, data: x.body}))
+    .catch(() => ({ok: false, status: 0, data: ""}));
+  if (!r.ok || r.status !== 200) return "";
+  try {
+    const j = safeJSON(r.data, {});
+    const ans = Array.isArray(j.Answer) ? j.Answer : [];
+    const first = ans.find((x) => x && (x.type === 12 || String(x.type) === "12") && x.data);
+    const host = first ? String(first.data).trim() : "";
+    return host.replace(/\.$/, "");
+  } catch (_) {
+    return "";
+  }
+}
+
+async function queryPTRMaybe(ip) {
+  // 预算不足时不做 PTR（避免拖慢面板）
+  if (!ip) return "";
+  if (budgetLeft() <= 800) return "";
+  return withTimeout(queryPTR(ip), Math.min(950, capByBudget(950)), "");
+}
+
+
 // 模块分类 · 数据源定义
 const DIRECT_V4_SOURCES = Object.freeze({
   ipip: {
@@ -1035,6 +1156,7 @@ const DIRECT_V4_SOURCES = Object.freeze({
 });
 
 const LANDING_V4_SOURCES = Object.freeze({
+  // ip-api：速度快，字段稳定（query/countryCode/isp/org/as）
   ipapi: {
     url: "http://ip-api.com/json?lang=zh-CN",
     parse: (r) => {
@@ -1046,40 +1168,49 @@ const LANDING_V4_SOURCES = Object.freeze({
           " "
         ),
         isp: j.isp || j.org || "",
-        // —— 风险计算用 ——（isp/org/country/countryCode）
-        org: j.org || j.as || "",
+        // —— 家宽判定用 ——
+        org: j.org || "",
+        as: j.as || "", // e.g. "AS4134 Chinanet"
         country: j.country || "",
-        countryCode: (j.countryCode || "").toUpperCase()
+        countryCode: String(j.countryCode || "").toUpperCase()
       };
     }
   },
+
+  // ipwhois：字段波动大，但能补充 isp/org/asn
   ipwhois: {
     url: "https://ipwhois.app/widget.php?lang=zh-CN",
     parse: (r) => {
       const j = safeJSON(r.body, {});
+      const asn = (j.asn || j.as || (j?.connection?.asn) || "");
       return {
         ip: j.ip || "",
         loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ""), j.region, j.city], " "),
         isp: (j?.connection?.isp) || "",
-        // —— 风险计算用 ——（org 优先取 org/connection.org）
+        // —— 家宽判定用 ——
         org: j.org || (j?.connection?.org) || "",
+        as: asn || "",
         country: j.country || "",
-        countryCode: (j.country_code || "").toUpperCase()
+        countryCode: String(j.country_code || "").toUpperCase()
       };
     }
   },
+
+  // ip.sb：常带 ASN/Organization（机房识别很有用）
   ipsb: {
     url: "https://api-ipv4.ip.sb/geoip",
     parse: (r) => {
       const j = safeJSON(r.body, {});
+      const as = j.asn ? (`AS${j.asn}` + (j.asn_organization ? ` ${j.asn_organization}` : "")) : "";
       return {
         ip: j.ip || "",
         loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], " ").replace(/\s*中国\s*/, ""),
         isp: j.isp || j.organization || "",
-        // —— 风险计算用 ——
+        // —— 家宽判定用 ——
         org: j.organization || j.asn_organization || "",
+        as,
         country: j.country || "",
-        countryCode: (j.country_code || "").toUpperCase()
+        countryCode: String(j.country_code || "").toUpperCase()
       };
     }
   }
@@ -2035,9 +2166,11 @@ log("debug", "BoxSettings(BOX)", BOX);
     v6_ready: V6_READY
   });
 
-  // 模块分类 · 风险评估（基于落地信息 + policyName）
-  const risk = calculateRiskValueSafe(px.isp, px.org, px.country, px.countryCode, policyName);
-
+  // 模块分类 · 风险评估（基于落地信息：ISP/ORG/ASN + PTR）
+  const rdnsHost = await queryPTRMaybe(px.ip).catch(() => "");
+  const asField = (px && (px.as || px.asn)) ? (px.as || px.asn) : "";
+  const risk = calculateRiskValueSafe(px.isp, px.org, px.country, asField, rdnsHost);
+  
   const title = netTypeLine() || t("unknownNet");
 
   const parts = [];
@@ -2072,27 +2205,28 @@ log("debug", "BoxSettings(BOX)", BOX);
 
   if (px && (px.ip || px6.ip || px.loc || px.isp)) {
     pushGroupTitle(parts, "落地");
-
+  
     const landIPv4 = ipLine("IPv4", px.ip);
     const landIPv6 = ipLine("IPv6", px6.ip);
     if (landIPv4) parts.push(landIPv4);
     if (landIPv6) parts.push(landIPv6);
-
+  
     if (px.loc) parts.push(`${t("location")}: ${flagFirst(px.loc)}`);
     if (px.isp) parts.push(`${t("isp")}: ${fmtISP(px.isp, px.loc)}`);
-
+  
     // 模块分类 · 风险/家宽/原生/VPN（落地维度）
     const r = (risk && typeof risk === "object")
       ? risk
       : {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-", _raw: {}};
-
-    parts.push(`网络类型: ${r.isHomeBroadband} · ${r.isNative}`);
+  
+    parts.push(`网络类型: ${r.lineType} · ${r.isNative}`);
     parts.push(`VPN 状态: ${r.vpnStatus}`);
-
+    if (rdnsHost) parts.push(`PTR: ${rdnsHost}`);
+  
     const rv = Number(r.riskValue);
     const riskValue = Number.isFinite(rv) ? Math.max(0, Math.min(100, Math.round(rv))) : 0;
     const riskWarn = (riskValue >= 80) ? " 🚨" : (riskValue >= 50) ? " ⚠️" : "";
-
+  
     parts.push(`风险值: ${riskValue}%${riskWarn}`);
   }
 
