@@ -1997,16 +1997,15 @@ log("debug", "BoxSettings(BOX)", BOX);
     if (px.isp) parts.push(`${t("isp")}: ${fmtISP(px.isp, px.loc)}`);
   
     // 风险/家宽/原生/VPN（落地维度）
-    parts.push(`网络类型: ${risk.isHomeBroadband} · ${risk.isNative};
-    parts.push(`VPN 状态: ${risk.vpnStatus}`);
-    
+    const r = risk || {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-"};
+    parts.push(`网络类型: ${r.isHomeBroadband} · ${r.isNative}`);
+    parts.push(`VPN 状态: ${r.vpnStatus}`);
+  
     let riskWarn = "";
-    if (risk.riskValue >= 80) riskWarn = " 🚨";
-    else if (risk.riskValue >= 50) riskWarn = " ⚠️";
-    
-    parts.push(
-      `风险值: ${risk.riskValue}%${riskWarn}`
-    );
+    if (r.riskValue >= 80) riskWarn = " 🚨";
+    else if (r.riskValue >= 50) riskWarn = " ⚠️";
+  
+    parts.push(`风险值: ${r.riskValue}%${riskWarn}`);
   }
 
   const sdLines = await sdPromise;
