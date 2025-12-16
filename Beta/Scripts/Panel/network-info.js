@@ -728,7 +728,20 @@ const RISK_RULES = Object.freeze({
     "isp", "broadband", "fiber", "ftth", "residential", "cable", "docsis",
     // 接入形态/命名习惯（常见于家宽/接入网描述）
     "pppoe", "dsl", "adsl", "vdsl", "pon", "gpon", "epon", "cpe",
-    "dynamic", "dyn", "pool", "subscriber", "cust", "customer"
+    "dynamic", "dyn", "pool", "subscriber", "cust", "customer",
+    "telecom",
+    "communications",
+    "chunghwa",
+    "cht",
+    "hinet",
+    "kbro",
+    "formosabroadband",
+    "formosa broadband",
+    "seednet",
+    "taiwan broadband",
+    "tbc",
+    "cable tv",
+    "cablemodem"
   ],
 
   // —— 更像“移动网络/蜂窝出口”的信号 ——（不等于机房，但也不算传统家宽）
@@ -758,6 +771,15 @@ const RISK_RULES = Object.freeze({
     "fiber", "ftth", "fios", "broadband", "res", "home",
     "cust", "customer", "subscriber", "pool", "cpe"
   ],
+
+  // —— rDNS（PTR）更像家宽/接入网的弱信号（别名，便于兼容旧字段） ——
+  rdnsHomeKeywords: [
+    "dynamic", "dyn", "pppoe", "dsl", "adsl", "vdsl", "cable", "docsis",
+    "fiber", "ftth", "fios", "broadband", "res", "home",
+    "cust", "customer", "subscriber", "pool", "cpe",
+    "hinet", "formosabroadband", "kbro", "cht", "seednet"
+  ],
+
 
   // —— rDNS（PTR）更像移动出口的弱信号 ——
   rdnsMobileKeywords: ["lte", "5g", "4g", "mobile", "cell", "wireless", "epc"],
