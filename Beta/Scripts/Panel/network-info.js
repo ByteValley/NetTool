@@ -773,10 +773,18 @@ function _normStr(x) {
 }
 
 function _hasAny(hay, list) {
-  const H = _normStr(hay);
+  const norm = (typeof _normStr === "function")
+    ? _normStr
+    : (x) => String(x ?? "")
+      .replace(/\s+/g, " ")
+      .replace(/[（(].*?[）)]/g, " ")
+      .trim()
+      .toLowerCase();
+
+  const H = norm(hay);
   if (!H) return false;
   for (const kw of list) {
-    const k = _normStr(kw);
+    const k = norm(kw);
     if (k && H.includes(k)) return true;
   }
   return false;
