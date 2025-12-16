@@ -2383,10 +2383,10 @@ log("debug", "BoxSettings(BOX)", BOX);
     log("warn", "LandingV4", String(e));
     return {};
   });
-  const px6 = V6_READY ? {ip: probe.ip} : {};
+  const px6 = (V6_READY && probe && probe.ip) ? {ip: probe.ip} : {};
   log("info", "Landing fetched", (Date.now() - t2) + "ms", {
     v4: _maskMaybe(px.ip || ""),
-    v6: _maskMaybe(px6.ip || ""),
+    v6: _maskMaybe((px6 && px6.ip) ? px6.ip : ""),
     v6_ready: V6_READY
   });
 
@@ -2435,11 +2435,11 @@ log("debug", "BoxSettings(BOX)", BOX);
     if (entShow?.isp2) parts.push(`${t("isp")}²: ${String(entShow.isp2).trim()}`);
   }
 
-  if (px && (px.ip || px6.ip || px.loc || px.isp)) {
+  if (px && (px.ip || (px6 && px6.ip) || px.loc || px.isp)) {
     pushGroupTitle(parts, "落地");
   
     const landIPv4 = ipLine("IPv4", px.ip);
-    const landIPv6 = ipLine("IPv6", px6.ip);
+    const landIPv6 = ipLine("IPv6", (px6 && px6.ip) ? px6.ip : "");
     if (landIPv4) parts.push(landIPv4);
     if (landIPv6) parts.push(landIPv6);
   
