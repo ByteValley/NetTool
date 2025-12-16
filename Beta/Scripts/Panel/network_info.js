@@ -1987,25 +1987,30 @@ log("debug", "BoxSettings(BOX)", BOX);
     if (entShow?.isp2) parts.push(`${t("isp")}²: ${String(entShow.isp2).trim()}`);
   }
 
-  if (px.ip || px6.ip || px.loc || px.isp) {
+  if (px && (px.ip || px6.ip || px.loc || px.isp)) {
     pushGroupTitle(parts, "落地");
+  
     const landIPv4 = ipLine("IPv4", px.ip);
     const landIPv6 = ipLine("IPv6", px6.ip);
     if (landIPv4) parts.push(landIPv4);
     if (landIPv6) parts.push(landIPv6);
+  
     if (px.loc) parts.push(`${t("location")}: ${flagFirst(px.loc)}`);
     if (px.isp) parts.push(`${t("isp")}: ${fmtISP(px.isp, px.loc)}`);
   
-    // 风险/家宽/原生/VPN（落地维度）
-    const r = risk || {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-"};
+    // 模块分类 · 风险/家宽/原生/VPN（落地维度）
+    const r = (risk && typeof risk === "object")
+      ? risk
+      : {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-", _raw: {}};
+  
     parts.push(`网络类型: ${r.isHomeBroadband} · ${r.isNative}`);
     parts.push(`VPN 状态: ${r.vpnStatus}`);
   
-    let riskWarn = "";
-    if (r.riskValue >= 80) riskWarn = " 🚨";
-    else if (r.riskValue >= 50) riskWarn = " ⚠️";
+    const rv = Number(r.riskValue);
+    const riskValue = Number.isFinite(rv) ? Math.max(0, Math.min(100, Math.round(rv))) : 0;
+    const riskWarn = (riskValue >= 80) ? " 🚨" : (riskValue >= 50) ? " ⚠️" : "";
   
-    parts.push(`风险值: ${r.riskValue}%${riskWarn}`);
+    parts.push(`风险值: ${riskValue}%${riskWarn}`);
   }
 
   const sdLines = await sdPromise;
