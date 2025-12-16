@@ -798,96 +798,123 @@ function _rdnsLooksDatacenter(ptrHost) {
   return RISK_RULES.rdnsDatacenterSuffix.some((suf) => host.endsWith(_normStr(suf)));
 }
 
-function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
-  const ISP = _normStr(isp);
-  const ORG = _normStr(org);
-  const CTRY = _normStr(country);
-  const AS = _normStr(asField);
+function calculateRiskValueSafe(isp, org, country, extra = {}) {
+  // extra: { ptr: "xxx", asn: "ASxxxx", asname: "xxx" }  // 你后面想接也方便
+  const normStr = (x) => String(x == null ? "" : x)
+    .replace(/\s+/g, " ")
+    .replace(/[（(].*?[）)]/g, " ") // 去掉括号噪音
+    .trim()
+    .toLowerCase();
 
-  const hay = joinNonEmpty([ISP, ORG, AS], " | ");
-  const asn = parseASNNumber(asField);
+  const ISP = normStr(isp);
+  const ORG = normStr(org);
+  const CTRY = normStr(country);
+  const PTR = normStr(extra.ptr);
+  const ASNAME = normStr(extra.asname);
 
-  // 这套判定是“证据加权”，目标是：
-  // - 命中机房证据就果断判非家宽（你说的“标注家宽但检测不是”大多属于这类伪装）
-  // - 家宽证据必须至少出现 2 类（ASN/组织词 + rDNS/命名习惯/接入形态等），才会判成“真家宽”
-  // - 移动网络单独标出来，避免把蜂窝出口当家宽
+  const hay = [ISP, ORG, ASNAME].filter(Boolean).join(" | ");
 
+  // —— 证据打分：可解释、可回拉 ——
   let riskValue = 0;
+  const reasons = [];
 
-  // 1) rDNS（PTR）强信号
-  const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost);
-  const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
-  const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.mobileKeywords);
+  // 机房/云强信号（比“泛关键词”更可靠）
+  const strongDcPtr = [
+    "compute.amazonaws.com", "cloudapp.azure.com", "googleusercontent.com",
+    "digitalocean.com", "linode.com", "vultr.com", "ovh.net", "hetzner.com",
+    "leaseweb", "choopa", "racknerd"
+  ];
 
-  if (rdnsHitDC) riskValue += 75;
-  if (rdnsHitHB) riskValue -= rdnsHitDC ? 6 : 26;
+  // 机房/云弱信号（只加一点点，避免误杀）
+  const weakDcKw = [
+    "datacenter", "data center", "hosting", "vps", "colo", "colocation",
+    "cdn", "edge", "server", "cloud", "compute", "proxy", "vpn", "tunnel", "relay"
+  ];
 
-  // 2) ORG/ASN/ISP 信号
-  const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
-  const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
-  const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
+  // 住宅/运营商强信号（能把“云味”拉回来）
+  const strongResKw = [
+    "residential", "broadband", "fiber", "ftth", "dsl", "cable", "home",
+    "comcast", "xfinity", "verizon", "fios", "at&t", "charter", "spectrum", "cox",
+    "rogers", "bell canada", "telus",
+    "bt", "virgin media", "sky broadband",
+    "deutsche telekom", "telefonica", "orange", "vodafone"
+  ];
 
-  if (dcHit) riskValue += 55;
-  if (hbHit) riskValue -= (rdnsHitDC || dcHit) ? 10 : 22;
-  if (mobileHit) riskValue -= (rdnsHitDC || dcHit) ? 0 : 10;
+  // 中国三家/教育网等：强住宅倾向（但不一票否决）
+  const cnStrongIsp = [
+    "chinanet", "china telecom", "ctcc", "as4134", "as4809",
+    "china mobile", "cmcc", "cmnet", "cmi", "as9808",
+    "china unicom", "unicom", "cucc", "as4837",
+    "cernet", "china education"
+  ];
 
-  // 3) 国家风险加成
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
-    riskValue += 18;
+  // —— Step A: PTR 强机房命中（强加分，但不直接判死）——
+  for (const s of strongDcPtr) {
+    if (PTR.includes(normStr(s))) {
+      riskValue += 35;
+      reasons.push(`PTR机房(${s})`);
+      break;
+    }
   }
 
-  // 4) 信息不足惩罚：别轻易给“真家宽”
-  if (!ORG && !AS && ISP.length <= 3) riskValue += 10;
+  // —— Step B: 文本弱机房关键词（加分上限，避免全变伪家宽）——
+  let weakHit = "";
+  for (const kw of weakDcKw) {
+    const k = normStr(kw);
+    if (k && hay.includes(k)) { weakHit = kw; break; }
+  }
+  if (weakHit) {
+    riskValue += 18;
+    reasons.push(`DC词(${weakHit})`);
+  }
+
+  // —— Step C: 住宅强关键词（强减分，可回拉）——
+  let resHit = "";
+  for (const kw of strongResKw) {
+    const k = normStr(kw);
+    if (k && hay.includes(k)) { resHit = kw; break; }
+  }
+  if (resHit) {
+    riskValue -= 35;
+    reasons.push(`住宅词(${resHit})`);
+  }
+
+  // —— Step D: 中国强 ISP（再减一点，防止“cloud”误杀）——
+  let cnHit = "";
+  for (const kw of cnStrongIsp) {
+    const k = normStr(kw);
+    if (k && hay.includes(k)) { cnHit = kw; break; }
+  }
+  if (cnHit) {
+    riskValue -= 22;
+    reasons.push(`运营商(${cnHit})`);
+  }
+
+  // 国家风险加成：保留但降权（别太戏剧化）
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(normStr(x)))) {
+    riskValue += 18;
+    reasons.push("国家风险");
+  }
 
   // 收敛到 0~100
   riskValue = Math.max(0, Math.min(100, Math.round(riskValue)));
 
-  // —— 判定：四档 + 单独移动网络 ——
-  // 证据计数：至少 2 类家宽证据才给“真家宽”
-  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (asn ? 1 : 0);
-  const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
-
-  let lineType = "伪家宽";
-  if (mobileHit || rdnsHitMobile) lineType = "移动网络";
-  if (dcEvidence >= 1 && riskValue >= 60) lineType = "机房专线";
-  else if (riskValue >= 55) lineType = "伪家宽";
-  else if (riskValue >= 32) lineType = "疑似家宽";
-  else if (hbEvidence >= 2 && riskValue < 32) lineType = "真家宽";
-
-  // 输出面板可读标签
-  const isHomeBroadband = (lineType === "真家宽") ? "真家宽" : (lineType === "疑似家宽") ? "疑似家宽" : "非家宽";
-  const isNative = (riskValue < 50 && dcEvidence === 0) ? "原生" : "非原生";
-  const vpnStatus = (lineType === "机房专线") ? "已连接" : "未连接";
-
+  // 标签：用更温和的阈值
+  const isVPNLike = riskValue >= 65;
+  const isHomeLike = riskValue <= 45; // 以前太苛刻会全伪家宽
   const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
-  const zh = (h, t) => isHant ? t : h;
+
+  const labelHome = isHant ? (isHomeLike ? "家寬" : "非家寬") : (isHomeLike ? "家宽" : "非家宽");
+  const labelNative = isHant ? (!isVPNLike ? "原生" : "非原生") : (!isVPNLike ? "原生" : "非原生");
+  const labelVPN = isHant ? (isVPNLike ? "已連線" : "未連線") : (isVPNLike ? "已连接" : "未连接");
 
   return {
     riskValue,
-    lineType: zh(
-      lineType,
-      (lineType === "真家宽") ? "真家寬" :
-      (lineType === "疑似家宽") ? "疑似家寬" :
-      (lineType === "移动网络") ? "行動網路" :
-      (lineType === "机房专线") ? "機房專線" :
-      "偽家寬"
-    ),
-    isHomeBroadband: zh(isHomeBroadband, (isHomeBroadband === "真家宽") ? "真家寬" : (isHomeBroadband === "疑似家宽") ? "疑似家寬" : "非家寬"),
-    isNative: zh(isNative, (isNative === "原生") ? "原生" : "非原生"),
-    vpnStatus: zh(vpnStatus, (vpnStatus === "已连接") ? "已連線" : "未連線"),
-    _raw: {
-      asn,
-      rdnsHost: rdnsHost || "",
-      dcHit,
-      hbHit,
-      mobileHit,
-      rdnsHitDC,
-      rdnsHitHB,
-      rdnsHitMobile,
-      hbEvidence,
-      dcEvidence,
-      _norm: {ISP, ORG, AS, CTRY}
-    }
+    isHomeBroadband: labelHome,
+    isNative: labelNative,
+    vpnStatus: labelVPN,
+    reasons: reasons.slice(0, 4), // 方便你面板展示依据
+    _raw: { isHomeLike, isVPNLike, _norm: { ISP, ORG, CTRY, PTR, ASNAME }, hay }
   };
 }
 
@@ -2282,6 +2309,9 @@ log("debug", "BoxSettings(BOX)", BOX);
     const riskWarn = (riskValue >= 80) ? " 🚨" : (riskValue >= 50) ? " ⚠️" : "";
   
     parts.push(`风险值: ${riskValue}%${riskWarn}`);
+    if (r.reasons && r.reasons.length) {
+      parts.push(`依据: ${r.reasons.join(" + ")}`);
+    }
   }
 
   const sdLines = await sdPromise;
