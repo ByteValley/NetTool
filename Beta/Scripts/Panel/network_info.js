@@ -684,40 +684,82 @@ function fmtISP(isp, locStr) {
 
 // 模块分类 · IP 风险评估（家宽/原生/VPN/风险值）
 const RISK_RULES = Object.freeze({
-  dataCenterKeywords: ["数据中心", "Amazon", "Google", "Tencent", "Alibaba", "Cloudflare", "IDC", "DMIT"],
-  homeBroadbandKeywords: ["电信", "移动", "联通", "宽带", "Comcast", "Verizon", "ChinaNet", "CTCC", "CMCC", "CUCC"],
-  highRiskCountries: ["俄罗斯", "印度", "乌克兰"]
+  // —— 更像“机房/云/VPN/代理”的信号 ——（命中后强烈加分=更风险）
+  dataCenterKeywords: [
+    "datacenter", "data center", "hosting", "cloud", "cdn", "edge", "vps", "colo", "colocation",
+    "proxy", "vpn", "tunnel", "relay", "compute", "server",
+
+    // 常见云厂商/机房（尽量用更明确的词）
+    "amazon", "aws", "google", "gcp", "microsoft", "azure", "digitalocean", "linode", "ovh",
+    "hetzner", "vultr", "oracle", "alibaba cloud", "tencent cloud", "cloudflare", "fastly",
+    "akamai", "leaseweb", "choopa", "dmit", "racknerd"
+  ],
+
+  // —— 更像“家庭宽带/运营商接入网”的信号 ——（命中后减分=更像家宽）
+  homeBroadbandKeywords: [
+    // 中国三家
+    "china telecom", "chinanet", "ctcc", "as4134", "as4809",
+    "china mobile", "cmcc", "cmnet", "cmi", "as9808",
+    "china unicom", "unicom", "cucc", "as4837",
+
+    // 其它常见家宽 ISP（示例：美/加/欧）
+    "comcast", "xfinity", "verizon", "at&t", "charter", "spectrum", "cox",
+    "rogers", "bell canada", "telus",
+    "bt", "virgin media", "sky broadband",
+    "deutsche telekom", "telefonica", "orange", "vodafone",
+    "isp", "broadband", "fiber", "ftth", "residential"
+  ],
+
+  // 地缘“风险加成”（归一化）
+  highRiskCountries: ["俄罗斯", "russia", "印度", "india", "乌克兰", "ukraine"]
 });
 
 function calculateRiskValueSafe(isp, org, country) {
-  const ISP = String(isp || "");
-  const ORG = String(org || "");
-  const CTRY = String(country || "");
+  const norm = (x) => String(x || "")
+    .replace(/\s+/g, " ")
+    .replace(/[（(].*?[）)]/g, " ") // 去掉括号里噪音
+    .trim()
+    .toLowerCase();
+
+  const ISP = norm(isp);
+  const ORG = norm(org);
+  const CTRY = norm(country);
+
+  const hay = `${ISP} | ${ORG}`.trim();
 
   let riskValue = 0;
-  let isHomeBroadband = false;
+
+  // 先判断“机房/代理”信号：命中就大幅加分
   let isVPN = false;
-
-  for (const kw of RISK_RULES.homeBroadbandKeywords) {
-    if (ISP.includes(kw) || ORG.includes(kw)) {
-      isHomeBroadband = true;
-      riskValue -= 10;
-      break;
-    }
-  }
-
   for (const kw of RISK_RULES.dataCenterKeywords) {
-    if (ISP.includes(kw) || ORG.includes(kw)) {
+    const k = norm(kw);
+    if (!k) continue;
+    if (hay.includes(k)) {
       isVPN = true;
-      riskValue += 50;
+      riskValue += 55; // 比你原来 50 略强一点
       break;
     }
   }
 
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(x))) {
+  // 再判断“家宽/运营商”信号：命中就减分
+  // 注意：如果同时命中机房关键词，家宽信号也不一定可信，所以减分较温和
+  let isHomeBroadband = false;
+  for (const kw of RISK_RULES.homeBroadbandKeywords) {
+    const k = norm(kw);
+    if (!k) continue;
+    if (hay.includes(k)) {
+      isHomeBroadband = true;
+      riskValue -= isVPN ? 6 : 18; // 同时像机房时，别被“运营商字样”轻易洗白
+      break;
+    }
+  }
+
+  // 国家风险加成（归一化后 contains）
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(norm(x)))) {
     riskValue += 30;
   }
 
+  // 收敛到 0~100
   riskValue = Math.max(0, Math.min(100, riskValue));
 
   const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
@@ -730,7 +772,7 @@ function calculateRiskValueSafe(isp, org, country) {
     isHomeBroadband: labelHome,
     isNative: labelNative,
     vpnStatus: labelVPN,
-    _raw: {isHomeBroadband, isVPN}
+    _raw: { isHomeBroadband, isVPN, _norm: { ISP, ORG, CTRY } }
   };
 }
 
