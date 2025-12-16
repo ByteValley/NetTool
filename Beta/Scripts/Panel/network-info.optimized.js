@@ -885,12 +885,7 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
   const zh = (h, t) => isHant ? t : h;
 
   const isVPNLike = (dcEvidence >= 2) || (riskValue >= 65) || rdnsHitDC;
-
-  // 家宽额外门槛：必须拿到 PTR（即 rDNS 有返回）
-  // 目的：避免“策略名/ISP/ASN 关键词”把没有 PTR 的接入/伪装误判成家宽（你这类场景最常见）。
-  // 代价：极少数真实家宽如果 PTR 不开放/被屏蔽，会被保守判为非家宽。
-  const hasPTR = !!_normStr(rdnsHost);
-  const isHomeLike = (hbEvidence >= 2) && hasPTR && !isVPNLike && (riskValue <= 45);
+  const isHomeLike = (hbEvidence >= 2) && !isVPNLike && (riskValue <= 45);
 
   const lineType = isHomeLike ? "家宽" : "非家宽";
 
@@ -2319,17 +2314,6 @@ log("debug", "BoxSettings(BOX)", BOX);
       : {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-", _raw: {}};
   
     parts.push(`网络类型: ${r.lineType} · ${r.isNative}`);
-
-    // 模块分类 · 策略名“家宽”与检测结果冲突提示
-    // 说明：不少节点会在策略名里写“家宽/住宅”，但落地 ISP/ASN/PTR 可能并不支持。
-    // 这里不改变判定，只提示“名称标注”与“检测结果”是否一致，避免误导。
-    try {
-      const nameHasHome = /家宽|家寬|住宅|residential|home\s*broadband|broadband/i.test(String(policyName || ""));
-      const nameHasIDC = /aws|amazon|ec2|gcp|google|azure|microsoft|oracle|oci|alibaba|aliyun|tencent|ucloud|linode|vultr|digitalocean|do\b|hetzner|ovh|leaseweb|colo|datacenter|idc/i.test(String(policyName || ""));
-      const isHome = /家宽|家寬/i.test(String(r.lineType || ""));
-      if (nameHasHome && !isHome) parts.push("⚠️ 策略名含“家宽/住宅”，但检测结果为非家宽（可能为接入/伪装）");
-      if (nameHasIDC && isHome) parts.push("⚠️ 策略名含云厂商/机房关键词，但检测结果为家宽（建议再复核）");
-    } catch (_) {}
     parts.push(`VPN 状态: ${r.vpnStatus}`);
     if (rdnsHost) parts.push(`PTR: ${rdnsHost}`);
   
