@@ -847,33 +847,52 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
   const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (asn ? 1 : 0);
   const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
 
-  // 标签：统一输出为「家宽 / 非家宽」，避免「家宽判断」歧义
-  const isVPNLike = riskValue >= 65;
-  const isHomeLike = riskValue <= 45;
-
+  // =============================
+  // 输出：统一为「家宽 / 非家宽」
+  // 说明：不再使用「伪家宽 / 疑似家宽 / 真家宽」避免误导。
+  //       细分信息放到 subtype / reasons / debug 里。
+  // =============================
   const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
+  const zh = (h, t) => isHant ? t : h;
 
-  const labelHome = isHant ? (isHomeLike ? "家寬" : "非家寬") : (isHomeLike ? "家宽" : "非家宽");
-  const labelNative = isHant ? (!isVPNLike ? "原生" : "非原生") : (!isVPNLike ? "原生" : "非原生");
-  const labelVPN = isHant ? (isVPNLike ? "已連線" : "未連線") : (isVPNLike ? "已连接" : "未连接");
+  const isVPNLike = (dcEvidence >= 2) || (riskValue >= 65) || rdnsHitDC;
+  const isHomeLike = (hbEvidence >= 2) && !isVPNLike && (riskValue <= 45);
 
-  // 主标签：只展示「家宽/非家宽」
-  const lineType = labelHome;
+  const lineType = isHomeLike ? "家宽" : "非家宽";
 
-  // 细分提示：仅用于 debug（不强行上屏）
-  const subtype = isVPNLike ? (isHant ? "機房/代理" : "机房/代理")
-    : (isHomeLike ? (isHant ? "住宅/接入" : "住宅/接入") : (isHant ? "商用/中繼" : "商用/中继"));
+  let subtype = "未知";
+  if (mobileHit || rdnsHitMobile) subtype = zh("移动网络", "行動網路");
+  else if (isVPNLike || dcEvidence >= 1) subtype = zh("机房/专线", "機房/專線");
+  else if (isHomeLike) subtype = zh("住宅/家宽", "住宅/家寬");
+  else if (hbEvidence >= 1) subtype = zh("运营商/接入", "運營商/接入");
+  else subtype = zh("普通 ISP", "一般 ISP");
+
+  const isHomeBroadband = lineType;
+  const isNative = (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生");
+  const vpnStatus = isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線");
 
   return {
     riskValue,
-    lineType,
+    lineType: zh(lineType, lineType === "家宽" ? "家寬" : "非家寬"),
     subtype,
-    isHomeBroadband: labelHome,
-    isNative: labelNative,
-    vpnStatus: labelVPN,
-    reasons: reasons.slice(0, 4),
-    _raw: { isHomeLike, isVPNLike, subtype, _norm: { ISP, ORG, CTRY, PTR, ASNAME }, hay }
+    isHomeBroadband: zh(isHomeBroadband, isHomeBroadband === "家宽" ? "家寬" : "非家寬"),
+    isNative,
+    vpnStatus,
+    _raw: {
+      asn,
+      rdnsHost: rdnsHost || "",
+      dcHit,
+      hbHit,
+      mobileHit,
+      rdnsHitDC,
+      rdnsHitHB,
+      rdnsHitMobile,
+      hbEvidence,
+      dcEvidence,
+      _norm: {ISP, ORG, AS, CTRY}
+    }
   };
+}
 
 // 模块分类 · 网络类型
 function radioToGen(r) {
@@ -1007,7 +1026,7 @@ function httpAPI(path = "/v1/requests/recent") {
   });
 }
 
-// 模块分类 · rDNS（PTR）探测（用于“家宽判断/机房”识别）
+// 模块分类 · rDNS（PTR）探测（用于“伪家宽/机房”识别）
 // 说明：不是所有 IP 都有 PTR；有的话往往非常有信息量。
 // 数据源：Google DNS-over-HTTPS（DoH）
 // · IPv4: <reversed>.in-addr.arpa
@@ -2215,8 +2234,6 @@ log("debug", "BoxSettings(BOX)", BOX);
     as: asField || "",
     ptr: rdnsHost || "",
     out: risk
-    subtype: (risk && risk.subtype) || "",
-    raw: (risk && risk._raw) || {}
   }));
   
   const title = netTypeLine() || t("unknownNet");
