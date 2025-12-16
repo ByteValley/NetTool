@@ -788,6 +788,13 @@ const RISK_RULES = Object.freeze({
   highRiskCountries: ["俄罗斯", "russia", "印度", "india", "乌克兰", "ukraine"]
 });
 
+// 模块分类 · 家宽/接入 ASN 强弱提示（用于 RiskCalc 收敛误判）
+const ASN_HOME_STRONG = new Set([
+  // TW
+  38841, // kbro (常见住宅接入)
+]);
+
+
 function parseASNNumber(s) {
   const str = String(s || "");
   const m = str.match(/\bAS(\d{1,10})\b/i);
@@ -866,7 +873,7 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
 
   // —— 判定：四档 + 单独移动网络 ——
   // 证据计数：至少 2 类家宽证据才给“真家宽”
-  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (asn ? 1 : 0);
+  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (ASN_HOME_STRONG.has(asn) ? 1 : 0);
   const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
 
   // =============================

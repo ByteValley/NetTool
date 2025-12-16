@@ -87,6 +87,9 @@ const CONSTS = Object.freeze({
   BUDGET_SOFT_GUARD_MS: 260
 });
 
+// 模块分类 · 兼容旧字段（避免 ReferenceError）
+const extraSafeIp = "";
+
 // 模块分类 · 语言包
 const SD_STR = {
   "zh-Hans": {
@@ -788,13 +791,6 @@ const RISK_RULES = Object.freeze({
   highRiskCountries: ["俄罗斯", "russia", "印度", "india", "乌克兰", "ukraine"]
 });
 
-// 模块分类 · 家宽/接入 ASN 强弱提示（用于 RiskCalc 收敛误判）
-const ASN_HOME_STRONG = new Set([
-  // TW
-  38841, // kbro (常见住宅接入)
-]);
-
-
 function parseASNNumber(s) {
   const str = String(s || "");
   const m = str.match(/\bAS(\d{1,10})\b/i);
@@ -828,99 +824,241 @@ function _rdnsLooksDatacenter(ptrHost) {
 }
 
 function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
-  const ISP = _normStr(isp);
-  const ORG = _normStr(org);
-  const CTRY = _normStr(country);
-  const AS = _normStr(asField);
+  // 五分类：
+  // 1) 家宽(Residential)   2) 伪家宽(Mixed/Proxy-like but looks residential)
+  // 3) 商宽(Business/Enterprise access / leased line)
+  // 4) 机房(DataCenter/Cloud)
+  // 5) 蜂窝(Mobile/Cellular egress)
+  //
+  // 说明：这是“基于公开信号的概率判断”，不是 ISP 内部真相。
+  // 证据来源：ISP/ORG/AS 字段 + rDNS(PTR) + 关键词 & ASN 经验表
 
-  const hay = joinNonEmpty([ISP, ORG, AS], " | ");
+  const norm = (x) => String(x == null ? "" : x)
+    .replace(/\s+/g, " ")
+    .replace(/[（(].*?[）)]/g, " ")
+    .trim()
+    .toLowerCase();
+
+  const ISP = norm(isp);
+  const ORG = norm(org);
+  const AS = norm(asField);
+  const CTRY = norm(country);
+  const PTR = norm(rdnsHost).replace(/\.$/, "");
+
+  const hay = [ISP, ORG, AS].filter(Boolean).join(" | ");
+
   const asn = parseASNNumber(asField);
 
-  // 这套判定是“证据加权”，目标是：
-  // - 命中机房证据就果断判非家宽（你说的“标注家宽但检测不是”大多属于这类伪装）
-  // - 家宽证据必须至少出现 2 类（ASN/组织词 + rDNS/命名习惯/接入形态等），才会判成“真家宽”
-  // - 移动网络单独标出来，避免把蜂窝出口当家宽
+  // --- ASN 经验表（不是硬编码“机场”，仅识别网络身份）
+  // 数据中心/云（常见）
+  const ASN_DC = new Set([13335, 16509, 14618, 15169, 8075, 14061, 63949, 20473, 16276, 24940, 31898, 36351, 54113]);
+  // 日本/香港/台湾：常见运营商（“可能更像接入网”，不等于家宽）
+  // 这张表只是辅助（弱证据），避免把明确运营商也打成“机房”或“伪家宽”
+  const ASN_ACCESS_HINT = new Set([
+    // TW
+    3462, 38841, 9923,
+    // HK
+    9269, 4760, 3491,
+    // JP
+    2914, 2516, 4713, 17676
+  ]);
 
+  // 住宅 ASN：强家宽信号（用于补足 PTR 缺失/关键词弱时的误杀）
+  const ASN_HOME_STRONG = new Set([
+    // TW
+    38841, // kbro (常见住宅接入)
+  ]);
+
+
+  // --- 关键词表
+  const KW_DC_STRONG = [
+    "amazonaws", "compute.amazonaws.com", "cloudapp.azure", "googleusercontent",
+    "digitalocean", "linodeusercontent", "vultrusercontent", "hetzner", "ovh", "leaseweb",
+    "cloudflare", "fastly", "akamai", "oracle", "microsoft", "azure", "gcp", "aws"
+  ];
+  const KW_DC_WEAK = [
+    "datacenter", "data center", "hosting", "vps", "colo", "colocation", "cdn", "edge",
+    "server", "cloud", "compute", "proxy", "vpn", "tunnel", "relay"
+  ];
+  const KW_RES = [
+    "residential", "broadband", "fiber", "ftth", "pppoe", "dsl", "adsl", "vdsl",
+    "cable", "docsis", "dynamic", "dyn", "pool", "subscriber", "customer", "cpe", "home"
+  ];
+  const KW_BUSINESS = [
+    "business", "enterprise", "corporate", "leased", "lease line", "mpls", "ip transit",
+    "backbone", "datacomm", "data communication", "carrier", "metro", "ix", "peering",
+    "idc", "colocation"
+  ];
+  const KW_MOBILE = ["mobile", "lte", "5g", "4g", "cell", "cellular", "wireless", "epc", "ims", "gprs"];
+
+  // --- PTR 规则：强证据（如果存在）
+  const ptrIsDC = (() => {
+    if (!PTR) return false;
+    const p = PTR;
+    // 机房/云的常见后缀
+    const suf = [
+      "amazonaws.com", "compute.amazonaws.com",
+      "googleusercontent.com", "cloudapp.azure.com",
+      "digitalocean.com", "linodeusercontent.com",
+      "ovh.net", "kimsufi.com", "hetzner.de", "hetzner.com",
+      "vultrusercontent.com", "leaseweb.net",
+      "cloudflarenet.com", "fastly.net", "akamai.net"
+    ];
+    for (const s of suf) if (p.endsWith(s)) return true;
+    // 机房关键词（PTR 里出现也很强）
+    return KW_DC_STRONG.some((k) => p.includes(k));
+  })();
+
+  const ptrResHint = (() => {
+    if (!PTR) return false;
+    return KW_RES.some((k) => PTR.includes(k));
+  })();
+
+  const ptrMobileHint = (() => {
+    if (!PTR) return false;
+    return KW_MOBILE.some((k) => PTR.includes(k));
+  })();
+
+  // --- 文本命中
+  const dcStrongHit = KW_DC_STRONG.find((k) => hay.includes(k)) || "";
+  const dcWeakHit = KW_DC_WEAK.find((k) => hay.includes(k)) || "";
+  const resHit = KW_RES.find((k) => hay.includes(k)) || "";
+  const bizHit = KW_BUSINESS.find((k) => hay.includes(k)) || "";
+  const mobHit = KW_MOBILE.find((k) => hay.includes(k)) || "";
+
+  // --- 证据计数（可解释）
+  let dcEvidence = 0;
+  let resEvidence = 0;
+  let bizEvidence = 0;
+  let mobEvidence = 0;
+
+  const reasons = [];
+
+  // DC 证据
+  if (ptrIsDC) { dcEvidence += 3; reasons.push("PTR机房"); }
+  if (ASN_DC.has(asn)) { dcEvidence += 2; reasons.push(`ASN云(${asn || "?"})`); }
+  if (dcStrongHit) { dcEvidence += 2; reasons.push(`云词(${dcStrongHit})`); }
+  if (dcWeakHit) { dcEvidence += 1; reasons.push(`DC词(${dcWeakHit})`); }
+
+  // Residential 证据
+  if (ptrResHint) { resEvidence += 2; reasons.push("PTR家宽"); }
+  if (resHit) { resEvidence += 1; reasons.push(`家宽词(${resHit})`); }
+  // 住宅 ASN：强家宽（比“接入ASN”更强）
+  if (ASN_HOME_STRONG.has(asn)) { resEvidence += 2; reasons.push(`住宅ASN(${asn || "?"})`); }
+
+  // 运营商 ASN 作为“接入网”辅助（弱证据，不直接=家宽）
+  if (ASN_ACCESS_HINT.has(asn)) { resEvidence += 1; reasons.push(`接入ASN(${asn || "?"})`); }
+
+  // Business 证据
+  if (bizHit) { bizEvidence += 2; reasons.push(`商宽词(${bizHit})`); }
+  // ASN 字段里出现“business group/datacomm”等也算一点
+  if (/business|datacomm|data\s+communication|corporate|enterprise/.test(AS)) { bizEvidence += 1; reasons.push("AS商宽描述"); }
+
+  // Mobile 证据
+  if (ptrMobileHint) { mobEvidence += 2; reasons.push("PTR蜂窝"); }
+  if (mobHit) { mobEvidence += 1; reasons.push(`蜂窝词(${mobHit})`); }
+
+  // --- 风险值（0~100，越高越像机房/代理）
+  // 让它更“解释型”而不是玄学：DC 证据推高，家宽/接入证据拉低，商宽居中。
   let riskValue = 0;
+  riskValue += dcEvidence * 28;      // 强推高
+  riskValue += Math.max(0, bizEvidence - 1) * 10; // 商宽：不一定高风险，但比家宽更像“非住宅”
+  riskValue -= resEvidence * 20;     // 拉低
+  riskValue -= mobEvidence * 6;      // 蜂窝不等于机房
 
-  // 1) rDNS（PTR）强信号
-  const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost);
-  const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
-  const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.mobileKeywords);
-
-  if (rdnsHitDC) riskValue += 75;
-  if (rdnsHitHB) riskValue -= rdnsHitDC ? 6 : 26;
-
-  // 2) ORG/ASN/ISP 信号
-  const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
-  const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
-  const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
-
-  if (dcHit) riskValue += 55;
-  if (hbHit) riskValue -= (rdnsHitDC || dcHit) ? 10 : 22;
-  if (mobileHit) riskValue -= (rdnsHitDC || dcHit) ? 0 : 10;
-
-  // 3) 国家风险加成
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
-    riskValue += 18;
+  // 国家轻微加成（保持温和）
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(norm(x)))) {
+    riskValue += 12;
+    reasons.push("国家风险");
   }
 
-  // 4) 信息不足惩罚：别轻易给“真家宽”
-  if (!ORG && !AS && ISP.length <= 3) riskValue += 10;
-
-  // 收敛到 0~100
   riskValue = Math.max(0, Math.min(100, Math.round(riskValue)));
 
-  // —— 判定：四档 + 单独移动网络 ——
-  // 证据计数：至少 2 类家宽证据才给“真家宽”
-  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (ASN_HOME_STRONG.has(asn) ? 1 : 0);
-  const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
+  // --- 五分类判定（顺序很重要）
+  // 1) 蜂窝：蜂窝证据明显，并且 DC 证据不强
+  let subtype = "";
+  let lineTypeKey = "";
 
-  // =============================
-  // 输出：统一为「家宽 / 非家宽」
-  // 说明：不再使用「伪家宽 / 疑似家宽 / 真家宽」避免误导。
-  //       细分信息放到 subtype / reasons / debug 里。
-  // =============================
+  if (mobEvidence >= 2 && dcEvidence <= 1) {
+    lineTypeKey = "mobile";
+    subtype = "蜂窝出口";
+  } else if (dcEvidence >= 4 || (dcEvidence >= 3 && resEvidence === 0 && bizEvidence === 0)) {
+    // 2) 机房：DC 证据足够强
+    lineTypeKey = "dc";
+    subtype = "机房/云";
+  } else if (bizEvidence >= 2 && resEvidence <= 1 && dcEvidence <= 2) {
+    // 3) 商宽：企业/专线/骨干语义明显，且不是机房
+    lineTypeKey = "business";
+    subtype = "商宽/企业";
+  } else if (resEvidence >= 2 && dcEvidence === 0 && bizEvidence <= 1) {
+    // 4) 家宽：住宅证据明确
+    lineTypeKey = "home";
+    subtype = "家宽/接入";
+  } else if (resEvidence >= 1 && dcEvidence >= 1) {
+    // 5) 伪家宽：混合信号（看起来像家宽，但又带点云/代理味）
+    lineTypeKey = "pseudo";
+    subtype = "混合信号";
+  } else {
+    // 默认：更像“非家宽”，但给出更具体的 subtype
+    lineTypeKey = "nonhome";
+    subtype = (ASN_ACCESS_HINT.has(asn) || /telecom|broadband|cable|isp/.test(hay)) ? "运营商/接入" : "未知";
+  }
+
+  const isVPNLike = riskValue >= 70; // 更像机房/代理
+  const isNative = !isVPNLike;
+
   const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
-  const zh = (h, t) => isHant ? t : h;
+  const labels = isHant ? {
+    home: "家寬",
+    pseudo: "偽家寬",
+    business: "商寬",
+    dc: "機房",
+    mobile: "蜂窩",
+    nonhome: "非家寬",
+    native: "原生",
+    nonnative: "非原生",
+    vpnOn: "已連線",
+    vpnOff: "未連線"
+  } : {
+    home: "家宽",
+    pseudo: "伪家宽",
+    business: "商宽",
+    dc: "机房",
+    mobile: "蜂窝",
+    nonhome: "非家宽",
+    native: "原生",
+    nonnative: "非原生",
+    vpnOn: "已连接",
+    vpnOff: "未连接"
+  };
 
-  const isVPNLike = (dcEvidence >= 2) || (riskValue >= 65) || rdnsHitDC;
-  const isHomeLike = (hbEvidence >= 2) && !isVPNLike && (riskValue <= 45);
+  const lineType = labels[lineTypeKey] || labels.nonhome;
+  const vpnStatus = isVPNLike ? labels.vpnOn : labels.vpnOff;
 
-  const lineType = isHomeLike ? "家宽" : "非家宽";
-
-  let subtype = "未知";
-  if (mobileHit || rdnsHitMobile) subtype = zh("移动网络", "行動網路");
-  else if (isVPNLike || dcEvidence >= 1) subtype = zh("机房/专线", "機房/專線");
-  else if (isHomeLike) subtype = zh("住宅/家宽", "住宅/家寬");
-  else if (hbEvidence >= 1) subtype = zh("运营商/接入", "運營商/接入");
-  else subtype = zh("普通 ISP", "一般 ISP");
-
-  const isHomeBroadband = lineType;
-  const isNative = (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生");
-  const vpnStatus = isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線");
-
-  return {
+  const out = {
     riskValue,
-    lineType: zh(lineType, lineType === "家宽" ? "家寬" : "非家寬"),
+    lineType,
     subtype,
-    isHomeBroadband: zh(isHomeBroadband, isHomeBroadband === "家宽" ? "家寬" : "非家寬"),
-    isNative,
+    isHomeBroadband: (lineTypeKey === "home") ? labels.home : labels.nonhome,
+    isNative: isNative ? labels.native : labels.nonnative,
     vpnStatus,
+    reasons: reasons.slice(0, 6),
     _raw: {
       asn,
       rdnsHost: rdnsHost || "",
-      dcHit,
-      hbHit,
-      mobileHit,
-      rdnsHitDC,
-      rdnsHitHB,
-      rdnsHitMobile,
-      hbEvidence,
-      dcEvidence,
-      _norm: {ISP, ORG, AS, CTRY}
+      dcEvidence, resEvidence, bizEvidence, mobEvidence,
+      ptrIsDC, ptrResHint, ptrMobileHint,
+      hits: {dcStrongHit, dcWeakHit, resHit, bizHit, mobHit},
+      _norm: {ISP, ORG, AS, CTRY, PTR},
+      hay
     }
   };
+
+  // 更“对账友好”的调试日志：让你一眼看出为什么被判成某类
+  log("debug", "RiskCalc", JSON.stringify({
+    ip: _maskMaybe((extraSafeIp || "") || ""), // 兼容旧字段，不影响
+  }));
+  return out;
 }
 
 // 模块分类 · 网络类型
@@ -2315,7 +2453,7 @@ log("debug", "BoxSettings(BOX)", BOX);
   
     parts.push(`网络类型: ${r.lineType} · ${r.isNative}`);
     parts.push(`VPN 状态: ${r.vpnStatus}`);
-    // if (rdnsHost) parts.push(`PTR: ${rdnsHost}`);
+    if (rdnsHost) parts.push(`PTR: ${rdnsHost}`);
   
     const rv = Number(r.riskValue);
     const riskValue = Number.isFinite(rv) ? Math.max(0, Math.min(100, Math.round(rv))) : 0;
