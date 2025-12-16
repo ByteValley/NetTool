@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者 · ByteValley
- * 版本 · 2025-11-28R1
+ * 版本 · 2025-12-16R1
  *
  * 模块分类 · 概述与边界
  * · 展示 本地 / 入口 / 落地（IPv4/IPv6），并发检测常见服务解锁状态
@@ -682,6 +682,58 @@ function fmtISP(isp, locStr) {
   return raw;
 }
 
+// 模块分类 · IP 风险评估（家宽/原生/VPN/风险值）
+const RISK_RULES = Object.freeze({
+  dataCenterKeywords: ["数据中心", "Amazon", "Google", "Tencent", "Alibaba", "Cloudflare", "IDC", "DMIT"],
+  homeBroadbandKeywords: ["电信", "移动", "联通", "宽带", "Comcast", "Verizon", "ChinaNet", "CTCC", "CMCC", "CUCC"],
+  highRiskCountries: ["俄罗斯", "印度", "乌克兰"]
+});
+
+function calculateRiskValueSafe(isp, org, country) {
+  const ISP = String(isp || "");
+  const ORG = String(org || "");
+  const CTRY = String(country || "");
+
+  let riskValue = 0;
+  let isHomeBroadband = false;
+  let isVPN = false;
+
+  for (const kw of RISK_RULES.homeBroadbandKeywords) {
+    if (ISP.includes(kw) || ORG.includes(kw)) {
+      isHomeBroadband = true;
+      riskValue -= 10;
+      break;
+    }
+  }
+
+  for (const kw of RISK_RULES.dataCenterKeywords) {
+    if (ISP.includes(kw) || ORG.includes(kw)) {
+      isVPN = true;
+      riskValue += 50;
+      break;
+    }
+  }
+
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(x))) {
+    riskValue += 30;
+  }
+
+  riskValue = Math.max(0, Math.min(100, riskValue));
+
+  const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
+  const labelHome = isHant ? (isHomeBroadband ? "家寬" : "非家寬") : (isHomeBroadband ? "家宽" : "非家宽");
+  const labelNative = isHant ? (riskValue < 50 ? "原生" : "非原生") : (riskValue < 50 ? "原生" : "非原生");
+  const labelVPN = isHant ? (isVPN ? "已連線" : "未連線") : (isVPN ? "已连接" : "未连接");
+
+  return {
+    riskValue,
+    isHomeBroadband: labelHome,
+    isNative: labelNative,
+    vpnStatus: labelVPN,
+    _raw: {isHomeBroadband, isVPN}
+  };
+}
+
 // 模块分类 · 网络类型
 function radioToGen(r) {
   if (!r) return "";
@@ -906,8 +958,15 @@ const LANDING_V4_SOURCES = Object.freeze({
       const j = safeJSON(r.body, {});
       return {
         ip: j.query || "",
-        loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ""), j.regionName?.split(/\s+or\s+/)[0], j.city], " "),
-        isp: j.isp || j.org || ""
+        loc: joinNonEmpty(
+          [flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ""), j.regionName?.split(/\s+or\s+/)[0], j.city],
+          " "
+        ),
+        isp: j.isp || j.org || "",
+        // —— 风险计算用（新增）——
+        org: j.org || j.as || "",
+        country: j.country || "",
+        countryCode: (j.countryCode || "").toUpperCase()
       };
     }
   },
@@ -918,7 +977,11 @@ const LANDING_V4_SOURCES = Object.freeze({
       return {
         ip: j.ip || "",
         loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ""), j.region, j.city], " "),
-        isp: (j?.connection?.isp) || ""
+        isp: (j?.connection?.isp) || "",
+        // —— 风险计算用（新增）——
+        org: j.org || (j?.connection?.org) || "",
+        country: j.country || "",
+        countryCode: (j.country_code || "").toUpperCase()
       };
     }
   },
@@ -929,7 +992,11 @@ const LANDING_V4_SOURCES = Object.freeze({
       return {
         ip: j.ip || "",
         loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], " ").replace(/\s*中国\s*/, ""),
-        isp: j.isp || j.organization || ""
+        isp: j.isp || j.organization || "",
+        // —— 风险计算用（新增）——
+        org: j.organization || j.asn_organization || "",
+        country: j.country || "",
+        countryCode: (j.country_code || "").toUpperCase()
       };
     }
   }
@@ -1885,6 +1952,9 @@ log("debug", "BoxSettings(BOX)", BOX);
     v6_ready: V6_READY
   });
 
+  // 模块分类 · 风险评估（基于落地信息）
+  const risk = calculateRiskValueSafe(px.isp, px.org, px.country);
+  
   const title = netTypeLine() || t("unknownNet");
 
   const parts = [];
@@ -1917,14 +1987,30 @@ log("debug", "BoxSettings(BOX)", BOX);
     if (entShow?.isp2) parts.push(`${t("isp")}²: ${String(entShow.isp2).trim()}`);
   }
 
-  if (px.ip || px6.ip || px.loc || px.isp) {
+  if (px && (px.ip || px6.ip || px.loc || px.isp)) {
     pushGroupTitle(parts, "落地");
+  
     const landIPv4 = ipLine("IPv4", px.ip);
     const landIPv6 = ipLine("IPv6", px6.ip);
     if (landIPv4) parts.push(landIPv4);
     if (landIPv6) parts.push(landIPv6);
+  
     if (px.loc) parts.push(`${t("location")}: ${flagFirst(px.loc)}`);
     if (px.isp) parts.push(`${t("isp")}: ${fmtISP(px.isp, px.loc)}`);
+  
+    // 模块分类 · 风险/家宽/原生/VPN（落地维度）
+    const r = (risk && typeof risk === "object")
+      ? risk
+      : {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-", _raw: {}};
+  
+    parts.push(`网络类型: ${r.isHomeBroadband} · ${r.isNative}`);
+    parts.push(`VPN 状态: ${r.vpnStatus}`);
+  
+    const rv = Number(r.riskValue);
+    const riskValue = Number.isFinite(rv) ? Math.max(0, Math.min(100, Math.round(rv))) : 0;
+    const riskWarn = (riskValue >= 80) ? " 🚨" : (riskValue >= 50) ? " ⚠️" : "";
+  
+    parts.push(`风险值: ${riskValue}%${riskWarn}`);
   }
 
   const sdLines = await sdPromise;
