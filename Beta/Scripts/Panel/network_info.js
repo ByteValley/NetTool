@@ -87,6 +87,9 @@ const CONSTS = Object.freeze({
   BUDGET_SOFT_GUARD_MS: 260
 });
 
+// 模块分类 · 兼容旧字段（避免 ReferenceError）
+const extraSafeIp = "";
+
 // 模块分类 · 语言包
 const SD_STR = {
   "zh-Hans": {
