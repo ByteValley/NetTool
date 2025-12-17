@@ -836,77 +836,113 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
   const hay = joinNonEmpty([ISP, ORG, AS], " | ");
   const asn = parseASNNumber(asField);
 
-  // 这套判定是“证据加权”，目标是：
-  // - 命中机房证据就果断判非家宽（你说的“标注家宽但检测不是”大多属于这类伪装）
-  // - 家宽证据必须至少出现 2 类（ASN/组织词 + rDNS/命名习惯/接入形态等），才会判成“真家宽”
-  // - 移动网络单独标出来，避免把蜂窝出口当家宽
-
+  const reasons = [];
   let riskValue = 0;
 
-  // 1) rDNS（PTR）强信号
+  // 1) rDNS（PTR）信号
   const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost);
   const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
-  const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.mobileKeywords);
+  // ✅ FIX: rDNS 移动信号应使用 rdnsMobileKeywords（更窄、更不误伤）
+  const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.rdnsMobileKeywords);
 
-  if (rdnsHitDC) riskValue += 75;
-  if (rdnsHitHB) riskValue -= rdnsHitDC ? 6 : 26;
+  if (rdnsHitDC) {
+    riskValue += 75;
+    reasons.push("PTR 命中机房域名后缀");
+  }
+  if (rdnsHitHB) {
+    const delta = rdnsHitDC ? -6 : -26;
+    riskValue += delta;
+    reasons.push(`PTR 命中住宅/接入网关键词(${delta})`);
+  }
+  if (rdnsHitMobile) {
+    // 移动网络不等于机房，但也不算传统家宽；轻微减分，防止被误判成“机房”
+    const delta = rdnsHitDC ? 0 : -8;
+    riskValue += delta;
+    reasons.push(`PTR 命中移动网络关键词(${delta})`);
+  }
 
-  // 2) ORG/ASN/ISP 信号
+  // 2) ORG/ASN/ISP 关键词信号
   const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
   const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
   const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
 
-  if (dcHit) riskValue += 55;
-  if (hbHit) riskValue -= (rdnsHitDC || dcHit) ? 10 : 22;
-  if (mobileHit) riskValue -= (rdnsHitDC || dcHit) ? 0 : 10;
-
-  // 3) 国家风险加成
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
-    riskValue += 18;
+  if (dcHit) {
+    riskValue += 55;
+    reasons.push("ORG/ISP/AS 命中机房/云/托管关键词(+55)");
+  }
+  if (hbHit) {
+    const delta = (rdnsHitDC || dcHit) ? -10 : -22;
+    riskValue += delta;
+    reasons.push(`ORG/ISP/AS 命中家宽/接入关键词(${delta})`);
+  }
+  if (mobileHit) {
+    const delta = (rdnsHitDC || dcHit) ? 0 : -10;
+    riskValue += delta;
+    reasons.push(`ORG/ISP/AS 命中移动网络关键词(${delta})`);
   }
 
-  // 4) 信息不足惩罚：别轻易给“真家宽”
-  if (!ORG && !AS && ISP.length <= 3) riskValue += 10;
+  // 3) 国家风险加成（可选线索：不当作决定性）
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
+    riskValue += 18;
+    reasons.push("国家风险加成(+18)");
+  }
+
+  // 4) 信息不足惩罚：别轻易给“干净/家宽”
+  if (!ORG && !AS && ISP.length <= 3) {
+    riskValue += 10;
+    reasons.push("信息不足惩罚(+10)");
+  }
 
   // 收敛到 0~100
   riskValue = Math.max(0, Math.min(100, Math.round(riskValue)));
 
-  // —— 判定：四档 + 单独移动网络 ——
-  // 证据计数：至少 2 类家宽证据才给“真家宽”
+  // —— 证据计数（用于最终分类收敛）——
   const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (ASN_HOME_STRONG.has(asn) ? 1 : 0);
   const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
 
-  // =============================
-  // 输出：统一为「家宽 / 非家宽」
-  // 说明：不再使用「伪家宽 / 疑似家宽 / 真家宽」避免误导。
-  //       细分信息放到 subtype / reasons / debug 里。
-  // =============================
   const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
-  const zh = (h, t) => isHant ? t : h;
+  const zh = (h, t) => (isHant ? t : h);
 
-  const isVPNLike = (dcEvidence >= 2) || (riskValue >= 65) || rdnsHitDC;
-  const isHomeLike = (hbEvidence >= 2) && !isVPNLike && (riskValue <= 45);
+  // “机房/隧道/代理特征”提示（更诚实：不等于你真的开了 VPN）
+  const tunnelLike = (dcEvidence >= 2) || (riskValue >= 70) || rdnsHitDC;
 
-  const lineType = isHomeLike ? "家宽" : "非家宽";
+  // 家宽判定：仍然偏保守，但不再苛刻到“多数真家宽都判非家宽”
+  // 条件思路：
+  // - 如果机房证据明显：直接非家宽
+  // - 如果机房证据为 0 且 risk 较低：hbEvidence>=1 就可以给“更像家宽”
+  // - hbEvidence>=2 依旧是“更强的家宽置信”
+  const homeLikeStrong = (hbEvidence >= 2) && !tunnelLike && (riskValue <= 50);
+  const homeLikeSoft = (hbEvidence >= 1) && (dcEvidence === 0) && !tunnelLike && (riskValue <= 38);
+  const isHomeBroadband = homeLikeStrong || homeLikeSoft;
 
-  let subtype = "未知";
-  if (mobileHit || rdnsHitMobile) subtype = zh("移动网络", "行動網路");
-  else if (isVPNLike || dcEvidence >= 1) subtype = zh("机房/专线", "機房/專線");
-  else if (isHomeLike) subtype = zh("住宅/家宽", "住宅/家寬");
+  const lineType = isHomeBroadband ? zh("家宽", "家寬") : zh("非家宽", "非家寬");
+
+  let subtype = zh("未知", "未知");
+  if (rdnsHitMobile || mobileHit) subtype = zh("移动网络", "行動網路");
+  else if (tunnelLike || dcEvidence >= 1) subtype = zh("机房/专线特征", "機房/專線特徵");
+  else if (isHomeBroadband) subtype = zh("住宅/接入特征", "住宅/接入特徵");
   else if (hbEvidence >= 1) subtype = zh("运营商/接入", "運營商/接入");
   else subtype = zh("普通 ISP", "一般 ISP");
 
-  const isHomeBroadband = lineType;
-  const isNative = (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生");
-  const vpnStatus = isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線");
+  // “原生”推测：这里仍是启发式
+  const nativeHint = (!tunnelLike && riskValue < 55) ? zh("更像原生", "更像原生") : zh("可能非原生", "可能非原生");
+  const tunnelHint = tunnelLike ? zh("机房/代理特征偏强", "機房/代理特徵偏強") : zh("机房/代理特征偏弱", "機房/代理特徵偏弱");
 
   return {
     riskValue,
-    lineType: zh(lineType, lineType === "家宽" ? "家寬" : "非家寬"),
+    lineType,
     subtype,
-    isHomeBroadband: zh(isHomeBroadband, isHomeBroadband === "家宽" ? "家寬" : "非家寬"),
-    isNative,
-    vpnStatus,
+
+    // ✅ boolean：后续你要做逻辑判断不会踩坑
+    isHomeBroadband,
+
+    // ✅ 更不误导的提示字段（你面板想保持原文也行，但建议改用这两个）
+    nativeHint,
+    tunnelHint,
+
+    // ✅ 可解释性：命中了哪些证据，一眼知道为什么是这个分
+    reasons,
+
     _raw: {
       asn,
       rdnsHost: rdnsHost || "",
@@ -918,7 +954,7 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
       rdnsHitMobile,
       hbEvidence,
       dcEvidence,
-      _norm: {ISP, ORG, AS, CTRY}
+      _norm: { ISP, ORG, AS, CTRY }
     }
   };
 }
@@ -2313,8 +2349,9 @@ log("debug", "BoxSettings(BOX)", BOX);
       ? risk
       : {riskValue: 0, isHomeBroadband: "-", isNative: "-", vpnStatus: "-", _raw: {}};
 
-    parts.push(`网络类型: ${r.lineType} · ${r.isNative}`);
-    parts.push(`VPN 状态: ${r.vpnStatus}`);
+      parts.push(`网络类型: ${r.lineType} · ${r.nativeHint}`);
+      parts.push(`代理特征: ${r.tunnelHint}`);
+      parts.push(`证据: ${(r.reasons || []).slice(0, 4).join("；") || "-"}`);
 //    if (rdnsHost) parts.push(`PTR: ${rdnsHost}`);
 
     const rv = Number(r.riskValue);
