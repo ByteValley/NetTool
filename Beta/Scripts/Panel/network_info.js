@@ -896,19 +896,69 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
   const isNative = (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生");
   const vpnStatus = isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線");
 
+  // —— reasons：证据列表（可读短句）——
+  const reasons = [];
+  const add = (s) => { if (s && !reasons.includes(s)) reasons.push(s); };
+
+  if (rdnsHost) add(`PTR: ${String(rdnsHost).replace(/\.$/, "")}`);
+
+  if (rdnsHitDC) add("PTR 命中常见机房域名后缀");
+  if (rdnsHitHB) add("PTR 命中家宽/接入网命名习惯");
+  if (rdnsHitMobile) add("PTR 命中移动网络命名习惯");
+
+  if (dcHit) add("ISP/ORG/ASN 命中机房/云/VPN 关键词");
+  if (hbHit) add("ISP/ORG/ASN 命中家宽/运营商接入关键词");
+  if (mobileHit) add("ISP/ORG/ASN 命中移动网络关键词");
+
+  if (ASN_HOME_STRONG.has(asn)) add(`ASN 命中强家宽白名单：AS${asn}`);
+
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
+    add("国家/地区风险加成命中");
+  }
+
+  if (!ORG && !AS && ISP.length <= 3) add("信息不足惩罚：ORG/ASN 缺失且 ISP 过短");
+
+  // —— nativeHint：原生/非原生更友好解释 ——（不硬扯“100%确定”，只是提示）
+  const nativeHint = isVPNLike
+    ? zh("非原生（疑似中转/机房）", "非原生（疑似中轉/機房）")
+    : (riskValue < 50
+        ? zh("原生（未见明显机房特征）", "原生（未見明顯機房特徵）")
+        : zh("偏非原生（特征混杂）", "偏非原生（特徵混雜）"));
+
+  // —— tunnelHint：代理/隧道特征（给面板看的单行结论）——
+  let tunnelHint = zh("未知", "未知");
+
+  if (isVPNLike) {
+    tunnelHint = zh("强代理特征（机房/云/VPN）", "強代理特徵（機房/雲/VPN）");
+  } else if (mobileHit || rdnsHitMobile) {
+    tunnelHint = zh("移动出口特征（蜂窝/无线）", "行動出口特徵（行動/無線）");
+  } else if (isHomeBroadband) {
+    tunnelHint = zh("家宽特征（住宅/接入网）", "家寬特徵（住宅/接入網）");
+  } else if (hbEvidence >= 1) {
+    tunnelHint = zh("偏运营商接入（证据不足以判家宽）", "偏運營商接入（證據不足以判家寬）");
+  } else if (riskValue >= 50) {
+    tunnelHint = zh("疑似中转/机房（证据不足但风险偏高）", "疑似中轉/機房（證據不足但風險偏高）");
+  } else {
+    tunnelHint = zh("普通 ISP（未见明显隧道特征）", "一般 ISP（未見明顯隧道特徵）");
+  }
+
   return {
     riskValue,
     lineType: zh(lineType, lineType === "家宽" ? "家寬" : "非家寬"),
     subtype,
 
-    // ✅ FIX 2：boolean 才是“比较符”该用的值
+    // boolean 判定
     isHomeBroadband,
 
-    // 如果你还想在面板里显示“家宽/非家宽”文本，就用下面这个字段
-    isHomeBroadbandText: zh(lineType, lineType === "家宽" ? "家寬" : "非家寬"),
+    // 你要的三个字段
+    nativeHint,
+    tunnelHint,
+    reasons,
 
-    isNative,
-    vpnStatus,
+    // 你原先已有的（可留可不留）
+    isNative: (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生"),
+    vpnStatus: isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線"),
+
     _raw: {
       asn,
       rdnsHost: rdnsHost || "",
@@ -920,7 +970,7 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
       rdnsHitMobile,
       hbEvidence,
       dcEvidence,
-      _norm: {ISP, ORG, AS, CTRY}
+      _norm: { ISP, ORG, AS, CTRY }
     }
   };
 }
