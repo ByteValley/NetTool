@@ -2,7 +2,7 @@
  * @name BoxJS Bridge
  * @description 通用：跨 Surge/Egern/Loon/Stash/Shadowrocket/QX 写入 BoxJs 根 JSON（默认 ComponentService）
  * @author ByteValley
- * @version 2025-12-19R2
+ * @version 2025-12-19R1
  *
  * URL:
  * - https://api.boxjs-bridge.com/set?boxKey=ComponentService&payload=...
