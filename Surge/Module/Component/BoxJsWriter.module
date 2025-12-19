@@ -1,12 +1,11 @@
-#!name=BoxJs组件服务
+#!name=BoxJs桥接服务
 #!category=组件服务
 #!desc=将数据写入BoxJs
 #!author=ByteValley
 #!version=2025-12-19R1
 
-[Script]
-# 模块分类 · BoxJs 数据接口
-BoxJSWriter = type=http-request, pattern=^https:\/\/boxjs\.write\/probe, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/boxjs_writer.js, timeout=10
-
 [MITM]
-hostname = %APPEND% boxjs.write
+hostname = %APPEND% boxjs.bridge
+
+[Script]
+BoxJSBridge = type=http-request, pattern=^https:\/\/boxjs\.bridge\/boxjs\/(set|appendLog|get)\?, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/boxjs_bridge.js, timeout=10
