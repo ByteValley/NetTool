@@ -1,0 +1,14 @@
+#!name=BoxJs桥接服务
+#!category=组件服务
+#!desc=通用写入/读取 BoxJs 根 JSON（默认 ComponentService），支持 set/appendLog/get
+#!author=ByteValley
+#!version=2025-12-19R5
+
+[Script]
+# 模块分类 · BoxJs桥接（通用写入/日志/读取）
+BoxJs桥接·写入 = type=http-request,pattern=^https?:\/\/api\.boxjs-bridge\.com\/set,requires-body=1,max-size=-1,timeout=10,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/boxjs_bridge.js,script-update-interval=0
+BoxJs桥接·日志 = type=http-request,pattern=^https?:\/\/api\.boxjs-bridge\.com\/appendLog,requires-body=1,max-size=-1,timeout=10,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/boxjs_bridge.js,script-update-interval=0
+BoxJs桥接·读取 = type=http-request,pattern=^https?:\/\/api\.boxjs-bridge\.com\/get,requires-body=1,max-size=-1,timeout=10,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/boxjs_bridge.js,script-update-interval=0
+
+[MITM]
+hostname = %APPEND% api.boxjs-bridge.com
