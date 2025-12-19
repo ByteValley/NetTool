@@ -11,9 +11,7 @@
  *
  * payload(JSON):
  * - set:
- *   { "path":"12123.Caches.cacheM", "value": {...}, "create": true }
- * - appendLog:
- *   { "path":"12123.Logs.log", "line":"hello", "maxLines":80 }
+ *   { "path":"12123.Caches.cacheMeta", "value": {...}, "create": true } *   { "path":"12123.Caches.cacheMe t", "value": {...}, "create": trueines":80 }
  * - get:
  *   { "path":"12123.Caches.cacheM" }
  * - batch:
