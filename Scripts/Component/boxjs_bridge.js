@@ -1,16 +1,52 @@
-// boxjs_bridge.js
-// 通用写入 BoxJS 根 JSON（Surge $persistentStore）
-// - 默认 rootKey=ComponentService，可通过 boxKey 指定
-// - set：写 value 到 path（如 12123.Caches.cacheMeta）
-// - appendLog：追加 line 到 logPath（如 12123.Logs.log），自动裁剪
-// - get：读取 paths（可选）
+/******************************************
+ * @name BoxJS Bridge
+ * @description 通用：跨 Surge/Egern/Loon/Stash/Shadowrocket/QX 写入 BoxJs 根 JSON（默认 ComponentService）
+ * @author ByteValley
+ * @version 2025-12-19R2
+ *
+ * URL:
+ * - https://api.boxjs-bridge.com/set?boxKey=ComponentService&payload=...
+ * - https://api.boxjs-bridge.com/appendLog?boxKey=ComponentService&payload=...
+ * - https://api.boxjs-bridge.com/get?boxKey=ComponentService&payload=...
+ *
+ * payload(JSON):
+ * - set:
+ *   { "path":"12123.Caches.cacheM", "value": {...}, "create": true }
+ * - appendLog:
+ *   { "path":"12123.Logs.log", "line":"hello", "maxLines":80 }
+ * - get:
+ *   { "path":"12123.Caches.cacheM" }
+ * - batch:
+ *   { "ops":[ {op:"set", path:"...", value:...}, {op:"appendLog", path:"...", line:"..."} ] }
+ ******************************************/
 
-function qs(url) {
+function getEnv() {
+  if (typeof $environment !== "undefined" && $environment["surge-version"]) return "Surge";
+  if (typeof $environment !== "undefined" && $environment["egern-version"]) return "Egern";
+  if (typeof $environment !== "undefined" && $environment["stash-version"]) return "Stash";
+  if (typeof $loon !== "undefined") return "Loon";
+  if (typeof $task !== "undefined") return "Quantumult X";
+  if (typeof $rocket !== "undefined") return "Shadowrocket";
+  return "Unknown";
+}
+
+const ENV = getEnv();
+
+function isObj(v) { return v && typeof v === "object" && !Array.isArray(v); }
+
+function jparse(s, defVal) {
+  try { return JSON.parse(s); } catch { return defVal; }
+}
+function jstr(v) {
+  try { return JSON.stringify(v); } catch { return String(v); }
+}
+
+function queryParams(url) {
   const out = {};
   const i = url.indexOf("?");
   if (i < 0) return out;
-  const s = url.slice(i + 1).split("&");
-  for (const kv of s) {
+  const seg = url.slice(i + 1).split("&");
+  for (const kv of seg) {
     if (!kv) continue;
     const p = kv.split("=");
     const k = decodeURIComponent(p[0] || "");
@@ -19,146 +55,178 @@ function qs(url) {
   }
   return out;
 }
-function jparse(s, def) { try { return JSON.parse(s); } catch { return def; } }
-function jstr(v) { try { return JSON.stringify(v); } catch { return String(v); } }
-function isObj(v) { return v && typeof v === "object" && !Array.isArray(v); }
 
-function ensureRoot(root) {
-  if (!isObj(root)) root = {};
-  return root;
+/* =======================
+ * Storage：跨内核统一
+ * ======================= */
+const Storage = {
+  read(key) {
+    if (ENV === "Quantumult X") return $prefs.valueForKey(key);
+    if (typeof $persistentStore !== "undefined" && $persistentStore.read) return $persistentStore.read(key);
+    return null;
+  },
+  write(key, val) {
+    if (ENV === "Quantumult X") return $prefs.setValueForKey(val, key);
+    if (typeof $persistentStore !== "undefined" && $persistentStore.write) return $persistentStore.write(val, key);
+    return false;
+  }
+};
+
+function respond(statusCode, obj) {
+  const body = jstr(obj);
+  const headers = { "Content-Type": "application/json;charset=utf-8" };
+
+  if (ENV === "Quantumult X") {
+    $done({ status: `HTTP/1.1 ${statusCode}`, headers, body });
+    return;
+  }
+
+  // Surge/Egern/Loon/Stash/Shadowrocket：两种形态都试一下
+  try {
+    $done({ response: { status: statusCode, headers, body } });
+  } catch {
+    $done({ status: statusCode, headers, body });
+  }
 }
+
+/* =======================
+ * Root JSON：读写
+ * ======================= */
+function readRoot(boxKey) {
+  const raw = Storage.read(boxKey) || "{}";
+  const root = jparse(raw, {});
+  return isObj(root) ? root : {};
+}
+
+function writeRoot(boxKey, root) {
+  return Storage.write(boxKey, jstr(root));
+}
+
+/* =======================
+ * Path：get/set（点路径）
+ * ======================= */
 function splitPath(path) {
   return String(path || "").split(".").map(s => s.trim()).filter(Boolean);
 }
-function setByPath(root, path, value) {
-  const seg = splitPath(path);
-  if (!seg.length) return;
-  let cur = root;
-  for (let i = 0; i < seg.length - 1; i++) {
-    const k = seg[i];
-    if (!isObj(cur[k])) cur[k] = {};
-    cur = cur[k];
-  }
-  cur[seg[seg.length - 1]] = value;
-}
+
 function getByPath(root, path) {
   const seg = splitPath(path);
-  if (!seg.length) return undefined;
   let cur = root;
   for (const k of seg) {
-    if (!isObj(cur) && !Array.isArray(cur)) return undefined;
+    if (cur == null) return undefined;
     cur = cur[k];
     if (cur === undefined) return undefined;
   }
   return cur;
 }
-function ensureArrAtPath(root, path) {
+
+function setByPath(root, path, value, create) {
   const seg = splitPath(path);
-  if (!seg.length) return [];
+  if (!seg.length) return false;
+
   let cur = root;
   for (let i = 0; i < seg.length - 1; i++) {
     const k = seg[i];
-    if (!isObj(cur[k])) cur[k] = {};
+    const next = cur[k];
+    if (!isObj(next)) {
+      if (create === false) return false;
+      cur[k] = {};
+    }
     cur = cur[k];
   }
-  const last = seg[seg.length - 1];
-  if (!Array.isArray(cur[last])) cur[last] = [];
-  return cur[last];
-}
-function trimLogs(logs, maxLines, maxBytes) {
-  if (!Array.isArray(logs)) logs = [];
-  let out = logs.length > maxLines ? logs.slice(logs.length - maxLines) : logs.slice();
-  const bytesApprox = (s) => String(s || "").length * 2; // 粗略估算
-  let total = out.reduce((a, s) => a + bytesApprox(s), 0);
-  while (out.length > 1 && total > maxBytes) {
-    const shifted = out.shift();
-    total -= bytesApprox(shifted);
-  }
-  return out;
-}
-function ok(body) {
-  $done({ status: 200, headers: { "Content-Type": "application/json;charset=utf-8" }, body: jstr(body) });
-}
-function bad(status, body) {
-  $done({ status: status || 500, headers: { "Content-Type": "application/json;charset=utf-8" }, body: jstr(body) });
+  cur[seg[seg.length - 1]] = value;
+  return true;
 }
 
+/* =======================
+ * Logs：append（目标路径必须是数组或不存在）
+ * ======================= */
+function ensureArray(v) { return Array.isArray(v) ? v : []; }
+
+function trimLogs(logs, maxLines) {
+  const n = Math.max(1, Math.min(500, Number(maxLines || 80) || 80));
+  if (logs.length <= n) return logs;
+  return logs.slice(logs.length - n);
+}
+
+function appendLogAtPath(root, path, line, maxLines) {
+  const s = String(line || "").trim();
+  if (!s) return false;
+
+  const iso = new Date().toISOString();
+  const msg = `[${iso}] ${s}`;
+
+  const prev = getByPath(root, path);
+  const logs = ensureArray(prev);
+  logs.push(msg);
+
+  setByPath(root, path, trimLogs(logs, maxLines), true);
+  return true;
+}
+
+/* =======================
+ * Router：/set /appendLog /get
+ * ======================= */
 (function main() {
-  const url = $request.url || "";
-  const p = qs(url);
+  const url = ($request && $request.url) ? $request.url : "";
+  if (!url) return respond(400, { ok: false, env: ENV, error: "Missing $request.url" });
 
-  const boxKey = (p.boxKey || "ComponentService").trim();
-  const payload = jparse(p.payload || "", null);
+  const params = queryParams(url);
+  const boxKey = (params.boxKey || "ComponentService").trim() || "ComponentService";
 
-  if (!payload || !isObj(payload)) return bad(400, { ok: false, error: "bad payload" });
+  const payloadRaw = (params.payload || "").trim();
+  const payload = payloadRaw ? jparse(payloadRaw, null) : null;
 
+  // action 只看 pathname（不再依赖 /boxjs/ 前缀）
+  const pathOnly = url.split("?")[0] || "";
   const action =
-    /\/boxjs\/set\b/.test(url) ? "set" :
-    /\/boxjs\/appendLog\b/.test(url) ? "appendLog" :
-    /\/boxjs\/get\b/.test(url) ? "get" :
+    /\/set$/.test(pathOnly) ? "set" :
+    /\/appendLog$/.test(pathOnly) ? "appendLog" :
+    /\/get$/.test(pathOnly) ? "get" :
     "";
 
-  if (!action) return bad(404, { ok: false, error: "unknown action" });
+  if (!action) return respond(404, { ok: false, env: ENV, error: "Unknown action", url: pathOnly });
+  if (!payload || !isObj(payload)) return respond(400, { ok: false, env: ENV, error: "Missing/invalid payload(JSON)" });
 
-  const raw = $persistentStore.read(boxKey) || "{}";
-  const root = ensureRoot(jparse(raw, {}));
+  const root = readRoot(boxKey);
 
-  const now = Date.now();
-  const stamp = `${now}|family=${String((globalThis.Widget && Widget.family) || "")}`;
+  // batch（注意：batch 不靠 action，payload.ops 有就执行）
+  if (Array.isArray(payload.ops)) {
+    const results = [];
+    for (const op of payload.ops) {
+      if (!isObj(op)) continue;
+      const t = String(op.op || "").trim();
 
-  if (action === "set") {
-    const path = String(payload.path || "").trim();
-    if (!path) return bad(400, { ok: false, error: "missing path" });
-
-    setByPath(root, path, payload.value);
-
-    // 可选：顺手写 updatedAt/stamp 到 service 节点（例如 servicePath="12123"）
-    if (payload.servicePath) {
-      const sp = String(payload.servicePath).trim();
-      if (sp) {
-        setByPath(root, `${sp}.updatedAt`, now);
-        setByPath(root, `${sp}.stamp`, stamp);
+      if (t === "set") {
+        const ok = setByPath(root, op.path, op.value, op.create !== false);
+        results.push({ op: "set", path: op.path, ok });
+      } else if (t === "appendLog") {
+        const ok = appendLogAtPath(root, op.path, op.line, op.maxLines);
+        results.push({ op: "appendLog", path: op.path, ok });
+      } else if (t === "get") {
+        const val = getByPath(root, op.path);
+        results.push({ op: "get", path: op.path, ok: val !== undefined, value: val });
       }
     }
 
-    $persistentStore.write(jstr(root), boxKey);
-    return ok({ ok: true, action, boxKey, path, stamp });
+    const wrote = writeRoot(boxKey, root);
+    return respond(200, { ok: !!wrote, env: ENV, boxKey, action: "batch", wrote, results });
+  }
+
+  if (action === "set") {
+    const ok = setByPath(root, payload.path, payload.value, payload.create !== false);
+    const wrote = ok ? writeRoot(boxKey, root) : false;
+    return respond(200, { ok: !!wrote, env: ENV, boxKey, action, path: payload.path, wrote });
   }
 
   if (action === "appendLog") {
-    const logPath = String(payload.logPath || "").trim();
-    const line = String(payload.line || "").trim();
-    if (!logPath || !line) return bad(400, { ok: false, error: "missing logPath/line" });
-
-    const maxLines = Math.max(20, Math.min(500, Number(payload.maxLines || 120) || 120));
-    const maxBytes = Math.max(2048, Math.min(128 * 1024, Number(payload.maxBytes || 12 * 1024) || 12 * 1024));
-
-    const arr = ensureArrAtPath(root, logPath);
-    arr.push(`[${new Date().toISOString()}] ${line}`);
-
-    const trimmed = trimLogs(arr, maxLines, maxBytes);
-    setByPath(root, logPath, trimmed);
-
-    if (payload.servicePath) {
-      const sp = String(payload.servicePath).trim();
-      if (sp) {
-        setByPath(root, `${sp}.updatedAt`, now);
-        setByPath(root, `${sp}.stamp`, stamp);
-      }
-    }
-
-    $persistentStore.write(jstr(root), boxKey);
-    return ok({ ok: true, action, boxKey, logPath, stamp, maxLines });
+    const ok = appendLogAtPath(root, payload.path, payload.line, payload.maxLines);
+    const wrote = ok ? writeRoot(boxKey, root) : false;
+    return respond(200, { ok: !!wrote, env: ENV, boxKey, action, path: payload.path, wrote });
   }
 
   if (action === "get") {
-    const paths = Array.isArray(payload.paths) ? payload.paths : [];
-    const out = {};
-    for (const path of paths) {
-      const k = String(path || "").trim();
-      if (!k) continue;
-      out[k] = getByPath(root, k);
-    }
-    return ok({ ok: true, action, boxKey, data: out });
+    const val = getByPath(root, payload.path);
+    return respond(200, { ok: val !== undefined, env: ENV, boxKey, action, path: payload.path, value: val });
   }
 })();
