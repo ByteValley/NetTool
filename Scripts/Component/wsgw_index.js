@@ -1374,7 +1374,7 @@ function getDataSource(idx) {
             "点击前往BoxJs配置",
             {
                 "open-url":
-                    "http://boxjs.com/#/sub/add/https%3A%2F%2Fraw.githubusercontent.com%2FYuheng0101%2FX%2Fmain%2FTasks%2Fboxjs.json",
+                    "http://boxjs.com/#/sub/add/https%3A%2F%2Fraw.githubusercontent.com%2FByteValley%2FNetTool%2Fmain%2FBoxJs%2FComponentService.boxjs.json",
             }
         );
 
