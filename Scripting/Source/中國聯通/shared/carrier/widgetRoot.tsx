@@ -22,6 +22,7 @@ import { Widget, VStack, HStack } from "scripting"
 import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/carrierUtils"
 import type { UiSettings } from "./ui"
+import { buildWidgetSurfaces } from "./surfaces"
 
 import { MediumLayout } from "./cards/medium"
 import { FeeCard } from "./cards/components/feeCard"
@@ -70,6 +71,11 @@ export type CarrierData = {
 
 export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath: string }) {
   const { data, ui, logoPath } = props
+
+  const surfaces = buildWidgetSurfaces({
+    transparentStyle: ui.transparentWidgetStyle,
+    colorfulLineBorder: ui.colorfulLineBorder,
+  })
 
   const {
     showRemainRatio,
@@ -144,6 +150,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
     return (
       <SmallLayout
         style={style}
+        surfaces={surfaces}
         feeTitle={data.fee.title}
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
@@ -175,6 +182,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
     return (
       <MediumLayout
         layout={mediumStyle}
+        surfaces={surfaces}
         feeTitle={data.fee.title}
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
@@ -194,12 +202,12 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
 
   // ==================== 大号 ====================
 
-  return (
+  const body = (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
       widgetBackground={{
-        style: outerCardBg,
+        style: surfaces.outer || outerCardBg,
         shape: { type: "rect", cornerRadius: 24, style: "continuous" },
       }}
     >
@@ -233,6 +241,20 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           ratio={voiceStat.ratio}
         />
       </HStack>
+    </VStack>
+  )
+
+  if (!surfaces.border) return body
+
+  return (
+    <VStack
+      padding={{ top: 2, leading: 2, bottom: 2, trailing: 2 }}
+      widgetBackground={{
+        style: surfaces.border,
+        shape: { type: "rect", cornerRadius: 26, style: "continuous" },
+      }}
+    >
+      {body}
     </VStack>
   )
 }

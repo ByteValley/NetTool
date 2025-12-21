@@ -33,7 +33,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
     (typeof otherValueText === "string" && otherValueText.trim().length > 0)
 
   return (
-    <MediumOuter>
+    <MediumOuter surfaces={props.surfaces}>
       <FeeCard
         title={feeTitle}
         valueText={feeText}
