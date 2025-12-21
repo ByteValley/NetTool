@@ -25,8 +25,8 @@
         "<b>— BoxJS —</b><br/>• 托管订阅（可选）：<code>https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json</code>"
       ],
       "icons": [
-        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png",
-        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/quanqiu(1).png"
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/03CNSoft/quanqiu(1).png",
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/03CNSoft/quanqiu(1).png"
       ],
       "keys": [
         "@Panel.NetworkInfo.Settings",
@@ -530,8 +530,8 @@
         "<b>— 备注 —</b><br/>• 当所有订阅链接均为空或无效时，面板内容为“未配置订阅参数”。<br/>• 本面板仅拉取订阅流量信息，不修改任何订阅内容。"
       ],
       "icons": [
-        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png",
-        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/ApplePodcasts(1).png"
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/03CNSoft/ApplePodcasts(1).png",
+        "https://raw.githubusercontent.com/lige47/QuanX-icon-rule/main/icon/03CNSoft/ApplePodcasts(1).png"
       ],
       "keys": [
         "@Panel.SubscribeInfo.Settings",
