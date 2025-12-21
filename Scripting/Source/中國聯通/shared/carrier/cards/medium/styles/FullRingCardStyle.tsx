@@ -1,6 +1,6 @@
 // shared/carrier/cards/medium/styles/FullRingCardStyle.tsx
 import type { MediumCommonProps } from "../common"
-import { MediumOuter } from "../common"
+import { DEFAULT_WIDGET_SURFACES, MediumOuter } from "../common"
 import { FeeCard } from "../../components/feeCard"
 import { FullRingStatCard } from "../../components/fullRingStatCard"
 import { ringThemes } from "../../../theme"
@@ -29,12 +29,14 @@ export function FullRingCardStyle(props: MediumCommonProps) {
     surfaces,
   } = props
 
+  const palette = surfaces ?? DEFAULT_WIDGET_SURFACES
+
   const showOther =
     (typeof otherTitle === "string" && otherTitle.trim().length > 0) ||
     (typeof otherValueText === "string" && otherValueText.trim().length > 0)
 
   return (
-    <MediumOuter surfaces={surfaces}>
+    <MediumOuter surfaces={palette}>
       <FeeCard
         title={feeTitle}
         valueText={feeText}
@@ -42,7 +44,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
         logoPath={logoPath}
         updateTime={updateTime}
         transparent={transparent}
-        surfaces={surfaces}
+        surfaces={palette}
       />
 
       <FullRingStatCard
@@ -51,7 +53,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
         theme={ringThemes.flow}
         ratio={flowRatio}
         transparent={transparent}
-        surfaces={surfaces}
+        surfaces={palette}
       />
 
       {showOther ? (
@@ -61,7 +63,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
           theme={ringThemes.flowDir}
           ratio={otherRatio ?? 0}
           transparent={transparent}
-          surfaces={surfaces}
+          surfaces={palette}
         />
       ) : null}
 
@@ -71,7 +73,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
         theme={ringThemes.voice}
         ratio={voiceRatio}
         transparent={transparent}
-        surfaces={surfaces}
+        surfaces={palette}
       />
     </MediumOuter>
   )
