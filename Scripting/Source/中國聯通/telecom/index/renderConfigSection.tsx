@@ -31,6 +31,11 @@ type RenderConfigSectionProps = {
 
   refreshInterval: number
   setRefreshInterval: (v: number) => void
+
+  useTransparentStyle: boolean
+  setUseTransparentStyle: (v: boolean) => void
+  useTintBorderOnTransparent: boolean
+  setUseTintBorderOnTransparent: (v: boolean) => void
 }
 
 const REFRESH_OPTIONS = [
@@ -78,6 +83,11 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
 
     refreshInterval,
     setRefreshInterval,
+
+    useTransparentStyle,
+    setUseTransparentStyle,
+    useTintBorderOnTransparent,
+    setUseTintBorderOnTransparent,
   } = props
 
   // ✅ 只对 CompactList / ProgressList 生效的联动开关（保持原逻辑不动）
@@ -107,6 +117,24 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
         value={showRemainRatio}
         onChanged={setShowRemainRatio}
       />
+
+      <Toggle
+        title={useTransparentStyle ? "透明样式：已开启" : "透明样式：已关闭"}
+        value={useTransparentStyle}
+        onChanged={setUseTransparentStyle}
+      />
+
+      {useTransparentStyle ? (
+        <Toggle
+          title={
+            useTintBorderOnTransparent
+              ? "透明样式：显示彩色线条边框"
+              : "透明样式：不显示彩色线条边框"
+          }
+          value={useTintBorderOnTransparent}
+          onChanged={setUseTintBorderOnTransparent}
+        />
+      ) : null}
 
       {/* ==================== 小号 ==================== */}
       <Picker

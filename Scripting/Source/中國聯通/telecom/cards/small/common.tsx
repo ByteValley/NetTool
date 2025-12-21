@@ -1,6 +1,7 @@
 // telecom/cards/small/common.tsx
 import { Text, Image } from "scripting"
 import { telecomRingThemes } from "../../theme"
+import type { VisualStyleConfig } from "../../visualStyle"
 
 /**
  * 小号组件通用 Props：
@@ -41,6 +42,9 @@ export type SmallCardCommonProps = {
 
   /** 仅作用于 CompactList / ProgressList：true=总流量+语音（2行），false=通用+定向+语音（3行） */
   smallMiniBarUseTotalFlow?: boolean
+
+  /** 视觉样式控制 */
+  visualStyle?: VisualStyleConfig
 }
 
 // ========= 小工具：Logo + 胶囊单位 =========

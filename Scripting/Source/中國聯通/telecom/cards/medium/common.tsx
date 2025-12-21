@@ -1,6 +1,7 @@
 // telecom/cards/medium/common.tsx
 import { VStack, HStack } from "scripting"
 import { outerCardBg } from "../../theme"
+import { buildCardBackground, wrapWithOutline, defaultVisualStyle, VisualStyleConfig } from "../../visualStyle"
 
 export type MediumStyleKey = "FullRing" | "DialRing"
 
@@ -21,22 +22,27 @@ export type MediumCommonProps = {
   voiceTitle: string
   voiceValueText: string
   voiceRatio: number
+
+  visualStyle?: VisualStyleConfig
 }
 
-export function MediumOuter(props: { children: any }) {
+export function MediumOuter(props: { children: any; visualStyle?: VisualStyleConfig }) {
   const { children } = props
-  return (
+  const visualStyle = props.visualStyle ?? defaultVisualStyle
+  return wrapWithOutline(
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={{
-        style: outerCardBg,
-        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
-      }}
+      widgetBackground={buildCardBackground({
+        visual: visualStyle,
+        base: outerCardBg,
+        cornerRadius: 24,
+      })}
     >
       <HStack alignment="center" spacing={10}>
         {children}
       </HStack>
-    </VStack>
+    </VStack>,
+    { visual: visualStyle, cornerRadius: 24 },
   )
 }

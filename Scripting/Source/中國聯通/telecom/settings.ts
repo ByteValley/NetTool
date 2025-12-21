@@ -12,6 +12,12 @@ export type MediumCardLayout = "three" | "four"
 export type UiSettings = {
   showRemainRatio: boolean
 
+  /** 是否渲染透明样式 */
+  useTransparentStyle: boolean
+
+  /** 透明样式下是否启用彩色线条边框 */
+  useTintBorderOnTransparent: boolean
+
   /** 中号样式：全圆环 / 仪表盘 */
   mediumStyle: MediumStyleKey
 
@@ -55,6 +61,10 @@ export type UiSwitchSource = Partial<UiSettings> & {
 
   // ✅ 新字段：给配置页做开关用
   mediumUseThreeLayout?: boolean
+
+  // ✅ 新字段：透明样式
+  useTransparentStyle?: boolean
+  useTintBorderOnTransparent?: boolean
 }
 
 // ==================== Operator Settings ====================
@@ -155,6 +165,9 @@ export function pickUiSettings(
 
   return {
     showRemainRatio: !!src.showRemainRatio,
+
+    useTransparentStyle: !!src.useTransparentStyle,
+    useTintBorderOnTransparent: !!src.useTintBorderOnTransparent,
 
     mediumStyle: normalizeMediumStyle((src as any).mediumStyle),
 
