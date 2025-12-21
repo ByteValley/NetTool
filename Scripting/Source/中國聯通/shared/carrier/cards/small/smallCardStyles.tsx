@@ -4,7 +4,12 @@ import { VStack, HStack, ZStack, Text, Spacer, Image } from "scripting"
 import type { SmallCardCommonProps } from "./common"
 import { ringThemes, timeStyle } from "../../theme"
 import type { RingCardTheme } from "../../theme"
-import { DEFAULT_WIDGET_SURFACES, type WidgetSurfacePalette, wrapWithBorderLayer } from "../../surfaces"
+import {
+  DEFAULT_WIDGET_SURFACES,
+  type WidgetSurfacePalette,
+  wrapWithBorderLayer,
+  buildWidgetBackground,
+} from "../../surfaces"
 
 // =====================================================================
 // Layout Helpers · 强制“靠左”
@@ -39,10 +44,7 @@ export function SmallCardSurface(props: { children: any; surfaces?: WidgetSurfac
     <VStack
       alignment="leading"
       padding={{ top: 6, leading: 8, bottom: 6, trailing: 8 }}
-      widgetBackground={{
-        style: surfaces.outer,
-        shape: { type: "rect", cornerRadius: 26, style: "continuous" },
-      }}
+      widgetBackground={buildWidgetBackground({ style: surfaces.outer, cornerRadius: 26 })}
       frame={{ minWidth: 0, maxWidth: Infinity, minHeight: 0, maxHeight: Infinity }}
     >
       <Spacer minLength={2} />
@@ -73,10 +75,7 @@ function ContentCard(props: {
       alignment="leading"
       padding={pad}
       frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: surfaces.content,
-        shape: { type: "rect", cornerRadius: 16, style: "continuous" },
-      }}
+      widgetBackground={buildWidgetBackground({ style: surfaces.content, cornerRadius: 16 })}
     >
       {props.children}
     </VStack>
@@ -103,10 +102,7 @@ function TintPanel(props: {
       alignment="leading"
       padding={pad}
       frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: surfaces.panel,
-        shape: { type: "rect", cornerRadius: r, style: "continuous" },
-      }}
+      widgetBackground={buildWidgetBackground({ style: surfaces.panel, cornerRadius: r })}
     >
       {props.children}
     </VStack>

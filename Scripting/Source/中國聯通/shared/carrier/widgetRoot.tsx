@@ -22,7 +22,7 @@ import { Widget, VStack, HStack } from "scripting"
 import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/carrierUtils"
 import type { UiSettings } from "./ui"
-import { buildWidgetSurfaces, wrapWithBorderLayer } from "./surfaces"
+import { buildWidgetSurfaces, wrapWithBorderLayer, buildWidgetBackground } from "./surfaces"
 
 import { MediumLayout } from "./cards/medium"
 import { FeeCard } from "./cards/components/feeCard"
@@ -206,10 +206,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={{
-        style: surfaces.outer || outerCardBg,
-        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
-      }}
+      widgetBackground={buildWidgetBackground({ style: surfaces.outer || outerCardBg, cornerRadius: 24 })}
     >
       <HStack alignment="center" spacing={10}>
         <FeeCard

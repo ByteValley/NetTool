@@ -1,7 +1,7 @@
 // shared/carrier/cards/components/feeCard.tsx
 import { VStack, HStack, Text, Image, Spacer } from "scripting"
 import { timeStyle, RingCardTheme } from "../../theme"
-import { type WidgetSurfacePalette, wrapWithBorderLayer } from "../../surfaces"
+import { type WidgetSurfacePalette, wrapWithBorderLayer, buildWidgetBackground } from "../../surfaces"
 
 export function FeeCard(props: {
   title: string
@@ -38,10 +38,7 @@ export function FeeCard(props: {
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: background,
-        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
-      }}
+      widgetBackground={buildWidgetBackground({ style: background, cornerRadius: 18 })}
     >
       <Spacer minLength={2} />
       <HStack alignment="center">
