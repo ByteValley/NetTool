@@ -29,13 +29,13 @@ const OPAQUE_SURFACES: WidgetSurfacePalette = {
 }
 
 const TRANSPARENT_SURFACES: WidgetSurfacePalette = {
-  // 完全透明：遵循 "Tinted Mode" 适配指南，交给系统做贴纸/染色处理
-  outer: { light: "rgba(255,255,255,0)", dark: "rgba(0,0,0,0)" } as DynamicShapeStyle,
-  content: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
-  panel: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
-  pill: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
-  chip: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
-  border: { light: "rgba(255,255,255,0.22)", dark: "rgba(255,255,255,0.30)" } as DynamicShapeStyle,
+  // 半透明 Alpha：遵循 "Tinted Mode" 指南，留出染色空间并避免纯灰蒙层发白
+  outer: { light: "rgba(255,255,255,0.14)", dark: "rgba(0,0,0,0.22)" } as DynamicShapeStyle,
+  content: { light: "rgba(255,255,255,0.10)", dark: "rgba(255,255,255,0.12)" } as DynamicShapeStyle,
+  panel: { light: "rgba(255,255,255,0.08)", dark: "rgba(255,255,255,0.10)" } as DynamicShapeStyle,
+  pill: { light: "rgba(255,255,255,0.12)", dark: "rgba(255,255,255,0.14)" } as DynamicShapeStyle,
+  chip: { light: "rgba(255,255,255,0.14)", dark: "rgba(255,255,255,0.18)" } as DynamicShapeStyle,
+  border: { light: "rgba(255,255,255,0.28)", dark: "rgba(255,255,255,0.34)" } as DynamicShapeStyle,
   transparentMode: true,
 }
 
