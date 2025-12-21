@@ -22,7 +22,6 @@ import { Widget, VStack, HStack } from "scripting"
 import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/carrierUtils"
 import type { UiSettings } from "./ui"
-import { buildWidgetSurfaces, wrapWithBorderLayer, buildWidgetBackground } from "./surfaces"
 
 import { MediumLayout } from "./cards/medium"
 import { FeeCard } from "./cards/components/feeCard"
@@ -71,11 +70,6 @@ export type CarrierData = {
 
 export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath: string }) {
   const { data, ui, logoPath } = props
-
-  const surfaces = buildWidgetSurfaces({
-    transparentStyle: ui.transparentWidgetStyle,
-    colorfulLineBorder: ui.colorfulLineBorder,
-  })
 
   const {
     showRemainRatio,
@@ -150,7 +144,6 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
     return (
       <SmallLayout
         style={style}
-        surfaces={surfaces}
         feeTitle={data.fee.title}
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
@@ -182,7 +175,6 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
     return (
       <MediumLayout
         layout={mediumStyle}
-        surfaces={surfaces}
         feeTitle={data.fee.title}
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
@@ -202,11 +194,14 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
 
   // ==================== 大号 ====================
 
-  const body = (
+  return (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={buildWidgetBackground({ style: surfaces.outer || outerCardBg, cornerRadius: 24 })}
+      widgetBackground={{
+        style: outerCardBg,
+        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
+      }}
     >
       <HStack alignment="center" spacing={10}>
         <FeeCard
@@ -215,7 +210,6 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           theme={ringThemes.fee}
           logoPath={logoPath}
           updateTime={data.updateTime}
-          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -223,7 +217,6 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={flowValueText}
           theme={ringThemes.flow}
           ratio={flowStat.ratio}
-          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -231,7 +224,6 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={otherValueText}
           theme={ringThemes.flowDir}
           ratio={otherStat.ratio}
-          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -239,11 +231,8 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={voiceValueText}
           theme={ringThemes.voice}
           ratio={voiceStat.ratio}
-          surfaces={surfaces}
         />
       </HStack>
     </VStack>
   )
-
-  return wrapWithBorderLayer({ child: body, surfaces, cornerRadius: 24, padding: 2 })
 }

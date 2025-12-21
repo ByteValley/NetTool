@@ -1,10 +1,12 @@
 // shared/carrier/cards/large/index.tsx
 // 大号组件布局：四卡（话费 + 通用流量 + 定向流量 + 语音）
 
-import { VStack, HStack } from "scripting"
+import {
+  VStack,
+  HStack,
+} from "scripting"
 
 import { outerCardBg, ringThemes } from "../../theme"
-import { type WidgetSurfacePalette, wrapWithBorderLayer, buildWidgetBackground } from "../../surfaces"
 import { FeeCard } from "../components/feeCard"
 import { FullRingStatCard } from "../components/fullRingStatCard"
 
@@ -14,8 +16,6 @@ export type TelecomLargeLayoutProps = {
   feeText: string
   logoPath: string
   updateTime: string
-
-  surfaces?: WidgetSurfacePalette
 
   // 通用流量
   flowTitle: string
@@ -48,17 +48,16 @@ export function TelecomLargeLayout(props: TelecomLargeLayoutProps) {
     voiceTitle,
     voiceValueText,
     voiceRatio,
-    surfaces,
   } = props
 
-  const body = (
+  return (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={buildWidgetBackground({
-        style: surfaces?.outer || outerCardBg,
-        cornerRadius: 24,
-      })}
+      widgetBackground={{
+        style: outerCardBg,
+        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
+      }}
     >
       <HStack alignment="center" spacing={10}>
         <FeeCard
@@ -67,7 +66,6 @@ export function TelecomLargeLayout(props: TelecomLargeLayoutProps) {
           theme={ringThemes.fee}
           logoPath={logoPath}
           updateTime={updateTime}
-          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -75,7 +73,6 @@ export function TelecomLargeLayout(props: TelecomLargeLayoutProps) {
           valueText={flowValueText}
           theme={ringThemes.flow}
           ratio={flowRatio}
-          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -83,7 +80,6 @@ export function TelecomLargeLayout(props: TelecomLargeLayoutProps) {
           valueText={otherValueText}
           theme={ringThemes.flowDir}
           ratio={otherRatio}
-          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -91,11 +87,8 @@ export function TelecomLargeLayout(props: TelecomLargeLayoutProps) {
           valueText={voiceValueText}
           theme={ringThemes.voice}
           ratio={voiceRatio}
-          surfaces={surfaces}
         />
       </HStack>
     </VStack>
   )
-
-  return wrapWithBorderLayer({ child: body, surfaces, cornerRadius: 24, padding: 2 })
 }

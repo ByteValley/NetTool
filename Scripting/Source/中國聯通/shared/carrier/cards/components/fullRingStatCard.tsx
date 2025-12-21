@@ -2,7 +2,6 @@
 
 import { VStack, Text, Image, Spacer, ZStack, Gauge } from "scripting"
 import { RingCardTheme, timeStyle } from "../../theme"
-import { type WidgetSurfacePalette, wrapWithBorderLayer, buildWidgetBackground } from "../../surfaces"
 import { clamp01, percentText } from "../../utils/carrierUtils"
 
 /**
@@ -14,19 +13,19 @@ export function FullRingStatCard(props: {
   valueText: string
   theme: RingCardTheme
   ratio?: number
-  surfaces?: WidgetSurfacePalette
 }) {
-  const { title, valueText, theme, ratio, surfaces } = props
+  const { title, valueText, theme, ratio } = props
   const r = clamp01(ratio ?? 0)
 
-  const background = surfaces?.panel ?? theme.bg
-
-  const card = (
+  return (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={buildWidgetBackground({ style: background, cornerRadius: 18 })}
+      widgetBackground={{
+        style: theme.bg,
+        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
+      }}
     >
       <Spacer minLength={2} />
       <ZStack frame={{ width: 56, height: 56 }}>
@@ -81,6 +80,4 @@ export function FullRingStatCard(props: {
       <Spacer minLength={4} />
     </VStack>
   )
-
-  return wrapWithBorderLayer({ child: card, surfaces, cornerRadius: 18, padding: 2 })
 }

@@ -192,16 +192,6 @@ function SettingsView() {
       ? initial.smallMiniBarUseTotalFlow
       : !!defaultChinaUnicomSettings.smallMiniBarUseTotalFlow
 
-  const initialTransparentStyle =
-    typeof initial.transparentWidgetStyle === "boolean"
-      ? initial.transparentWidgetStyle
-      : !!defaultChinaUnicomSettings.transparentWidgetStyle
-
-  const initialColorfulBorder =
-    typeof initial.colorfulLineBorder === "boolean"
-      ? initial.colorfulLineBorder
-      : !!defaultChinaUnicomSettings.colorfulLineBorder
-
   const initialCacheScopeKey = String(initial.cacheScopeKey ?? defaultChinaUnicomSettings.cacheScopeKey ?? "")
 
   const initialCache = (initial.cache ?? defaultChinaUnicomSettings.cache) as CacheConfig
@@ -237,8 +227,6 @@ function SettingsView() {
   const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] = useState<boolean>(
     initialSmallMiniBarUseTotalFlow,
   )
-  const [transparentWidgetStyle, setTransparentWidgetStyle] = useState<boolean>(initialTransparentStyle)
-  const [colorfulLineBorder, setColorfulLineBorder] = useState<boolean>(initialColorfulBorder)
 
   const [cacheScopeKey, setCacheScopeKey] = useState<string>(initialCacheScopeKey)
   const [cacheDraft, setCacheDraft] = useState<CacheConfig>(initialCache)
@@ -291,9 +279,6 @@ function SettingsView() {
       mediumStyle,
       mediumUseThreeCard: !!mediumUseThreeCard,
       includeDirectionalInTotal: !!includeDirectionalInTotal,
-
-      transparentWidgetStyle: !!transparentWidgetStyle,
-      colorfulLineBorder: !!colorfulLineBorder,
 
       smallCardStyle,
       smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
@@ -392,10 +377,6 @@ function SettingsView() {
           setSmallCardStyle={setSmallCardStyle}
           showRemainRatio={showRemainRatio}
           setShowRemainRatio={setShowRemainRatio}
-          transparentWidgetStyle={transparentWidgetStyle}
-          setTransparentWidgetStyle={setTransparentWidgetStyle}
-          colorfulLineBorder={colorfulLineBorder}
-          setColorfulLineBorder={setColorfulLineBorder}
           smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
           mediumStyle={mediumStyle}

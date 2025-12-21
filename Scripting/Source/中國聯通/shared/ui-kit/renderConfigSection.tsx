@@ -10,11 +10,6 @@ type RenderConfigSectionProps = {
   showRemainRatio: boolean
   setShowRemainRatio: (v: boolean) => void
 
-  transparentWidgetStyle: boolean
-  setTransparentWidgetStyle: (v: boolean) => void
-  colorfulLineBorder: boolean
-  setColorfulLineBorder: (v: boolean) => void
-
   // 小号
   smallCardStyle: SmallCardStyle
   setSmallCardStyle: (v: SmallCardStyle) => void
@@ -66,11 +61,6 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
     showRemainRatio,
     setShowRemainRatio,
 
-    transparentWidgetStyle,
-    setTransparentWidgetStyle,
-    colorfulLineBorder,
-    setColorfulLineBorder,
-
     smallCardStyle,
     setSmallCardStyle,
     smallMiniBarUseTotalFlow,
@@ -107,7 +97,6 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
           {"\n"}• 百分比含义：作用于通用/定向/语音（或总流量/语音），由「显示剩余/已使用」决定。
           {"\n"}• 中号组件：样式=全圆环/仪表盘；布局=三卡/四卡（三卡会隐藏定向卡）。
           {"\n"}• 三卡布局下：可选择“总流量包含定向”或“仅通用流量”。
-          {"\n"}• 外观：可切换透明外观；透明时可叠加彩色描边。
           {"\n"}• 刷新间隔建议 15 分钟～24 小时（系统调度可能更慢）。
         </Text>
       }
@@ -117,20 +106,6 @@ export function RenderConfigSection(props: RenderConfigSectionProps) {
         value={showRemainRatio}
         onChanged={setShowRemainRatio}
       />
-
-      <Toggle
-        title={transparentWidgetStyle ? "外观：透明小组件" : "外观：不透明小组件"}
-        value={transparentWidgetStyle}
-        onChanged={setTransparentWidgetStyle}
-      />
-
-      {transparentWidgetStyle ? (
-        <Toggle
-          title={colorfulLineBorder ? "透明模式：彩色描边" : "透明模式：浅色描边"}
-          value={colorfulLineBorder}
-          onChanged={setColorfulLineBorder}
-        />
-      ) : null}
 
       {/* ==================== 小号 ==================== */}
       <Picker

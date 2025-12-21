@@ -1,11 +1,6 @@
 // shared/carrier/cards/small/common.tsx
 import { Text, Image } from "scripting"
 import { ringThemes } from "../../theme"
-import {
-  type WidgetSurfacePalette,
-  DEFAULT_WIDGET_SURFACES,
-  buildWidgetBackground,
-} from "../../surfaces"
 
 /**
  * 小号组件通用 Props：
@@ -46,9 +41,6 @@ export type SmallCardCommonProps = {
 
   /** 仅作用于 CompactList / ProgressList：true=总流量+语音（2行），false=通用+定向+语音（3行） */
   smallMiniBarUseTotalFlow?: boolean
-
-  /** Widget 外观：透明/描边等样式由上层传入；不传则使用默认不透明外观 */
-  surfaces?: WidgetSurfacePalette
 }
 
 // ========= 小工具：Logo + 胶囊单位 =========
@@ -86,14 +78,16 @@ export function LogoImage(props: { logoPath: string; size?: number }) {
   )
 }
 
-export function UnitPill(props: { text: string; surfaces?: WidgetSurfacePalette }) {
-  const surfaces = props?.surfaces ?? DEFAULT_WIDGET_SURFACES
+export function UnitPill(props: { text: string }) {
   return (
     <Text
       font={9}
       fontWeight="semibold"
       padding={{ top: 2, leading: 8, bottom: 2, trailing: 8 }}
-      widgetBackground={buildWidgetBackground({ style: surfaces.pill, cornerRadius: 999, shape: "capsule" })}
+      widgetBackground={{
+        style: "systemGray5",
+        shape: { type: "capsule", style: "continuous" },
+      }}
     >
       {props.text}
     </Text>

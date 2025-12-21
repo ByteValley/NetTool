@@ -1,12 +1,6 @@
 // shared/carrier/cards/medium/common.tsx
 import { VStack, HStack } from "scripting"
 import { outerCardBg } from "../../theme"
-import {
-  type WidgetSurfacePalette,
-  DEFAULT_WIDGET_SURFACES,
-  wrapWithBorderLayer,
-  buildWidgetBackground,
-} from "../../surfaces"
 
 export type MediumStyleKey = "FullRing" | "DialRing"
 
@@ -27,28 +21,22 @@ export type MediumCommonProps = {
   voiceTitle: string
   voiceValueText: string
   voiceRatio: number
-
-  surfaces?: WidgetSurfacePalette
 }
 
-export function MediumOuter(props: { children: any; surfaces?: WidgetSurfacePalette }) {
-  const surfaces = props.surfaces ?? DEFAULT_WIDGET_SURFACES
-  const body = (
+export function MediumOuter(props: { children: any }) {
+  const { children } = props
+  return (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={
-        buildWidgetBackground({
-          style: surfaces.outer || outerCardBg,
-          cornerRadius: 24,
-        })
-      }
+      widgetBackground={{
+        style: outerCardBg,
+        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
+      }}
     >
       <HStack alignment="center" spacing={10}>
-        {props.children}
+        {children}
       </HStack>
     </VStack>
   )
-
-  return wrapWithBorderLayer({ child: body, surfaces, cornerRadius: 24, padding: 2 })
 }
