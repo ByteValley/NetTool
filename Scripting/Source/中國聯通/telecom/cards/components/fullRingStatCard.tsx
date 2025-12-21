@@ -3,6 +3,7 @@
 import { VStack, Text, Image, Spacer, ZStack, Gauge } from "scripting"
 import { RingCardTheme, timeStyle } from "../../theme"
 import { clamp01, percentText } from "../../utils/telecomUtils"
+import { buildCardBackground, wrapWithOutline, defaultVisualStyle, VisualStyleConfig } from "../../visualStyle"
 
 /**
  * FullRingStatCard（全圆环）
@@ -13,19 +14,22 @@ export function FullRingStatCard(props: {
   valueText: string
   theme: RingCardTheme
   ratio?: number
+  visualStyle?: VisualStyleConfig
 }) {
   const { title, valueText, theme, ratio } = props
+  const visualStyle = props.visualStyle ?? defaultVisualStyle
   const r = clamp01(ratio ?? 0)
 
-  return (
+  const card = (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: theme.bg,
-        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
-      }}
+      widgetBackground={buildCardBackground({
+        visual: visualStyle,
+        base: theme.bg,
+        cornerRadius: 18,
+      })}
     >
       <Spacer minLength={2} />
       <ZStack frame={{ width: 56, height: 56 }}>
@@ -80,4 +84,10 @@ export function FullRingStatCard(props: {
       <Spacer minLength={4} />
     </VStack>
   )
+
+  return wrapWithOutline(card, {
+    visual: visualStyle,
+    tint: theme.tint,
+    cornerRadius: 18,
+  })
 }

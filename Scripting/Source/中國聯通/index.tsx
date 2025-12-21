@@ -113,6 +113,10 @@ const defaultSettings: ChinaUnicomSettings = {
 
   // ✅ 仅作用于紧凑/进度清单：2行/3行
   smallMiniBarUseTotalFlow: false,
+
+  // 透明样式
+  useTransparentStyle: false,
+  useTintBorderOnTransparent: false,
 }
 
 // ==================== 设置页面 ====================
@@ -180,6 +184,13 @@ function SettingsView() {
   const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
     useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
 
+  // 透明样式
+  const [useTransparentStyle, setUseTransparentStyle] = useState<boolean>(
+    initial.useTransparentStyle ?? false,
+  )
+  const [useTintBorderOnTransparent, setUseTintBorderOnTransparent] =
+    useState<boolean>(initial.useTintBorderOnTransparent ?? false)
+
   const currentMatchType: "flowType" | "addupItemCode" =
     MATCH_TYPE_OPTIONS[matchTypeIndex]?.value ?? "flowType"
 
@@ -206,6 +217,9 @@ function SettingsView() {
 
       smallCardStyle,
       smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
+
+      useTransparentStyle: !!useTransparentStyle,
+      useTintBorderOnTransparent: !!useTintBorderOnTransparent,
     }
 
     Storage.set(SETTINGS_KEY, newSettings)
@@ -309,6 +323,10 @@ function SettingsView() {
           setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
           refreshInterval={refreshInterval}
           setRefreshInterval={setRefreshInterval}
+          useTransparentStyle={useTransparentStyle}
+          setUseTransparentStyle={setUseTransparentStyle}
+          useTintBorderOnTransparent={useTintBorderOnTransparent}
+          setUseTintBorderOnTransparent={setUseTintBorderOnTransparent}
         />
 
         {/* 定向流量配置 */}

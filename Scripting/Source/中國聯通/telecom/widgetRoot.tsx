@@ -5,6 +5,7 @@ import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/telecomUtils"
 import type { UiSettings } from "./settings"
 import { loadUiSettings } from "./settings"
+import { buildCardBackground, VisualStyleConfig, wrapWithOutline } from "./visualStyle"
 
 import { MediumLayout } from "./cards/medium"
 import { FeeCard } from "./cards/components/feeCard"
@@ -41,7 +42,15 @@ export function WidgetRoot(props: {
 
     smallCardStyle,
     smallMiniBarUseTotalFlow,
+
+    useTransparentStyle,
+    useTintBorderOnTransparent,
   } = ui
+
+  const visualStyle: VisualStyleConfig = {
+    useTransparentStyle,
+    useTintBorderOnTransparent,
+  }
 
   // ✅ 新结构：用布局决定“是否走总流量三卡”
   const useTotalFlow = mediumUseThreeLayout
@@ -137,6 +146,7 @@ export function WidgetRoot(props: {
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
         updateTime={data.updateTime}
+        visualStyle={visualStyle}
 
         // summary 用
         totalFlowLabel={summaryTotalFlowLabel}
@@ -177,6 +187,7 @@ export function WidgetRoot(props: {
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
         updateTime={data.updateTime}
+        visualStyle={visualStyle}
 
         // 三卡：这里切总流量；四卡：这里切通用
         flowTitle={useTotalFlow ? totalFlowTitle : flowTitle}
@@ -197,14 +208,16 @@ export function WidgetRoot(props: {
 
   // ===== 大号：四格 RingCard =====
   return (
-    <VStack
-      alignment="center"
-      padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={{
-        style: outerCardBg,
-        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
-      }}
-    >
+    {wrapWithOutline(
+      <VStack
+        alignment="center"
+        padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
+        widgetBackground={buildCardBackground({
+          visual: visualStyle,
+          base: outerCardBg,
+          cornerRadius: 24,
+        })}
+      >
       <HStack alignment="center" spacing={10}>
         <FeeCard
           title={data.fee.title}
@@ -235,6 +248,8 @@ export function WidgetRoot(props: {
           ratio={voiceStat.ratio}
         />
       </HStack>
-    </VStack>
+      </VStack>,
+      { visual: visualStyle, cornerRadius: 24 },
+    )}
   )
 }

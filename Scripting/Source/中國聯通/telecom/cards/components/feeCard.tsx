@@ -7,6 +7,7 @@ import {
   Spacer,
 } from "scripting"
 import { timeStyle, RingCardTheme } from "../../theme"
+import { buildCardBackground, wrapWithOutline, defaultVisualStyle, VisualStyleConfig } from "../../visualStyle"
 
 export function FeeCard(props: {
   title: string
@@ -14,8 +15,10 @@ export function FeeCard(props: {
   theme: RingCardTheme
   logoPath?: string | null
   updateTime: string
+  visualStyle?: VisualStyleConfig
 }) {
   const { title, valueText, theme, logoPath, updateTime } = props
+  const visualStyle = props.visualStyle ?? defaultVisualStyle
   const isUrlLogo =
     !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
 
@@ -35,15 +38,16 @@ export function FeeCard(props: {
       />
     )
 
-  return (
+  const card = (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
-      widgetBackground={{
-        style: theme.bg,
-        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
-      }}
+      widgetBackground={buildCardBackground({
+        visual: visualStyle,
+        base: theme.bg,
+        cornerRadius: 18,
+      })}
     >
       <Spacer minLength={2} />
       <HStack alignment="center">
@@ -94,4 +98,10 @@ export function FeeCard(props: {
       <Spacer minLength={4} />
     </VStack>
   )
+
+  return wrapWithOutline(card, {
+    visual: visualStyle,
+    tint: theme.tint,
+    cornerRadius: 18,
+  })
 }
