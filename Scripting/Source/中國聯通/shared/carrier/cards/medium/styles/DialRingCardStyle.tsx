@@ -56,8 +56,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
       />
 
       {showOther ? (
-        <
-          DialRingStatCard
+        <DialRingStatCard
           title={otherTitle ?? "定向流量"}
           valueText={otherValueText ?? "0MB"}
           theme={ringThemes.flowDir}
