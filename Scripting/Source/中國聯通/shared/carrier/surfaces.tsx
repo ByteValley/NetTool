@@ -2,7 +2,7 @@
 // 统一外观：控制透明/描边样式
 
 import { DynamicShapeStyle, VStack } from "scripting"
-import { outerCardBg, ringThemes } from "./theme"
+import { ringThemes } from "./theme"
 
 export type WidgetSurfacePalette = {
   outer: DynamicShapeStyle | string
@@ -27,12 +27,13 @@ const OPAQUE_SURFACES: WidgetSurfacePalette = {
 }
 
 const TRANSPARENT_SURFACES: WidgetSurfacePalette = {
-  outer: { light: "rgba(255,255,255,0.04)", dark: "rgba(0,0,0,0.18)" } as DynamicShapeStyle,
-  content: { light: "rgba(255,255,255,0.06)", dark: "rgba(255,255,255,0.12)" } as DynamicShapeStyle,
-  panel: { light: "rgba(255,255,255,0.05)", dark: "rgba(255,255,255,0.10)" } as DynamicShapeStyle,
-  pill: { light: "rgba(255,255,255,0.12)", dark: "rgba(255,255,255,0.16)" } as DynamicShapeStyle,
-  chip: { light: "rgba(255,255,255,0.12)", dark: "rgba(255,255,255,0.18)" } as DynamicShapeStyle,
-  border: { light: "rgba(255,255,255,0.18)", dark: "rgba(255,255,255,0.28)" } as DynamicShapeStyle,
+  // 完全透明：遵循 "Tinted Mode" 适配指南，交给系统做贴纸/染色处理
+  outer: { light: "rgba(255,255,255,0)", dark: "rgba(0,0,0,0)" } as DynamicShapeStyle,
+  content: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
+  panel: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
+  pill: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
+  chip: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
+  border: { light: "rgba(255,255,255,0.22)", dark: "rgba(255,255,255,0.30)" } as DynamicShapeStyle,
 }
 
 export const DEFAULT_WIDGET_SURFACES: WidgetSurfacePalette = { ...OPAQUE_SURFACES }
