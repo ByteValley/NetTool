@@ -4,7 +4,7 @@ import { VStack, HStack, ZStack, Text, Spacer, Image } from "scripting"
 import type { SmallCardCommonProps } from "./common"
 import { ringThemes, timeStyle } from "../../theme"
 import type { RingCardTheme } from "../../theme"
-import { DEFAULT_WIDGET_SURFACES, type WidgetSurfacePalette } from "../../surfaces"
+import { DEFAULT_WIDGET_SURFACES, type WidgetSurfacePalette, wrapWithBorderLayer } from "../../surfaces"
 
 // =====================================================================
 // Layout Helpers · 强制“靠左”
@@ -55,19 +55,7 @@ export function SmallCardSurface(props: { children: any; surfaces?: WidgetSurfac
     </VStack>
   )
 
-  if (!surfaces.border) return body
-
-  return (
-    <VStack
-      padding={{ top: 2, leading: 2, bottom: 2, trailing: 2 }}
-      widgetBackground={{
-        style: surfaces.border,
-        shape: { type: "rect", cornerRadius: 28, style: "continuous" },
-      }}
-    >
-      {body}
-    </VStack>
-  )
+  return wrapWithBorderLayer({ child: body, surfaces, cornerRadius: 26, padding: 2 })
 }
 
 // =====================================================================
@@ -171,12 +159,17 @@ function useSurfacesFromProps(props: { surfaces?: WidgetSurfacePalette }) {
   return props?.surfaces ?? DEFAULT_WIDGET_SURFACES
 }
 
-function UnitPill(props: { text: string; tint: any }) {
+function UnitPill(props: { text: string; tint: any; surfaces?: WidgetSurfacePalette }) {
+  const transparent = !!props.surfaces?.transparentMode
+  const capsule = transparent
+    ? props.surfaces?.pill ?? { light: "rgba(0,0,0,0)", dark: "rgba(0,0,0,0)" }
+    : { light: "rgba(0,0,0,0.10)", dark: "rgba(255,255,255,0.10)" }
+
   return (
     <VStack
       padding={{ top: 1, leading: 8, bottom: 1, trailing: 8 }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.10)", dark: "rgba(255,255,255,0.10)" } as any,
+        style: capsule as any,
         shape: { type: "capsule", style: "continuous" },
       }}
     >
@@ -241,13 +234,22 @@ function ValueWithUnit(props: { value: string; unit: string; tint: any; big?: bo
 // =====================================================================
 // ListRow · 列表行统一（防溢出 + 文案靠左）
 // =====================================================================
-function ListRow(props: { theme: RingCardTheme; label: string; valueText: string; unitText: string }) {
-  const { theme, label, valueText, unitText } = props
+function ListRow(props: {
+  theme: RingCardTheme
+  label: string
+  valueText: string
+  unitText: string
+  surfaces?: WidgetSurfacePalette
+}) {
+  const { theme, label, valueText, unitText, surfaces } = props
+  const transparent = !!surfaces?.transparentMode
+  const accent = transparent ? surfaces?.chip ?? surfaces?.pill ?? theme.tint : theme.tint
+
   return (
     <HStack alignment="center" spacing={8} frame={{ minWidth: 0, maxWidth: Infinity }}>
       <VStack
         frame={{ width: 3, height: 18 }}
-        widgetBackground={{ style: theme.tint, shape: { type: "capsule", style: "continuous" } }}
+        widgetBackground={{ style: accent, shape: { type: "capsule", style: "continuous" } }}
       />
       <VStack spacing={1} alignment="leading" frame={{ minWidth: 0, maxWidth: Infinity }}>
         <Left>
@@ -260,7 +262,7 @@ function ListRow(props: { theme: RingCardTheme; label: string; valueText: string
           <Text font={14} fontWeight="semibold" foregroundStyle={theme.tint} lineLimit={1} minScaleFactor={0.5}>
             {valueText}
           </Text>
-          <UnitPill text={unitText} tint={theme.tint} />
+          <UnitPill text={unitText} tint={theme.tint} surfaces={surfaces} />
           <Spacer />
         </HStack>
       </VStack>
@@ -279,8 +281,17 @@ function clamp01(n: number) {
   return n
 }
 
-function InfoRowWithBar(props: { label: string; value: string; unit: string; theme: RingCardTheme; ratio?: number }) {
-  const { label, value, unit, theme, ratio } = props
+function InfoRowWithBar(props: {
+  label: string
+  value: string
+  unit: string
+  theme: RingCardTheme
+  ratio?: number
+  surfaces?: WidgetSurfacePalette
+}) {
+  const { label, value, unit, theme, ratio, surfaces } = props
+  const transparent = !!surfaces?.transparentMode
+  const accent = transparent ? surfaces?.chip ?? surfaces?.pill ?? theme.tint : theme.tint
   const hasRatio = typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0
   const pct = hasRatio ? clamp01(ratio!) : 0
 
@@ -293,7 +304,7 @@ function InfoRowWithBar(props: { label: string; value: string; unit: string; the
       <HStack alignment="center" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
         <VStack
           frame={{ width: 3, height: 16 }}
-          widgetBackground={{ style: theme.tint, shape: { type: "capsule", style: "continuous" } }}
+          widgetBackground={{ style: accent, shape: { type: "capsule", style: "continuous" } }}
         />
 
         <VStack spacing={1} alignment="leading" frame={{ minWidth: 0, maxWidth: Infinity }}>
@@ -309,7 +320,7 @@ function InfoRowWithBar(props: { label: string; value: string; unit: string; the
           </Left>
         </VStack>
 
-        <UnitPill text={unit} tint={theme.tint} />
+        <UnitPill text={unit} tint={theme.tint} surfaces={surfaces} />
       </HStack>
 
       <HStack alignment="center" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
@@ -325,7 +336,7 @@ function InfoRowWithBar(props: { label: string; value: string; unit: string; the
             {hasRatio && filledWidth > 0 ? (
               <VStack
                 frame={{ width: filledWidth, height: BAR_HEIGHT }}
-                widgetBackground={{ style: theme.tint, shape: { type: "capsule", style: "continuous" } }}
+                widgetBackground={{ style: accent, shape: { type: "capsule", style: "continuous" } }}
               />
             ) : null}
             <Spacer />
@@ -520,6 +531,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
             unit={String(flowUnit ?? "").toUpperCase() || "GB"}
             theme={ringThemes.flow}
             ratio={flowRatio}
+            surfaces={surfaces}
           />
 
           {showOther ? (
@@ -529,6 +541,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
               unit={String(props.otherFlowUnit ?? "").toUpperCase() || "GB"}
               theme={ringThemes.flowDir}
               ratio={props.otherFlowRatio}
+              surfaces={surfaces}
             />
           ) : null}
 
@@ -538,6 +551,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
             unit={"分钟"}
             theme={ringThemes.voice}
             ratio={props.voiceRatio}
+            surfaces={surfaces}
           />
         </VStack>
       </VStack>
@@ -769,11 +783,29 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
         </ContentCard>
 
         <TintPanel surfaces={surfaces} spacing={showOther ? 6 : 7} cornerRadius={16}>
-          <ListRow theme={ringThemes.flow} label={props.flowLabel || "剩余流量"} valueText={flowValueText} unitText={flowUnitText} />
+          <ListRow
+            theme={ringThemes.flow}
+            label={props.flowLabel || "剩余流量"}
+            valueText={flowValueText}
+            unitText={flowUnitText}
+            surfaces={surfaces}
+          />
           {showOther ? (
-            <ListRow theme={ringThemes.flowDir} label={String(props.otherFlowLabel)} valueText={otherValueText} unitText={otherUnitText} />
+            <ListRow
+              theme={ringThemes.flowDir}
+              label={String(props.otherFlowLabel)}
+              valueText={otherValueText}
+              unitText={otherUnitText}
+              surfaces={surfaces}
+            />
           ) : null}
-          <ListRow theme={ringThemes.voice} label={props.voiceLabel || "剩余语音"} valueText={voiceValueText} unitText={"分钟"} />
+          <ListRow
+            theme={ringThemes.voice}
+            label={props.voiceLabel || "剩余语音"}
+            valueText={voiceValueText}
+            unitText={"分钟"}
+            surfaces={surfaces}
+          />
         </TintPanel>
       </VStack>
     </SmallCardSurface>
