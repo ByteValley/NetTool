@@ -1,4 +1,22 @@
-// 中國聯通/index.tsx
+/* =====================================================================
+ * index.tsx（中国联通）
+ *
+ * 模块分类 · 背景
+ * - 设置页支持「页面（全屏）/ 弹层弹出」切换；偏好存 Storage
+ * - ⚠️ main() 不在组件渲染树内，不能调用 hook（useFullscreenPref），否则可能直接“无法执行”
+ * - settings.ts 负责 merge + normalize；UI 层只做“确定值收敛”
+ *
+ * 模块分类 · 目标
+ * - 修复“弹层/页面切换后无法执行”：main() 改用 readFullscreenPref（非 hook）
+ * - 设置页：继续用 useFullscreenPref（切换时写入 + 弹窗提示）
+ * - RenderConfigSection + CacheSection + cacheScopeKey 指纹隔离
+ *
+ * 模块分类 · 使用方式
+ * - 运行脚本打开设置页；切换显示模式后，下次打开设置页生效
+ *
+ * 模块分类 · 日志与边界
+ * - 本文件不主动刷屏；异常由 main() 捕获并 Dialog.alert
+ * ===================================================================== */
 
 import {
   Navigation,
@@ -7,7 +25,6 @@ import {
   Section,
   TextField,
   Button,
-  Color,
   Text,
   Toggle,
   Picker,
@@ -17,35 +34,60 @@ import {
 
 import {
   type ChinaUnicomSettings,
-  UNICOM_SETTINGS_KEY,
-} from "./telecom/settings"
+  defaultChinaUnicomSettings,
+  loadChinaUnicomSettings,
+  saveChinaUnicomSettings,
+  FULLSCREEN_KEY,
+  MODULE_COLLAPSE_KEY,
+} from "./settings"
 
-import { RenderConfigSection } from "./telecom/index/renderConfigSection"
-import type { SmallCardStyle } from "./telecom/cards/small"
-import { ModuleSection } from "./telecom/index/moduleSection"
-import type { ModuleLinks } from "./telecom/index/moduleActions"
-import { createModuleHandles, createModuleActions } from "./telecom/index/moduleActions"
-import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
-// import { showNoticeOnce } from "./telecom/utils/noticeOnce"
+import { RenderConfigSection } from "./shared/ui-kit/renderConfigSection"
+import type { SmallCardStyle } from "./shared/carrier/cards/small"
+import { ModuleSection } from "./shared/ui-kit/moduleSection"
+import type { ModuleLinks } from "./shared/ui-kit/moduleActions"
+import { createModuleHandles, createModuleActions } from "./shared/ui-kit/moduleActions"
 
-declare const Storage: any
+// ✅ hook 只在组件内使用；main 用 readFullscreenPref（非 hook）
+import { useFullscreenPref, readFullscreenPref } from "./shared/ui-kit/useFullscreenPref"
+
+// ✅ 缓存策略（CacheSection）
+import { CacheSection, type CacheConfig } from "./shared/ui-kit/cacheSection"
+import { formatDuration } from "./shared/utils/time"
+
 declare const Dialog: any
 
-// ==================== 版本信息 ====================
-// 版本号说明（Semantic Versioning）
-// MAJOR：破坏性变更或配置结构调整（不兼容旧版）
-// MINOR：新增功能、兼容性增强（兼容旧版）
-// PATCH：修复 Bug、UI 微调、文案修改等小改动
-const VERSION = "1.0.1"
+/* =====================================================================
+ * 模块分类 · 版本信息
+ *
+ * 模块分类 · 背景
+ * - 语义化版本：便于你定位构建与回溯变更
+ *
+ * 模块分类 · 目标
+ * - VERSION：x.y.z
+ * - BUILD_DATE：YYYY-MM-DD
+ *
+ * 模块分类 · 使用方式
+ * - About 弹窗展示：v${VERSION}（${BUILD_DATE}）
+ *
+ * 模块分类 · 日志与边界
+ * - 常量区无日志
+ * ===================================================================== */
 
-// 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-14"
+const VERSION = "1.0.0"
+const BUILD_DATE = "2025-12-20"
 
-const SETTINGS_KEY = UNICOM_SETTINGS_KEY
-const FULLSCREEN_KEY = "chinaUnicomSettingsFullscreen"
-const MODULE_COLLAPSE_KEY = "chinaUnicomModuleSectionCollapsed"
-
-// ==================== BoxJs / 模块 ====================
+/* =====================================================================
+ * 模块分类 · BoxJS / 模块链接
+ *
+ * 模块分类 · 背景
+ * - ModuleSection 需要 actions（复制/跳转/订阅）
+ *
+ * 模块分类 · 目标
+ * - 统一维护：BoxJS 订阅 / Surge 模块 / Loon 插件 / QuanX 重写
+ *
+ * 模块分类 · 日志与边界
+ * - 常量区无日志
+ * ===================================================================== */
 
 const UNICOM_BOXJS_SUB_URL =
   "http://boxjs.com/#/sub/add/https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/ComponentService.boxjs.json"
@@ -53,11 +95,8 @@ const UNICOM_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Component/ChinaUnicom.module"
 const UNICOM_LOON_PLUGIN_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/Component/ChinaUnicom.lpx"
-
 const UNICOM_QX_REWRITE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/refs/heads/main/QuantumultX/Rewrite/Component/ChinaUnicom.conf"
-
-// ==================== 安装 / 跳转（抽象） ====================
 
 const links: ModuleLinks = {
   boxjsSubUrl: UNICOM_BOXJS_SUB_URL,
@@ -67,174 +106,215 @@ const links: ModuleLinks = {
   extras: [],
 }
 
-const handles = createModuleHandles(
-  { egernName: "中国联通组件服务" },
-  links,
-)
-
+const handles = createModuleHandles({ egernName: "中国联通组件服务" }, links)
 const moduleActions = createModuleActions(handles, links)
 
-// ==================== 匹配类型 ====================
+/* =====================================================================
+ * 模块分类 · 匹配类型（定向流量）
+ *
+ * 模块分类 · 背景
+ * - 定向流量可通过 flowType 聚合，也可用 addupItemCode 精确匹配
+ *
+ * 模块分类 · 目标
+ * - 统一 options：label/value
+ * - UI 使用 Picker 选择
+ *
+ * 模块分类 · 日志与边界
+ * - 常量区无日志
+ * ===================================================================== */
 
-const MATCH_TYPE_OPTIONS: { label: string; value: "flowType" | "addupItemCode" }[] =
-  [
-    { label: "flowType 聚合", value: "flowType" },
-    { label: "addupItemCode 精确匹配", value: "addupItemCode" },
-  ]
+const MATCH_TYPE_OPTIONS: { label: string; value: "flowType" | "addupItemCode" }[] = [
+  { label: "flowType 聚合", value: "flowType" },
+  { label: "addupItemCode 精确匹配", value: "addupItemCode" },
+]
 
-// ==================== 默认设置 ====================
-// ✅ 不做旧结构兼容：以当前新结构为准
-const defaultSettings: ChinaUnicomSettings = {
-  cookie: "",
-  titleDayColor: "#666666" as unknown as Color,
-  titleNightColor: "#CCCCCC" as unknown as Color,
-  descDayColor: "#000000" as unknown as Color,
-  descNightColor: "#FFFFFF" as unknown as Color,
-  refreshTimeDayColor: "#999999" as unknown as Color,
-  refreshTimeNightColor: "#AAAAAA" as unknown as Color,
-  refreshInterval: 180,
-
-  otherFlowMatchType: "flowType",
-  otherFlowMatchValue: "2",
-
-  enableBoxJs: false,
-  boxJsUrl: "",
-
-  showRemainRatio: false,
-
-  // ✅ 中号：样式 + 三卡/四卡（默认四卡）
-  mediumStyle: "FullRing",
-  mediumUseThreeLayout: false,
-  // ✅ 三卡时：总流量是否包含定向
-  includeDirectionalInTotal: true,
-
-  // 小号组件
-  smallCardStyle: "summary",
-
-  // ✅ 仅作用于紧凑/进度清单：2行/3行
-  smallMiniBarUseTotalFlow: false,
-
-  // 透明样式
-  useTransparentStyle: false,
-  useTintBorderOnTransparent: false,
-}
-
-// ==================== 设置页面 ====================
+/* =====================================================================
+ * 模块分类 · SettingsView（设置页主体）
+ *
+ * 模块分类 · 背景
+ * - loadChinaUnicomSettings 已做 merge + normalize
+ * - UI 层统一把关键字段收敛成“确定值”，避免 undefined/类型问题
+ *
+ * 模块分类 · 目标
+ * - BoxJS：可选读取 Cookie（enableBoxJs + boxJsUrl）
+ * - 登录凭证：Cookie
+ * - 渲染配置：RenderConfigSection（对齐移动/电信）
+ * - 定向流量：匹配类型 + 匹配值
+ * - 缓存隔离：cacheScopeKey
+ * - 缓存策略：CacheSection（deferPersist=true）
+ *
+ * 模块分类 · 日志与边界
+ * - 不主动刷屏；保存失败由外层 try/catch 兜底
+ * ===================================================================== */
 
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
   const { fullscreenPref, toggleFullscreen } = useFullscreenPref(FULLSCREEN_KEY)
 
-  const stored = Storage.get(SETTINGS_KEY) as ChinaUnicomSettings | null
-  const initial: ChinaUnicomSettings = stored ?? defaultSettings
+  const initial = loadChinaUnicomSettings()
 
-  // 颜色字段仅透传
-  const colorFields = {
-    titleDayColor: initial.titleDayColor,
-    titleNightColor: initial.titleNightColor,
-    descDayColor: initial.descDayColor,
-    descNightColor: initial.descNightColor,
-    refreshTimeDayColor: initial.refreshTimeDayColor,
-    refreshTimeNightColor: initial.refreshTimeNightColor,
-  }
+  // ==================== 初始化收敛（确定值） ====================
 
-  // 匹配类型 index
-  const initialMatchType =
-    initial.otherFlowMatchType ?? defaultSettings.otherFlowMatchType
-  const initialMatchIndex = Math.max(
-    0,
-    MATCH_TYPE_OPTIONS.findIndex((opt) => opt.value === initialMatchType),
-  )
+  const initialRefreshInterval =
+    typeof initial.refreshInterval === "number" && Number.isFinite(initial.refreshInterval)
+      ? initial.refreshInterval
+      : defaultChinaUnicomSettings.refreshInterval
+
+  const initialEnableBoxJs =
+    typeof initial.enableBoxJs === "boolean" ? initial.enableBoxJs : !!defaultChinaUnicomSettings.enableBoxJs
+
+  const initialBoxJsUrl = String(initial.boxJsUrl ?? defaultChinaUnicomSettings.boxJsUrl ?? "").trim()
+
+  const initialShowRemainRatio =
+    typeof initial.showRemainRatio === "boolean"
+      ? initial.showRemainRatio
+      : !!defaultChinaUnicomSettings.showRemainRatio
+
+  const initialMediumStyle =
+    (initial.mediumStyle ?? defaultChinaUnicomSettings.mediumStyle ?? "FullRing") as "FullRing" | "DialRing"
+
+  const initialMediumUseThreeCard =
+    typeof initial.mediumUseThreeCard === "boolean"
+      ? initial.mediumUseThreeCard
+      : !!defaultChinaUnicomSettings.mediumUseThreeCard
+
+  const initialIncludeDirectionalInTotal =
+    typeof initial.includeDirectionalInTotal === "boolean"
+      ? initial.includeDirectionalInTotal
+      : (defaultChinaUnicomSettings.includeDirectionalInTotal ?? true)
+
+  const initialSmallCardStyle =
+    ((initial.smallCardStyle ?? defaultChinaUnicomSettings.smallCardStyle) as SmallCardStyle) ??
+    ("summary" as SmallCardStyle)
+
+  const initialSmallMiniBarUseTotalFlow =
+    typeof initial.smallMiniBarUseTotalFlow === "boolean"
+      ? initial.smallMiniBarUseTotalFlow
+      : !!defaultChinaUnicomSettings.smallMiniBarUseTotalFlow
+
+  const initialCacheScopeKey = String(initial.cacheScopeKey ?? defaultChinaUnicomSettings.cacheScopeKey ?? "")
+
+  const initialCache = (initial.cache ?? defaultChinaUnicomSettings.cache) as CacheConfig
+
+  // 定向流量匹配：index 收敛
+  const initialMatchType = (initial.otherFlowMatchType ??
+    defaultChinaUnicomSettings.otherFlowMatchType ??
+    "flowType") as "flowType" | "addupItemCode"
+
+  const initialMatchIndex = Math.max(0, MATCH_TYPE_OPTIONS.findIndex((opt) => opt.value === initialMatchType))
 
   // ==================== State ====================
 
-  const [cookie, setCookie] = useState(initial.cookie || "")
-  const [refreshInterval, setRefreshInterval] = useState(
-    initial.refreshInterval ?? 180,
-  )
+  const [cookie, setCookie] = useState<string>(String(initial.cookie ?? ""))
+  const [refreshInterval, setRefreshInterval] = useState<number>(initialRefreshInterval)
 
   const [matchTypeIndex, setMatchTypeIndex] = useState<number>(initialMatchIndex)
-  const [otherFlowMatchValue, setOtherFlowMatchValue] = useState(
-    initial.otherFlowMatchValue ?? "2",
+  const [otherFlowMatchValue, setOtherFlowMatchValue] = useState<string>(String(initial.otherFlowMatchValue ?? ""))
+
+  const [enableBoxJs, setEnableBoxJs] = useState<boolean>(initialEnableBoxJs)
+  const [boxJsUrl, setBoxJsUrl] = useState<string>(initialBoxJsUrl)
+
+  const [showRemainRatio, setShowRemainRatio] = useState<boolean>(initialShowRemainRatio)
+
+  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(initialMediumStyle)
+  const [mediumUseThreeCard, setMediumUseThreeCard] = useState<boolean>(initialMediumUseThreeCard)
+
+  const [includeDirectionalInTotal, setIncludeDirectionalInTotal] = useState<boolean>(
+    !!initialIncludeDirectionalInTotal,
   )
 
-  const [enableBoxJs, setEnableBoxJs] = useState(initial.enableBoxJs ?? false)
-  const [boxJsUrl, setBoxJsUrl] = useState(initial.boxJsUrl ?? "")
-
-  const [showRemainRatio, setShowRemainRatio] = useState(
-    initial.showRemainRatio ?? false,
+  const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(initialSmallCardStyle)
+  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] = useState<boolean>(
+    initialSmallMiniBarUseTotalFlow,
   )
 
-  // ✅ 中号：样式 + “三卡开关”（关=默认四卡）
-  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(
-    initial.mediumStyle ?? "FullRing",
-  )
-  const [mediumUseThreeLayout, setMediumUseThreeLayout] = useState<boolean>(
-    initial.mediumUseThreeLayout ?? false,
-  )
+  const [cacheScopeKey, setCacheScopeKey] = useState<string>(initialCacheScopeKey)
+  const [cacheDraft, setCacheDraft] = useState<CacheConfig>(initialCache)
 
-  // ✅ 三卡时的总/通用联动控制
-  const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
-    useState<boolean>(initial.includeDirectionalInTotal ?? true)
-
-  const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(
-    (initial.smallCardStyle as SmallCardStyle) ?? "summary",
-  )
-
-  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
-    useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
-
-  // 透明样式
-  const [useTransparentStyle, setUseTransparentStyle] = useState<boolean>(
-    initial.useTransparentStyle ?? false,
-  )
-  const [useTintBorderOnTransparent, setUseTintBorderOnTransparent] =
-    useState<boolean>(initial.useTintBorderOnTransparent ?? false)
+  const cacheStore = {
+    title: "启用缓存",
+    load: () => loadChinaUnicomSettings(),
+    save: (next: ChinaUnicomSettings) => saveChinaUnicomSettings(next),
+    getCache: (s: ChinaUnicomSettings) => (s.cache ?? defaultChinaUnicomSettings.cache),
+    setCache: (s: ChinaUnicomSettings, cache: CacheConfig) => ({ ...s, cache }),
+  }
 
   const currentMatchType: "flowType" | "addupItemCode" =
     MATCH_TYPE_OPTIONS[matchTypeIndex]?.value ?? "flowType"
 
-  // ==================== 保存 ====================
+  /* =====================================================================
+   * 模块分类 · 保存（统一写回）
+   *
+   * 模块分类 · 背景
+   * - CacheSection deferPersist=true：编辑过程不落盘，避免频繁写 Storage
+   *
+   * 模块分类 · 目标
+   * - 将 state 汇总为 next → saveChinaUnicomSettings
+   *
+   * 模块分类 · 使用方式
+   * - 点击“完成”
+   *
+   * 模块分类 · 日志与边界
+   * - 保存后 dismiss
+   * ===================================================================== */
 
   const handleSave = () => {
-    const newSettings: ChinaUnicomSettings = {
-      ...colorFields,
+    const next: ChinaUnicomSettings = {
+      ...initial,
 
-      cookie: (cookie ?? "").trim(),
-      refreshInterval: Number(refreshInterval) || 180,
+      cookie: String(cookie ?? "").trim(),
+      refreshInterval:
+        typeof refreshInterval === "number" && Number.isFinite(refreshInterval)
+          ? refreshInterval
+          : defaultChinaUnicomSettings.refreshInterval,
 
       otherFlowMatchType: currentMatchType,
-      otherFlowMatchValue: (otherFlowMatchValue ?? "").trim(),
+      otherFlowMatchValue: String(otherFlowMatchValue ?? "").trim(),
 
       enableBoxJs: !!enableBoxJs,
-      boxJsUrl: (boxJsUrl ?? "").trim(),
+      boxJsUrl: String(boxJsUrl ?? "").trim(),
 
       showRemainRatio: !!showRemainRatio,
 
       mediumStyle,
-      mediumUseThreeLayout: !!mediumUseThreeLayout,
+      mediumUseThreeCard: !!mediumUseThreeCard,
       includeDirectionalInTotal: !!includeDirectionalInTotal,
 
       smallCardStyle,
       smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
 
-      useTransparentStyle: !!useTransparentStyle,
-      useTintBorderOnTransparent: !!useTintBorderOnTransparent,
+      cacheScopeKey: String(cacheScopeKey || "").trim(),
+      cache: cacheDraft,
     }
 
-    Storage.set(SETTINGS_KEY, newSettings)
+    saveChinaUnicomSettings(next)
     dismiss()
   }
 
+  /* =====================================================================
+   * 模块分类 · About（版本信息弹窗）
+   *
+   * 模块分类 · 背景
+   * - 便于确认版本/构建日期
+   *
+   * 模块分类 · 目标
+   * - Dialog.alert 展示 VERSION / BUILD_DATE / 致谢
+   *
+   * 模块分类 · 使用方式
+   * - 工具栏底部“关于本组件”
+   *
+   * 模块分类 · 日志与边界
+   * - Dialog 不可用则静默
+   * ===================================================================== */
+
   const handleAbout = async () => {
-    await Dialog.alert({
-      title: "联通余量组件",
-      message:
-        `作者：©ByteValley\n` +
-        `版本：v${VERSION}（${BUILD_DATE}）\n` +
-        `致谢：@DTZSGHNR`,
-      buttonLabel: "关闭",
-    })
+    try {
+      await Dialog?.alert?.({
+        title: "联通余量组件",
+        message: `作者：©ByteValley\n版本：v${VERSION}（${BUILD_DATE}）\n致谢：@DTZSGHNR`,
+        buttonLabel: "关闭",
+      })
+    } catch { }
   }
 
   // ==================== UI ====================
@@ -242,18 +322,14 @@ function SettingsView() {
   return (
     <NavigationStack>
       <List
-        navigationTitle={"联通余量组件"}
-        navigationBarTitleDisplayMode={"inline"}
+        navigationTitle="联通余量组件"
+        navigationBarTitleDisplayMode="inline"
         toolbar={{
           topBarLeading: [<Button title="关闭" action={dismiss} />],
           topBarTrailing: [
             <Button
               title={fullscreenPref ? "页面" : "弹层"}
-              systemImage={
-                fullscreenPref
-                  ? "rectangle.arrowtriangle.2.outward"
-                  : "rectangle"
-              }
+              systemImage={fullscreenPref ? "rectangle.arrowtriangle.2.outward" : "rectangle"}
               action={toggleFullscreen}
             />,
             <Button title="完成" action={handleSave} />,
@@ -268,8 +344,6 @@ function SettingsView() {
           ],
         }}
       >
-
-        {/* 组件模块 */}
         <ModuleSection
           footerLines={[
             "使用前建议按顺序完成：",
@@ -282,32 +356,22 @@ function SettingsView() {
           actions={moduleActions}
         />
 
-        {/* BoxJs */}
         <Section header={<Text font="body" fontWeight="semibold">BoxJs 配置</Text>}>
           <Toggle
             title="启用 BoxJs 读取 Cookie"
             value={enableBoxJs}
             onChanged={(value) => {
               setEnableBoxJs(value)
-              if (value && !boxJsUrl) setBoxJsUrl("https://boxjs.com")
+              if (value && !String(boxJsUrl || "").trim()) setBoxJsUrl("https://boxjs.com")
             }}
           />
-          {enableBoxJs ? (
-            <TextField title="BoxJs 地址" value={boxJsUrl} onChanged={setBoxJsUrl} />
-          ) : null}
+          {enableBoxJs ? <TextField title="BoxJs 地址" value={boxJsUrl} onChanged={setBoxJsUrl} /> : null}
         </Section>
 
-        {/* 登录凭证 */}
         <Section header={<Text font="body" fontWeight="semibold">登录凭证</Text>}>
-          <TextField
-            title="Cookie"
-            value={cookie}
-            prompt="在此处粘贴联通 App 的 Cookie"
-            onChanged={setCookie}
-          />
+          <TextField title="Cookie" value={cookie} prompt="在此处粘贴联通 App 的 Cookie" onChanged={setCookie} />
         </Section>
 
-        {/* 渲染配置（改为开关版） */}
         <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
@@ -317,20 +381,22 @@ function SettingsView() {
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
           mediumStyle={mediumStyle}
           setMediumStyle={setMediumStyle}
-          mediumUseThreeLayout={mediumUseThreeLayout}
-          setMediumUseThreeLayout={setMediumUseThreeLayout}
+          mediumUseThreeCard={mediumUseThreeCard}
+          setMediumUseThreeCard={setMediumUseThreeCard}
           includeDirectionalInTotal={includeDirectionalInTotal}
           setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
           refreshInterval={refreshInterval}
           setRefreshInterval={setRefreshInterval}
-          useTransparentStyle={useTransparentStyle}
-          setUseTransparentStyle={setUseTransparentStyle}
-          useTintBorderOnTransparent={useTintBorderOnTransparent}
-          setUseTintBorderOnTransparent={setUseTintBorderOnTransparent}
         />
 
-        {/* 定向流量配置 */}
-        <Section header={<Text font="body" fontWeight="semibold">定向流量配置</Text>}>
+        <Section
+          header={<Text font="body" fontWeight="semibold">定向流量配置</Text>}
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              定向流量可配置 flowType 或具体的 addupItemCode 精确匹配。默认使用 flowType：2 定向，也可改为 3 聚合；不匹配会有兜底逻辑。
+            </Text>
+          }
+        >
           <Picker
             title="匹配类型"
             value={matchTypeIndex}
@@ -344,55 +410,94 @@ function SettingsView() {
             ))}
           </Picker>
 
-          <TextField
-            title="匹配值"
-            value={otherFlowMatchValue}
-            onChanged={setOtherFlowMatchValue}
-          />
+          <TextField title="匹配值" value={otherFlowMatchValue} onChanged={setOtherFlowMatchValue} />
         </Section>
+
+{/*         <Section
+          header={<Text font="body" fontWeight="semibold">缓存隔离</Text>}
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              填一个稳定标识（如：主号/副号、A套餐）。它会被哈希为指纹用于绑定数据缓存；更改后缓存会自动隔离，避免切账号/切数据源读到旧缓存。
+            </Text>
+          }
+        >
+          <TextField title="隔离标识" value={cacheScopeKey} prompt="主号/副号" onChanged={setCacheScopeKey} />
+        </Section> */}
+
+        <CacheSection
+          store={cacheStore as any}
+          refreshKey={refreshInterval}
+          draft={cacheDraft}
+          onDraftChange={(next) => setCacheDraft(next)}
+          deferPersist={true}
+        />
+
+        <Section
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              当前生效示例：refresh={refreshInterval} 分钟，TTL 自动为 max(4 小时, refresh)；固定 TTL 则为 max(4 小时, 固定值)。
+              {"\n"}提示：你设置的“兜底旧缓存最长允许”会被自动纠偏为 ≥ TTL（避免反直觉）。
+              {"\n"}（用于说明：
+              {formatDuration(Math.max(240, Number(refreshInterval) || 0), { includeSeconds: false })}）
+            </Text>
+          }
+        />
       </List>
     </NavigationStack>
   )
 }
 
-// ==================== App / Run ====================
+/* =====================================================================
+ * 模块分类 · App 包装层
+ *
+ * 模块分类 · 背景
+ * - 与移动/电信保持一致：便于未来扩展 props
+ *
+ * 模块分类 · 目标
+ * - 提供 interactiveDismissDisabled 入口（宿主支持则生效）
+ *
+ * 模块分类 · 日志与边界
+ * - 纯 UI 包装，无日志
+ * ===================================================================== */
 
 type AppProps = { interactiveDismissDisabled?: boolean }
 function App(_props: AppProps) {
   return <SettingsView />
 }
 
-function readFullscreenPrefForRun(): boolean {
+/* =====================================================================
+ * 模块分类 · main（呈现入口）
+ *
+ * 模块分类 · 背景
+ * - ⚠️ main() 不能调用 useFullscreenPref（hook）
+ * - 正确方式：readFullscreenPref(storageKey) 读取 Storage 偏好
+ *
+ * 模块分类 · 目标
+ * - fullscreen=true → fullScreen
+ * - fullscreen=false → 默认弹层
+ *
+ * 模块分类 · 日志与边界
+ * - 捕获异常：Dialog.alert；最后 Script.exit()
+ * ===================================================================== */
+
+async function main() {
   try {
-    const v = Storage.get(FULLSCREEN_KEY)
-    if (typeof v === "boolean") return v
-  } catch { }
-  return true
+    const fullscreen = readFullscreenPref(FULLSCREEN_KEY, true)
+
+    await Navigation.present({
+      element: <App interactiveDismissDisabled />,
+      ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
+    })
+
+    Script.exit()
+  } catch (e) {
+    const msg =
+      e && typeof e === "object" && "stack" in e ? String((e as { stack?: unknown }).stack ?? e) : String(e)
+    try {
+      await Dialog?.alert?.({ title: "脚本执行失败", message: msg, buttonLabel: "知道了" })
+    } catch { }
+    Script.exit()
+  }
 }
 
-/* const FUNCTION_NOTICE_ID = "boxjs-kv-v2"
-const NOTICE_TAG = "2025-12-13" */
-
-async function run() {
-  /*   await showNoticeOnce({
-      scopeKey: SETTINGS_KEY,
-      noticeId: FUNCTION_NOTICE_ID,
-      tag: NOTICE_TAG,
-      title: "BoxJs 配置变更提醒",
-      message:
-        "本次更新调整 BoxJs 键值对。\n\n" +
-        "请重写添加：\n" +
-        "• BoxJs 订阅\n" +
-        "• BoxJs 重写 / 插件 / 模块\n\n" +
-        "否则可能读取不到 Token。",
-    }) */
-
-  const fullscreen = readFullscreenPrefForRun()
-  await Navigation.present({
-    element: <App interactiveDismissDisabled />,
-    ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
-  })
-  Script.exit()
-}
-
-run()
+main()

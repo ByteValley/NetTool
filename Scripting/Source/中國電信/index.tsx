@@ -1,169 +1,241 @@
-// index.tsx（中国电信）
+/* =====================================================================
+ * index.tsx（中国电信）
+ *
+ * 模块分类 · 背景
+ * - 设置页需要“页面（全屏）/ 弹层弹出”切换；偏好存 Storage
+ * - ⚠️ main() 不在组件渲染树内，不能调用 hook（useFullscreenPref），否则可能直接“无法执行”
+ * - settings.ts 负责 merge + normalize；UI 层只做“确定值收敛”
+ *
+ * 模块分类 · 目标
+ * - 修复“弹层/页面切换后无法执行”：main() 改用 readFullscreenPref（非 hook）
+ * - 设置页：继续用 useFullscreenPref（切换时写入 + 弹窗提示）
+ * - 对齐移动/联通：RenderConfigSection + CacheSection + cacheScopeKey 指纹隔离
+ *
+ * 模块分类 · 使用方式
+ * - 运行脚本打开设置页；切换显示模式后，下次打开设置页生效
+ *
+ * 模块分类 · 日志与边界
+ * - 本文件不主动刷屏；异常由 main() 捕获并 Dialog.alert
+ * ===================================================================== */
 
 import {
   Navigation,
   NavigationStack,
   List,
   Section,
+  TextField,
   Button,
   Text,
-  TextField,
-  SecureField,
   Script,
   useState,
 } from "scripting"
 
 import {
   type ChinaTelecomSettings,
-  TELECOM_SETTINGS_KEY,
-} from "./telecom/settings"
-import { RenderConfigSection } from "./telecom/index/renderConfigSection"
-import type { SmallCardStyle } from "./telecom/cards/small"
-import { useFullscreenPref } from "./telecom/index/useFullscreenPref"
+  defaultChinaTelecomSettings,
+  loadChinaTelecomSettings,
+  saveChinaTelecomSettings,
+  FULLSCREEN_KEY,
+  MODULE_COLLAPSE_KEY,
+} from "./settings"
 
-declare const Storage: any
+import { ModuleSection } from "./shared/ui-kit/moduleSection"
+import { RenderConfigSection } from "./shared/ui-kit/renderConfigSection"
+import type { SmallCardStyle } from "./shared/carrier/cards/small"
+
+// ✅ hook 只在组件内使用；main 用 readFullscreenPref（非 hook）
+import { useFullscreenPref, readFullscreenPref } from "./shared/ui-kit/useFullscreenPref"
+
+// ✅ 缓存策略（CacheSection）
+import { CacheSection, type CacheConfig } from "./shared/ui-kit/cacheSection"
+import { formatDuration } from "./shared/utils/time"
+
 declare const Dialog: any
 
-// ==================== 版本信息 ====================
-// 版本号说明（Semantic Versioning）
-// MAJOR：破坏性变更或配置结构调整（不兼容旧版）
-// MINOR：新增功能、兼容性增强（兼容旧版）
-// PATCH：修复 Bug、UI 微调、文案修改等小改动
-const VERSION = "1.0.1"
+/* =====================================================================
+ * 模块分类 · 版本信息
+ *
+ * 模块分类 · 背景
+ * - 语义化版本：便于你定位构建与回溯变更
+ *
+ * 模块分类 · 目标
+ * - VERSION：x.y.z
+ * - BUILD_DATE：YYYY-MM-DD
+ *
+ * 模块分类 · 使用方式
+ * - About 弹窗展示：v${VERSION}（${BUILD_DATE}）
+ *
+ * 模块分类 · 日志与边界
+ * - 常量区无日志
+ * ===================================================================== */
 
-// 构建日期：YYYY-MM-DD
-const BUILD_DATE = "2025-12-14"
+const VERSION = "1.0.0"
+const BUILD_DATE = "2025-12-20"
 
-const SETTINGS_KEY = TELECOM_SETTINGS_KEY
-const FULLSCREEN_KEY = "chinaTelecomSettingsFullscreen"
-
-// ==================== 小工具 ====================
-
-function toSafeIntMinutes(v: unknown, fallback: number): number {
-  let n: number
-  if (typeof v === "number") n = v
-  else if (typeof v === "string") n = parseInt(v, 10)
-  else n = fallback
-
-  if (!Number.isFinite(n)) n = fallback
-  n = Math.round(n)
-
-  if (n < 15) n = 15
-  if (n > 1440) n = 1440
-  return n
-}
-
-// ==================== 默认设置 ====================
-
-const defaultSettings: ChinaTelecomSettings = {
-  mobile: "",
-  password: "",
-
-  refreshTimeDayColor: "#999999",
-  refreshTimeNightColor: "#AAAAAA",
-  refreshInterval: 180,
-
-  showRemainRatio: false,
-
-  // ✅ 中号：样式 + 三卡开关（关=四卡默认，开=三卡）
-  mediumStyle: "FullRing",
-  mediumUseThreeLayout: false,
-
-  includeDirectionalInTotal: true,
-
-  // 小号组件（新体系）
-  smallCardStyle: "summary",
-
-  // ✅ 仅作用于「紧凑清单 / 进度清单」
-  // true  = 总流量 + 语音（2 行）
-  // false = 通用 + 定向 + 语音（3 行）
-  smallMiniBarUseTotalFlow: false,
-}
-
-// ==================== 设置页面 ====================
+/* =====================================================================
+ * 模块分类 · SettingsView（设置页主体）
+ *
+ * 模块分类 · 背景
+ * - loadChinaTelecomSettings 已做 merge + normalize
+ * - UI 层统一把关键字段收敛成“确定值”，避免 undefined/类型问题
+ *
+ * 模块分类 · 目标
+ * - 基础配置：手机号/密码
+ * - 渲染配置：RenderConfigSection（对齐移动/联通）
+ * - 缓存隔离：cacheScopeKey
+ * - 缓存策略：CacheSection（deferPersist=true）
+ *
+ * 模块分类 · 使用方式
+ * - main() present SettingsView
+ *
+ * 模块分类 · 日志与边界
+ * - 不主动刷屏；保存失败由外层 try/catch 兜底
+ * ===================================================================== */
 
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
-  const { fullscreenPref, toggleFullscreen } =
-    useFullscreenPref(FULLSCREEN_KEY)
+  const { fullscreenPref, toggleFullscreen } = useFullscreenPref(FULLSCREEN_KEY)
 
-  const stored = Storage.get(SETTINGS_KEY) as ChinaTelecomSettings | null
-  const initial: ChinaTelecomSettings = stored ?? defaultSettings
+  const initial = loadChinaTelecomSettings()
 
-  // ==================== State ====================
+  // ==================== 初始化收敛（确定值） ====================
 
-  const [mobile, setMobile] = useState(initial.mobile || "")
-  const [password, setPassword] = useState(initial.password || "")
+  const initialMobile = String(initial.mobile ?? "")
+  const initialPassword = String(initial.password ?? "")
 
-  // 颜色字段仅透传
-  const refreshTimeDayColor =
-    initial.refreshTimeDayColor ?? defaultSettings.refreshTimeDayColor
-  const refreshTimeNightColor =
-    initial.refreshTimeNightColor ?? defaultSettings.refreshTimeNightColor
+  const initialRefreshInterval =
+    typeof initial.refreshInterval === "number" && Number.isFinite(initial.refreshInterval)
+      ? initial.refreshInterval
+      : defaultChinaTelecomSettings.refreshInterval
 
-  const [refreshInterval, setRefreshInterval] = useState(
-    toSafeIntMinutes(initial.refreshInterval, 180),
+  const initialShowRemainRatio =
+    typeof initial.showRemainRatio === "boolean"
+      ? initial.showRemainRatio
+      : !!defaultChinaTelecomSettings.showRemainRatio
+
+  const initialMediumStyle =
+    (initial.mediumStyle ?? defaultChinaTelecomSettings.mediumStyle ?? "FullRing") as "FullRing" | "DialRing"
+
+  const initialMediumUseThreeCard =
+    typeof initial.mediumUseThreeCard === "boolean"
+      ? initial.mediumUseThreeCard
+      : !!defaultChinaTelecomSettings.mediumUseThreeCard
+
+  const initialIncludeDirectionalInTotal =
+    typeof initial.includeDirectionalInTotal === "boolean"
+      ? initial.includeDirectionalInTotal
+      : !!defaultChinaTelecomSettings.includeDirectionalInTotal
+
+  const initialSmallCardStyle =
+    ((initial.smallCardStyle ?? defaultChinaTelecomSettings.smallCardStyle) as SmallCardStyle) ??
+    ("summary" as SmallCardStyle)
+
+  const initialSmallMiniBarUseTotalFlow =
+    typeof initial.smallMiniBarUseTotalFlow === "boolean"
+      ? initial.smallMiniBarUseTotalFlow
+      : !!defaultChinaTelecomSettings.smallMiniBarUseTotalFlow
+
+  const initialCacheScopeKey = String(initial.cacheScopeKey ?? defaultChinaTelecomSettings.cacheScopeKey ?? "")
+  const initialCache = (initial.cache ?? defaultChinaTelecomSettings.cache) as CacheConfig
+
+  // ==================== State（基础配置） ====================
+
+  const [mobile, setMobile] = useState<string>(initialMobile)
+  const [password, setPassword] = useState<string>(initialPassword)
+  const [refreshInterval, setRefreshInterval] = useState<number>(initialRefreshInterval)
+
+  // ==================== State（渲染配置） ====================
+
+  const [showRemainRatio, setShowRemainRatio] = useState<boolean>(initialShowRemainRatio)
+  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(initialMediumStyle)
+  const [mediumUseThreeCard, setMediumUseThreeCard] = useState<boolean>(initialMediumUseThreeCard)
+  const [includeDirectionalInTotal, setIncludeDirectionalInTotal] = useState<boolean>(
+    initialIncludeDirectionalInTotal,
+  )
+  const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(initialSmallCardStyle)
+  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] = useState<boolean>(
+    initialSmallMiniBarUseTotalFlow,
   )
 
-  const [showRemainRatio, setShowRemainRatio] = useState(
-    initial.showRemainRatio ?? false,
-  )
+  // ==================== State（缓存隔离 + CacheSection） ====================
 
-  // ✅ 中号：样式 + “三卡开关”（关=默认四卡）
-  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(
-    (initial as any).mediumStyle ?? "FullRing",
-  )
-  const [mediumUseThreeLayout, setMediumUseThreeLayout] = useState<boolean>(
-    (initial as any).mediumUseThreeLayout ?? false,
-  )
+  const [cacheScopeKey, setCacheScopeKey] = useState<string>(initialCacheScopeKey)
+  const [cacheDraft, setCacheDraft] = useState<CacheConfig>(initialCache)
 
-  const [includeDirectionalInTotal, setIncludeDirectionalInTotal] =
-    useState<boolean>(initial.includeDirectionalInTotal ?? true)
+  const cacheStore = {
+    title: "启用缓存",
+    load: () => loadChinaTelecomSettings(),
+    save: (next: ChinaTelecomSettings) => saveChinaTelecomSettings(next),
+    getCache: (s: ChinaTelecomSettings) => (s.cache ?? defaultChinaTelecomSettings.cache),
+    setCache: (s: ChinaTelecomSettings, cache: CacheConfig) => ({ ...s, cache }),
+  }
 
-  const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(
-    (initial.smallCardStyle as SmallCardStyle) ?? "summary",
-  )
-
-  // ✅ 紧凑清单 / 进度清单 2行 / 3行 联动
-  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] =
-    useState<boolean>(initial.smallMiniBarUseTotalFlow ?? false)
-
-  // ==================== 保存 ====================
+  /* =====================================================================
+   * 模块分类 · 保存（统一写回）
+   *
+   * 模块分类 · 背景
+   * - CacheSection deferPersist=true：编辑过程不落盘，避免频繁写 Storage
+   *
+   * 模块分类 · 目标
+   * - 将 state 汇总为 next → saveChinaTelecomSettings
+   *
+   * 模块分类 · 使用方式
+   * - 点击“完成”
+   *
+   * 模块分类 · 日志与边界
+   * - 保存后 dismiss
+   * ===================================================================== */
 
   const handleSave = () => {
-    const newSettings: ChinaTelecomSettings = {
-      mobile: mobile.trim(),
-      password: password.trim(),
+    const next: ChinaTelecomSettings = {
+      ...initial,
 
-      refreshTimeDayColor,
-      refreshTimeNightColor,
-      refreshInterval: toSafeIntMinutes(refreshInterval, 180),
+      mobile: String(mobile ?? "").trim(),
+      password: String(password ?? "").trim(),
+      refreshInterval:
+        typeof refreshInterval === "number" && Number.isFinite(refreshInterval)
+          ? refreshInterval
+          : defaultChinaTelecomSettings.refreshInterval,
 
       showRemainRatio: !!showRemainRatio,
-
-      // ✅ 新结构保存：只写 mediumUseThreeLayout + mediumStyle
       mediumStyle,
-      mediumUseThreeLayout: !!mediumUseThreeLayout,
-
+      mediumUseThreeCard: !!mediumUseThreeCard,
       includeDirectionalInTotal: !!includeDirectionalInTotal,
-
       smallCardStyle,
       smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
+
+      cacheScopeKey: String(cacheScopeKey || "").trim(),
+      cache: cacheDraft,
     }
 
-    Storage.set(SETTINGS_KEY, newSettings)
+    saveChinaTelecomSettings(next)
     dismiss()
   }
 
+  /* =====================================================================
+   * 模块分类 · About（版本信息弹窗）
+   *
+   * 模块分类 · 背景
+   * - 便于确认版本/构建日期
+   *
+   * 模块分类 · 目标
+   * - Dialog.alert 展示 VERSION / BUILD_DATE
+   *
+   * 模块分类 · 使用方式
+   * - 工具栏底部“关于本组件”
+   *
+   * 模块分类 · 日志与边界
+   * - Dialog 不可用则静默
+   * ===================================================================== */
+
   const handleAbout = async () => {
-    await Dialog.alert({
-      title: "电信余量组件",
-      message:
-        `作者：©ByteValley\n` +
-        `版本：v${VERSION}（${BUILD_DATE}）\n` +
-        `致谢：@DTZSGHNR`,
-      buttonLabel: "关闭",
-    })
+    try {
+      await Dialog?.alert?.({
+        title: "电信余量组件",
+        message: `作者：©ByteValley\n版本：v${VERSION}（${BUILD_DATE}）\n`,
+        buttonLabel: "关闭",
+      })
+    } catch { }
   }
 
   // ==================== UI ====================
@@ -171,18 +243,14 @@ function SettingsView() {
   return (
     <NavigationStack>
       <List
-        navigationTitle={"电信余量组件"}
-        navigationBarTitleDisplayMode={"inline"}
+        navigationTitle="电信余量组件"
+        navigationBarTitleDisplayMode="inline"
         toolbar={{
           topBarLeading: [<Button title="关闭" action={dismiss} />],
           topBarTrailing: [
             <Button
               title={fullscreenPref ? "页面" : "弹层"}
-              systemImage={
-                fullscreenPref
-                  ? "rectangle.arrowtriangle.2.outward"
-                  : "rectangle"
-              }
+              systemImage={fullscreenPref ? "rectangle.arrowtriangle.2.outward" : "rectangle"}
               action={toggleFullscreen}
             />,
             <Button title="完成" action={handleSave} />,
@@ -197,30 +265,30 @@ function SettingsView() {
           ],
         }}
       >
-        {/* 账号设置 */}
+        <ModuleSection
+          footerLines={[
+            "使用说明：",
+            "1）在设置页填写账号/密码（接口会在本地请求中使用）",
+            "2）回到桌面添加组件查看数据",
+          ]}
+          collapsible
+          collapseStorageKey={MODULE_COLLAPSE_KEY}
+          defaultCollapsed={true}
+          actions={{} as any}
+        />
+
         <Section
-          header={<Text font="body" fontWeight="semibold">账号设置</Text>}
+          header={<Text font="body" fontWeight="semibold">账号</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              使用官方接口查询数据，账号信息仅保存在本机，不上传到任何第三方服务器。
+              账号/密码用于请求新版接口；仅保存在本地 Storage。
             </Text>
           }
         >
-          <TextField
-            title="手机号"
-            prompt="请输入 11 位手机号"
-            value={mobile}
-            onChanged={setMobile}
-          />
-          <SecureField
-            title="服务密码"
-            prompt="请输入服务密码"
-            value={password}
-            onChanged={setPassword}
-          />
+          <TextField title="手机号" value={mobile} onChanged={setMobile} prompt="请输入手机号" />
+          <TextField title="密码" value={password} onChanged={setPassword} prompt="请输入密码" />
         </Section>
 
-        {/* 渲染配置（对齐联通新结构：mediumStyle + mediumUseThreeLayout） */}
         <RenderConfigSection
           smallCardStyle={smallCardStyle}
           setSmallCardStyle={setSmallCardStyle}
@@ -230,43 +298,105 @@ function SettingsView() {
           setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
           mediumStyle={mediumStyle}
           setMediumStyle={setMediumStyle}
-          mediumUseThreeLayout={mediumUseThreeLayout}
-          setMediumUseThreeLayout={setMediumUseThreeLayout}
+          mediumUseThreeCard={mediumUseThreeCard}
+          setMediumUseThreeCard={setMediumUseThreeCard}
           includeDirectionalInTotal={includeDirectionalInTotal}
           setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
           refreshInterval={refreshInterval}
           setRefreshInterval={setRefreshInterval}
+        />
+
+        {/*         <Section
+          header={<Text font="body" fontWeight="semibold">缓存隔离</Text>}
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              填一个稳定标识（如：主号/副号、A套餐）。它会被哈希为指纹用于绑定数据缓存；更改后缓存会自动隔离，避免切账号/切数据源读到旧缓存。
+            </Text>
+          }
+        >
+          <TextField title="隔离标识" value={cacheScopeKey} prompt="主号/副号" onChanged={setCacheScopeKey} />
+        </Section> */}
+
+        <CacheSection
+          store={cacheStore as any}
+          refreshKey={refreshInterval}
+          draft={cacheDraft}
+          onDraftChange={(next) => setCacheDraft(next)}
+          deferPersist={true}
+        />
+
+        <Section
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              当前生效示例：refresh={refreshInterval} 分钟，TTL 自动为 max(4 小时, refresh)；固定 TTL 则为 max(4 小时, 固定值)。
+              {"\n"}提示：你设置的“兜底旧缓存最长允许”会被自动纠偏为 ≥ TTL（避免反直觉）。
+              {"\n"}（用于说明：
+              {formatDuration(Math.max(240, Number(refreshInterval) || 0), { includeSeconds: false })}）
+            </Text>
+          }
         />
       </List>
     </NavigationStack>
   )
 }
 
-// ==================== App / Run ====================
+/* =====================================================================
+ * 模块分类 · App 包装层
+ *
+ * 模块分类 · 背景
+ * - 与移动/联通保持一致：便于未来扩展 props
+ *
+ * 模块分类 · 目标
+ * - 提供 interactiveDismissDisabled 入口（宿主支持则生效）
+ *
+ * 模块分类 · 使用方式
+ * - main() 内 <App interactiveDismissDisabled />
+ *
+ * 模块分类 · 日志与边界
+ * - 纯 UI 包装，无日志
+ * ===================================================================== */
 
 type AppProps = { interactiveDismissDisabled?: boolean }
-
 function App(_props: AppProps) {
   return <SettingsView />
 }
 
-function readFullscreenPrefForRun(): boolean {
+/* =====================================================================
+ * 模块分类 · main（呈现入口）
+ *
+ * 模块分类 · 背景
+ * - ⚠️ main() 不能调用 useFullscreenPref（hook）
+ * - 正确方式：readFullscreenPref(storageKey) 读取 Storage 偏好
+ *
+ * 模块分类 · 目标
+ * - fullscreen=true → fullScreen
+ * - fullscreen=false → 默认弹层
+ *
+ * 模块分类 · 使用方式
+ * - 脚本入口：main()
+ *
+ * 模块分类 · 日志与边界
+ * - 捕获异常：Dialog.alert；最后 Script.exit()
+ * ===================================================================== */
+
+async function main() {
   try {
-    const v = Storage.get(FULLSCREEN_KEY)
-    if (typeof v === "boolean") return v
-  } catch { }
-  return true
+    const fullscreen = readFullscreenPref(FULLSCREEN_KEY, true)
+
+    await Navigation.present({
+      element: <App interactiveDismissDisabled />,
+      ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
+    })
+
+    Script.exit()
+  } catch (e) {
+    const msg =
+      e && typeof e === "object" && "stack" in e ? String((e as { stack?: unknown }).stack ?? e) : String(e)
+    try {
+      await Dialog?.alert?.({ title: "脚本执行失败", message: msg, buttonLabel: "知道了" })
+    } catch { }
+    Script.exit()
+  }
 }
 
-async function run() {
-  const fullscreen = readFullscreenPrefForRun()
-
-  await Navigation.present({
-    element: <App interactiveDismissDisabled />,
-    ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
-  })
-
-  Script.exit()
-}
-
-run()
+main()
