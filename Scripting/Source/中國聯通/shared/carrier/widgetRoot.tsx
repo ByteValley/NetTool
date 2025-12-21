@@ -181,14 +181,14 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
   // ==================== 中号 ====================
 
   if (Widget.family === "systemMedium") {
-      return (
-        <MediumLayout
-          layout={mediumStyle}
-          surfaces={surfaces}
-          transparent={transparent}
-          feeTitle={data.fee.title}
-          feeText={`${data.fee.balance}${data.fee.unit}`}
-          logoPath={logoPath}
+    return (
+      <MediumLayout
+        layout={mediumStyle}
+        surfaces={surfaces}
+        transparent={transparent}
+        feeTitle={data.fee.title}
+        feeText={`${data.fee.balance}${data.fee.unit}`}
+        logoPath={logoPath}
         updateTime={data.updateTime}
         flowTitle={useTotalFlow ? totalFlowTitle : flowTitle}
         flowValueText={useTotalFlow ? totalFlowValueText : flowValueText}
