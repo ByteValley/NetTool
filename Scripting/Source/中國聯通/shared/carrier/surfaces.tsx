@@ -11,6 +11,7 @@ export type WidgetSurfacePalette = {
   pill: DynamicShapeStyle | string
   chip: DynamicShapeStyle | string
   border?: DynamicShapeStyle | string
+  transparentMode?: boolean
 }
 
 type SurfaceOptions = {
@@ -24,6 +25,7 @@ const OPAQUE_SURFACES: WidgetSurfacePalette = {
   panel: { light: "rgba(255,255,255,0.70)", dark: "rgba(255,255,255,0.08)" } as DynamicShapeStyle,
   pill: { light: "rgba(255,255,255,0.78)", dark: "rgba(255,255,255,0.12)" } as DynamicShapeStyle,
   chip: { light: "rgba(255,255,255,0.78)", dark: "rgba(255,255,255,0.14)" } as DynamicShapeStyle,
+  transparentMode: false,
 }
 
 const TRANSPARENT_SURFACES: WidgetSurfacePalette = {
@@ -34,6 +36,7 @@ const TRANSPARENT_SURFACES: WidgetSurfacePalette = {
   pill: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
   chip: { light: "rgba(255,255,255,0)", dark: "rgba(255,255,255,0)" } as DynamicShapeStyle,
   border: { light: "rgba(255,255,255,0.22)", dark: "rgba(255,255,255,0.30)" } as DynamicShapeStyle,
+  transparentMode: true,
 }
 
 export const DEFAULT_WIDGET_SURFACES: WidgetSurfacePalette = { ...OPAQUE_SURFACES }
