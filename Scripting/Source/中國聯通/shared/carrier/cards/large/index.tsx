@@ -4,7 +4,7 @@
 import { VStack, HStack } from "scripting"
 
 import { outerCardBg, ringThemes } from "../../theme"
-import { type WidgetSurfacePalette, wrapWithBorderLayer } from "../../surfaces"
+import { type WidgetSurfacePalette, wrapWithBorderLayer, buildWidgetBackground } from "../../surfaces"
 import { FeeCard } from "../components/feeCard"
 import { FullRingStatCard } from "../components/fullRingStatCard"
 
@@ -55,10 +55,10 @@ export function TelecomLargeLayout(props: TelecomLargeLayoutProps) {
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
-      widgetBackground={{
+      widgetBackground={buildWidgetBackground({
         style: surfaces?.outer || outerCardBg,
-        shape: { type: "rect", cornerRadius: 24, style: "continuous" },
-      }}
+        cornerRadius: 24,
+      })}
     >
       <HStack alignment="center" spacing={10}>
         <FeeCard

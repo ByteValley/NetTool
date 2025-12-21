@@ -1,7 +1,11 @@
 // shared/carrier/cards/small/common.tsx
 import { Text, Image } from "scripting"
 import { ringThemes } from "../../theme"
-import { type WidgetSurfacePalette, DEFAULT_WIDGET_SURFACES } from "../../surfaces"
+import {
+  type WidgetSurfacePalette,
+  DEFAULT_WIDGET_SURFACES,
+  buildWidgetBackground,
+} from "../../surfaces"
 
 /**
  * 小号组件通用 Props：
@@ -89,10 +93,7 @@ export function UnitPill(props: { text: string; surfaces?: WidgetSurfacePalette 
       font={9}
       fontWeight="semibold"
       padding={{ top: 2, leading: 8, bottom: 2, trailing: 8 }}
-      widgetBackground={{
-        style: surfaces.pill,
-        shape: { type: "capsule", style: "continuous" },
-      }}
+      widgetBackground={buildWidgetBackground({ style: surfaces.pill, cornerRadius: 999, shape: "capsule" })}
     >
       {props.text}
     </Text>

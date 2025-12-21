@@ -19,6 +19,22 @@ type SurfaceOptions = {
   colorfulLineBorder?: boolean
 }
 
+type WidgetShape = "rect" | "capsule"
+
+export function buildWidgetBackground(options: {
+  style?: DynamicShapeStyle | string
+  cornerRadius: number
+  shape?: WidgetShape
+}) {
+  const { style, cornerRadius, shape = "rect" } = options
+  if (!style) return undefined
+
+  return {
+    style,
+    shape: { type: shape, cornerRadius, style: "continuous" as const },
+  }
+}
+
 const OPAQUE_SURFACES: WidgetSurfacePalette = {
   outer: { light: "rgba(255,255,255,0.90)", dark: "rgba(0,0,0,0.55)" } as DynamicShapeStyle,
   content: { light: "rgba(255,255,255,0.78)", dark: "rgba(255,255,255,0.10)" } as DynamicShapeStyle,
