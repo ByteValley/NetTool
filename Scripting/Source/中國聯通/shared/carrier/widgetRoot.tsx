@@ -22,6 +22,7 @@ import { Widget, VStack, HStack } from "scripting"
 import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/carrierUtils"
 import type { UiSettings } from "./ui"
+import { buildWidgetSurfaces } from "./surfaces"
 
 import { MediumLayout } from "./cards/medium"
 import { FeeCard } from "./cards/components/feeCard"
@@ -70,6 +71,13 @@ export type CarrierData = {
 
 export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath: string }) {
   const { data, ui, logoPath } = props
+
+  const transparent = !!ui.transparentWidgetStyle
+
+  const surfaces = buildWidgetSurfaces({
+    transparentStyle: transparent,
+    colorfulLineBorder: ui.colorfulLineBorder,
+  })
 
   const {
     showRemainRatio,
@@ -144,6 +152,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
     return (
       <SmallLayout
         style={style}
+        surfaces={surfaces}
         feeTitle={data.fee.title}
         feeText={`${data.fee.balance}${data.fee.unit}`}
         logoPath={logoPath}
@@ -172,12 +181,14 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
   // ==================== 中号 ====================
 
   if (Widget.family === "systemMedium") {
-    return (
-      <MediumLayout
-        layout={mediumStyle}
-        feeTitle={data.fee.title}
-        feeText={`${data.fee.balance}${data.fee.unit}`}
-        logoPath={logoPath}
+      return (
+        <MediumLayout
+          layout={mediumStyle}
+          surfaces={surfaces}
+          transparent={transparent}
+          feeTitle={data.fee.title}
+          feeText={`${data.fee.balance}${data.fee.unit}`}
+          logoPath={logoPath}
         updateTime={data.updateTime}
         flowTitle={useTotalFlow ? totalFlowTitle : flowTitle}
         flowValueText={useTotalFlow ? totalFlowValueText : flowValueText}
@@ -194,12 +205,12 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
 
   // ==================== 大号 ====================
 
-  return (
+  const body = (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
       widgetBackground={{
-        style: outerCardBg,
+        style: surfaces.outer || outerCardBg,
         shape: { type: "rect", cornerRadius: 24, style: "continuous" },
       }}
     >
@@ -210,6 +221,8 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           theme={ringThemes.fee}
           logoPath={logoPath}
           updateTime={data.updateTime}
+          transparent={transparent}
+          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -217,6 +230,8 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={flowValueText}
           theme={ringThemes.flow}
           ratio={flowStat.ratio}
+          transparent={transparent}
+          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -224,6 +239,8 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={otherValueText}
           theme={ringThemes.flowDir}
           ratio={otherStat.ratio}
+          transparent={transparent}
+          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -231,8 +248,24 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={voiceValueText}
           theme={ringThemes.voice}
           ratio={voiceStat.ratio}
+          transparent={transparent}
+          surfaces={surfaces}
         />
       </HStack>
+    </VStack>
+  )
+
+  if (!surfaces.border) return body
+
+  return (
+    <VStack
+      padding={{ top: 2, leading: 2, bottom: 2, trailing: 2 }}
+      widgetBackground={{
+        style: surfaces.border,
+        shape: { type: "rect", cornerRadius: 26, style: "continuous" },
+      }}
+    >
+      {body}
     </VStack>
   )
 }
