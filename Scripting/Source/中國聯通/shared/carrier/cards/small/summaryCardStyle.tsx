@@ -23,6 +23,7 @@ export function TelecomSmallSummaryCard(props: SmallCardCommonProps) {
           theme={ringThemes.fee}
           logoPath={logoPath}
           updateTime={updateTime ?? ""}
+          surfaces={surfaces}
         />
         <Spacer />
       </VStack>
