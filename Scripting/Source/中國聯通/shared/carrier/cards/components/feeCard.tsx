@@ -1,12 +1,7 @@
 // shared/carrier/cards/components/feeCard.tsx
-import {
-  VStack,
-  HStack,
-  Text,
-  Image,
-  Spacer,
-} from "scripting"
+import { VStack, HStack, Text, Image, Spacer } from "scripting"
 import { timeStyle, RingCardTheme } from "../../theme"
+import { type WidgetSurfacePalette, wrapWithBorderLayer } from "../../surfaces"
 
 export function FeeCard(props: {
   title: string
@@ -14,10 +9,13 @@ export function FeeCard(props: {
   theme: RingCardTheme
   logoPath?: string | null
   updateTime: string
+  surfaces?: WidgetSurfacePalette
 }) {
-  const { title, valueText, theme, logoPath, updateTime } = props
+  const { title, valueText, theme, logoPath, updateTime, surfaces } = props
   const isUrlLogo =
     !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
+
+  const background = surfaces?.content ?? theme.bg
 
   const LogoImage = ({ size }: { size: number }) =>
     logoPath ? (
@@ -35,13 +33,13 @@ export function FeeCard(props: {
       />
     )
 
-  return (
+  const card = (
     <VStack
       alignment="center"
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: theme.bg,
+        style: background,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
@@ -97,4 +95,6 @@ export function FeeCard(props: {
       <Spacer minLength={4} />
     </VStack>
   )
+
+  return wrapWithBorderLayer({ child: card, surfaces, cornerRadius: 18, padding: 2 })
 }

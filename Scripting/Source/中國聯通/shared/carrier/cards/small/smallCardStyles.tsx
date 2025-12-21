@@ -4,7 +4,7 @@ import { VStack, HStack, ZStack, Text, Spacer, Image } from "scripting"
 import type { SmallCardCommonProps } from "./common"
 import { ringThemes, timeStyle } from "../../theme"
 import type { RingCardTheme } from "../../theme"
-import { DEFAULT_WIDGET_SURFACES, type WidgetSurfacePalette } from "../../surfaces"
+import { DEFAULT_WIDGET_SURFACES, type WidgetSurfacePalette, wrapWithBorderLayer } from "../../surfaces"
 
 // =====================================================================
 // Layout Helpers · 强制“靠左”
@@ -55,19 +55,7 @@ export function SmallCardSurface(props: { children: any; surfaces?: WidgetSurfac
     </VStack>
   )
 
-  if (!surfaces.border) return body
-
-  return (
-    <VStack
-      padding={{ top: 2, leading: 2, bottom: 2, trailing: 2 }}
-      widgetBackground={{
-        style: surfaces.border,
-        shape: { type: "rect", cornerRadius: 28, style: "continuous" },
-      }}
-    >
-      {body}
-    </VStack>
-  )
+  return wrapWithBorderLayer({ child: body, surfaces, cornerRadius: 26, padding: 2 })
 }
 
 // =====================================================================
