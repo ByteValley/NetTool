@@ -22,7 +22,7 @@ import { Widget, VStack, HStack } from "scripting"
 import { outerCardBg, ringThemes } from "./theme"
 import { buildUsageStat, formatFlowValue } from "./utils/carrierUtils"
 import type { UiSettings } from "./ui"
-import { buildWidgetSurfaces } from "./surfaces"
+import { buildWidgetSurfaces, wrapWithBorderLayer } from "./surfaces"
 
 import { MediumLayout } from "./cards/medium"
 import { FeeCard } from "./cards/components/feeCard"
@@ -218,6 +218,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           theme={ringThemes.fee}
           logoPath={logoPath}
           updateTime={data.updateTime}
+          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -225,6 +226,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={flowValueText}
           theme={ringThemes.flow}
           ratio={flowStat.ratio}
+          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -232,6 +234,7 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={otherValueText}
           theme={ringThemes.flowDir}
           ratio={otherStat.ratio}
+          surfaces={surfaces}
         />
 
         <FullRingStatCard
@@ -239,22 +242,11 @@ export function WidgetRoot(props: { data: CarrierData; ui: UiSettings; logoPath:
           valueText={voiceValueText}
           theme={ringThemes.voice}
           ratio={voiceStat.ratio}
+          surfaces={surfaces}
         />
       </HStack>
     </VStack>
   )
 
-  if (!surfaces.border) return body
-
-  return (
-    <VStack
-      padding={{ top: 2, leading: 2, bottom: 2, trailing: 2 }}
-      widgetBackground={{
-        style: surfaces.border,
-        shape: { type: "rect", cornerRadius: 26, style: "continuous" },
-      }}
-    >
-      {body}
-    </VStack>
-  )
+  return wrapWithBorderLayer({ child: body, surfaces, cornerRadius: 24, padding: 2 })
 }
