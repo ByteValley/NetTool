@@ -3,7 +3,7 @@
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
 #!author=ByteValley
-#!version=2025-12-11R1
+#!version=2025-12-20R1
 #!arguments=激励视频:REJECT-DROP
 
 [MITM]
@@ -82,6 +82,7 @@ DOMAIN-SUFFIX,partner.toutiao.com,REJECT
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,mon11-misc)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lf)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-lq)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,misc-hl)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lf)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,normal-lq)),REJECT-DROP
 
