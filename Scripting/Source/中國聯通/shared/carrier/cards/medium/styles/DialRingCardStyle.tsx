@@ -26,6 +26,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
     voiceTitle,
     voiceValueText,
     voiceRatio,
+    surfaces,
   } = props
 
   const showOther =
@@ -40,6 +41,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
         theme={ringThemes.fee}
         logoPath={logoPath}
         updateTime={updateTime}
+        surfaces={surfaces}
       />
 
       <DialRingStatCard
@@ -47,6 +49,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
         valueText={flowValueText}
         theme={ringThemes.flow}
         ratio={flowRatio}
+        surfaces={surfaces}
       />
 
       {showOther ? (
@@ -56,6 +59,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
           valueText={otherValueText ?? "0MB"}
           theme={ringThemes.flowDir}
           ratio={otherRatio ?? 0}
+          surfaces={surfaces}
         />
       ) : null}
 
@@ -64,6 +68,7 @@ export function DialRingCardStyle(props: MediumCommonProps) {
         valueText={voiceValueText}
         theme={ringThemes.voice}
         ratio={voiceRatio}
+        surfaces={surfaces}
       />
     </MediumOuter>
   )

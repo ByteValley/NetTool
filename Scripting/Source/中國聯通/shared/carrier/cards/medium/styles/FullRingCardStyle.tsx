@@ -25,6 +25,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
     voiceTitle,
     voiceValueText,
     voiceRatio,
+    surfaces,
   } = props
 
   const showOther =
@@ -39,6 +40,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
         theme={ringThemes.fee}
         logoPath={logoPath}
         updateTime={updateTime}
+        surfaces={surfaces}
       />
 
       <FullRingStatCard
@@ -46,6 +48,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
         valueText={flowValueText}
         theme={ringThemes.flow}
         ratio={flowRatio}
+        surfaces={surfaces}
       />
 
       {showOther ? (
@@ -55,6 +58,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
           valueText={otherValueText ?? "0MB"}
           theme={ringThemes.flowDir}
           ratio={otherRatio ?? 0}
+          surfaces={surfaces}
         />
       ) : null}
 
@@ -63,6 +67,7 @@ export function FullRingCardStyle(props: MediumCommonProps) {
         valueText={voiceValueText}
         theme={ringThemes.voice}
         ratio={voiceRatio}
+        surfaces={surfaces}
       />
     </MediumOuter>
   )
