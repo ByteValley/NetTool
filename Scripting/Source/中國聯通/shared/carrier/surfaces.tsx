@@ -2,7 +2,7 @@
 // 统一外观：控制透明/描边样式
 
 import { DynamicShapeStyle, VStack } from "scripting"
-import { ringThemes } from "./theme"
+import { outerCardBg, ringThemes } from "./theme"
 
 export type WidgetSurfacePalette = {
   outer: DynamicShapeStyle | string
