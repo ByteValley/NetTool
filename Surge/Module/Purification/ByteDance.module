@@ -19,6 +19,7 @@ DOMAIN,ad.zijieapi.com,REJECT
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,ad)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lq)),REJECT-DROP
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-lf)),{{{激励视频}}}    # 统一广告/活动下发线（normal-lf）
+AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,normal-hl)),REJECT-DROP
 
 # —— ABTest / 实验策略下发 ——
 AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,abtest)),REJECT-DROP
