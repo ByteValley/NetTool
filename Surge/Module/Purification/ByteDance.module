@@ -54,8 +54,8 @@ DOMAIN,tr.byteurl.cn,REJECT-DROP,extended-matching
 # 说明：
 # · ib.snssdk.com 常用于章中短剧/推荐视频的“内容注入控制层”
 # · 优先拦控制层而不是拦视频 CDN，可最大限度避免误伤正常视频能力
-DOMAIN,ib.snssdk.com,REJECT,extended-matching
-DOMAIN,i.snssdk.com,REJECT-DROP,extended-matching
+# DOMAIN,ib.snssdk.com,REJECT,extended-matching
+# DOMAIN,i.snssdk.com,REJECT-DROP,extended-matching
 
 # =====================================================================
 # 模块分类 · 番茄小说章中短剧兜底（视频流 CDN，可选）
