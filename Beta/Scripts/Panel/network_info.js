@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息 + 服务检测（BoxJS / Surge / Loon / QuanX / Egern 兼容）
  * 作者 · ByteValley
- * 版本 · 2025-12-16R1
+ * 版本 · 2025-12-27R2
  *
  * 模块分类 · 概述与边界
  * · 展示 本地 / 入口 / 落地（IPv4/IPv6），并发检测常见服务解锁状态
@@ -857,130 +857,112 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
     const hay = joinNonEmpty([ISP, ORG, AS], " | ");
     const asn = parseASNNumber(asField);
 
+    const reasons = [];
     let riskValue = 0;
 
-    // 1) rDNS（PTR）强信号
+    // 1) rDNS（PTR）信号
     const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost);
     const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
-
-    // ✅ FIX 1：rDNS 移动信号应使用 rdnsMobileKeywords（不是 mobileKeywords）
+    // ✅ FIX: rDNS 移动信号应使用 rdnsMobileKeywords（更窄、更不误伤）
     const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.rdnsMobileKeywords);
 
-    if (rdnsHitDC) riskValue += 75;
-    if (rdnsHitHB) riskValue -= rdnsHitDC ? 6 : 26;
+    if (rdnsHitDC) {
+        riskValue += 75;
+        reasons.push("PTR 命中机房域名后缀");
+    }
+    if (rdnsHitHB) {
+        const delta = rdnsHitDC ? -6 : -26;
+        riskValue += delta;
+        reasons.push(`PTR 命中住宅/接入网关键词(${delta})`);
+    }
+    if (rdnsHitMobile) {
+        // 移动网络不等于机房，但也不算传统家宽；轻微减分，防止被误判成“机房”
+        const delta = rdnsHitDC ? 0 : -8;
+        riskValue += delta;
+        reasons.push(`PTR 命中移动网络关键词(${delta})`);
+    }
 
-    // 2) ORG/ASN/ISP 信号
+    // 2) ORG/ASN/ISP 关键词信号
     const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
     const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
     const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
 
-    if (dcHit) riskValue += 55;
-    if (hbHit) riskValue -= (rdnsHitDC || dcHit) ? 10 : 22;
-    if (mobileHit) riskValue -= (rdnsHitDC || dcHit) ? 0 : 10;
-
-    // 3) 国家风险加成
-    if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
-        riskValue += 18;
+    if (dcHit) {
+        riskValue += 55;
+        reasons.push("ORG/ISP/AS 命中机房/云/托管关键词(+55)");
+    }
+    if (hbHit) {
+        const delta = (rdnsHitDC || dcHit) ? -10 : -22;
+        riskValue += delta;
+        reasons.push(`ORG/ISP/AS 命中家宽/接入关键词(${delta})`);
+    }
+    if (mobileHit) {
+        const delta = (rdnsHitDC || dcHit) ? 0 : -10;
+        riskValue += delta;
+        reasons.push(`ORG/ISP/AS 命中移动网络关键词(${delta})`);
     }
 
-    // 4) 信息不足惩罚：别轻易给“真家宽”
-    if (!ORG && !AS && ISP.length <= 3) riskValue += 10;
+    // 3) 国家风险加成（可选线索：不当作决定性）
+    if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
+        riskValue += 18;
+        reasons.push("国家风险加成(+18)");
+    }
+
+    // 4) 信息不足惩罚：别轻易给“干净/家宽”
+    if (!ORG && !AS && ISP.length <= 3) {
+        riskValue += 10;
+        reasons.push("信息不足惩罚(+10)");
+    }
 
     // 收敛到 0~100
     riskValue = Math.max(0, Math.min(100, Math.round(riskValue)));
 
-    // —— 判定（严格比较符：家宽证据 >= 2）——
-    const hbEvidence =
-        [hbHit, rdnsHitHB].filter(Boolean).length +
-        (ASN_HOME_STRONG.has(asn) ? 1 : 0);
-
+    // —— 证据计数（用于最终分类收敛）——
+    const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (ASN_HOME_STRONG.has(asn) ? 1 : 0);
     const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
 
     const isHant = (typeof SD_LANG === "string" && SD_LANG === "zh-Hant");
     const zh = (h, t) => (isHant ? t : h);
 
-    // 机房/代理倾向：与你原脚本一致
-    const isVPNLike = (dcEvidence >= 2) || (riskValue >= 65) || rdnsHitDC;
+    // “机房/隧道/代理特征”提示（更诚实：不等于你真的开了 VPN）
+    const tunnelLike = (dcEvidence >= 2) || (riskValue >= 70) || rdnsHitDC;
 
-    // ✅ 严格家宽：必须 >=2 类证据，且不 VPNLike，且 riskValue <=45
-    const isHomeBroadband = (hbEvidence >= 2) && !isVPNLike && (riskValue <= 45);
+    // 家宽判定：仍然偏保守，但不再苛刻到“多数真家宽都判非家宽”
+    // 条件思路：
+    // - 如果机房证据明显：直接非家宽
+    // - 如果机房证据为 0 且 risk 较低：hbEvidence>=1 就可以给“更像家宽”
+    // - hbEvidence>=2 依旧是“更强的家宽置信”
+    const homeLikeStrong = (hbEvidence >= 2) && !tunnelLike && (riskValue <= 50);
+    const homeLikeSoft = (hbEvidence >= 1) && (dcEvidence === 0) && !tunnelLike && (riskValue <= 38);
+    const isHomeBroadband = homeLikeStrong || homeLikeSoft;
 
-    const lineType = isHomeBroadband ? "家宽" : "非家宽";
+    const lineType = isHomeBroadband ? zh("家宽", "家寬") : zh("非家宽", "非家寬");
 
-    let subtype = "未知";
-    if (mobileHit || rdnsHitMobile) subtype = zh("移动网络", "行動網路");
-    else if (isVPNLike || dcEvidence >= 1) subtype = zh("机房/专线", "機房/專線");
-    else if (isHomeBroadband) subtype = zh("住宅/家宽", "住宅/家寬");
+    let subtype = zh("未知", "未知");
+    if (rdnsHitMobile || mobileHit) subtype = zh("移动网络", "行動網路");
+    else if (tunnelLike || dcEvidence >= 1) subtype = zh("机房/专线特征", "機房/專線特徵");
+    else if (isHomeBroadband) subtype = zh("住宅/接入特征", "住宅/接入特徵");
     else if (hbEvidence >= 1) subtype = zh("运营商/接入", "運營商/接入");
     else subtype = zh("普通 ISP", "一般 ISP");
 
-    const isNative = (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生");
-    const vpnStatus = isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線");
-
-    // —— reasons：证据列表（可读短句）——
-    const reasons = [];
-    const add = (s) => {
-        if (s && !reasons.includes(s)) reasons.push(s);
-    };
-
-    if (rdnsHost) add(`PTR: ${String(rdnsHost).replace(/\.$/, "")}`);
-
-    if (rdnsHitDC) add("PTR 命中常见机房域名后缀");
-    if (rdnsHitHB) add("PTR 命中家宽/接入网命名习惯");
-    if (rdnsHitMobile) add("PTR 命中移动网络命名习惯");
-
-    if (dcHit) add("ISP/ORG/ASN 命中机房/云/VPN 关键词");
-    if (hbHit) add("ISP/ORG/ASN 命中家宽/运营商接入关键词");
-    if (mobileHit) add("ISP/ORG/ASN 命中移动网络关键词");
-
-    if (ASN_HOME_STRONG.has(asn)) add(`ASN 命中强家宽白名单：AS${asn}`);
-
-    if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(_normStr(x)))) {
-        add("国家/地区风险加成命中");
-    }
-
-    if (!ORG && !AS && ISP.length <= 3) add("信息不足惩罚：ORG/ASN 缺失且 ISP 过短");
-
-    // —— nativeHint：原生/非原生更友好解释 ——（不硬扯“100%确定”，只是提示）
-    const nativeHint = isVPNLike
-        ? zh("非原生（疑似中转/机房）", "非原生（疑似中轉/機房）")
-        : (riskValue < 50
-            ? zh("原生（未见明显机房特征）", "原生（未見明顯機房特徵）")
-            : zh("偏非原生（特征混杂）", "偏非原生（特徵混雜）"));
-
-    // —— tunnelHint：代理/隧道特征（给面板看的单行结论）——
-    let tunnelHint = zh("未知", "未知");
-
-    if (isVPNLike) {
-        tunnelHint = zh("强代理特征（机房/云/VPN）", "強代理特徵（機房/雲/VPN）");
-    } else if (mobileHit || rdnsHitMobile) {
-        tunnelHint = zh("移动出口特征（蜂窝/无线）", "行動出口特徵（行動/無線）");
-    } else if (isHomeBroadband) {
-        tunnelHint = zh("家宽特征（住宅/接入网）", "家寬特徵（住宅/接入網）");
-    } else if (hbEvidence >= 1) {
-        tunnelHint = zh("偏运营商接入（证据不足以判家宽）", "偏運營商接入（證據不足以判家寬）");
-    } else if (riskValue >= 50) {
-        tunnelHint = zh("疑似中转/机房（证据不足但风险偏高）", "疑似中轉/機房（證據不足但風險偏高）");
-    } else {
-        tunnelHint = zh("普通 ISP（未见明显隧道特征）", "一般 ISP（未見明顯隧道特徵）");
-    }
+    // “原生”推测：这里仍是启发式
+    const nativeHint = (!tunnelLike && riskValue < 55) ? zh("更像原生", "更像原生") : zh("可能非原生", "可能非原生");
+    const tunnelHint = tunnelLike ? zh("机房/代理特征偏强", "機房/代理特徵偏強") : zh("机房/代理特征偏弱", "機房/代理特徵偏弱");
 
     return {
         riskValue,
-        lineType: zh(lineType, lineType === "家宽" ? "家寬" : "非家寬"),
+        lineType,
         subtype,
 
-        // boolean 判定
+        // ✅ boolean：后续你要做逻辑判断不会踩坑
         isHomeBroadband,
 
-        // 你要的三个字段
+        // ✅ 更不误导的提示字段（你面板想保持原文也行，但建议改用这两个）
         nativeHint,
         tunnelHint,
-        reasons,
 
-        // 你原先已有的（可留可不留）
-        isNative: (!isVPNLike && riskValue < 50) ? zh("原生", "原生") : zh("非原生", "非原生"),
-        vpnStatus: isVPNLike ? zh("已连接", "已連線") : zh("未连接", "未連線"),
+        // ✅ 可解释性：命中了哪些证据，一眼知道为什么是这个分
+        reasons,
 
         _raw: {
             asn,
@@ -2581,13 +2563,28 @@ log("debug", "BoxSettings(BOX)", BOX);
         parts.push(DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES).join("\n"));
     }
 
-    const content = maybeTify(parts.join("\n"));
-    const outTitle = maybeTify(title);
-    $done({title: outTitle, content, icon: ICON_NAME, "icon-color": ICON_COLOR});
+    // 说明：繁体转换时，避免把「代理策略」这一行里的策略名称做字词替换（例如「蜂窝」→「行動」）。
+function maybeTifyLine(line) {
+    if (SD_LANG !== "zh-Hant") return line;
+    const prefix = t("policy") + ": ";
+    if (String(line || "").startsWith(prefix)) return line; // 保留策略名原样
+    return zhHansToHantOnce(line);
+}
+
+const content = (SD_LANG === "zh-Hant")
+    ? parts.map(maybeTifyLine).join("
+")
+    : parts.join("
+");
+
+// 标题由语言包/网络类型直接生成；避免对 SSID/策略名等用户字符串做二次转换
+const outTitle = title;
+
+$done({title: outTitle, content, icon: ICON_NAME, "icon-color": ICON_COLOR});
 
     log("info", "Done", (Date.now() - (DEADLINE - BUDGET_MS)) + "ms");
 })().catch((err) => {
     const msg = String(err);
     logErrPush(t("panelTitle"), msg);
-    $done({title: t("panelTitle"), content: maybeTify(msg), icon: ICON_NAME, "icon-color": ICON_COLOR});
+    $done({title: t("panelTitle"), content: (SD_LANG==="zh-Hant"? zhHansToHantOnce(msg): msg), icon: ICON_NAME, "icon-color": ICON_COLOR});
 });
