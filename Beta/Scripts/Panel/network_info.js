@@ -2572,10 +2572,8 @@ function maybeTifyLine(line) {
 }
 
 const content = (SD_LANG === "zh-Hant")
-    ? parts.map(maybeTifyLine).join("
-")
-    : parts.join("
-");
+    ? parts.map(maybeTifyLine).join("\n")
+    : parts.join("\n");
 
 // 标题由语言包/网络类型直接生成；避免对 SSID/策略名等用户字符串做二次转换
 const outTitle = title;
