@@ -12,13 +12,18 @@
 # hostname = %APPEND% *.toutiao.com
 
 [Rule]
+# 汽水音乐直连
+# AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务,extended-matching
+
+# 下标横幅广告
+AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonlineb)),REJECT-DROP,extended-matching
 
 # =====================================================================
 # 模块分类 · 广告线路标签总闸（-lf / -lq / -hl）
 # =====================================================================
 # 说明：
 # · -lf / -lq / -hl 常见于字节系「线路标识」（load-balance / region / 机房）命名
-# · 广告 / 前贴片 / 埋点调度经常走这些线路，因此可作为“高命中总闸”
+# · 广告 / 激励 / 前贴片 / 埋点调度经常走这些线路，因此可作为“高命中总闸”
 # · 风险：部分业务接口也可能带此类标签；若出现章节加载慢/书城空白/短剧异常，可临时注释本段排查
 # · 行为：REJECT-DROP 更“硬”，能减少重试；如遇到卡顿可改为 REJECT
 #
@@ -28,39 +33,27 @@
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
 
 # =====================================================================
-# 模块分类 · 激励视频强度开关（仅覆盖激励链路）
-# =====================================================================
-# 说明：
-# · 避免把“激励视频”参数误用于总闸，从而放行其它广告线路
-# · 你需要看激励时：把参数改为 DIRECT；平时保持 REJECT-DROP
-AND,((DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-KEYWORD,saveu)),{{{激励视频}}},extended-matching
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonline)),{{{激励视频}}},extended-matching
-AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),{{{激励视频}}},extended-matching
-AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,pangolin)),{{{激励视频}}},extended-matching
-
-# =====================================================================
 # 模块分类 · 短链 / 跳转追踪域（落地页与归因）
 # =====================================================================
 # 说明：
 # · bdurl / zjurl / byteurl 多用于站外跳转与归因追踪（广告投放/活动裂变常用）
+# · i.snssdk.com 常作为跳转中转与落地页承载（部分活动页/推广链路会依赖）
 # · 若你需要使用特定活动链接（例如邀请、裂变、兑换等）可按需注释对应行
 DOMAIN-SUFFIX,bdurl.net,REJECT-DROP,extended-matching
 DOMAIN-SUFFIX,zjurl.cn,REJECT-DROP,extended-matching
 DOMAIN,tr.byteurl.cn,REJECT-DROP,extended-matching
 
 # =====================================================================
-# 模块分类 · 番茄小说章中短剧（内容注入控制）
+# 番茄小说 · 章中短剧内容控制（推荐）
 # =====================================================================
-# 说明：
-# · ib.snssdk.com 常用于章中短剧/推荐视频的“内容注入控制层”
-# · 优先拦控制层而不是拦视频 CDN，可最大限度避免误伤正常视频能力
-# DOMAIN,ib.snssdk.com,REJECT,extended-matching
+# DOMAIN,ib.snssdk.com,REJECT-DROP,extended-matching
 # DOMAIN,i.snssdk.com,REJECT-DROP,extended-matching
 
 # =====================================================================
-# 模块分类 · 番茄小说章中短剧兜底（视频流 CDN，可选）
+# 番茄小说 · 章中短剧（仅拦推流视频源，避免误伤头条）
 # =====================================================================
 # 说明：
-# · 若后续出现“绕过 ib 仍能推流”，可开启此兜底
-# · 风险：会影响番茄内所有视频内容（不仅短剧），默认注释态
-# AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn)),REJECT,extended-matching
+# · 章中短剧推流常走 lf-sourcecdn-tos.bytegecko.com（TOS 视频源）
+# · 仅拦 sourcecdn 视频源：不影响头条信息流接口加载
+# · 副作用：番茄内所有走该 sourcecdn 的视频内容都会无法播放（包括非短剧视频）
+AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn),(DOMAIN-KEYWORD,tos)),REJECT,extended-matching
