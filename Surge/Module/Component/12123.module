@@ -6,5 +6,8 @@
 # 模块分类 · 交管组件服务参数获取
 交管12123·参数获取 = type=http-request,pattern=^https:\/\/miniappcsfw\.122\.gov\.cn:8443\/openapi\/invokeApi\/business\/biz,requires-body=1,max-size=0,timeout=1000,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/12123_token.js,script-update-interval=0
 
+# 模块分类 · BoxJS Bridge（set/appendLog/get/batch）
+BoxJSBridge·数据桥接 = type=http-request,pattern=^https?:\/\/api\.boxjs-bridge\.com\/(set|appendLog|get|batch)\b,requires-body=1,max-size=-1,timeout=30,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/boxjs_bridge.js,script-update-interval=0
+
 [MITM]
-hostname = %APPEND% miniappcsfw.122.gov.cn:8443
+hostname = %APPEND% miniappcsfw.122.gov.cn:8443, api.boxjs-bridge.com
