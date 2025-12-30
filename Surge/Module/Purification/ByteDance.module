@@ -13,7 +13,7 @@
 
 [Rule]
 # 汽水音乐直连
-AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),境内服务
+AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),DIRECT
 
 # 下标横幅广告
 AND,((DOMAIN-SUFFIX,ugsdk.cn,extended-matching),(DOMAIN-KEYWORD,-sinfonlineb,extended-matching)),REJECT-DROP
