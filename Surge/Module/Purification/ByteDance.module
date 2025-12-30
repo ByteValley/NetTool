@@ -13,10 +13,14 @@
 
 [Rule]
 # 汽水音乐直连
-# AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务,extended-matching
+AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),境内服务
 
 # 下标横幅广告
-AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonlineb)),REJECT-DROP,extended-matching
+AND,((DOMAIN-SUFFIX,ugsdk.cn,extended-matching),(DOMAIN-KEYWORD,-sinfonlineb,extended-matching)),REJECT-DROP
+
+# —— 激励 / 前贴片媒体素材 ——
+# AND,((DOMAIN-SUFFIX,bytedcdn.com),(DOMAIN-KEYWORD,reward-video)),REJECT-DROP,extended-matching
+# AND,((DOMAIN-SUFFIX,snssdk.com),(DOMAIN-KEYWORD,toutiao-frontier)),REJECT-DROP,extended-matching
 
 # =====================================================================
 # 模块分类 · 广告线路标签总闸（-lf / -lq / -hl）
@@ -30,7 +34,7 @@ AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonlineb)),REJECT-DROP,extende
 # 规则逻辑：
 # · 命中域：douyin.com / zijieapi.com / snssdk.com / toutiaoapi.com / fqnovel.com
 # · 命中关键字：-lf / -lq / -hl（任一出现即拦截）
-AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
+AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,zijieapi.com,extended-matching),(DOMAIN-SUFFIX,snssdk.com,extended-matching),(DOMAIN-SUFFIX,toutiaoapi.com,extended-matching),(DOMAIN-SUFFIX,fqnovel.com,extended-matching))),(OR,((DOMAIN-KEYWORD,-lf,extended-matching),(DOMAIN-KEYWORD,-lq,extended-matching),(DOMAIN-KEYWORD,-hl,extended-matching)))),REJECT-DROP
 
 # =====================================================================
 # 模块分类 · 短链 / 跳转追踪域（落地页与归因）
@@ -56,4 +60,4 @@ DOMAIN,tr.byteurl.cn,REJECT-DROP,extended-matching
 # · 章中短剧推流常走 lf-sourcecdn-tos.bytegecko.com（TOS 视频源）
 # · 仅拦 sourcecdn 视频源：不影响头条信息流接口加载
 # · 副作用：番茄内所有走该 sourcecdn 的视频内容都会无法播放（包括非短剧视频）
-AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,sourcecdn),(DOMAIN-KEYWORD,tos)),REJECT,extended-matching
+AND,((DOMAIN-SUFFIX,bytegecko.com,extended-matching),(DOMAIN-KEYWORD,-tos,extended-matching)),REJECT-DROP
