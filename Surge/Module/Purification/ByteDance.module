@@ -45,7 +45,7 @@ AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,zijieapi.c
 # · 若你需要使用特定活动链接（例如邀请、裂变、兑换等）可按需注释对应行
 DOMAIN-SUFFIX,bdurl.net,REJECT-DROP,extended-matching
 DOMAIN-SUFFIX,zjurl.cn,REJECT-DROP,extended-matching
-DOMAIN,tr.byteurl.cn,REJECT-DROP,extended-matching
+DOMAIN-SUFFIX,byteurl.cn,REJECT-DROP,extended-matching
 
 # =====================================================================
 # 番茄小说 · 章中短剧内容控制（推荐）
