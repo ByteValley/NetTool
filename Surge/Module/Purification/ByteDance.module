@@ -48,7 +48,7 @@ URL-REGEX,^https?:\/\/[a-z0-9-]+\.douyincdn\.com\/stage\/stream-[^?]+\.(flv|m3u8
 # · 上游拦截命中高，但可能影响短剧或内嵌视频能力
 # · 默认使用 REJECT，避免激进重试
 # =====================================================================
-AND,((DOMAIN-SUFFIX,snssdk.com),(OR,((DOMAIN-KEYWORD,frontier-aweme),(DOMAIN-KEYWORD,-bjlgy)))),REJECT,extended-matching
+AND,((DOMAIN-SUFFIX,snssdk.com),(OR,((DOMAIN-KEYWORD,frontier-aweme),(DOMAIN-KEYWORD,-bjlgy)))),REJECT-DROP,extended-matching
 
 # =====================================================================
 # 模块分类 · 章节视频广告（开放平台入口）
@@ -66,7 +66,7 @@ AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,-open)),REJECT-DROP,extended-mat
 # · 通过域名 + 线路标签双条件命中
 # · 默认使用 REJECT，优先保证稳定性
 # =====================================================================
-AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT,extended-matching
+AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
 
 # =====================================================================
 # 模块分类 · 番茄小说短剧（TOS 推流视频）
