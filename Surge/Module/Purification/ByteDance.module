@@ -3,34 +3,59 @@
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
 #!author=ByteValley
-#!version=2025-12-30R1
+#!version=2025-12-31R1
 
 [Rule]
 # =====================================================================
-# 模块分类 · 直连放行（业务音频）
+# 模块分类 · 直连放行（业务音频 · 兼容层）
 # 说明：
 # · 汽水音乐部分音频流量需直连
 # · 通过 -luna 线路标签识别
+# · 不同内核对 extended-matching 触发路径不同，需双写法并存
 # =====================================================================
+
+# 模块分类 · 直连放行（兼容层 A · 标准写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务,extended-matching
 
+# 模块分类 · 直连放行（兼容层 B · 内嵌写法）
+AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),境内服务
+
+
 # =====================================================================
-# 模块分类 · 横幅广告（SDK 下标位）
+# 模块分类 · 横幅广告（SDK 下标位 · 兼容层）
 # 说明：
 # · ug-sdk 下标横幅与浮层广告
 # · 不影响核心业务流程
+# · 双写法用于适配不同 AND/OR + extended-matching 解析路径
 # =====================================================================
+
+# 模块分类 · 横幅广告（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended-matching
+
+# 模块分类 · 横幅广告（兼容层 B · 内嵌写法）
+AND,((DOMAIN-SUFFIX,ugsdk.cn,extended-matching),(DOMAIN-KEYWORD,-sinfonline,extended-matching)),REJECT-DROP
+
 
 # =====================================================================
 # 模块分类 · 短链 / 跳转追踪（落地页与归因）
 # 说明：
 # · bdurl / zjurl / byteurl 多用于广告跳转与归因
 # · 不影响站内核心功能
+# · 域名规则稳定，无需兼容层
 # =====================================================================
 DOMAIN-SUFFIX,bdurl.net,REJECT-DROP,extended-matching
 DOMAIN-SUFFIX,zjurl.cn,REJECT-DROP,extended-matching
 DOMAIN-SUFFIX,byteurl.cn,REJECT-DROP,extended-matching
+
+
+# =====================================================================
+# 模块分类 · 章节短剧广告（vegslb 域名兜底）
+# 说明：
+# · vegslb 为章节短剧广告常见负载均衡入口
+# · 子域高度随机，采用后缀兜底更稳定
+# =====================================================================
+DOMAIN-SUFFIX,vegslb.com,REJECT-DROP,extended-matching
+
 
 # =====================================================================
 # 模块分类 · 章节视频广告（推流源拦截 · 推荐）
@@ -41,38 +66,66 @@ DOMAIN-SUFFIX,byteurl.cn,REJECT-DROP,extended-matching
 # =====================================================================
 URL-REGEX,^https?:\/\/[a-z0-9-]+\.douyincdn\.com\/stage\/stream-[^?]+\.(flv|m3u8|mp4)(\?|$),REJECT-DROP,extended-matching
 
-# =====================================================================
-# 模块分类 · 章节视频广告（上游调度拦截 · 高风险）
-# 说明：
-# · frontier-aweme / -bjlgy 常见于视频调度线路
-# · 上游拦截命中高，但可能影响短剧或内嵌视频能力
-# · 默认使用 REJECT，避免激进重试
-# =====================================================================
-AND,((DOMAIN-SUFFIX,snssdk.com),(OR,((DOMAIN-KEYWORD,frontier-aweme),(DOMAIN-KEYWORD,-bjlgy)))),REJECT-DROP,extended-matching
 
 # =====================================================================
-# 模块分类 · 章节视频广告（开放平台入口）
+# 模块分类 · 章节视频广告（上游调度拦截 · 兼容层）
+# 说明：
+# · frontier-aweme / -bjlgy 常见于视频调度线路
+# · 属于上游调度拦截，命中高但风险较大
+# · 不同内核对 OR + KEYWORD 的解析差异较大，需双写法并存
+# =====================================================================
+
+# 模块分类 · 上游调度拦截（兼容层 A · 标准写法）
+AND,((OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,frontier-aweme))),(DOMAIN-SUFFIX,snssdk.com)),REJECT-DROP,extended-matching
+
+# 模块分类 · 上游调度拦截（兼容层 B · 内嵌写法）
+AND,((OR,((DOMAIN-KEYWORD,-bjlgy,extended-matching),(DOMAIN-KEYWORD,frontier-aweme,extended-matching))),(DOMAIN-SUFFIX,snssdk.com,extended-matching)),REJECT-DROP
+
+
+# =====================================================================
+# 模块分类 · 章节视频广告（开放平台入口 · 兼容层）
 # 说明：
 # · -open 线路常用于抖音开放能力调度
 # · 可能影响分享 / 授权 / 拉起功能
-# · 如出现异常可临时注释
+# · 双写法用于适配不同内核的 extended-matching 行为
 # =====================================================================
+
+# 模块分类 · 开放平台入口（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,-open)),REJECT-DROP,extended-matching
 
-# =====================================================================
-# 模块分类 · 广告线路标签总闸（-lf / -lq / -hl）
-# 说明：
-# · 字节系常见广告 / 激励 / 前贴片线路标签
-# · 通过域名 + 线路标签双条件命中
-# · 默认使用 REJECT，优先保证稳定性
-# =====================================================================
-AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
+# 模块分类 · 开放平台入口（兼容层 B · 内嵌写法）
+AND,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-KEYWORD,-open,extended-matching)),REJECT-DROP
+
 
 # =====================================================================
-# 模块分类 · 番茄小说短剧（TOS 推流视频）
+# 模块分类 · 广告线路标签总闸（-lf / -lq / -hl · 兼容层）
+# 说明：
+# · 字节系常见广告 / 激励 / 前贴片线路标签
+# · 不同内核 / 版本对 AND/OR + extended-matching 的解析路径差异显著
+# · 实测：部分版本需「标准写法 + 内嵌写法」并存才可稳定命中
+# · 并存属于兼容性冗余，并非重复规则
+# =====================================================================
+
+# 模块分类 · 广告线路标签总闸（兜底直拦 · 单关键字）
+DOMAIN-KEYWORD,-lq,REJECT-DROP,extended-matching
+
+# 模块分类 · 广告线路标签总闸（兼容层 A · 标准写法）
+AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
+
+# 模块分类 · 广告线路标签总闸（兼容层 B · 内嵌写法）
+AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,zijieapi.com,extended-matching),(DOMAIN-SUFFIX,snssdk.com,extended-matching),(DOMAIN-SUFFIX,toutiaoapi.com,extended-matching),(DOMAIN-SUFFIX,fqnovel.com,extended-matching),(DOMAIN-SUFFIX,fqnovelvod.com,extended-matching))),(OR,((DOMAIN-KEYWORD,-lf,extended-matching),(DOMAIN-KEYWORD,-lq,extended-matching),(DOMAIN-KEYWORD,-hl,extended-matching)))),REJECT-DROP
+
+
+# =====================================================================
+# 模块分类 · 番茄小说短剧（TOS 推流视频 · 兼容层）
 # 说明：
 # · 命中 bytegecko TOS 视频源
 # · 仅拦推流，不影响信息流接口
-# · 副作用：所有走该源的视频内容将无法播放
+# · 不同内核对 TOS 域名 + KEYWORD 的解析存在差异
 # =====================================================================
+
+# 模块分类 · TOS 推流视频（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,-tos)),REJECT-DROP,extended-matching
+
+# 模块分类 · TOS 推流视频（兼容层 B · 内嵌写法）
+AND,((DOMAIN-SUFFIX,bytegecko.com,extended-matching),(DOMAIN-KEYWORD,-tos,extended-matching)),REJECT-DROP
