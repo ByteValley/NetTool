@@ -3,7 +3,7 @@
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
 #!author=ByteValley
-#!version=2025-12-31R1
+#!version=2026-01-02R1
 
 [Rule]
 # =====================================================================
@@ -36,6 +36,10 @@ AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended
 AND,((DOMAIN-SUFFIX,ugsdk.cn,extended-matching),(DOMAIN-KEYWORD,-sinfonline,extended-matching)),REJECT-DROP
 
 
+# 模块分类 · 横幅广告（域名兜底）
+DOMAIN-SUFFIX,ugsdk.cn,REJECT-DROP,extended-matching
+
+
 # =====================================================================
 # 模块分类 · 短链 / 跳转追踪（落地页与归因）
 # 说明：
@@ -53,8 +57,9 @@ DOMAIN-SUFFIX,byteurl.cn,REJECT-DROP,extended-matching
 # 说明：
 # · vegslb 为章节短剧广告常见负载均衡入口
 # · 子域高度随机，采用后缀兜底更稳定
+# · 若你需要更强拦截可取消注释；若需保留短剧播放建议保持关闭
 # =====================================================================
-DOMAIN-SUFFIX,vegslb.com,REJECT-DROP,extended-matching
+# DOMAIN-SUFFIX,vegslb.com,REJECT-DROP,extended-matching
 
 
 # =====================================================================
@@ -107,7 +112,7 @@ AND,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-KEYWORD,-open,extended
 # =====================================================================
 
 # 模块分类 · 广告线路标签总闸（兜底直拦 · 单关键字）
-DOMAIN-KEYWORD,-lq,REJECT-DROP,extended-matching
+# DOMAIN-KEYWORD,-lq,REJECT-DROP,extended-matching
 
 # 模块分类 · 广告线路标签总闸（兼容层 A · 标准写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
@@ -129,3 +134,52 @@ AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,-tos)),REJECT-DROP,extended-m
 
 # 模块分类 · TOS 推流视频（兼容层 B · 内嵌写法）
 AND,((DOMAIN-SUFFIX,bytegecko.com,extended-matching),(DOMAIN-KEYWORD,-tos,extended-matching)),REJECT-DROP
+
+
+# =====================================================================
+# 模块分类 · 激励 / 推广视频广告（reward 关键字）
+# 说明：
+# · reward 常用于字节系激励视频 / 推广视频命名
+# · 多见于章节插入的视频广告、看视频得奖励等场景
+# · 命中视频分发 CDN 或投放链路命名关键字
+# · 副作用较低，通常不影响正常短剧播放
+# =====================================================================
+DOMAIN-KEYWORD,-reward-,REJECT-DROP,extended-matching
+
+
+# =====================================================================
+# 模块分类 · 激励 / 推广短剧（投放入口域名）
+# 说明：
+# · ad.zijieapi.com 常用于激励广告请求入口与投放调度
+# · 与 inspire 接口搭配可减少“转圈 + 跳秒”的无效播放尝试
+# · 副作用：可能影响金币/激励任务的领取与展示
+# =====================================================================
+DOMAIN,ad.zijieapi.com,REJECT-DROP,extended-matching
+
+
+# =====================================================================
+# 模块分类 · 激励 / 推广短剧（激励广告入口 · inspire）
+# 说明：
+# · ad.zijieapi.com 的 inspire 为激励广告入口（看视频得奖励/推广短剧常用）
+# · 拦截后可减少“转圈 + 跳秒”的无效播放尝试
+# · 副作用：可能影响金币/激励任务的领取与展示
+# =====================================================================
+# URL-REGEX,^https?:\/\/ad\.zijieapi\.com\/api\/ad\/v1\/inspire\/,REJECT-DROP
+
+
+# =====================================================================
+# 模块分类 · 激励 / 推广短剧（LuckyCat 任务体系）
+# 说明：
+# · luckycat 相关接口常用于任务挂件、奖励页与投放资源计划
+# · 目标：阻断章节内推广短剧/激励视频的上游触发
+# · 副作用：会影响任务挂件、奖励页、部分福利入口（但更能彻底消除转圈）
+# =====================================================================
+
+# 模块分类 · LuckyCat 任务挂件（pendant_list）
+URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v1\/task\/pendant_list,REJECT-DROP
+
+# 模块分类 · LuckyCat 任务页面（meal_v2）
+URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v1\/task\/meal_v2\/page,REJECT-DROP
+
+# 模块分类 · LuckyCat 资源计划（resource_plan）
+URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v2\/resource\/resource_plan,REJECT-DROP
