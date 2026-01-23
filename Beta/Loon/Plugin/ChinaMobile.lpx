@@ -1,0 +1,17 @@
+#!name=中国移动组件服务
+#!desc=查询套餐内通话、套餐使用情况
+#!author=ByteValley
+#!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1043.png
+#!tag=组件服务
+#!arguments-desc=[参数设置]\n\n⓵ 禁用脚本：填写#禁用捕获参数重写。
+
+[Argument]
+禁用获参重写=input,'',tag=禁用获参重写, desc=禁用获参重写
+
+[Script]
+http-request ^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/[LD]N\/(uam(onekey|randcode)login|realPersonAuthentication)\/autoLogin script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, requires-body=true, tag={禁用获参重写}移动参数获取
+
+http-request ^https?:\/\/api\.example\.com\/10086\/query script-path=https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js, requires-body=true, timeout=60, tag=移动余量查询·组件
+
+[MITM]
+hostname = api.example.com, client.app.coc.10086.cn
