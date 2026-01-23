@@ -1,9 +1,10 @@
 #!name=中国移动组件服务
-#!desc=查询套餐内通话、套餐使用情况
+#!desc=查询套餐内通话与流量、供小组件使用的查询服务（包含参数捕获与定时查询）
 #!author=ByteValley
-#!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1043.png
 #!tag=组件服务
-#!arguments-desc=[参数设置]\n\n⓵ 禁用脚本：填写#禁用捕获参数重写。
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/ChinaMobile.png
+#!homepage=https://github.com/ChinaTelecomOperators/ChinaMobile
+#!date=2024-11-14 16:00:00
 
 [Argument]
 禁用获参重写=input,'',tag=禁用获参重写, desc=禁用获参重写
