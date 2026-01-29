@@ -1,0 +1,12 @@
+#!name=Github增强
+#!desc=解决github速率限制返回429问题
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/GitHub.png
+#!tag=功能增强
+
+[Rewrite]
+# 解决github速率限制返回429问题
+^https:\/\/github\.com\/ header-replace Accept-Language en-us
+^https:\/\/(raw|gist)\.githubusercontent\.com\/ header-replace Accept-Language en-us
+
+[MITM]
+hostname = raw.githubusercontent.com, gist.githubusercontent.com, github.com
