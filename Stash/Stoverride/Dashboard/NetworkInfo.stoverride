@@ -16,9 +16,9 @@ arguments-desc: |-
   参数（优先级：arguments“显式改动” > BoxJS > 默认）\n\n— 基本设置 —\n• Update: 面板刷新间隔(秒)\n• Timeout: 脚本总超时(秒)\n• BUDGET: 执行预算(秒)，0=自动（脚本内部会在 5.5s~10s 与 Timeout 之间取折中）\n\n— 隐私显示 —\n• MASK_IP: IP 脱敏(1/0)\n• MASK_POS: 位置脱敏(auto=跟随 MASK_IP / 1=仅旗帜 / 0=完整)\n• IPv6: 启用 IPv6(1/0)；会先探测“是否有 v6 出口”，无出口则跳过外网 v6（仍显示本地 v6）\n• TW_FLAG_MODE: 台湾旗模式(0=🇨🇳/1=🇹🇼/2=🇼🇸)\n\n— 数据源选择 —\n• DOMESTIC_IPv4: 直连 v4 源（ipip/cip/163/126/bilibili/pingan）\n• DOMESTIC_IPv6: 直连 v6 源（ddnspod/neu6/ipsb/ident/ipify）\n• LANDING_IPv4: 落地 v4 源（ipapi/ipwhois/ipsb）\n• LANDING_IPv6: 落地 v6 探测源（ipsb/ident/ipify）\n\n— 图标接管 —\n• IconPreset: wifi|globe|dots|antenna|point\n• Icon: 覆盖图标名（优先于 IconPreset）\n• IconColor: 图标颜色\n\n— 子标题样式 —\n• SUBTITLE_STYLE: line/cnBracket/cnQuote/square/curly/angle/pipe/bullet/plain\n• SUBTITLE_MINIMAL: 极简子标题(1/0)\n• GAP_LINES: 组间空行(0~2)\n\n— 服务检测 —\n• SD_STYLE: icon|text\n• SD_LANG: zh-Hans|zh-Hant\n• SD_TIMEOUT: 单项超时(秒)；0=跟随 Timeout（脚本最小 2 秒）\n• SD_CONCURRENCY: 并发数(1~8)\n• SD_REGION_MODE: full|abbr|flag\n• SD_ICON_THEME: check|lock|circle\n• SD_ARROW: 连接符(1=➟ / 0=｜)\n• SD_SHOW_LAT: 显示耗时(1/0)\n• SD_SHOW_HTTP: 显示 HTTP 状态码(1/0)\n• SERVICES: JSON数组或逗号/空白分隔；[]/留空=不指定（走 BoxJS 或默认全开）\n\n— 日志 —\n• LOG: 1/0\n• LOG_LEVEL: debug|info|warn|error\n• LOG_TO_PANEL: 面板尾部附加调试日志(1/0)\n• LOG_PUSH: 异常通知(1/0)\n\n— BoxJS 参数托管 —\n• https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json
 
 tiles:
-  - name: "网络信息·面板_9"
+  - name: "网络信息·面板"
     interval: 3600
-    title: "网络信息·面板_9"
+    title: "网络信息·面板"
     icon: ""
     backgroundColor: "#5d84f8"
     timeout: 14
@@ -26,6 +26,6 @@ tiles:
       Update=10&Timeout=14&BUDGET=0&MASK_IP=1&MASK_POS=auto&IPv6=1&DOMESTIC_IPv4=ipip&DOMESTIC_IPv6=ddnspod&LANDING_IPv4=ipapi&LANDING_IPv6=ipsb&TW_FLAG_MODE=1&IconPreset=globe&Icon=globe.asia.australia&IconColor=#1E90FF&SUBTITLE_STYLE=line&SUBTITLE_MINIMAL=0&GAP_LINES=1&SD_STYLE=icon&SD_LANG=zh-Hans&SD_TIMEOUT=3&SD_CONCURRENCY=6&SD_REGION_MODE=full&SD_ICON_THEME=check&SD_ARROW=1&SD_SHOW_LAT=1&SD_SHOW_HTTP=1&SERVICES=[]&LOG=1&LOG_LEVEL=info&LOG_TO_PANEL=0&LOG_PUSH=1
 
 script-providers:
-  "网络信息·面板_9":
-    url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/network_info.js
+  "网络信息·面板":
+    url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Stash/Scripts/network_info_stash.js
     interval: 86400
