@@ -64,6 +64,40 @@
  *  · 每次 log 只打印一行完整文本，防止刷屏
  * ========================================================= */
 
+/**
+ * ===============================
+ * 重置时间（resetDay）使用说明
+ * ===============================
+ *
+ * 本脚本支持三种重置方式：
+ *
+ * ① 每月重置（按日）
+ *    resetDay1=22
+ *    表示：每月 22 日重置流量
+ *    面板显示：剩余 X 天
+ *
+ * ② 每年重置（按月-日）
+ *    resetDay1=1-22
+ *    resetDay1=01/22
+ *    resetDay1=1月22日
+ *    表示：每年 1 月 22 日重置
+ *    自动计算下一次重置日期及剩余天数
+ *    若今年已过，则自动滚动到下一年
+ *
+ * ③ 指定日期（绝对日期）
+ *    resetDay1=2027-01-22
+ *    resetDay1=2027年1月22日
+ *    表示：指定日期重置
+ *    若该日期已过去，将自动滚动为“下一年同月同日”
+ *    无需每年手动修改年份
+ *
+ * 说明：
+ * - 支持 1~10 组订阅（resetDay1 ~ resetDay10）
+ * - 若填写非上述格式，将按文本原样显示
+ * - 所有计算基于本地时间
+ *
+ */
+
 // ===== 日志工具 =====
 const TAG = "SubscribeInfo";
 
@@ -125,6 +159,86 @@ function getResetDaysLeft(resetDayNum) {
     else resetDate = new Date(nowYear, nowMonth + 1, resetDayNum);
     const diff = Math.ceil((resetDate - today) / (1000 * 60 * 60 * 24));
     return diff > 0 ? diff : 0;
+}
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function daysUntilDate(targetDate) {
+  const today = startOfDay(new Date());
+  const t = startOfDay(targetDate);
+  const diff = Math.ceil((t - today) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+}
+
+/**
+ * 解析 resetDay：
+ * - "22"            => { type: "monthly", day: 22 }
+ * - "1-22"/"01/22"  => { type: "yearly", month: 1, day: 22 }
+ * - "1月22日"        => { type: "yearly", month: 1, day: 22 }
+ * - "2027-01-22"    => { type: "absolute", year: 2027, month: 1, day: 22 }
+ * - "2027年1月22日"  => { type: "absolute", year: 2027, month: 1, day: 22 }
+ */
+function parseResetSpec(s) {
+  const t = String(s || "").trim();
+  if (!t) return null;
+
+  // 纯数字：每月几号
+  if (/^\d{1,2}$/.test(t)) {
+    const day = parseInt(t, 10);
+    if (day >= 1 && day <= 31) return { type: "monthly", day };
+    return null;
+  }
+
+  // 绝对日期：YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD / YYYY年M月D日
+  let m = t.match(/^(\d{4})[.\-\/年](\d{1,2})[.\-\/月](\d{1,2})/);
+  if (m) {
+    const year = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10);
+    const day = parseInt(m[3], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { type: "absolute", year, month, day };
+    }
+    return null;
+  }
+
+  // 每年：MM-DD / MM/DD / M.D / M月D日
+  m = t.match(/^(\d{1,2})[.\-\/月](\d{1,2})(?:日)?$/);
+  if (m) {
+    const month = parseInt(m[1], 10);
+    const day = parseInt(m[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return { type: "yearly", month, day };
+    }
+  }
+
+  return null;
+}
+
+function nextResetDateFromSpec(spec) {
+  const now = new Date();
+  const today = startOfDay(now);
+
+  if (spec.type === "yearly") {
+    let d = new Date(now.getFullYear(), spec.month - 1, spec.day);
+    if (startOfDay(d) <= today) d = new Date(now.getFullYear() + 1, spec.month - 1, spec.day);
+    return d;
+  }
+
+  if (spec.type === "absolute") {
+    // 先按用户给的年份算一次
+    let d = new Date(spec.year, spec.month - 1, spec.day);
+    // 若已过去：自动滚到“下一个同月同日”（用户不需要每年改年份）
+    if (startOfDay(d) <= today) {
+      let y = now.getFullYear();
+      d = new Date(y, spec.month - 1, spec.day);
+      if (startOfDay(d) <= today) d = new Date(y + 1, spec.month - 1, spec.day);
+    }
+    return d;
+  }
+
+  return null;
 }
 
 function isPureNumber(s) {
@@ -572,15 +686,29 @@ function fetchInfo(url, resetDayRaw, title, index) {
 
                 // 重置：数字→N天；中文/非数字→原文；未提供则不显示
                 let resetLinePart = "";
-                const resetClean = cleanArg(resetDayRaw);
-                if (resetClean) {
-                    if (isPureNumber(resetClean)) {
-                        const left = getResetDaysLeft(parseInt(resetClean, 10));
-                        resetLinePart = `重置：${left ?? 0}天`;
-                    } else {
-                        resetLinePart = `重置：${resetClean}`;
-                    }
-                }
+const resetClean = cleanArg(resetDayRaw);
+if (resetClean) {
+  const spec = parseResetSpec(resetClean);
+
+  if (spec && spec.type === "monthly") {
+    const left = getResetDaysLeft(spec.day);
+    resetLinePart = `重置：${left ?? 0}天`;
+  } else if (spec && (spec.type === "yearly" || spec.type === "absolute")) {
+    const nextDate = nextResetDateFromSpec(spec);
+    if (nextDate) {
+      const left = daysUntilDate(nextDate);
+      // 你可以按喜好选显示样式：
+      // A) 只显示剩余天数 + 下次日期
+      resetLinePart = `重置：${left}天（${formatDate(nextDate.getTime())}）`;
+      // B) 或者更短：resetLinePart = `重置：${left}天`;
+    } else {
+      resetLinePart = `重置：${resetClean}`;
+    }
+  } else {
+    // 兜底：保留原行为（用户自定义文本）
+    resetLinePart = `重置：${resetClean}`;
+  }
+}
 
                 const now = new Date();
                 const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
