@@ -39,7 +39,13 @@ compat_arguments_desc: |-
   • Update=刷新间隔(秒)
   • TitleN=机场名称
   • URLN=订阅链接(http/https)
-  • ResetDayN=重置规则(1~31=每月N日重置,中文=原样显示)
+  • ResetDayN=重置规则
+      1~31                = 每月 N 日重置
+      MM-DD / M-D         = 每年对应月-日重置
+      M月D日               = 每年对应月-日重置
+      YYYY-MM-DD          = 指定日期重置(到期后自动滚动为下一年同月同日)
+      YYYY年M月D日        = 指定日期重置(到期后自动滚动为下一年同月同日)
+      其他文本             = 原样显示
   • DefaultIcon=面板图标(SF Symbols 名称)
   • DefaultIconColor=图标颜色(十六进制色值)
 
