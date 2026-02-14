@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：订阅信息面板（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2025-11-17R1
+ * 版本：2026-01-20R1
  *
  * 概述 · 功能边界
  *  · 支持最多 10 组订阅链接，按顺序展示总量 / 已用 / 剩余 / 到期时间
@@ -51,6 +51,12 @@
  *
  *  · 无任何有效订阅（全部 urlN 无法解析为 http(s) 链接）时：
  *      · 面板内容：'未配置订阅参数'
+ *
+ * 优化说明 · 超时治理
+ *  · 并发限流：避免串行 10 次请求叠加总耗时
+ *  · 单请求硬超时：避免某个机场卡死拖垮全局
+ *  · HEAD 优先：优先只取 header，失败再回退 GET
+ *  · 降低重试：面板场景更应该“快失败”，而不是“慢三倍”
  *
  * 日志说明
  *  · 默认输出基础日志（控制台 console.log）
@@ -143,7 +149,6 @@ function isPlaceholderString(s) {
     if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
     const low = t.toLowerCase();
     return low === "null" || low === "undefined";
-
 }
 
 function cleanArg(val) {
@@ -393,42 +398,132 @@ function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
     return chosen;
 }
 
-// ===== HTTP 请求（带最多 3 次重试） =====
-const MAX_RETRY = 3;
+// =====================================================================
+// 模块分类 · 网络请求（并发限流 / 单请求超时 / HEAD 优先回退 GET）
+// =====================================================================
 
-function httpGetWithRetry(options, attempt, cb) {
-    $httpClient.get(options, (err, resp) => {
+// 并发上限：建议 2~4（弱网 2，常规 3）
+const CONCURRENCY_LIMIT = 3;
+
+// 单请求硬超时（毫秒）：建议 4000~6000
+const REQ_TIMEOUT_MS = 5000;
+
+// 重试次数：面板建议 0~1
+const MAX_RETRY = 1;
+
+function httpInvoke(method, options, cb) {
+    const m = String(method || "GET").toUpperCase();
+    const opt = Object.assign({}, options);
+
+    // 尽量给容器提供 timeout 字段（不同环境支持程度不同）
+    if (!opt.timeout) opt.timeout = REQ_TIMEOUT_MS;
+
+    // 兼容：有的实现提供 $httpClient.head / $httpClient.post 等
+    const lower = m.toLowerCase();
+    const fn = $httpClient && $httpClient[lower] ? $httpClient[lower] : null;
+
+    if (fn) {
+        fn(opt, cb);
+        return;
+    }
+
+    // fallback：只有 get 的环境，尝试通过 method 字段传递
+    opt.method = m;
+    $httpClient.get(opt, cb);
+}
+
+function httpRequestWithRetry(method, options, attempt, cb) {
+    const start = Date.now();
+    let finished = false;
+
+    const timer = setTimeout(() => {
+        if (finished) return;
+        finished = true;
+        cb(new Error("timeout"), null);
+    }, REQ_TIMEOUT_MS + 200);
+
+    const done = (err, resp) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        log("httpRequest", String(method || "GET"), "attempt", attempt, "cost(ms):", Date.now() - start, "err:", err && String(err), "status:", resp && resp.status);
+        cb(err, resp);
+    };
+
+    httpInvoke(method, options, (err, resp) => {
         if (err || !resp) {
-            log("httpGet error attempt", attempt, "err:", err && String(err), "status:", resp && resp.status);
-            if (attempt < MAX_RETRY) {
-                httpGetWithRetry(options, attempt + 1, cb);
-            } else {
-                cb(err || new Error("request error"), resp);
-            }
-            return;
+            if (attempt < MAX_RETRY) return httpRequestWithRetry(method, options, attempt + 1, cb);
+            return done(err || new Error("request error"), resp);
         }
-        cb(null, resp);
+        done(null, resp);
     });
 }
 
-// ===== 拉取机场信息（返回文本块） =====
+function requestSubInfo(url, headers, cb) {
+    const opt = { url, headers };
+
+    // 1) HEAD 优先（仅取 header），成功则返回
+    httpRequestWithRetry("HEAD", opt, 1, (errH, respH) => {
+        const statusH = respH && respH.status;
+
+        // 认为 HEAD 成功的条件：200~399（允许 302 等跳转）
+        if (!errH && respH && statusH >= 200 && statusH < 400) {
+            cb(null, respH);
+            return;
+        }
+
+        // 2) HEAD 不支持/被拒绝/异常：回退 GET
+        httpRequestWithRetry("GET", opt, 1, cb);
+    });
+}
+
+// ===== 并发池：限制同一时间最多跑 N 个任务 =====
+async function runPool(tasks, limit) {
+    const results = new Array(tasks.length);
+    let nextIndex = 0;
+
+    async function worker() {
+        while (true) {
+            const cur = nextIndex++;
+            if (cur >= tasks.length) break;
+            try {
+                results[cur] = await tasks[cur]();
+            } catch (e) {
+                results[cur] = null;
+            }
+        }
+    }
+
+    const workers = [];
+    const n = Math.max(1, Math.min(limit || 3, tasks.length));
+    for (let i = 0; i < n; i++) workers.push(worker());
+    await Promise.all(workers);
+    return results;
+}
+
+// =====================================================================
+// 模块分类 · 订阅信息拉取与解析（subscription-userinfo）
+// =====================================================================
+
 function fetchInfo(url, resetDayRaw, title, index) {
     return new Promise(resolve => {
         log("fetchInfo start", "slot", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
 
-        httpGetWithRetry(
-            {url, headers: {"User-Agent": "Quantumult%20X/1.5.2"}},
-            1,
+        requestSubInfo(
+            url,
+            { "User-Agent": "Quantumult%20X/1.5.2" },
             (err, resp) => {
                 if (err || !resp) {
                     log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
-                    resolve(`机场：${title}\n订阅请求失败，状态码：${resp ? resp.status : "请求错误"}`);
+                    const reason = err && String(err) === "Error: timeout" ? "请求超时" : "请求错误";
+                    resolve(`机场：${title}\n订阅请求失败：${reason}`);
                     return;
                 }
 
                 log("fetchInfo resp", "slot", index, "status:", resp.status);
 
-                if (resp.status !== 200) {
+                // 有的服务会 302，最终可能仍带 header；这里把 200~399 都放行尝试解析
+                if (!(resp.status >= 200 && resp.status < 400)) {
                     resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
                     return;
                 }
@@ -488,10 +583,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
                 }
 
                 const now = new Date();
-                const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now
-                    .getMinutes()
-                    .toString()
-                    .padStart(2, "0")}`;
+                const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
                 const titleLine = `${title} | ${bytesToSize(total)} | ${timeStr}`;
                 const usedLine = `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)}`;
                 const remainLine = `剩余：${toReversePercent(used, total)} ➟ ${bytesToSize(remain)}`;
@@ -506,24 +598,27 @@ function fetchInfo(url, resetDayRaw, title, index) {
     });
 }
 
-// ===== 主流程 =====
+// =====================================================================
+// 模块分类 · 主流程
+// =====================================================================
 (async () => {
     log("script start");
 
     const defaultIcon = pickStr(
         "defaultIcon",
         "DefaultIcon",
-        "antenna.radiowaves.left.and.right.circle.fill",   // 脚本默认值 = 模块默认 arguments
+        "antenna.radiowaves.left.and.right.circle.fill",
         "antenna.radiowaves.left.and.right.circle.fill"
     );
     const defaultColor = pickStr(
         "defaultIconColor",
         "DefaultIconColor",
-        "#00E28F",   // 脚本默认值 = 模块默认 arguments
+        "#00E28F",
         "#00E28F"
     );
 
-    const blocks = [];
+    // 先收集任务（保持 slots 顺序），再并发限流执行
+    const tasks = [];
     for (let i = 1; i <= 10; i++) {
         // URL：默认 arguments=“订阅链接”，逻辑默认值=null
         const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
@@ -550,35 +645,36 @@ function fetchInfo(url, resetDayRaw, title, index) {
             continue;
         }
 
-        const block = await fetchInfo(url, reset, title, i);
-        blocks.push(block);
+        tasks.push(() => fetchInfo(url, reset, title, i));
     }
+
+    const results = await runPool(tasks, CONCURRENCY_LIMIT);
+    const blocks = results.filter(Boolean);
 
     // ===== 顶部执行时间（全局一次）=====
     function pad2(n) {
-      return String(n).padStart(2, "0");
+        return String(n).padStart(2, "0");
     }
     function runAtLine() {
-      const d = new Date();
-      const MM = pad2(d.getMonth() + 1);
-      const DD = pad2(d.getDate());
-      const hh = pad2(d.getHours());
-      const mm = pad2(d.getMinutes());
-      const ss = pad2(d.getSeconds());
-      return `⏱ 执行时间：${MM}-${DD} ${hh}:${mm}:${ss}`;
+        const d = new Date();
+        const MM = pad2(d.getMonth() + 1);
+        const DD = pad2(d.getDate());
+        const hh = pad2(d.getHours());
+        const mm = pad2(d.getMinutes());
+        const ss = pad2(d.getSeconds());
+        return `⏱ 执行时间：${MM}-${DD} ${hh}:${mm}:${ss}`;
     }
 
     const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
-    // ✅ 顶部加一行执行时间（空一行再接正文）
     const content = `${runAtLine()}\n\n${contentAll}`;
 
     log("final blocks count:", blocks.length);
     log("final content:\n" + content);
 
     $done({
-      title: "订阅信息",
-      content,
-      icon: defaultIcon,
-      iconColor: defaultColor
+        title: "订阅信息",
+        content,
+        icon: defaultIcon,
+        iconColor: defaultColor
     });
 })();
