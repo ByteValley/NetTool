@@ -565,17 +565,26 @@ function httpRequestWithRetry(method, options, attempt, cb) {
 function requestSubInfo(url, headers, cb) {
     const opt = { url, headers };
 
-    // 1) HEAD 优先（仅取 header），成功则返回
+    function hasUserinfo(resp) {
+        if (!resp || !resp.headers) return false;
+        const key = Object.keys(resp.headers).find(k => String(k).toLowerCase() === "subscription-userinfo");
+        return !!(key && resp.headers[key]);
+    }
+
+    // 1) HEAD 优先：但必须拿到 subscription-userinfo 才算“成功”
     httpRequestWithRetry("HEAD", opt, 1, (errH, respH) => {
         const statusH = respH && respH.status;
 
-        // 认为 HEAD 成功的条件：200~399（允许 302 等跳转）
         if (!errH && respH && statusH >= 200 && statusH < 400) {
-            cb(null, respH);
-            return;
+            if (hasUserinfo(respH)) {
+                cb(null, respH);
+                return;
+            }
+            // ✅ HEAD 200 但没有 subscription-userinfo：回退 GET
+            log("requestSubInfo", "HEAD ok but no subscription-userinfo, fallback GET");
         }
 
-        // 2) HEAD 不支持/被拒绝/异常：回退 GET
+        // 2) HEAD 不支持/被拒绝/异常/无 userinfo：回退 GET
         httpRequestWithRetry("GET", opt, 1, cb);
     });
 }
