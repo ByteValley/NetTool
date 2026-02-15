@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：订阅信息面板（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2026-02-14R1
+ * 版本：2026-02-15R1
  *
  * 概述 · 功能边界
  *  · 支持最多 10 组订阅链接，按顺序展示总量 / 已用 / 剩余 / 到期时间
@@ -69,96 +69,137 @@
  * 重置时间（resetDay）使用说明
  * ===============================
  *
- * 本脚本支持三种重置方式：
- *
  * ① 每月重置（按日）
  *    resetDay1=22
- *    表示：每月 22 日重置流量
- *    面板显示：剩余 X 天
  *
  * ② 每年重置（按月-日）
  *    resetDay1=1-22
  *    resetDay1=01/22
  *    resetDay1=1月22日
- *    表示：每年 1 月 22 日重置
- *    自动计算下一次重置日期及剩余天数
- *    若今年已过，则自动滚动到下一年
  *
  * ③ 指定日期（绝对日期）
  *    resetDay1=2027-01-22
  *    resetDay1=2027年1月22日
- *    表示：指定日期重置
- *    若该日期已过去，将自动滚动为“下一年同月同日”
- *    无需每年手动修改年份
+ *    若已过去，将自动滚动为下一年同月同日（无需每年改年份）
  *
  * 说明：
- * - 支持 1~10 组订阅（resetDay1 ~ resetDay10）
  * - 若填写非上述格式，将按文本原样显示
  * - 所有计算基于本地时间
- *
  */
 
 // ===== 日志工具 =====
 const TAG = "SubscribeInfo";
+const SCRIPT_NAME = "订阅信息";
+
+// debug 开关（可在 BoxJS/arguments 里加 is_debug=1/true）
+let IS_DEBUG = false;
 
 function log() {
-    if (typeof console === "undefined" || !console.log) return;
-    const parts = [];
-    for (let i = 0; i < arguments.length; i++) {
-        const v = arguments[i];
-        if (v === null || v === undefined) {
-            parts.push("");
-        } else if (typeof v === "string") {
-            parts.push(v);
-        } else {
-            try {
-                parts.push(JSON.stringify(v));
-            } catch (_) {
-                parts.push(String(v));
-            }
-        }
+  if (typeof console === "undefined" || !console.log) return;
+  const parts = [];
+  for (let i = 0; i < arguments.length; i++) {
+    const v = arguments[i];
+    if (v === null || v === undefined) parts.push("");
+    else if (typeof v === "string") parts.push(v);
+    else {
+      try {
+        parts.push(JSON.stringify(v));
+      } catch (_) {
+        parts.push(String(v));
+      }
     }
-    console.log("[" + TAG + "] " + parts.join(" "));
+  }
+  console.log("[" + TAG + "] " + parts.join(" "));
+}
+
+function debug() {
+  if (!IS_DEBUG) return;
+  log.apply(null, arguments);
+}
+
+function logErr(e, ctx) {
+  const msg = e && (e.stack || e.message || String(e));
+  log("❗️error", ctx || "", msg);
+}
+
+// ===== 环境识别 / UA =====
+function detectClient() {
+  const isEgern = typeof Egern !== "undefined" && Egern && typeof Egern.version === "string";
+  const isQuanX = typeof $task !== "undefined" && typeof $prefs !== "undefined";
+  const isLoon = typeof $loon !== "undefined";
+  const isSurge =
+    typeof $environment !== "undefined" &&
+    $environment &&
+    ($environment["surge-version"] || $environment["app"] === "Surge") &&
+    !isLoon;
+  const isStash = typeof $environment !== "undefined" && $environment && $environment["stash-version"];
+  return { isEgern, isSurge, isLoon, isQuanX, isStash };
+}
+
+function buildUA() {
+  const env = detectClient();
+  if (env.isEgern) return `Egern/${Egern.version}`;
+  if (env.isSurge) {
+    const v = ($environment && ($environment["surge-version"] || $environment.surgeVersion)) || "";
+    return v ? `Surge/${v}` : "Surge";
+  }
+  if (env.isLoon) return "Loon";
+  if (env.isStash) return "Stash";
+  if (env.isQuanX) return "Quantumult X";
+  return TAG;
+}
+
+function buildHeaders(extra) {
+  const h = Object.assign(
+    {
+      "User-Agent": buildUA(),
+      "Accept": "*/*",
+      "Connection": "close",
+    },
+    extra || {}
+  );
+  return h;
 }
 
 // ===== 工具函数 =====
 function bytesToSize(bytes) {
-    if (!bytes || bytes <= 0) return "0 B";
-    const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const val = bytes / Math.pow(k, i);
-    return `${val.toFixed(2)} ${sizes[i]}`;
+  if (!bytes || bytes <= 0) return "0 B";
+  const k = 1024,
+    sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const val = bytes / Math.pow(k, i);
+  return `${val.toFixed(2)} ${sizes[i]}`;
 }
 
 function toPercent(used, total) {
-    if (!total) return "0%";
-    return `${((used / total) * 100).toFixed(2)}%`;
+  if (!total) return "0%";
+  return `${((used / total) * 100).toFixed(2)}%`;
 }
 
 function toReversePercent(used, total) {
-    if (!total) return "0%";
-    return `${(((total - used) / total) * 100).toFixed(2)}%`;
+  if (!total) return "0%";
+  return `${(((total - used) / total) * 100).toFixed(2)}%`;
 }
 
 function formatDate(ts) {
-    const d = new Date(ts);
-    const y = d.getFullYear();
-    const m = (d.getMonth() + 1).toString().padStart(2, "0");
-    const day = d.getDate().toString().padStart(2, "0");
-    return `${y}.${m}.${day}`;
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${y}.${m}.${day}`;
 }
 
 function getResetDaysLeft(resetDayNum) {
-    if (!resetDayNum) return null;
-    const today = new Date();
-    const nowDay = today.getDate();
-    const nowMonth = today.getMonth();
-    const nowYear = today.getFullYear();
-    let resetDate;
-    if (nowDay < resetDayNum) resetDate = new Date(nowYear, nowMonth, resetDayNum);
-    else resetDate = new Date(nowYear, nowMonth + 1, resetDayNum);
-    const diff = Math.ceil((resetDate - today) / (1000 * 60 * 60 * 24));
-    return diff > 0 ? diff : 0;
+  if (!resetDayNum) return null;
+  const today = new Date();
+  const nowDay = today.getDate();
+  const nowMonth = today.getMonth();
+  const nowYear = today.getFullYear();
+  let resetDate;
+  if (nowDay < resetDayNum) resetDate = new Date(nowYear, nowMonth, resetDayNum);
+  else resetDate = new Date(nowYear, nowMonth + 1, resetDayNum);
+  const diff = Math.ceil((resetDate - today) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
 }
 
 function startOfDay(d) {
@@ -184,14 +225,12 @@ function parseResetSpec(s) {
   const t = String(s || "").trim();
   if (!t) return null;
 
-  // 纯数字：每月几号
   if (/^\d{1,2}$/.test(t)) {
     const day = parseInt(t, 10);
     if (day >= 1 && day <= 31) return { type: "monthly", day };
     return null;
   }
 
-  // 绝对日期：YYYY-MM-DD / YYYY/MM/DD / YYYY.MM.DD / YYYY年M月D日
   let m = t.match(/^(\d{4})[.\-\/年](\d{1,2})[.\-\/月](\d{1,2})/);
   if (m) {
     const year = parseInt(m[1], 10);
@@ -203,7 +242,6 @@ function parseResetSpec(s) {
     return null;
   }
 
-  // 每年：MM-DD / MM/DD / M.D / M月D日
   m = t.match(/^(\d{1,2})[.\-\/月](\d{1,2})(?:日)?$/);
   if (m) {
     const month = parseInt(m[1], 10);
@@ -227,9 +265,7 @@ function nextResetDateFromSpec(spec) {
   }
 
   if (spec.type === "absolute") {
-    // 先按用户给的年份算一次
     let d = new Date(spec.year, spec.month - 1, spec.day);
-    // 若已过去：自动滚到“下一个同月同日”（用户不需要每年改年份）
     if (startOfDay(d) <= today) {
       let y = now.getFullYear();
       d = new Date(y, spec.month - 1, spec.day);
@@ -241,110 +277,95 @@ function nextResetDateFromSpec(spec) {
   return null;
 }
 
-function isPureNumber(s) {
-    return typeof s === "number" || (/^\d+$/.test(String(s || "").trim()));
-}
-
 function isHttpUrl(s) {
-    return /^https?:\/\//i.test(String(s || ""));
+  return /^https?:\/\//i.test(String(s || ""));
 }
 
 // 占位符文本（等价为空）
-const PLACEHOLDER_STRINGS = [
-    "订阅链接",
-    "机场名称",
-    "重置日期"
-];
+const PLACEHOLDER_STRINGS = ["订阅链接", "机场名称", "重置日期"];
 
 function isPlaceholderString(s) {
-    const t = String(s || "").trim();
-    if (!t) return false;
-    if (/^{{{[^}]+}}}$/.test(t)) return true;
-    if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
-    const low = t.toLowerCase();
-    return low === "null" || low === "undefined";
+  const t = String(s || "").trim();
+  if (!t) return false;
+  if (/^{{{[^}]+}}}$/.test(t)) return true;
+  if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
+  const low = t.toLowerCase();
+  return low === "null" || low === "undefined";
 }
 
 function cleanArg(val) {
-    if (val === null || val === undefined) return null;
-    const s = String(val).trim();
-    if (!s) return null;
-    if (isPlaceholderString(s)) return null;
-    return s;
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  if (isPlaceholderString(s)) return null;
+  return s;
 }
 
 // 尝试处理 URL：原样 / decodeURIComponent 一次
 function normalizeUrl(src, label) {
-    const s = cleanArg(src);
-    if (!s) {
-        log("normalizeUrl", label, "=> empty/placeholder, skip");
-        return null;
-    }
-    if (isHttpUrl(s)) {
-        log("normalizeUrl", label, "use raw http(s):", s);
-        return s;
-    }
-    try {
-        const decoded = decodeURIComponent(s);
-        if (isHttpUrl(decoded)) {
-            log("normalizeUrl", label, "decoded to http(s):", decoded);
-            return decoded;
-        }
-        log("normalizeUrl", label, "decoded but still not http(s):", decoded);
-    } catch (e) {
-        log("normalizeUrl", label, "decodeURIComponent error:", String(e), "raw:", s);
-    }
-    log("normalizeUrl", label, "invalid http(s):", s);
+  const s = cleanArg(src);
+  if (!s) {
+    debug("normalizeUrl", label, "=> empty/placeholder, skip");
     return null;
+  }
+  if (isHttpUrl(s)) {
+    debug("normalizeUrl", label, "use raw http(s):", s);
+    return s;
+  }
+  try {
+    const decoded = decodeURIComponent(s);
+    if (isHttpUrl(decoded)) {
+      debug("normalizeUrl", label, "decoded to http(s):", decoded);
+      return decoded;
+    }
+    debug("normalizeUrl", label, "decoded but still not http(s):", decoded);
+  } catch (e) {
+    debug("normalizeUrl", label, "decodeURIComponent error:", String(e), "raw:", s);
+  }
+  debug("normalizeUrl", label, "invalid http(s):", s);
+  return null;
 }
 
-// ===== 参数解析 & 清洗（$argument） =====
+// ===== 参数解析 & 清洗（$argument 字符串） =====
 const args = {};
-(($argument || "") + "").split("&").forEach(p => {
-    if (!p) return;
-    const idx = p.indexOf("=");
-    if (idx === -1) return;
-    const key = p.substring(0, idx);
-    const value = p.substring(idx + 1);
+((($argument || "") + "")).split("&").forEach((p) => {
+  if (!p) return;
+  const idx = p.indexOf("=");
+  if (idx === -1) return;
+  const key = p.substring(0, idx);
+  const value = p.substring(idx + 1);
+  try {
     args[key] = decodeURIComponent(value || "");
+  } catch (_) {
+    args[key] = value || "";
+  }
 });
 
 log("raw $argument:", ($argument || "") + "");
 
-function getArg(lower, upper) {
-    if (Object.prototype.hasOwnProperty.call(args, lower)) return args[lower];
-    if (Object.prototype.hasOwnProperty.call(args, upper)) return args[upper];
-    return null;
-}
-
 // ===== BoxJS & 参数优先级 =====
 const KVStore = (() => {
-    if (typeof $prefs !== "undefined" && $prefs.valueForKey) {
-        return {
-            read: k => $prefs.valueForKey(k),
-            write: (v, k) => $prefs.setValueForKey(v, k)
-        };
-    }
-    if (typeof $persistentStore !== "undefined" && $persistentStore.read) {
-        return {
-            read: k => $persistentStore.read(k),
-            write: (v, k) => $persistentStore.write(v, k)
-        };
-    }
-    try {
-        if (typeof localStorage !== "undefined") {
-            return {
-                read: k => localStorage.getItem(k),
-                write: (v, k) => localStorage.setItem(k, v)
-            };
-        }
-    } catch (e) {
-    }
+  if (typeof $prefs !== "undefined" && $prefs.valueForKey) {
     return {
-        read: () => null,
-        write: () => {
-        }
+      read: (k) => $prefs.valueForKey(k),
+      write: (v, k) => $prefs.setValueForKey(v, k),
     };
+  }
+  if (typeof $persistentStore !== "undefined" && $persistentStore.read) {
+    return {
+      read: (k) => $persistentStore.read(k),
+      write: (v, k) => $persistentStore.write(v, k),
+    };
+  }
+  try {
+    if (typeof localStorage !== "undefined") {
+      return {
+        read: (k) => localStorage.getItem(k),
+        write: (v, k) => localStorage.setItem(k, v),
+      };
+    }
+  } catch (_) {}
+  return { read: () => null, write: () => {} };
 })();
 
 /**
@@ -355,86 +376,88 @@ const KVStore = (() => {
  *      - key="@Panel.SubscribeInfo.Settings"
  */
 function readBoxSettings() {
-    // 1. Panel 聚合
-    try {
-        const rawPanel = KVStore.read("Panel");
-        if (rawPanel) {
-            let panel = rawPanel;
-            if (typeof rawPanel === "string") {
-                try {
-                    panel = JSON.parse(rawPanel);
-                } catch (e) {
-                    log("readBoxSettings Panel JSON.parse error:", String(e));
-                }
-            }
-            if (panel && typeof panel === "object") {
-                if (panel.SubscribeInfo && panel.SubscribeInfo.Settings && typeof panel.SubscribeInfo.Settings === "object") {
-                    log("readBoxSettings hit Panel.SubscribeInfo.Settings");
-                    return panel.SubscribeInfo.Settings;
-                }
-            }
-        } else {
-            log("readBoxSettings key 'Panel' empty");
-        }
-    } catch (e) {
-        log("readBoxSettings read 'Panel' error:", String(e));
-    }
-
-    // 2. 直接 SubscribeInfo.Settings
-    const candidates = [
-        "Panel.SubscribeInfo.Settings",
-        "@Panel.SubscribeInfo.Settings"
-    ];
-    for (const key of candidates) {
+  try {
+    const rawPanel = KVStore.read("Panel");
+    if (rawPanel) {
+      let panel = rawPanel;
+      if (typeof rawPanel === "string") {
         try {
-            const raw = KVStore.read(key);
-            if (!raw) {
-                log("readBoxSettings", key, "empty");
-                continue;
-            }
-            let val = raw;
-            if (typeof raw === "string") {
-                try {
-                    val = JSON.parse(raw);
-                } catch (e) {
-                    log("readBoxSettings", key, "JSON.parse error:", String(e));
-                    continue;
-                }
-            }
-            if (val && typeof val === "object") {
-                if (val.Settings && typeof val.Settings === "object") {
-                    log("readBoxSettings hit", key, "Settings");
-                    return val.Settings;
-                }
-                log("readBoxSettings hit", key, "direct object");
-                return val;
-            }
+          panel = JSON.parse(rawPanel);
         } catch (e) {
-            log("readBoxSettings read", key, "error:", String(e));
+          log("readBoxSettings Panel JSON.parse error:", String(e));
         }
+      }
+      if (panel && typeof panel === "object") {
+        if (panel.SubscribeInfo && panel.SubscribeInfo.Settings && typeof panel.SubscribeInfo.Settings === "object") {
+          log("readBoxSettings hit Panel.SubscribeInfo.Settings");
+          return panel.SubscribeInfo.Settings;
+        }
+      }
+    } else {
+      debug("readBoxSettings key 'Panel' empty");
     }
+  } catch (e) {
+    log("readBoxSettings read 'Panel' error:", String(e));
+  }
 
-    log("readBoxSettings no SubscribeInfo settings found, use {}");
-    return {};
+  const candidates = ["Panel.SubscribeInfo.Settings", "@Panel.SubscribeInfo.Settings"];
+  for (const key of candidates) {
+    try {
+      const raw = KVStore.read(key);
+      if (!raw) {
+        debug("readBoxSettings", key, "empty");
+        continue;
+      }
+      let val = raw;
+      if (typeof raw === "string") {
+        try {
+          val = JSON.parse(raw);
+        } catch (e) {
+          log("readBoxSettings", key, "JSON.parse error:", String(e));
+          continue;
+        }
+      }
+      if (val && typeof val === "object") {
+        if (val.Settings && typeof val.Settings === "object") {
+          log("readBoxSettings hit", key, "Settings");
+          return val.Settings;
+        }
+        log("readBoxSettings hit", key, "direct object");
+        return val;
+      }
+    } catch (e) {
+      log("readBoxSettings read", key, "error:", String(e));
+    }
+  }
+
+  debug("readBoxSettings no SubscribeInfo settings found, use {}");
+  return {};
 }
 
 const BOX = readBoxSettings();
-try {
-    log("BOX snapshot:", JSON.stringify(BOX));
-} catch (e) {
-    log("BOX snapshot stringify error:", String(e));
-}
+
+// debug 开关：BoxJS/arguments 任意处支持 is_debug=1/true
+(function initDebugFlag() {
+  const b = BOX && (BOX.is_debug || BOX.isDebug || BOX.debug);
+  const a = args.is_debug || args.isDebug || args.debug;
+  const v = cleanArg(a != null ? a : b);
+  if (!v) return;
+  IS_DEBUG = v === "1" || v.toLowerCase() === "true" || v.toLowerCase() === "yes";
+  if (IS_DEBUG) log("debug enabled");
+})();
+
+debug("BOX snapshot:", (() => { try { return JSON.stringify(BOX); } catch (_) { return "[unstringifiable]"; } })());
 
 function readBoxMulti(keys) {
-    if (!BOX || typeof BOX !== "object") return undefined;
-    for (const k of keys) {
-        if (!k) continue;
-        if (!Object.prototype.hasOwnProperty.call(BOX, k)) continue;
-        const v = BOX[k];
-        if (v === "" || v === null || v === undefined) continue;
-        return v;
-    }
-    return undefined;
+  if (!BOX || typeof BOX !== "object") return undefined;
+  for (const k of keys) {
+    if (!k) continue;
+    if (!Object.prototype.hasOwnProperty.call(BOX, k)) continue;
+    const v = BOX[k];
+    if (v === "" || v === null || v === undefined) continue;
+    return v;
+  }
+  return undefined;
 }
 
 /**
@@ -443,73 +466,49 @@ function readBoxMulti(keys) {
  *   2）BoxJS (SubscribeInfo.Settings.*)
  *   3）「未修改」的 #!arguments（与默认 arguments 相同）
  *   4）defVal（脚本默认值）
- *
- * 说明：
- *  · 对于 url/title/reset 这类参数：
- *      - 默认 arguments（如“订阅链接/机场名称/重置日期”）只用于判断“是否修改”，本身不当作有效值返回
- *  · 对于 defaultIcon/defaultIconColor：
- *      - 默认 arguments = 脚本 defVal
- *      - 若没改过且无 BoxJS，则返回 defVal
  */
 function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
-    const canon = v => (v == null ? "" : String(v).trim());
+  const canon = (v) => (v == null ? "" : String(v).trim());
 
-    // 1. 原始 arguments 值（未清洗，用来和默认 arguments 比较）
-    const argRaw =
-        Object.prototype.hasOwnProperty.call(args, lowerKey)
-            ? args[lowerKey]
-            : (Object.prototype.hasOwnProperty.call(args, upperKey)
-                ? args[upperKey]
-                : null);
+  const argRaw = Object.prototype.hasOwnProperty.call(args, lowerKey)
+    ? args[lowerKey]
+    : Object.prototype.hasOwnProperty.call(args, upperKey)
+      ? args[upperKey]
+      : null;
 
-    const argClean = cleanArg(argRaw);
-    const hasArg = argClean != null;
+  const argClean = cleanArg(argRaw);
+  const hasArg = argClean != null;
 
-    // 2. 默认 arguments（模块里写死的例如“订阅链接/机场名称/重置日期”等）
-    const defArgCanon = canon(defArgRaw);
+  const defArgCanon = canon(defArgRaw);
 
-    // 3. BoxJS
-    const boxRaw = readBoxMulti([upperKey, lowerKey]);
-    const boxClean = cleanArg(boxRaw);
-    const hasBox = boxClean != null;
+  const boxRaw = readBoxMulti([upperKey, lowerKey]);
+  const boxClean = cleanArg(boxRaw);
+  const hasBox = boxClean != null;
 
-    // 4. 判断 arguments 是否“被修改过”
-    //   - argRaw 不为 null/undefined，且和默认 arguments 文本不同 ⇒ 视为“修改过”
-    let argChanged = false;
-    if (argRaw !== null && argRaw !== undefined) {
-        if (canon(argRaw) !== defArgCanon) {
-            argChanged = true;
-        }
-    }
+  let argChanged = false;
+  if (argRaw !== null && argRaw !== undefined) {
+    if (canon(argRaw) !== defArgCanon) argChanged = true;
+  }
 
-    let chosen;
-    if (argChanged && hasArg) {
-        // ① 修改后的 arguments 最高优先级
-        chosen = argClean;
-    } else if (hasBox) {
-        // ② 没有被修改 ⇒ BoxJS 优先
-        chosen = boxClean;
-    } else if (hasArg) {
-        // ③ 有 arguments 且与默认值相同（比较少见，但保底）
-        chosen = argClean;
-    } else {
-        // ④ 完全没配置 ⇒ 用脚本默认 defVal
-        chosen = defVal;
-    }
+  let chosen;
+  if (argChanged && hasArg) chosen = argClean;
+  else if (hasBox) chosen = boxClean;
+  else if (hasArg) chosen = argClean;
+  else chosen = defVal;
 
-    log(
-        "pickStr",
-        `${lowerKey}/${upperKey}`,
-        "| defVal:", defVal,
-        "| defArgRaw:", defArgRaw,
-        "| argRaw:", argRaw,
-        "| argClean:", argClean,
-        "| box:", boxClean,
-        "| argChanged:", argChanged,
-        "| chosen:", chosen
-    );
+  debug(
+    "pickStr",
+    `${lowerKey}/${upperKey}`,
+    "| defVal:", defVal,
+    "| defArgRaw:", defArgRaw,
+    "| argRaw:", argRaw,
+    "| argClean:", argClean,
+    "| box:", boxClean,
+    "| argChanged:", argChanged,
+    "| chosen:", chosen
+  );
 
-    return chosen;
+  return chosen;
 }
 
 // =====================================================================
@@ -519,100 +518,120 @@ function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
 // 并发上限：建议 2~4（弱网 2，常规 3）
 const CONCURRENCY_LIMIT = 3;
 
-// 单请求硬超时（毫秒）：建议 4000~6000
-const REQ_TIMEOUT_MS = 5000;
+// 单请求硬超时：秒（关键：Egern 的 $httpClient.timeout 单位为“秒”）
+const REQ_TIMEOUT_SEC = 6;
+
+// JS 兜底定时器：毫秒
+const REQ_TIMEOUT_MS = REQ_TIMEOUT_SEC * 1000;
 
 // 重试次数：面板建议 0~1
 const MAX_RETRY = 1;
 
 function httpInvoke(method, options, cb) {
-    const m = String(method || "GET").toUpperCase();
-    const opt = Object.assign({}, options);
+  const m = String(method || "GET").toUpperCase();
+  const opt = Object.assign({}, options);
 
-    // 尽量给容器提供 timeout 字段（不同环境支持程度不同）
-    if (!opt.timeout) opt.timeout = REQ_TIMEOUT_MS;
+  // ✅ 给容器的 timeout 用“秒”
+  if (!opt.timeout) opt.timeout = REQ_TIMEOUT_SEC;
 
-    // 兼容：有的实现提供 $httpClient.head / $httpClient.post 等
-    const lower = m.toLowerCase();
-    const fn = $httpClient && $httpClient[lower] ? $httpClient[lower] : null;
+  const lower = m.toLowerCase();
+  const fn = $httpClient && $httpClient[lower] ? $httpClient[lower] : null;
 
-    if (fn) {
-        fn(opt, cb);
-        return;
-    }
+  if (fn) {
+    fn(opt, cb);
+    return;
+  }
 
-    // fallback：只有 get 的环境，尝试通过 method 字段传递
-    opt.method = m;
-    $httpClient.get(opt, cb);
+  // fallback：只有 get 的环境，尝试通过 method 字段传递
+  opt.method = m;
+  $httpClient.get(opt, cb);
 }
 
 function httpRequestWithRetry(method, options, attempt, cb) {
-    const start = Date.now();
-    let finished = false;
+  const start = Date.now();
+  let finished = false;
 
-    const timer = setTimeout(() => {
-        if (finished) return;
-        finished = true;
-        cb(new Error("timeout"), null);
-    }, REQ_TIMEOUT_MS + 200);
+  const timer = setTimeout(() => {
+    if (finished) return;
+    finished = true;
+    cb(new Error("timeout"), null);
+  }, REQ_TIMEOUT_MS + 200);
 
-    const done = (err, resp) => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        log("httpRequest", String(method || "GET"), "attempt", attempt, "cost(ms):", Date.now() - start, "err:", err && String(err), "status:", resp && resp.status);
-        cb(err, resp);
-    };
+  const done = (err, resp) => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    debug(
+      "httpRequest",
+      String(method || "GET"),
+      "attempt",
+      attempt,
+      "cost(ms):",
+      Date.now() - start,
+      "err:",
+      err && String(err),
+      "status:",
+      resp && resp.status
+    );
+    cb(err, resp);
+  };
 
-    httpInvoke(method, options, (err, resp) => {
-        if (err || !resp) {
-            if (attempt < MAX_RETRY) return httpRequestWithRetry(method, options, attempt + 1, cb);
-            return done(err || new Error("request error"), resp);
-        }
-        done(null, resp);
-    });
+  httpInvoke(method, options, (err, resp) => {
+    if (err || !resp) {
+      if (attempt < MAX_RETRY) return httpRequestWithRetry(method, options, attempt + 1, cb);
+      return done(err || new Error("request error"), resp);
+    }
+    done(null, resp);
+  });
 }
 
 function requestSubInfo(url, headers, cb) {
-    const opt = { url, headers };
+  const env = detectClient();
+  const opt = { url, headers };
 
-    // 1) HEAD 优先（仅取 header），成功则返回
-    httpRequestWithRetry("HEAD", opt, 1, (errH, respH) => {
-        const statusH = respH && respH.status;
+  // ✅ Egern：尽量跟随重定向 + 自动 cookie（对部分订阅/短链更稳）
+  if (env.isEgern) {
+    opt["auto-redirect"] = true;
+    opt["auto-cookie"] = true;
+  }
 
-        // 认为 HEAD 成功的条件：200~399（允许 302 等跳转）
-        if (!errH && respH && statusH >= 200 && statusH < 400) {
-            cb(null, respH);
-            return;
-        }
+  // 1) HEAD 优先（仅取 header）
+  httpRequestWithRetry("HEAD", opt, 1, (errH, respH) => {
+    const statusH = respH && respH.status;
 
-        // 2) HEAD 不支持/被拒绝/异常：回退 GET
-        httpRequestWithRetry("GET", opt, 1, cb);
-    });
+    // HEAD 成功：200~399（允许 302 等跳转）
+    if (!errH && respH && statusH >= 200 && statusH < 400) {
+      cb(null, respH);
+      return;
+    }
+
+    // 2) 回退 GET
+    httpRequestWithRetry("GET", opt, 1, cb);
+  });
 }
 
 // ===== 并发池：限制同一时间最多跑 N 个任务 =====
 async function runPool(tasks, limit) {
-    const results = new Array(tasks.length);
-    let nextIndex = 0;
+  const results = new Array(tasks.length);
+  let nextIndex = 0;
 
-    async function worker() {
-        while (true) {
-            const cur = nextIndex++;
-            if (cur >= tasks.length) break;
-            try {
-                results[cur] = await tasks[cur]();
-            } catch (e) {
-                results[cur] = null;
-            }
-        }
+  async function worker() {
+    while (true) {
+      const cur = nextIndex++;
+      if (cur >= tasks.length) break;
+      try {
+        results[cur] = await tasks[cur]();
+      } catch (e) {
+        results[cur] = null;
+      }
     }
+  }
 
-    const workers = [];
-    const n = Math.max(1, Math.min(limit || 3, tasks.length));
-    for (let i = 0; i < n; i++) workers.push(worker());
-    await Promise.all(workers);
-    return results;
+  const workers = [];
+  const n = Math.max(1, Math.min(limit || 3, tasks.length));
+  for (let i = 0; i < n; i++) workers.push(worker());
+  await Promise.all(workers);
+  return results;
 }
 
 // =====================================================================
@@ -620,189 +639,174 @@ async function runPool(tasks, limit) {
 // =====================================================================
 
 function fetchInfo(url, resetDayRaw, title, index) {
-    return new Promise(resolve => {
-        log("fetchInfo start", "slot", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
+  return new Promise((resolve) => {
+    debug("fetchInfo start", "slot", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
 
-        requestSubInfo(
-            url,
-            { "User-Agent": "Quantumult%20X/1.5.2" },
-            (err, resp) => {
-                if (err || !resp) {
-                    log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
-                    const reason = err && String(err) === "Error: timeout" ? "请求超时" : "请求错误";
-                    resolve(`机场：${title}\n订阅请求失败：${reason}`);
-                    return;
-                }
+    requestSubInfo(url, buildHeaders(), (err, resp) => {
+      if (err || !resp) {
+        log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
+        const reason = err && String(err) === "Error: timeout" ? "请求超时" : "请求错误";
+        resolve(`机场：${title}\n订阅请求失败：${reason}`);
+        return;
+      }
 
-                log("fetchInfo resp", "slot", index, "status:", resp.status);
+      debug("fetchInfo resp", "slot", index, "status:", resp.status);
 
-                // 有的服务会 302，最终可能仍带 header；这里把 200~399 都放行尝试解析
-                if (!(resp.status >= 200 && resp.status < 400)) {
-                    resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
-                    return;
-                }
+      if (!(resp.status >= 200 && resp.status < 400)) {
+        resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
+        return;
+      }
 
-                const headerKey = Object.keys(resp.headers || {}).find(
-                    k => k.toLowerCase() === "subscription-userinfo"
-                );
-                log("fetchInfo headerKey slot", index, "=>", headerKey || "none");
+      const headerKey = Object.keys(resp.headers || {}).find((k) => k.toLowerCase() === "subscription-userinfo");
+      debug("fetchInfo headerKey slot", index, "=>", headerKey || "none");
 
-                const data = {};
-                if (headerKey && resp.headers[headerKey]) {
-                    resp.headers[headerKey].split(";").forEach(p => {
-                        const kv = p.trim().split("=");
-                        if (kv.length !== 2) return;
-                        const k = kv[0];
-                        const v = kv[1];
-                        if (!k || !v) return;
-                        const num = parseInt(v, 10);
-                        if (!isNaN(num)) data[k] = num;
-                    });
-                }
+      const data = {};
+      if (headerKey && resp.headers[headerKey]) {
+        resp.headers[headerKey].split(";").forEach((p) => {
+          const kv = p.trim().split("=");
+          if (kv.length !== 2) return;
+          const k = kv[0];
+          const v = kv[1];
+          if (!k || !v) return;
+          const num = parseInt(v, 10);
+          if (!isNaN(num)) data[k] = num;
+        });
+      }
 
-                try {
-                    log("fetchInfo userinfo slot", index, JSON.stringify(data));
-                } catch (_) {
-                }
+      debug("fetchInfo userinfo slot", index, (() => { try { return JSON.stringify(data); } catch (_) { return "[unstringifiable]"; } })());
 
-                const upload = data.upload || 0;
-                const download = data.download || 0;
-                const total = data.total || 0;
-                const used = upload + download;
-                const remain = Math.max(total - used, 0);
+      const upload = data.upload || 0;
+      const download = data.download || 0;
+      const total = data.total || 0;
+      const used = upload + download;
+      const remain = Math.max(total - used, 0);
 
-                // 到期时间：无则 2099-12-31
-                let expireMs;
-                if (data.expire) {
-                    let exp = Number(data.expire);
-                    if (/^\d+$/.test(String(data.expire))) {
-                        if (exp < 10000000000) exp *= 1000; // 秒→毫秒
-                    }
-                    expireMs = exp;
-                } else {
-                    expireMs = new Date("2099-12-31T00:00:00Z").getTime();
-                }
-                const expireStr = formatDate(expireMs);
+      // 到期时间：无则 2099-12-31
+      let expireMs;
+      if (data.expire) {
+        let exp = Number(data.expire);
+        if (/^\d+$/.test(String(data.expire))) {
+          if (exp < 10000000000) exp *= 1000; // 秒→毫秒
+        }
+        expireMs = exp;
+      } else {
+        expireMs = new Date("2099-12-31T00:00:00Z").getTime();
+      }
+      const expireStr = formatDate(expireMs);
 
-                // 重置：数字→N天；中文/非数字→原文；未提供则不显示
-                let resetLinePart = "";
-const resetClean = cleanArg(resetDayRaw);
-if (resetClean) {
-  const spec = parseResetSpec(resetClean);
+      // 重置：数字→N天；年/绝对日期→自动滚动；文本→原文
+      let resetLinePart = "";
+      const resetClean = cleanArg(resetDayRaw);
+      if (resetClean) {
+        const spec = parseResetSpec(resetClean);
 
-  if (spec && spec.type === "monthly") {
-    const left = getResetDaysLeft(spec.day);
-    resetLinePart = `重置：${left ?? 0}天`;
-  } else if (spec && (spec.type === "yearly" || spec.type === "absolute")) {
-    const nextDate = nextResetDateFromSpec(spec);
-    if (nextDate) {
-      const left = daysUntilDate(nextDate);
-      // 你可以按喜好选显示样式：
-      // A) 只显示剩余天数 + 下次日期
-      resetLinePart = `重置：${left}天（${formatDate(nextDate.getTime())}）`;
-      // B) 或者更短：resetLinePart = `重置：${left}天`;
-    } else {
-      resetLinePart = `重置：${resetClean}`;
-    }
-  } else {
-    // 兜底：保留原行为（用户自定义文本）
-    resetLinePart = `重置：${resetClean}`;
-  }
-}
+        if (spec && spec.type === "monthly") {
+          const left = getResetDaysLeft(spec.day);
+          resetLinePart = `重置：${left ?? 0}天`;
+        } else if (spec && (spec.type === "yearly" || spec.type === "absolute")) {
+          const nextDate = nextResetDateFromSpec(spec);
+          if (nextDate) {
+            const left = daysUntilDate(nextDate);
+            resetLinePart = `重置：${left}天（${formatDate(nextDate.getTime())}）`;
+          } else {
+            resetLinePart = `重置：${resetClean}`;
+          }
+        } else {
+          resetLinePart = `重置：${resetClean}`;
+        }
+      }
 
-                const now = new Date();
-                const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-                const titleLine = `${title} | ${bytesToSize(total)} | ${timeStr}`;
-                const usedLine = `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)}`;
-                const remainLine = `剩余：${toReversePercent(used, total)} ➟ ${bytesToSize(remain)}`;
-                let tailLine = `到期：${expireStr}`;
-                if (resetLinePart) tailLine = `${resetLinePart} | 到期：${expireStr}`;
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      const titleLine = `${title} | ${bytesToSize(total)} | ${timeStr}`;
+      const usedLine = `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)}`;
+      const remainLine = `剩余：${toReversePercent(used, total)} ➟ ${bytesToSize(remain)}`;
+      let tailLine = `到期：${expireStr}`;
+      if (resetLinePart) tailLine = `${resetLinePart} | 到期：${expireStr}`;
 
-                const block = [titleLine, usedLine, remainLine, tailLine].join("\n");
-                log("fetchInfo done", "slot", index, "\n" + block);
-                resolve(block);
-            }
-        );
+      const block = [titleLine, usedLine, remainLine, tailLine].join("\n");
+      debug("fetchInfo done", "slot", index, "\n" + block);
+      resolve(block);
     });
+  });
 }
 
 // =====================================================================
 // 模块分类 · 主流程
 // =====================================================================
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+function runAtLine() {
+  const d = new Date();
+  const MM = pad2(d.getMonth() + 1);
+  const DD = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+  const ss = pad2(d.getSeconds());
+  return `⏱ 执行时间：${MM}-${DD} ${hh}:${mm}:${ss}`;
+}
+
 (async () => {
-    log("script start");
+  const startAt = Date.now();
+  log(`${SCRIPT_NAME} start | UA=${buildUA()} | env=${JSON.stringify(detectClient())}`);
 
+  try {
     const defaultIcon = pickStr(
-        "defaultIcon",
-        "DefaultIcon",
-        "antenna.radiowaves.left.and.right.circle.fill",
-        "antenna.radiowaves.left.and.right.circle.fill"
+      "defaultIcon",
+      "DefaultIcon",
+      "antenna.radiowaves.left.and.right.circle.fill",
+      "antenna.radiowaves.left.and.right.circle.fill"
     );
-    const defaultColor = pickStr(
-        "defaultIconColor",
-        "DefaultIconColor",
-        "#00E28F",
-        "#00E28F"
-    );
+    const defaultColor = pickStr("defaultIconColor", "DefaultIconColor", "#00E28F", "#00E28F");
 
-    // 先收集任务（保持 slots 顺序），再并发限流执行
+    // 收集任务（保持 slots 顺序），再并发限流执行
     const tasks = [];
     for (let i = 1; i <= 10; i++) {
-        // URL：默认 arguments=“订阅链接”，逻辑默认值=null
-        const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
-        const url = normalizeUrl(rawUrl, "url" + i);
+      const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
+      const url = normalizeUrl(rawUrl, "url" + i);
 
-        // 标题：默认 arguments=“机场名称”，逻辑默认值=null，再用“机场N”兜底
-        const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
-        const title = rawTitle || `机场${i}`;
+      const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
+      const title = rawTitle || `机场${i}`;
 
-        // 重置：默认 arguments=“重置日期”，逻辑默认值=null
-        const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
+      const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
 
-        log(
-            "slot", i,
-            "| rawUrl:", rawUrl,
-            "| url:", url,
-            "| title:", title,
-            "| reset:", reset
-        );
+      debug("slot", i, "| rawUrl:", rawUrl, "| url:", url, "| title:", title, "| reset:", reset);
 
-        // 没有 URL/无效 URL：不发请求
-        if (!url || !isHttpUrl(url)) {
-            log("slot", i, "no valid url, skip request");
-            continue;
-        }
+      if (!url || !isHttpUrl(url)) {
+        debug("slot", i, "no valid url, skip request");
+        continue;
+      }
 
-        tasks.push(() => fetchInfo(url, reset, title, i));
+      tasks.push(() => fetchInfo(url, reset, title, i));
     }
 
     const results = await runPool(tasks, CONCURRENCY_LIMIT);
     const blocks = results.filter(Boolean);
 
-    // ===== 顶部执行时间（全局一次）=====
-    function pad2(n) {
-        return String(n).padStart(2, "0");
-    }
-    function runAtLine() {
-        const d = new Date();
-        const MM = pad2(d.getMonth() + 1);
-        const DD = pad2(d.getDate());
-        const hh = pad2(d.getHours());
-        const mm = pad2(d.getMinutes());
-        const ss = pad2(d.getSeconds());
-        return `⏱ 执行时间：${MM}-${DD} ${hh}:${mm}:${ss}`;
-    }
-
     const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
     const content = `${runAtLine()}\n\n${contentAll}`;
 
     log("final blocks count:", blocks.length);
-    log("final content:\n" + content);
+    debug("final content:\n" + content);
 
     $done({
-        title: "订阅信息",
-        content,
-        icon: defaultIcon,
-        iconColor: defaultColor
+      title: "订阅信息",
+      content,
+      icon: defaultIcon,
+      iconColor: defaultColor,
     });
+  } catch (e) {
+    logErr(e, "main");
+    // 出错也要结束，避免 Egern 只剩 exec timeout
+    $done({
+      title: "订阅信息",
+      content: `${runAtLine()}\n\n脚本异常：${e && (e.message || String(e))}`,
+      icon: "exclamationmark.triangle.fill",
+      iconColor: "#FF3B30",
+    });
+  } finally {
+    const cost = ((Date.now() - startAt) / 1000).toFixed(2);
+    log(`${SCRIPT_NAME} end | cost=${cost}s`);
+  }
 })();
