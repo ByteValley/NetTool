@@ -565,26 +565,17 @@ function httpRequestWithRetry(method, options, attempt, cb) {
 function requestSubInfo(url, headers, cb) {
     const opt = { url, headers };
 
-    function hasUserinfo(resp) {
-        if (!resp || !resp.headers) return false;
-        const key = Object.keys(resp.headers).find(k => String(k).toLowerCase() === "subscription-userinfo");
-        return !!(key && resp.headers[key]);
-    }
-
-    // 1) HEAD 优先：但必须拿到 subscription-userinfo 才算“成功”
+    // 1) HEAD 优先（仅取 header），成功则返回
     httpRequestWithRetry("HEAD", opt, 1, (errH, respH) => {
         const statusH = respH && respH.status;
 
+        // 认为 HEAD 成功的条件：200~399（允许 302 等跳转）
         if (!errH && respH && statusH >= 200 && statusH < 400) {
-            if (hasUserinfo(respH)) {
-                cb(null, respH);
-                return;
-            }
-            // ✅ HEAD 200 但没有 subscription-userinfo：回退 GET
-            log("requestSubInfo", "HEAD ok but no subscription-userinfo, fallback GET");
+            cb(null, respH);
+            return;
         }
 
-        // 2) HEAD 不支持/被拒绝/异常/无 userinfo：回退 GET
+        // 2) HEAD 不支持/被拒绝/异常：回退 GET
         httpRequestWithRetry("GET", opt, 1, cb);
     });
 }
@@ -616,28 +607,6 @@ async function runPool(tasks, limit) {
 // =====================================================================
 // 模块分类 · 订阅信息拉取与解析（subscription-userinfo）
 // =====================================================================
-// ===== User-Agent（按环境自动设置）=====
-function detectClient() {
-    const isEgern = typeof Egern !== "undefined" && Egern && typeof Egern.version === "string";
-    const isLoon = typeof $loon !== "undefined";
-    const isSurge =
-        typeof $environment !== "undefined" &&
-        $environment &&
-        ($environment["surge-version"] || $environment["app"] === "Surge") &&
-        !isLoon;
-    return { isEgern, isSurge, isLoon };
-}
-
-function buildUA() {
-    const env = detectClient();
-    if (env.isEgern) return `Egern/${Egern.version}`;
-    if (env.isSurge) {
-        const v = ($environment && ($environment["surge-version"] || $environment.surgeVersion)) || "";
-        return v ? `Surge/${v}` : "Surge";
-    }
-    if (env.isLoon) return "Loon";
-    return "SubscribeInfo";
-}
 
 function fetchInfo(url, resetDayRaw, title, index) {
     return new Promise(resolve => {
@@ -645,7 +614,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
 
         requestSubInfo(
             url,
-            { "User-Agent": buildUA() },
+            { "User-Agent": "Quantumult%20X/1.5.2" },
             (err, resp) => {
                 if (err || !resp) {
                     log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
