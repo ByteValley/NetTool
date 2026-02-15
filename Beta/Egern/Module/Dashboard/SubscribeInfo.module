@@ -1,0 +1,64 @@
+name: 订阅信息
+description: 机场订阅流量看板，展示总量/已用/剩余及到期日期，支持最多 10 个订阅
+compat_arguments:
+  Update: '21600'
+  DefaultIcon: antenna.radiowaves.left.and.right.circle.fill
+  DefaultIconColor: 00E28F
+  Title1: 机场名称
+  URL1: 订阅链接
+  ResetDay1: 重置日期
+  Title2: 机场名称
+  URL2: 订阅链接
+  ResetDay2: 重置日期
+  Title3: 机场名称
+  URL3: 订阅链接
+  ResetDay3: 重置日期
+  Title4: 机场名称
+  URL4: 订阅链接
+  ResetDay4: 重置日期
+  Title5: 机场名称
+  URL5: 订阅链接
+  ResetDay5: 重置日期
+  Title6: 机场名称
+  URL6: 订阅链接
+  ResetDay6: 重置日期
+  Title7: 机场名称
+  URL7: 订阅链接
+  ResetDay7: 重置日期
+  Title8: 机场名称
+  URL8: 订阅链接
+  ResetDay8: 重置日期
+  Title9: 机场名称
+  URL9: 订阅链接
+  ResetDay9: 重置日期
+  Title10: 机场名称
+  URL10: 订阅链接
+  ResetDay10: 重置日期
+compat_arguments_desc: |-
+  — 参数说明 —
+  • Update=刷新间隔(秒)
+  • TitleN=机场名称
+  • URLN=订阅链接(http/https)
+  • ResetDayN=重置规则：
+    1~31=每月N日 | MM-DD/M-D 或 M月D日=每年对应月-日
+    YYYY-MM-DD 或 YYYY年M月D日=指定日期(到期自动滚动下一年)
+    其他文本=原样显示
+  • DefaultIcon=面板图标(SF Symbols 名称)
+  • DefaultIconColor=图标颜色(十六进制色值)
+
+  — 参数托管 —
+  • BoxJS订阅: https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/Dashboard/panel.boxjs.json
+author: ByteValley
+dns: {}
+scriptings:
+- generic:
+    name: 机场订阅查询
+    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Panel/subscribe_info.js
+    arguments:
+      _compat.$argument: "defaultIcon={{{DefaultIcon}}}&defaultIconColor={{{DefaultIconColor}}}&title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}&title6={{{Title6}}}&url6={{{URL6}}}&resetDay6={{{ResetDay6}}}&title7={{{Title7}}}&url7={{{URL7}}}&resetDay7={{{ResetDay7}}}&title8={{{Title8}}}&url8={{{URL8}}}&resetDay8={{{ResetDay8}}}&title9={{{Title9}}}&url9={{{URL9}}}&resetDay9={{{ResetDay9}}}&title10={{{Title10}}}&url10={{{URL10}}}&resetDay10={{{ResetDay10}}}"
+    update_interval: {{{Update}}}
+    timeout: 15
+panels:
+- name: 订阅信息
+  script_name: 机场订阅查询
+  update_interval: {{{Update}}}
