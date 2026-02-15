@@ -58,10 +58,10 @@ scriptings:
     name: 机场订阅查询
     script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/subscribe_info.js
     arguments:
-      _compat.$argument: defaultIcon=antenna.radiowaves.left.and.right.circle.fill&defaultIconColor=00E28F&title1=机场名称&url1=订阅链接&resetDay1=重置日期&title2=机场名称&url2=订阅链接&resetDay2=重置日期&title3=机场名称&url3=订阅链接&resetDay3=重置日期&title4=机场名称&url4=订阅链接&resetDay4=重置日期&title5=机场名称&url5=订阅链接&resetDay5=重置日期&title6=机场名称&url6=订阅链接&resetDay6=重置日期&title7=机场名称&url7=订阅链接&resetDay7=重置日期&title8=机场名称&url8=订阅链接&resetDay8=重置日期&title9=机场名称&url9=订阅链接&resetDay9=重置日期&title10=机场名称&url10=订阅链接&resetDay10=重置日期
-    update_interval: 21600
+      _compat.$argument: defaultIcon={{{DefaultIcon}}}&defaultIconColor={{{DefaultIconColor}}}&title1={{{Title1}}}&url1={{{URL1}}}&resetDay1={{{ResetDay1}}}&title2={{{Title2}}}&url2={{{URL2}}}&resetDay2={{{ResetDay2}}}&title3={{{Title3}}}&url3={{{URL3}}}&resetDay3={{{ResetDay3}}}&title4={{{Title4}}}&url4={{{URL4}}}&resetDay4={{{ResetDay4}}}&title5={{{Title5}}}&url5={{{URL5}}}&resetDay5={{{ResetDay5}}}&title6={{{Title6}}}&url6={{{URL6}}}&resetDay6={{{ResetDay6}}}&title7={{{Title7}}}&url7={{{URL7}}}&resetDay7={{{ResetDay7}}}&title8={{{Title8}}}&url8={{{URL8}}}&resetDay8={{{ResetDay8}}}&title9={{{Title9}}}&url9={{{URL9}}}&resetDay9={{{ResetDay9}}}&title10={{{Title10}}}&url10={{{URL10}}}&resetDay10={{{ResetDay10}}}
+    update_interval: {{{Update}}}
     timeout: 15
 panels:
 - name: 订阅信息
   script_name: 机场订阅查询
-  update_interval: 21600
+  update_interval: {{{Update}}}
