@@ -89,10 +89,6 @@
 
 // ===== 日志工具 =====
 const TAG = "SubscribeInfo";
-const SCRIPT_NAME = "订阅信息";
-
-// debug 开关（可在 BoxJS/arguments 里加 is_debug=1/true）
-let IS_DEBUG = false;
 
 function log() {
   if (typeof console === "undefined" || !console.log) return;
@@ -102,24 +98,10 @@ function log() {
     if (v === null || v === undefined) parts.push("");
     else if (typeof v === "string") parts.push(v);
     else {
-      try {
-        parts.push(JSON.stringify(v));
-      } catch (_) {
-        parts.push(String(v));
-      }
+      try { parts.push(JSON.stringify(v)); } catch (_) { parts.push(String(v)); }
     }
   }
   console.log("[" + TAG + "] " + parts.join(" "));
-}
-
-function debug() {
-  if (!IS_DEBUG) return;
-  log.apply(null, arguments);
-}
-
-function logErr(e, ctx) {
-  const msg = e && (e.stack || e.message || String(e));
-  log("❗️error", ctx || "", msg);
 }
 
 // ===== 环境识别 / UA =====
@@ -150,37 +132,31 @@ function buildUA() {
 }
 
 function buildHeaders(extra) {
-  const h = Object.assign(
+  return Object.assign(
     {
       "User-Agent": buildUA(),
       "Accept": "*/*",
-      "Connection": "close",
     },
     extra || {}
   );
-  return h;
 }
 
 // ===== 工具函数 =====
 function bytesToSize(bytes) {
   if (!bytes || bytes <= 0) return "0 B";
-  const k = 1024,
-    sizes = ["B", "KB", "MB", "GB", "TB"];
+  const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   const val = bytes / Math.pow(k, i);
   return `${val.toFixed(2)} ${sizes[i]}`;
 }
-
 function toPercent(used, total) {
   if (!total) return "0%";
   return `${((used / total) * 100).toFixed(2)}%`;
 }
-
 function toReversePercent(used, total) {
   if (!total) return "0%";
   return `${(((total - used) / total) * 100).toFixed(2)}%`;
 }
-
 function formatDate(ts) {
   const d = new Date(ts);
   const y = d.getFullYear();
@@ -188,7 +164,6 @@ function formatDate(ts) {
   const day = d.getDate().toString().padStart(2, "0");
   return `${y}.${m}.${day}`;
 }
-
 function getResetDaysLeft(resetDayNum) {
   if (!resetDayNum) return null;
   const today = new Date();
@@ -201,11 +176,7 @@ function getResetDaysLeft(resetDayNum) {
   const diff = Math.ceil((resetDate - today) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 0;
 }
-
-function startOfDay(d) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
+function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function daysUntilDate(targetDate) {
   const today = startOfDay(new Date());
   const t = startOfDay(targetDate);
@@ -236,9 +207,7 @@ function parseResetSpec(s) {
     const year = parseInt(m[1], 10);
     const month = parseInt(m[2], 10);
     const day = parseInt(m[3], 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return { type: "absolute", year, month, day };
-    }
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { type: "absolute", year, month, day };
     return null;
   }
 
@@ -246,14 +215,11 @@ function parseResetSpec(s) {
   if (m) {
     const month = parseInt(m[1], 10);
     const day = parseInt(m[2], 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return { type: "yearly", month, day };
-    }
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { type: "yearly", month, day };
   }
 
   return null;
 }
-
 function nextResetDateFromSpec(spec) {
   const now = new Date();
   const today = startOfDay(now);
@@ -273,26 +239,20 @@ function nextResetDateFromSpec(spec) {
     }
     return d;
   }
-
   return null;
 }
 
-function isHttpUrl(s) {
-  return /^https?:\/\//i.test(String(s || ""));
-}
+function isHttpUrl(s) { return /^https?:\/\//i.test(String(s || "")); }
 
 // 占位符文本（等价为空）
 const PLACEHOLDER_STRINGS = ["订阅链接", "机场名称", "重置日期"];
-
 function isPlaceholderString(s) {
   const t = String(s || "").trim();
   if (!t) return false;
-  if (/^{{{[^}]+}}}$/.test(t)) return true;
   if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
   const low = t.toLowerCase();
   return low === "null" || low === "undefined";
 }
-
 function cleanArg(val) {
   if (val === null || val === undefined) return null;
   const s = String(val).trim();
@@ -300,33 +260,21 @@ function cleanArg(val) {
   if (isPlaceholderString(s)) return null;
   return s;
 }
-
-// 尝试处理 URL：原样 / decodeURIComponent 一次
 function normalizeUrl(src, label) {
   const s = cleanArg(src);
-  if (!s) {
-    debug("normalizeUrl", label, "=> empty/placeholder, skip");
-    return null;
-  }
-  if (isHttpUrl(s)) {
-    debug("normalizeUrl", label, "use raw http(s):", s);
-    return s;
-  }
+  if (!s) { log("normalizeUrl", label, "=> empty/placeholder, skip"); return null; }
+  if (isHttpUrl(s)) return s;
   try {
     const decoded = decodeURIComponent(s);
-    if (isHttpUrl(decoded)) {
-      debug("normalizeUrl", label, "decoded to http(s):", decoded);
-      return decoded;
-    }
-    debug("normalizeUrl", label, "decoded but still not http(s):", decoded);
+    if (isHttpUrl(decoded)) return decoded;
   } catch (e) {
-    debug("normalizeUrl", label, "decodeURIComponent error:", String(e), "raw:", s);
+    log("normalizeUrl", label, "decodeURIComponent error:", String(e));
   }
-  debug("normalizeUrl", label, "invalid http(s):", s);
+  log("normalizeUrl", label, "invalid http(s):", s);
   return null;
 }
 
-// ===== 参数解析 & 清洗（$argument 字符串） =====
+// ===== 参数解析（$argument） =====
 const args = {};
 ((($argument || "") + "")).split("&").forEach((p) => {
   if (!p) return;
@@ -334,119 +282,51 @@ const args = {};
   if (idx === -1) return;
   const key = p.substring(0, idx);
   const value = p.substring(idx + 1);
-  try {
-    args[key] = decodeURIComponent(value || "");
-  } catch (_) {
-    args[key] = value || "";
-  }
+  try { args[key] = decodeURIComponent(value || ""); } catch (_) { args[key] = value || ""; }
 });
-
 log("raw $argument:", ($argument || "") + "");
 
-// ===== BoxJS & 参数优先级 =====
+// ===== BoxJS 读取 =====
 const KVStore = (() => {
   if (typeof $prefs !== "undefined" && $prefs.valueForKey) {
-    return {
-      read: (k) => $prefs.valueForKey(k),
-      write: (v, k) => $prefs.setValueForKey(v, k),
-    };
+    return { read: (k) => $prefs.valueForKey(k), write: (v, k) => $prefs.setValueForKey(v, k) };
   }
   if (typeof $persistentStore !== "undefined" && $persistentStore.read) {
-    return {
-      read: (k) => $persistentStore.read(k),
-      write: (v, k) => $persistentStore.write(v, k),
-    };
+    return { read: (k) => $persistentStore.read(k), write: (v, k) => $persistentStore.write(v, k) };
   }
-  try {
-    if (typeof localStorage !== "undefined") {
-      return {
-        read: (k) => localStorage.getItem(k),
-        write: (v, k) => localStorage.setItem(k, v),
-      };
-    }
-  } catch (_) {}
   return { read: () => null, write: () => {} };
 })();
 
-/**
- * 读取 BoxJS 订阅信息设置：
- *  · 优先读取 key="Panel" 且含 SubscribeInfo.Settings
- *  · 兼容：
- *      - key="Panel.SubscribeInfo.Settings"
- *      - key="@Panel.SubscribeInfo.Settings"
- */
 function readBoxSettings() {
   try {
     const rawPanel = KVStore.read("Panel");
     if (rawPanel) {
       let panel = rawPanel;
       if (typeof rawPanel === "string") {
-        try {
-          panel = JSON.parse(rawPanel);
-        } catch (e) {
-          log("readBoxSettings Panel JSON.parse error:", String(e));
-        }
+        try { panel = JSON.parse(rawPanel); } catch (e) { log("Panel JSON.parse error:", String(e)); }
       }
-      if (panel && typeof panel === "object") {
-        if (panel.SubscribeInfo && panel.SubscribeInfo.Settings && typeof panel.SubscribeInfo.Settings === "object") {
-          log("readBoxSettings hit Panel.SubscribeInfo.Settings");
-          return panel.SubscribeInfo.Settings;
-        }
-      }
-    } else {
-      debug("readBoxSettings key 'Panel' empty");
+      if (panel && panel.SubscribeInfo && panel.SubscribeInfo.Settings) return panel.SubscribeInfo.Settings;
     }
   } catch (e) {
-    log("readBoxSettings read 'Panel' error:", String(e));
+    log("readBoxSettings Panel error:", String(e));
   }
 
   const candidates = ["Panel.SubscribeInfo.Settings", "@Panel.SubscribeInfo.Settings"];
   for (const key of candidates) {
     try {
       const raw = KVStore.read(key);
-      if (!raw) {
-        debug("readBoxSettings", key, "empty");
-        continue;
-      }
+      if (!raw) continue;
       let val = raw;
       if (typeof raw === "string") {
-        try {
-          val = JSON.parse(raw);
-        } catch (e) {
-          log("readBoxSettings", key, "JSON.parse error:", String(e));
-          continue;
-        }
+        try { val = JSON.parse(raw); } catch (e) { continue; }
       }
-      if (val && typeof val === "object") {
-        if (val.Settings && typeof val.Settings === "object") {
-          log("readBoxSettings hit", key, "Settings");
-          return val.Settings;
-        }
-        log("readBoxSettings hit", key, "direct object");
-        return val;
-      }
-    } catch (e) {
-      log("readBoxSettings read", key, "error:", String(e));
-    }
+      if (val && typeof val === "object") return val.Settings && typeof val.Settings === "object" ? val.Settings : val;
+    } catch (_) {}
   }
-
-  debug("readBoxSettings no SubscribeInfo settings found, use {}");
   return {};
 }
 
 const BOX = readBoxSettings();
-
-// debug 开关：BoxJS/arguments 任意处支持 is_debug=1/true
-(function initDebugFlag() {
-  const b = BOX && (BOX.is_debug || BOX.isDebug || BOX.debug);
-  const a = args.is_debug || args.isDebug || args.debug;
-  const v = cleanArg(a != null ? a : b);
-  if (!v) return;
-  IS_DEBUG = v === "1" || v.toLowerCase() === "true" || v.toLowerCase() === "yes";
-  if (IS_DEBUG) log("debug enabled");
-})();
-
-debug("BOX snapshot:", (() => { try { return JSON.stringify(BOX); } catch (_) { return "[unstringifiable]"; } })());
 
 function readBoxMulti(keys) {
   if (!BOX || typeof BOX !== "object") return undefined;
@@ -460,13 +340,6 @@ function readBoxMulti(keys) {
   return undefined;
 }
 
-/**
- * 字符串参数读取，优先级：
- *   1）「已修改」的 #!arguments（与默认 arguments 不同）
- *   2）BoxJS (SubscribeInfo.Settings.*)
- *   3）「未修改」的 #!arguments（与默认 arguments 相同）
- *   4）defVal（脚本默认值）
- */
 function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
   const canon = (v) => (v == null ? "" : String(v).trim());
 
@@ -490,59 +363,49 @@ function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
     if (canon(argRaw) !== defArgCanon) argChanged = true;
   }
 
-  let chosen;
-  if (argChanged && hasArg) chosen = argClean;
-  else if (hasBox) chosen = boxClean;
-  else if (hasArg) chosen = argClean;
-  else chosen = defVal;
-
-  debug(
-    "pickStr",
-    `${lowerKey}/${upperKey}`,
-    "| defVal:", defVal,
-    "| defArgRaw:", defArgRaw,
-    "| argRaw:", argRaw,
-    "| argClean:", argClean,
-    "| box:", boxClean,
-    "| argChanged:", argChanged,
-    "| chosen:", chosen
-  );
-
-  return chosen;
+  if (argChanged && hasArg) return argClean;
+  if (hasBox) return boxClean;
+  if (hasArg) return argClean;
+  return defVal;
 }
 
 // =====================================================================
-// 模块分类 · 网络请求（并发限流 / 单请求超时 / HEAD 优先回退 GET）
+// 网络请求：并发 / 超时 / HEAD→GET
 // =====================================================================
-
-// 并发上限：建议 2~4（弱网 2，常规 3）
 const CONCURRENCY_LIMIT = 3;
 
-// 单请求硬超时：秒（关键：Egern 的 $httpClient.timeout 单位为“秒”）
+// 保持你原来的 5000ms 体验（Surge 正常）
+const REQ_TIMEOUT_MS = 5000;
+// Egern 需要秒
 const REQ_TIMEOUT_SEC = 6;
 
-// JS 兜底定时器：毫秒
-const REQ_TIMEOUT_MS = REQ_TIMEOUT_SEC * 1000;
-
-// 重试次数：面板建议 0~1
 const MAX_RETRY = 1;
+
+function envTimeoutValue() {
+  const env = detectClient();
+  // ✅ Egern：秒；其他：毫秒（保持原行为）
+  return env.isEgern ? REQ_TIMEOUT_SEC : REQ_TIMEOUT_MS;
+}
 
 function httpInvoke(method, options, cb) {
   const m = String(method || "GET").toUpperCase();
   const opt = Object.assign({}, options);
 
-  // ✅ 给容器的 timeout 用“秒”
-  if (!opt.timeout) opt.timeout = REQ_TIMEOUT_SEC;
+  // ✅ timeout 按环境单位注入
+  if (!opt.timeout) opt.timeout = envTimeoutValue();
+
+  const env = detectClient();
+  // ✅ 只在 Egern 下加这两个字段
+  if (env.isEgern) {
+    if (opt["auto-redirect"] === undefined) opt["auto-redirect"] = true;
+    if (opt["auto-cookie"] === undefined) opt["auto-cookie"] = true;
+  }
 
   const lower = m.toLowerCase();
   const fn = $httpClient && $httpClient[lower] ? $httpClient[lower] : null;
 
-  if (fn) {
-    fn(opt, cb);
-    return;
-  }
+  if (fn) { fn(opt, cb); return; }
 
-  // fallback：只有 get 的环境，尝试通过 method 字段传递
   opt.method = m;
   $httpClient.get(opt, cb);
 }
@@ -551,28 +414,21 @@ function httpRequestWithRetry(method, options, attempt, cb) {
   const start = Date.now();
   let finished = false;
 
+  // JS 兜底超时仍用“毫秒”，但要按环境换算
+  const env = detectClient();
+  const jsTimeoutMs = env.isEgern ? (REQ_TIMEOUT_SEC * 1000) : REQ_TIMEOUT_MS;
+
   const timer = setTimeout(() => {
     if (finished) return;
     finished = true;
     cb(new Error("timeout"), null);
-  }, REQ_TIMEOUT_MS + 200);
+  }, jsTimeoutMs + 200);
 
   const done = (err, resp) => {
     if (finished) return;
     finished = true;
     clearTimeout(timer);
-    debug(
-      "httpRequest",
-      String(method || "GET"),
-      "attempt",
-      attempt,
-      "cost(ms):",
-      Date.now() - start,
-      "err:",
-      err && String(err),
-      "status:",
-      resp && resp.status
-    );
+    log("httpRequest", String(method || "GET"), "attempt", attempt, "cost(ms):", Date.now() - start, "err:", err && String(err), "status:", resp && resp.status);
     cb(err, resp);
   };
 
@@ -586,31 +442,15 @@ function httpRequestWithRetry(method, options, attempt, cb) {
 }
 
 function requestSubInfo(url, headers, cb) {
-  const env = detectClient();
   const opt = { url, headers };
 
-  // ✅ Egern：尽量跟随重定向 + 自动 cookie（对部分订阅/短链更稳）
-  if (env.isEgern) {
-    opt["auto-redirect"] = true;
-    opt["auto-cookie"] = true;
-  }
-
-  // 1) HEAD 优先（仅取 header）
   httpRequestWithRetry("HEAD", opt, 1, (errH, respH) => {
     const statusH = respH && respH.status;
-
-    // HEAD 成功：200~399（允许 302 等跳转）
-    if (!errH && respH && statusH >= 200 && statusH < 400) {
-      cb(null, respH);
-      return;
-    }
-
-    // 2) 回退 GET
+    if (!errH && respH && statusH >= 200 && statusH < 400) { cb(null, respH); return; }
     httpRequestWithRetry("GET", opt, 1, cb);
   });
 }
 
-// ===== 并发池：限制同一时间最多跑 N 个任务 =====
 async function runPool(tasks, limit) {
   const results = new Array(tasks.length);
   let nextIndex = 0;
@@ -619,11 +459,7 @@ async function runPool(tasks, limit) {
     while (true) {
       const cur = nextIndex++;
       if (cur >= tasks.length) break;
-      try {
-        results[cur] = await tasks[cur]();
-      } catch (e) {
-        results[cur] = null;
-      }
+      try { results[cur] = await tasks[cur](); } catch (_) { results[cur] = null; }
     }
   }
 
@@ -635,12 +471,11 @@ async function runPool(tasks, limit) {
 }
 
 // =====================================================================
-// 模块分类 · 订阅信息拉取与解析（subscription-userinfo）
+// 拉取 & 解析 subscription-userinfo
 // =====================================================================
-
 function fetchInfo(url, resetDayRaw, title, index) {
   return new Promise((resolve) => {
-    debug("fetchInfo start", "slot", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
+    log("fetchInfo start", "slot", index, "url:", url, "title:", title, "resetDay:", resetDayRaw);
 
     requestSubInfo(url, buildHeaders(), (err, resp) => {
       if (err || !resp) {
@@ -650,7 +485,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
         return;
       }
 
-      debug("fetchInfo resp", "slot", index, "status:", resp.status);
+      log("fetchInfo resp", "slot", index, "status:", resp.status);
 
       if (!(resp.status >= 200 && resp.status < 400)) {
         resolve(`机场：${title}\n订阅请求失败，状态码：${resp.status}`);
@@ -658,7 +493,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
       }
 
       const headerKey = Object.keys(resp.headers || {}).find((k) => k.toLowerCase() === "subscription-userinfo");
-      debug("fetchInfo headerKey slot", index, "=>", headerKey || "none");
+      log("fetchInfo headerKey slot", index, "=>", headerKey || "none");
 
       const data = {};
       if (headerKey && resp.headers[headerKey]) {
@@ -673,15 +508,12 @@ function fetchInfo(url, resetDayRaw, title, index) {
         });
       }
 
-      debug("fetchInfo userinfo slot", index, (() => { try { return JSON.stringify(data); } catch (_) { return "[unstringifiable]"; } })());
-
       const upload = data.upload || 0;
       const download = data.download || 0;
       const total = data.total || 0;
       const used = upload + download;
       const remain = Math.max(total - used, 0);
 
-      // 到期时间：无则 2099-12-31
       let expireMs;
       if (data.expire) {
         let exp = Number(data.expire);
@@ -694,7 +526,6 @@ function fetchInfo(url, resetDayRaw, title, index) {
       }
       const expireStr = formatDate(expireMs);
 
-      // 重置：数字→N天；年/绝对日期→自动滚动；文本→原文
       let resetLinePart = "";
       const resetClean = cleanArg(resetDayRaw);
       if (resetClean) {
@@ -717,7 +548,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
       }
 
       const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+      const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const titleLine = `${title} | ${bytesToSize(total)} | ${timeStr}`;
       const usedLine = `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)}`;
       const remainLine = `剩余：${toReversePercent(used, total)} ➟ ${bytesToSize(remain)}`;
@@ -725,18 +556,20 @@ function fetchInfo(url, resetDayRaw, title, index) {
       if (resetLinePart) tailLine = `${resetLinePart} | 到期：${expireStr}`;
 
       const block = [titleLine, usedLine, remainLine, tailLine].join("\n");
-      debug("fetchInfo done", "slot", index, "\n" + block);
+      log("fetchInfo done", "slot", index, "\n" + block);
       resolve(block);
     });
   });
 }
 
 // =====================================================================
-// 模块分类 · 主流程
+// 主流程
 // =====================================================================
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
+(function padHelpers() {
+  // no-op: 保留结构
+})();
+
+function pad2(n) { return String(n).padStart(2, "0"); }
 function runAtLine() {
   const d = new Date();
   const MM = pad2(d.getMonth() + 1);
@@ -748,65 +581,64 @@ function runAtLine() {
 }
 
 (async () => {
-  const startAt = Date.now();
-  log(`${SCRIPT_NAME} start | UA=${buildUA()} | env=${JSON.stringify(detectClient())}`);
+  const env = detectClient();
+  log("script start", "| UA:", buildUA(), "| env:", JSON.stringify(env), "| timeout:", envTimeoutValue());
 
-  try {
-    const defaultIcon = pickStr(
-      "defaultIcon",
-      "DefaultIcon",
-      "antenna.radiowaves.left.and.right.circle.fill",
-      "antenna.radiowaves.left.and.right.circle.fill"
-    );
-    const defaultColor = pickStr("defaultIconColor", "DefaultIconColor", "#00E28F", "#00E28F");
+  const defaultIcon = pickStr(
+    "defaultIcon",
+    "DefaultIcon",
+    "antenna.radiowaves.left.and.right.circle.fill",
+    "antenna.radiowaves.left.and.right.circle.fill"
+  );
+  const defaultColor = pickStr(
+    "defaultIconColor",
+    "DefaultIconColor",
+    "#00E28F",
+    "#00E28F"
+  );
 
-    // 收集任务（保持 slots 顺序），再并发限流执行
-    const tasks = [];
-    for (let i = 1; i <= 10; i++) {
-      const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
-      const url = normalizeUrl(rawUrl, "url" + i);
+  const tasks = [];
+  for (let i = 1; i <= 10; i++) {
+    const rawUrl = pickStr(`url${i}`, `URL${i}`, null, "订阅链接");
+    const url = normalizeUrl(rawUrl, "url" + i);
 
-      const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
-      const title = rawTitle || `机场${i}`;
+    const rawTitle = pickStr(`title${i}`, `Title${i}`, null, "机场名称");
+    const title = rawTitle || `机场${i}`;
 
-      const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
+    const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
 
-      debug("slot", i, "| rawUrl:", rawUrl, "| url:", url, "| title:", title, "| reset:", reset);
+    log("slot", i, "| rawUrl:", rawUrl, "| url:", url, "| title:", title, "| reset:", reset);
 
-      if (!url || !isHttpUrl(url)) {
-        debug("slot", i, "no valid url, skip request");
-        continue;
-      }
-
-      tasks.push(() => fetchInfo(url, reset, title, i));
+    if (!url || !isHttpUrl(url)) {
+      log("slot", i, "no valid url, skip request");
+      continue;
     }
 
-    const results = await runPool(tasks, CONCURRENCY_LIMIT);
-    const blocks = results.filter(Boolean);
-
-    const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
-    const content = `${runAtLine()}\n\n${contentAll}`;
-
-    log("final blocks count:", blocks.length);
-    debug("final content:\n" + content);
-
-    $done({
-      title: "订阅信息",
-      content,
-      icon: defaultIcon,
-      iconColor: defaultColor,
-    });
-  } catch (e) {
-    logErr(e, "main");
-    // 出错也要结束，避免 Egern 只剩 exec timeout
-    $done({
-      title: "订阅信息",
-      content: `${runAtLine()}\n\n脚本异常：${e && (e.message || String(e))}`,
-      icon: "exclamationmark.triangle.fill",
-      iconColor: "#FF3B30",
-    });
-  } finally {
-    const cost = ((Date.now() - startAt) / 1000).toFixed(2);
-    log(`${SCRIPT_NAME} end | cost=${cost}s`);
+    tasks.push(() => fetchInfo(url, reset, title, i));
   }
-})();
+
+  const results = await runPool(tasks, CONCURRENCY_LIMIT);
+  const blocks = results.filter(Boolean);
+
+  const contentAll = blocks.length ? blocks.join("\n\n") : "未配置订阅参数";
+  const content = `${runAtLine()}\n\n${contentAll}`;
+
+  log("final blocks count:", blocks.length);
+
+  $done({
+    title: "订阅信息",
+    content,
+    icon: defaultIcon,
+    iconColor: defaultColor
+  });
+
+  log("script end");
+})().catch((e) => {
+  log("❗️fatal", e && (e.stack || String(e)));
+  $done({
+    title: "订阅信息",
+    content: `${runAtLine()}\n\n脚本异常：${e && (e.message || String(e))}`,
+    icon: "exclamationmark.triangle.fill",
+    iconColor: "#FF3B30"
+  });
+});
