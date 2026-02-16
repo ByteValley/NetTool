@@ -614,7 +614,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
 
         requestSubInfo(
             url,
-            { "User-Agent": "egern/2.15.0" },
+            { "User-Agent": "Quantumult%20X/1.5.2" },
             (err, resp) => {
                 if (err || !resp) {
                     log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
