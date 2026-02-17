@@ -9,3 +9,6 @@ DOMAIN,apt.dyljstar.sbs
 
 IP-CIDR,47.112.222.4/32
 IP-CIDR,118.193.44.164/32
+
+DOMAIN,1.starbb.sbs
+DOMAIN,fby.fbystar.sbs
