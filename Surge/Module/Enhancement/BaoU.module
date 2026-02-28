@@ -4,24 +4,21 @@
 #!category=功能增强
 #!date=2026-02-28
 
-[rewrite_local]
-# ==========================
-# 请求头重写 · 业务 API
-# ==========================
-^https?:\/\/d5t7z4cnu1vzi\.cloudfront\.net\/api\/.+ url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js
-^https?:\/\/[^\/]+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile|shop\/getAppInfo) url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js
+[Map Local]
+# =========================  上报拦截 · 本地映射  =========================
+^https?:\/\/siajksslwiso\.anningsh\.com\/report data-type=text data=" " status-code=200
 
-# ==========================
-# 数据上报 · 直接拦截
-# ==========================
-^https?:\/\/sessions\.bugsnag\.com\/ url reject-200
-^https?:\/\/videocloud\.cn-hangzhou\.log\.aliyuncs\.com\/logstores\/.+\/track url reject-200
-^https?:\/\/pv\.sohu\.com\/cityjson url reject-200
+[Script]
+# =========================  请求头重写 · 业务 API  =========================
+# 仅改请求头：覆盖/修复 User-Agent（由远程脚本处理）
+鲍鱼盒子18+-UA = type=http-request, pattern=^https?:\/\/d5t7z4cnu1vzi\.cloudfront\.net\/api\/.+, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, timeout=60
+鲍鱼盒子18+-UA = type=http-request, pattern=^https?:\/\/.+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile|shop\/getAppInfo), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, timeout=60
 
-# ==========================
-# 旧规则保留 · report 拦截
-# ==========================
-^https?:\/\/siajksslwiso\.anningsh\.com\/report url reject-200
+[Rule]
+# =========================  数据上报 · 直接拦截  =========================
+DOMAIN,sessions.bugsnag.com,REJECT
+DOMAIN,videocloud.cn-hangzhou.log.aliyuncs.com,REJECT
+DOMAIN,pv.sohu.com,REJECT
 
-[mitm]
-hostname = %APPEND% d5t7z4cnu1vzi.cloudfront.net,drn23kgaout572x6dztd.huichisb.com,static.moonscap.com,568.mxtth.com,videocloud.cn-hangzhou.log.aliyuncs.com,sessions.bugsnag.com,pv.sohu.com
+[MITM]
+hostname = %APPEND% d5t7z4cnu1vzi.cloudfront.net, drn23kgaout572x6dztd.huichisb.com, static.moonscap.com, 568.mxtth.com, videocloud.cn-hangzhou.log.aliyuncs.com, sessions.bugsnag.com, pv.sohu.com, siajksslwiso.anningsh.com
