@@ -7,6 +7,7 @@ import {
   Spacer,
 } from "scripting"
 import { timeStyle, RingCardTheme } from "../../theme"
+import { type WidgetSurfacePalette } from "../../surfaces"
 
 export function FeeCard(props: {
   title: string
@@ -14,10 +15,14 @@ export function FeeCard(props: {
   theme: RingCardTheme
   logoPath?: string | null
   updateTime: string
+  surfaces?: WidgetSurfacePalette
+  transparent?: boolean
 }) {
-  const { title, valueText, theme, logoPath, updateTime } = props
+  const { title, valueText, theme, logoPath, updateTime, surfaces, transparent } = props
   const isUrlLogo =
     !!logoPath && (logoPath.startsWith("http://") || logoPath.startsWith("https://"))
+
+  const cardBg = transparent ? surfaces?.content ?? theme.bg : theme.bg
 
   const LogoImage = ({ size }: { size: number }) =>
     logoPath ? (
@@ -41,7 +46,7 @@ export function FeeCard(props: {
       padding={{ top: 10, leading: 10, bottom: 10, trailing: 10 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: theme.bg,
+        style: cardBg,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
