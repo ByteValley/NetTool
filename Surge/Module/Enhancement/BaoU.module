@@ -1,24 +1,16 @@
-#!name=鲍鱼盒子18+ · 去混淆重写版（抓包修复）
-#!desc=基于 HAR 域名重整 MITM 与 rewrite，使用远程脚本覆盖请求头 UA，并屏蔽常见上报
+#!name=鲍鱼盒子
+#!desc=自动注入最新 Authorization 和 URL 签名参数 (2026-02-28)
 #!author=ByteValley
 #!category=功能增强
 #!date=2026-02-28
 
-[Map Local]
-# =========================  上报拦截 · 本地映射  =========================
-^https?:\/\/siajksslwiso\.anningsh\.com\/report data-type=text data=" " status-code=200
+[Rule]
+# 强制让 IP 请求走解密，防止由于不走代理导致的拦截失败
+IP-CIDR, 211.154.21.150/32, DIRECT
 
 [Script]
-# =========================  请求头重写 · 业务 API  =========================
-# 仅改请求头：覆盖/修复 User-Agent（由远程脚本处理）
-鲍鱼盒子18+-UA = type=http-request, pattern=^https?:\/\/d5t7z4cnu1vzi\.cloudfront\.net\/api\/.+, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, timeout=60
-鲍鱼盒子18+-UA = type=http-request, pattern=^https?:\/\/.+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile|shop\/getAppInfo), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, timeout=60
-
-[Rule]
-# =========================  数据上报 · 直接拦截  =========================
-DOMAIN,sessions.bugsnag.com,REJECT
-DOMAIN,videocloud.cn-hangzhou.log.aliyuncs.com,REJECT
-DOMAIN,pv.sohu.com,REJECT
+# 拦截个人资料、视频详情等关键接口，修改请求头和URL参数
+鲍鱼盒子修复 = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, requires-body=false
 
 [MITM]
-hostname = %APPEND% d5t7z4cnu1vzi.cloudfront.net, drn23kgaout572x6dztd.huichisb.com, static.moonscap.com, 568.mxtth.com, videocloud.cn-hangzhou.log.aliyuncs.com, sessions.bugsnag.com, pv.sohu.com, siajksslwiso.anningsh.com
+hostname = %APPEND% 211.154.21.150, w1c2.ooat88.com, *api.h8h4h.com, byapi.*.com
