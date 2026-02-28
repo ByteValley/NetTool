@@ -12,7 +12,7 @@
  */
 
 // --- 核心配置参数 ---
-const token = "bearer 33debe0063bb6a599e5c6b360dc782c1"; 
+const token = "bearer 47516c8088984f2c4f1788be51216289"; 
 
 let headers = { ...$request.headers };
 
