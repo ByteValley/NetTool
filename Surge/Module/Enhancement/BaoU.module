@@ -1,0 +1,27 @@
+#!name=鲍鱼盒子18+ · 去混淆重写版（抓包修复）
+#!desc=基于 HAR 域名重整 MITM 与 rewrite，使用远程脚本覆盖请求头 UA，并屏蔽常见上报
+#!author=ByteValley
+#!category=功能增强
+#!date=2026-02-28
+
+[rewrite_local]
+# ==========================
+# 请求头重写 · 业务 API
+# ==========================
+^https?:\/\/d5t7z4cnu1vzi\.cloudfront\.net\/api\/.+ url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js
+^https?:\/\/[^\/]+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile|shop\/getAppInfo) url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js
+
+# ==========================
+# 数据上报 · 直接拦截
+# ==========================
+^https?:\/\/sessions\.bugsnag\.com\/ url reject-200
+^https?:\/\/videocloud\.cn-hangzhou\.log\.aliyuncs\.com\/logstores\/.+\/track url reject-200
+^https?:\/\/pv\.sohu\.com\/cityjson url reject-200
+
+# ==========================
+# 旧规则保留 · report 拦截
+# ==========================
+^https?:\/\/siajksslwiso\.anningsh\.com\/report url reject-200
+
+[mitm]
+hostname = %APPEND% d5t7z4cnu1vzi.cloudfront.net,drn23kgaout572x6dztd.huichisb.com,static.moonscap.com,568.mxtth.com,videocloud.cn-hangzhou.log.aliyuncs.com,sessions.bugsnag.com,pv.sohu.com
