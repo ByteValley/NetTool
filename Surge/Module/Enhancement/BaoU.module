@@ -13,4 +13,4 @@ IP-CIDR, 211.154.21.150/32, DIRECT
 鲍鱼盒子修复 = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, requires-body=false
 
 [MITM]
-hostname = %APPEND% 211.154.21.150, w1c2.ooat88.com, *api.h8h4h.com, byapi.*.com
+hostname = %APPEND% 211.154.21.150:8020, w1c2.ooat88.com, *api.h8h4h.com, byapi.*.com
