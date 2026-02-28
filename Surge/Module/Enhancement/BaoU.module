@@ -3,12 +3,13 @@
 #!category=功能增强
 
 [Map Local]
-# 屏蔽上报接口，防止检测
+# 保持原有的屏蔽上报逻辑
 ^https?://siajksslwiso\.anningsh\.com/report data-type=text data=" " status-code=200
 
 [Script]
-# 核心脚本：修改请求头和URL鉴权参数
-byhz = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, requires-body=false, timeout=60
+# 注入逻辑：使用你指定的 GitHub 远程脚本地址
+鲍鱼盒子 = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/byhz_header_fix.js, requires-body=false, timeout=60
 
 [MITM]
+# 关键：增加了你抓到的新 IP 地址
 hostname = %APPEND% 211.154.21.150, w1c2.ooat88.com, tu.dfgfdg.win, 103.44.236.*, *.artrg.cn, vkfqb.ojyrz.com, byapi.*.com, 211.99.98.*, 103.39.222.*, yubaoyu.oss-cn-shenzhen.aliyuncs.com, *api.h8h4h.com, 42.157.129.25, siajksslwiso.anningsh.com, 211.99.98.63, 111.180.204.11, 88.gbvdfe.com, vdop.fqoas.com, ica.ooat88.com, 103.44.236.131:8001
