@@ -20,30 +20,23 @@ const config = {
 };
 
 let url = $request.url;
-let headers = $request.headers;
+let headers = { ...$request.headers };
 
-// 1. 处理请求头 Authorization
-for (let key in headers) {
-    if (key.toLowerCase() === 'authorization') {
-        headers[key] = config.token;
-    }
-}
+// 1. 注入 Authorization
+let authHeader = Object.keys(headers).find(k => k.toLowerCase() === 'authorization');
+headers[authHeader || "Authorization"] = config.token;
 
-// 如果没有该请求头，手动补上
-if (!headers['Authorization'] && !headers['authorization']) {
-    headers['Authorization'] = config.token;
-}
-
-// 2. 处理 URL 中的签名参数 (针对 my/profile 等接口)
-if (url.indexOf('auth=') !== -1) {
-    url = url.replace(/auth=[^&]+/, "auth=" + config.auth);
-}
-if (url.indexOf('once=') !== -1) {
-    url = url.replace(/once=[^&]+/, "once=" + config.once);
-}
-if (url.indexOf('auth_timestamp_s=') !== -1) {
-    url = url.replace(/auth_timestamp_s=[^&]+/, "auth_timestamp_s=" + config.timestamp);
+// 2. 注入 URL 参数 (auth, once, timestamp)
+// 使用 URL 对象更优雅地处理参数，防止正则替换失败
+if (url.includes('auth=')) {
+    url = url.replace(/auth=[^&]+/, "auth=" + config.auth)
+             .replace(/once=[^&]+/, "once=" + config.once)
+             .replace(/auth_timestamp_s=[^&]+/, "auth_timestamp_s=" + config.timestamp);
 }
 
-// 3. 返回修改后的结果
-$done({ url: url, headers: headers });
+// 3. 容错处理：某些接口可能需要特定 Host
+if (url.includes('211.154.21.150')) {
+    headers['Host'] = '211.154.21.150:8020';
+}
+
+$done({ url, headers });
