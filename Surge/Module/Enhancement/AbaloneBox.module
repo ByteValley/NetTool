@@ -11,7 +11,7 @@
 
 [Script]
 # 注入逻辑
-鲍鱼盒子 = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Scripts/AbaloneBox/Injector.js, argument=token={{{token}}}, requires-body=false, timeout=60
+鲍鱼盒子 = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/abaloneBox_injector.js, argument=token={{{token}}}, requires-body=false, timeout=60
 
 [MITM]
 # 解密 IP 地址
