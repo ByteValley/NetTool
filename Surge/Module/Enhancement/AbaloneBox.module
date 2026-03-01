@@ -3,6 +3,7 @@
 #!category=功能增强
 #!author=ByteValley
 #!version=2026-03-01R1
+#!arguments=token:bearer 47516c8088984f2c4f1788be51216289
 
 [Map Local]
 # 屏蔽上报逻辑
