@@ -1,26 +1,25 @@
 /**
- * 用途：为匹配到的请求设置 Authorization 头，token 通过外部参数传入
- * 只处理请求阶段；未提供 token 时不做任何修改
- *
- * 传参：
- *  - argument=token=Bearer%20xxxx
- *  - argument=token=xxxx   // 自动补上 "Bearer "
- *  - 兼容 $argument 为对象：{ "token": "xxxx" }
+ * 鲍鱼盒子 18+ (Surge 适配版)
+ * 逻辑：注入授权头，优先使用外部参数，仅在缺失前缀时补上 "bearer "
+ * 传参：argument=token=47516c8088984f2c4f1788be51216289
  */
 (function () {
-  // —— 仅在响应阶段快速放行 —— 
+  // 1. 响应阶段快速放行
   if (typeof $response !== 'undefined') { 
     $done({}); 
     return; 
   }
 
-  // —— 请求阶段：先打印命中 URL —— 
-  try { console.log('[byhz][hit] ' + ($request && $request.url)); } catch (e) {}
+  // 2. 请求阶段：日志记录命中 URL
+  var url = ($request && $request.url) ? $request.url : '';
+  try { console.log('[byhz][hit] ' + url); } catch (e) {}
 
-  // —— 读取并解析参数 —— 
-  var TOKEN = '';
+  // 3. 读取并解析参数 (Token)
+  // 内置默认 Token
+  var TOKEN = "bearer 47516c8088984f2c4f1788be51216289"; 
+  
   try {
-    if (typeof $argument === 'string') {
+    if (typeof $argument === 'string' && $argument.indexOf('token=') !== -1) {
       var dec = decodeURIComponent($argument);
       dec.split(/[&;,]/).forEach(function (pair) {
         var kv = pair.split('=');
@@ -28,26 +27,22 @@
           TOKEN = kv.slice(1).join('=').trim();
         }
       });
-    } else if ($argument && typeof $argument === 'object') {
-      TOKEN = String($argument.token || '').trim();
+      try { console.log('[byhz][arg] 已读取外部传入 Token'); } catch (e) {}
     }
   } catch (e) {}
 
-  var headers = ($request && $request.headers) ? $request.headers : {};
+  var headers = ($request && $request.headers) ? { ...$request.headers } : {};
 
-  if (!TOKEN) {
-    // 没传 token 就原样放行
-    $done({ headers });
-    return;
+  // 4. 核心逻辑：条件补全前缀
+  if (TOKEN) {
+    // 只有当字符串中完全不包含 bearer (不区分大小写) 时才补上小写的 "bearer "
+    if (!/bearer\s+/i.test(TOKEN)) {
+      TOKEN = 'bearer ' + TOKEN;
+    }
   }
 
-  // 未带前缀则补上；已带 bearer/Bearer 均保持
-  if (!/^Bearer\s+/i.test(TOKEN)) {
-    TOKEN = 'Bearer ' + TOKEN;
-  }
-
-  // 找到已存在的 Authorization（大小写不敏感），没有就用标准写法
-  var authKey = 'Authorization';
+  // 找到已存在的 authorization 键名（保持原始大小写，或默认小写）
+  var authKey = 'authorization'; 
   for (var k in headers) {
     if (Object.prototype.hasOwnProperty.call(headers, k) &&
         String(k).toLowerCase() === 'authorization') { 
@@ -55,12 +50,12 @@
       break; 
     }
   }
-
+  
   headers[authKey] = TOKEN;
 
-  // 打一行确认已设置的值（可选）
+  // 5. 打印最终结果日志
   try { console.log('[byhz][set] ' + authKey + ': ' + headers[authKey]); } catch (e) {}
 
-  // —— 只调用一次 $done —— 
-  $done({ headers });
+  // 6. 调用 $done，不改动 URL 和 Host
+  $done({ headers: headers });
 })();
