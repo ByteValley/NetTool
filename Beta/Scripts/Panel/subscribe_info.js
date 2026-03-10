@@ -614,7 +614,7 @@ function fetchInfo(url, resetDayRaw, title, index) {
 
         requestSubInfo(
             url,
-            { "User-Agent": "Surge iOS/3621" },
+            { "User-Agent": "Clash/1.18.0" },
             (err, resp) => {
                 if (err || !resp) {
                     log("fetchInfo final error", "slot", index, "err:", err && String(err), "status:", resp && resp.status);
