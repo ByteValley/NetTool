@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息小组件
  * 作者 · ByteValley
- * 版本 · 2026-03-12R2
+ * 版本 · 2026-03-12R1
  *
  * 模块分类 · 说明
  * · 纯 Egern Generic Script 版本
@@ -826,21 +826,25 @@ function headerBar(summary) {
 }
 function serviceChip(item) {
   const bg = item.state === "full" ? "rgba(52,199,89,0.18)" : item.state === "partial" ? "rgba(255,204,0,0.18)" : "rgba(255,59,48,0.18)";
-  return hstack([
-    txt(item.icon, 11, "regular", "#FFFFFF"),
-    txt(item.name, 10, "medium", "#FFFFFF"),
-    spacer(2),
-    txt(item.region || "—", 9, "medium", "rgba(255,255,255,0.72)")
-  ], { gap: 4, padding: [4, 6, 4, 6], backgroundColor: bg, borderRadius: 10 });
+  return vstack([
+    hstack([txt(item.icon, 11, "regular", "#FFFFFF"), txt(item.name, 10, "medium", "#FFFFFF", { maxLines: 1, minScale: 0.72 })], { gap: 4 }),
+    txt(item.region || "—", 9, "medium", "rgba(255,255,255,0.72)", { maxLines: 1, minScale: 0.72 })
+  ], { gap: 2, padding: [5, 7, 5, 7], backgroundColor: bg, borderRadius: 10, alignItems: "start" });
 }
 
 function blockSummary(titleText, info, opts = {}) {
+  const ip4 = info.ip4 || (isIPv4(info.ip || "") ? info.ip : "");
+  const ip6 = info.ip6 || (isIPv6(info.ip || "") ? info.ip : "");
   const loc = info.loc ? (S().CFG.MASK_POS ? onlyFlag(info.loc) : flagFirst(info.loc)) : "-";
+  const isp = fmtISP(info.isp || "", info.loc || "") || "-";
+  const lines = [];
+  if (ip4) lines.push(txt(shortIP(ip4), 12, "bold", "#FFFFFF", { maxLines: 1, minScale: 0.65 }));
+  if (ip6) lines.push(txt(shortIP(ip6), 10, "medium", "rgba(255,255,255,0.82)", { maxLines: 1, minScale: 0.58 }));
+  lines.push(txt(loc || "-", 10, "medium", "rgba(255,255,255,0.82)", { maxLines: 1, minScale: 0.6 }));
+  lines.push(txt(isp, 9, "medium", "rgba(255,255,255,0.55)", { maxLines: 1, minScale: 0.6 }));
   return card([
     txt(titleText, 10, "medium", "rgba(255,255,255,0.52)"),
-    txt(shortIP(info.ip || ""), 12, "bold", "#FFFFFF", { maxLines: 1, minScale: 0.65 }),
-    txt(loc || "-", 10, "medium", "rgba(255,255,255,0.82)", { maxLines: 1, minScale: 0.6 }),
-    txt(fmtISP(info.isp || "", info.loc || "") || "-", 9, "medium", "rgba(255,255,255,0.55)", { maxLines: 1, minScale: 0.6 })
+    ...lines.slice(0, 4)
   ], opts);
 }
 
@@ -881,7 +885,7 @@ function buildMedium(summary) {
 
   const serviceBlock = vstack([
     txt(t("services"), 10, "medium", "rgba(255,255,255,0.52)"),
-    hstack(summary.serviceChips.slice(0, 3), { gap: 6 })
+    hstack(summary.serviceChips.slice(0, 3), { gap: 6, alignItems: "start" })
   ], { gap: 6 });
 
   return {
@@ -983,9 +987,9 @@ async function runMain(ctx) {
   const rdnsHost = await queryPTRMaybe(landing.ip).catch(() => "");
   const risk = calculateRiskValueSafe(landing.isp, landing.org, landing.country, landing.as || landing.asn || "", rdnsHost);
 
-  const localBlock = { ip: cn.ip || cn6.ip || ctx.device?.ipv4?.address || "", loc: cn.loc || "", isp: cn.isp || "" };
-  const entranceBlock = { ip: S().CFG.ENTRANCE4 || S().CFG.ENTRANCE6 || "", loc: S().CFG.ENTRANCE4 || S().CFG.ENTRANCE6 ? (S().CFG.SD_LANG === "zh-Hant" ? "請手動維護" : "请手动维护") : "", isp: S().CFG.PROXY_POLICY || "" };
-  const landingBlock = { ip: landing.ip || landing6.ip || "", loc: landing.loc || "", isp: landing.isp || "" };
+  const localBlock = { ip: cn.ip || cn6.ip || ctx.device?.ipv4?.address || "", ip4: cn.ip || ctx.device?.ipv4?.address || "", ip6: cn6.ip || ctx.device?.ipv6?.address || "", loc: cn.loc || "", isp: cn.isp || "" };
+  const entranceBlock = { ip: S().CFG.ENTRANCE4 || S().CFG.ENTRANCE6 || "", ip4: S().CFG.ENTRANCE4 || "", ip6: S().CFG.ENTRANCE6 || "", loc: S().CFG.ENTRANCE4 || S().CFG.ENTRANCE6 ? (S().CFG.SD_LANG === "zh-Hant" ? "請手動維護" : "请手动维护") : "", isp: S().CFG.PROXY_POLICY || "" };
+  const landingBlock = { ip: landing.ip || landing6.ip || "", ip4: landing.ip || "", ip6: landing6.ip || "", loc: landing.loc || "", isp: landing.isp || "" };
 
   const summary = summarize(localBlock, entranceBlock, landingBlock, risk, services);
 
