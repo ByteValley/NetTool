@@ -1,5 +1,6 @@
 #!name=订阅节点重命名
 #!desc=本地订阅节点重命名
+!#category=功能增强
 #!author=ByteValley
 #!version=2026-03-12R1
 #!arguments=domain:'',rules:''
