@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息小组件
  * 作者 · ByteValley
- * 版本 · 2026-03-12R2
+ * 版本 · 2026-03-12R1
  *
  * 模块分类 · 更新说明
  * · 当入口无数据时，不再渲染空入口卡片
@@ -1059,18 +1059,16 @@ function makeRoot(children, gradientColors, padding) {
 }
 
 function headerBar(model, titleSize, iconSize) {
-  return hstack([
-    icon(S().CFG.ICON_NAME, iconSize, S().CFG.IconColor),
-    vstack([
-      txt(t("title"), titleSize, "heavy", "#FFFFFF"),
-      txt(netTypeLine(), Math.max(9, titleSize - 4), "medium", "rgba(255,255,255,0.65)", { maxLines: 1, minScale: 0.8 })
-    ], { gap: 0 }),
-    spacer(),
-    vstack([
-      txt(model.policy || "-", 10, "bold", "#BFDBFE", { maxLines: 1, minScale: 0.75 }),
-      txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)")
-    ], { alignItems: "end", gap: 1 })
-  ], { gap: 8 });
+  const meta = `${netTypeLine()} · ${t("policy")}: ${model.policy || "-"}`;
+  return vstack([
+    hstack([
+      icon(S().CFG.ICON_NAME, iconSize, S().CFG.IconColor),
+      txt(t("title"), titleSize, "heavy", "#FFFFFF", { maxLines: 1, minScale: 0.8 }),
+      spacer(),
+      txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)", { maxLines: 1, minScale: 0.8 })
+    ], { gap: 8 }),
+    txt(meta, 10, "medium", "rgba(255,255,255,0.68)", { maxLines: 1, minScale: 0.66 })
+  ], { gap: 3 });
 }
 
 function riskCard(model, width) {
@@ -1112,36 +1110,19 @@ function renderSystemSmall(model) {
 }
 
 function renderSystemMedium(model) {
-  const cardW = 150;
-  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", width: cardW, maxLines: 3 });
-  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", width: cardW, maxLines: 3 });
-  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", model.entrance, model.entrance6), { iconColor: "#A78BFA", width: cardW, maxLines: 3 });
-  const hasEnt = hasEntrance(model);
-
+  const COL_W = 148;
+  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", width: COL_W, maxLines: 4, height: 120 });
+  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", width: COL_W, maxLines: 4, height: 120 });
+  const risk = riskCard(model); risk.width = COL_W; risk.height = 110;
+  const sv = servicesRow(model, 3); sv.width = COL_W; sv.height = 110;
   const children = [
-    headerBar(model, 14, 16), spacer(6), divider(), spacer(8)
+    headerBar(model, 14, 16), spacer(6), divider(), spacer(8),
+    hstack([
+      vstack([localCard, spacer(8), risk], { gap: 0, width: COL_W }),
+      vstack([landingCard, spacer(8), sv], { gap: 0, width: COL_W })
+    ], { gap: 8, alignItems: "start" })
   ];
-
-  if (hasEnt) {
-    children.push(
-      hstack([localCard, entranceCard, landingCard], { gap: 8, alignItems: "start" }),
-      spacer(8),
-      hstack([riskCard(model, 150), servicesRow(model, 4, 150)], { gap: 8, alignItems: "start" })
-    );
-  } else {
-    children.push(
-      hstack([localCard, landingCard], { gap: 8, alignItems: "start" }),
-      spacer(8),
-      hstack([riskCard(model, cardW), servicesRow(model, 4, cardW)], { gap: 8, alignItems: "start" })
-    );
-  }
-
-  children.push(
-    spacer(),
-    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
-  );
-
-  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [12, 14, 10, 14]);
+  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [12, 14, 12, 14]);
 }
 
 function serviceListCard(model, maxItems) {
