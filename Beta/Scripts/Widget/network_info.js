@@ -983,13 +983,15 @@ function sectionCard(title, iconName, lines, opts = {}) {
     ], { gap: 4 })
   ];
   for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
+  
   return vstack(children, {
     gap: 3,
     padding: [9, 10, 9, 10],
     backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
     borderRadius: 12,
-    width: opts.width,
-    height: opts.height
+    // width: opts.width,  <-- 移除或注释掉这一行，让它自适应容器宽度
+    height: opts.height,
+    flex: 1 // 确保在 hstack 中能平分空间
   });
 }
 
@@ -1043,7 +1045,7 @@ function renderAccessoryRectangular(model) {
 function makeRoot(children, gradientColors, padding) {
   return {
     type: "widget",
-    padding: padding || [12, 14, 12, 14],
+    padding: padding || [10, 12, 8, 12], // 调整为 [上, 右, 下, 左]
     gap: 0,
     backgroundGradient: {
       type: "linear",
@@ -1081,7 +1083,13 @@ function riskCard(model) {
     txt(`${risk.lineType} · ${risk.nativeHint}`, 10, "medium", "rgba(255,255,255,0.8)", { maxLines: 1, minScale: 0.75 }),
     txt(risk.tunnelHint, 9, "medium", "rgba(255,255,255,0.58)", { maxLines: 1, minScale: 0.75 }),
     txt((risk.reasons || []).slice(0, 2).join(" · ") || "-", 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
-  ], { gap: 3, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
+  ], { 
+    gap: 3, 
+    padding: [9, 10, 9, 10], 
+    backgroundColor: "rgba(255,255,255,0.06)", 
+    borderRadius: 12,
+    flex: 1 // 增加这一行
+  });
 }
 
 function servicesRow(model, maxItems) {
@@ -1110,19 +1118,28 @@ function renderSystemSmall(model) {
 }
 
 function renderSystemMedium(model) {
-  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", width: 106, maxLines: 3 });
+  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", maxLines: 3 });
+  
   const entData = model.entrance?.ip || model.entrance?.loc1 || model.entrance?.isp1 ? model.entrance : {};
-  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", width: 106, maxLines: 3, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
-  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", width: 106, maxLines: 3 });
+  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", maxLines: 3, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
+  
+  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", maxLines: 3 });
+
   const children = [
-    headerBar(model, 14, 16), spacer(6), divider(), spacer(8),
-    hstack([localCard, entranceCard, landingCard], { gap: 8, alignItems: "start" }),
-    spacer(8),
-    hstack([riskCard(model), servicesRow(model, 4)], { gap: 8, alignItems: "start" }),
+    headerBar(model, 14, 16), 
+    spacer(4), // 减小间距防止溢出
+    divider(), 
+    spacer(6), 
+    // 使用 gap 均匀分配三个卡片
+    hstack([localCard, entranceCard, landingCard], { gap: 6, alignItems: "start" }),
+    spacer(6),
+    hstack([riskCard(model), servicesRow(model, 4)], { gap: 6, alignItems: "start" }),
     spacer(),
     txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
   ];
-  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [12, 14, 10, 14]);
+  
+  // 调整 padding 确保上下不被截断
+  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [10, 12, 8, 12]);
 }
 
 function serviceListCard(model, maxItems) {
