@@ -956,6 +956,7 @@ async function getEntranceBundle(ip) {
   return res;
 }
 
+
 function txt(text, fontSize, weight, color, opts) {
   const el = { type: "text", text: String(text ?? ""), font: { size: fontSize, weight: weight || "regular" } };
   if (color) el.textColor = color;
@@ -972,24 +973,25 @@ function hstack(children, opts) { const el = { type: "stack", direction: "row", 
 function vstack(children, opts) { const el = { type: "stack", direction: "column", alignItems: "start", children }; if (opts) Object.assign(el, opts); return el; }
 function spacer(length) { const el = { type: "spacer" }; if (length != null) el.length = length; return el; }
 function divider() { return hstack([spacer()], { height: 1, backgroundColor: "rgba(255,255,255,0.08)" }); }
-function pill(textStr, bg, fg) { return vstack([txt(textStr, 9, "semibold", fg || "#FFFFFF")], { padding: [4, 7, 4, 7], backgroundColor: bg, borderRadius: 999 }); }
+function pill(textStr, bg, fg) { return vstack([txt(textStr, 9, "semibold", fg || "#FFFFFF")], { padding: [4, 7, 4, 7], backgroundColor: bg, borderRadius: 999, alignItems: "center" }); }
 
 function sectionCard(title, iconName, lines, opts = {}) {
   const children = [
     hstack([
       icon(iconName, 11, opts.iconColor || "#93C5FD"),
-      txt(title, 10, "bold", "rgba(255,255,255,0.88)"),
+      txt(title, 10, "bold", "rgba(255,255,255,0.9)"),
       spacer()
     ], { gap: 4 })
   ];
-  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
+  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) {
+    children.push(txt(line, opts.lineSize || 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.68 }));
+  }
   return vstack(children, {
     gap: 3,
-    padding: [9, 10, 9, 10],
+    padding: opts.padding || [9, 10, 9, 10],
     backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
     borderRadius: 12,
-    width: opts.width,
-    height: opts.height
+    alignItems: "start"
   });
 }
 
@@ -1010,9 +1012,19 @@ function buildSectionLines(kind, data, ip6) {
   return lines.filter(Boolean);
 }
 
+function compactServiceText(items, count) {
+  return (items || []).slice(0, count || 3).map((x) => `${x.icon}${x.name.replace(/\(.+?\)/g, "")}${x.cc ? " " + x.cc : ""}`).join("  ");
+}
+
 function renderAccessoryInline(model) {
-  const textStr = `${netTypeLine()} · ${model.policy || "-"} · ${model.landing?.ip ? maskIP(model.landing.ip) : t("noData")}`;
-  return { type: "widget", children: [icon(S().CFG.ICON_NAME, 12, S().CFG.IconColor), txt(textStr, 12, "medium", null, { maxLines: 1, minScale: 0.65 })] };
+  const left = model.landing?.loc ? flagFirst(model.landing.loc) : (model.landing?.ip ? maskIP(model.landing.ip) : t("noData"));
+  return {
+    type: "widget",
+    children: [
+      icon(S().CFG.ICON_NAME, 12, S().CFG.IconColor),
+      txt(`${model.policy || "-"} · ${left}`, 12, "medium", null, { maxLines: 1, minScale: 0.65 })
+    ]
+  };
 }
 function renderAccessoryCircular(model) {
   return {
@@ -1022,20 +1034,20 @@ function renderAccessoryCircular(model) {
       spacer(),
       icon(S().CFG.ICON_NAME, 18, S().CFG.IconColor),
       txt(model.risk ? `${model.risk.riskValue}%` : "--", 12, "bold", null, { minScale: 0.6 }),
-      txt(model.risk ? model.risk.lineType : t("risk"), 9, "medium", null, { minScale: 0.6 }),
+      txt(model.risk ? model.risk.lineType : t("risk"), 9, "medium", null, { minScale: 0.6, maxLines: 1 }),
       spacer()
     ]
   };
 }
 function renderAccessoryRectangular(model) {
-  const sv = (model.services || []).slice(0, 3).map((x) => `${x.icon}${x.name.replace(/\(.+?\)/g, "")}`);
+  const region = model.landing?.loc ? flagFirst(model.landing.loc) : t("noData");
   return {
     type: "widget",
     gap: 3,
     children: [
       hstack([icon(S().CFG.ICON_NAME, 11, S().CFG.IconColor), txt(model.policy || "-", 11, "bold", null, { maxLines: 1, minScale: 0.7 }), spacer(), txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)")], { gap: 4 }),
-      txt(model.landing?.loc ? flagFirst(model.landing.loc) : t("noData"), 10, "medium", null, { maxLines: 1, minScale: 0.7 }),
-      txt(sv.join("  ") || t("noData"), 9, "medium", null, { maxLines: 1, minScale: 0.65 })
+      txt(region, 10, "medium", null, { maxLines: 1, minScale: 0.7 }),
+      txt(compactServiceText(model.services, 2) || t("noData"), 9, "medium", null, { maxLines: 1, minScale: 0.62 })
     ]
   };
 }
@@ -1056,7 +1068,7 @@ function makeRoot(children, gradientColors, padding) {
   };
 }
 
-function headerBar(model, titleSize, iconSize) {
+function headerBar(model, titleSize, iconSize, compact) {
   return hstack([
     icon(S().CFG.ICON_NAME, iconSize, S().CFG.IconColor),
     vstack([
@@ -1065,77 +1077,74 @@ function headerBar(model, titleSize, iconSize) {
     ], { gap: 0 }),
     spacer(),
     vstack([
-      txt(model.policy || "-", 10, "bold", "#BFDBFE", { maxLines: 1, minScale: 0.75 }),
-      txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)")
+      txt(model.policy || "-", compact ? 9 : 10, "bold", "#BFDBFE", { maxLines: 1, minScale: 0.75 }),
+      txt(model.runAt.slice(6), compact ? 8 : 9, "medium", "rgba(255,255,255,0.55)")
     ], { alignItems: "end", gap: 1 })
-  ], { gap: 8 });
+  ], { gap: compact ? 6 : 8 });
 }
 
-function riskCard(model) {
+function riskCard(model, compact) {
   const risk = model.risk;
-  if (!risk) return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], { iconColor: "#FCA5A5", backgroundColor: "rgba(255,255,255,0.06)" });
+  if (!risk) return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], { iconColor: "#FCA5A5" });
   const riskText = `${risk.riskValue}%`;
   const color = risk.riskValue >= 80 ? "#F87171" : risk.riskValue >= 50 ? "#FBBF24" : "#34D399";
   return vstack([
     hstack([icon("shield.lefthalf.filled", 12, color), txt(t("risk"), 10, "bold", "rgba(255,255,255,0.88)"), spacer(), pill(riskText, color + "33", color)], { gap: 4 }),
-    txt(`${risk.lineType} · ${risk.nativeHint}`, 10, "medium", "rgba(255,255,255,0.8)", { maxLines: 1, minScale: 0.75 }),
-    txt(risk.tunnelHint, 9, "medium", "rgba(255,255,255,0.58)", { maxLines: 1, minScale: 0.75 }),
-    txt((risk.reasons || []).slice(0, 2).join(" · ") || "-", 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+    txt(`${risk.lineType} · ${risk.nativeHint}`, compact ? 9 : 10, "medium", "rgba(255,255,255,0.8)", { maxLines: 1, minScale: 0.72 }),
+    txt(risk.tunnelHint, compact ? 8 : 9, "medium", "rgba(255,255,255,0.58)", { maxLines: 1, minScale: 0.72 })
   ], { gap: 3, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
 }
 
-function servicesRow(model, maxItems) {
-  const items = (model.services || []).slice(0, maxItems || 4).map((x) => vstack([
+function servicesGrid(model, count) {
+  const items = (model.services || []).slice(0, count || 4).map((x) => vstack([
     txt(x.icon, 13, "regular", null),
-    txt(x.name.replace(/\(.+?\)/g, ""), 8, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.7 }),
-    txt(x.cc ? x.cc : "-", 8, "medium", "rgba(255,255,255,0.5)", { maxLines: 1, minScale: 0.7 })
-  ], { alignItems: "center", gap: 1, padding: [6, 4, 6, 4], backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10, width: 58 }));
+    txt(x.name.replace(/\(.+?\)/g, ""), 8, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.68 }),
+    txt(x.cc || "-", 8, "medium", "rgba(255,255,255,0.52)", { maxLines: 1, minScale: 0.68 })
+  ], { alignItems: "center", gap: 1, padding: [6, 3, 6, 3], backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10 }));
   if (!items.length) return sectionCard(t("services"), "play.rectangle.on.rectangle", [t("noData")], { iconColor: "#C4B5FD" });
   return vstack([
     hstack([icon("play.rectangle.on.rectangle", 12, "#C4B5FD"), txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")], { gap: 4 }),
-    hstack(items, { gap: 6 })
+    hstack(items, { gap: 6, distribution: "fillEqually" })
   ], { gap: 6, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
+}
+
+function serviceListCard(model, maxItems) {
+  const rows = (model.services || []).slice(0, maxItems || 6).map((x) => hstack([
+    txt(x.icon, 12),
+    txt(x.name, 10, "medium", "rgba(255,255,255,0.86)", { maxLines: 1, minScale: 0.72 }),
+    spacer(),
+    txt(x.region || x.cc || "-", 9, "medium", "rgba(255,255,255,0.62)", { maxLines: 1, minScale: 0.7 })
+  ], { gap: 5 }));
+  return vstack([
+    hstack([icon("play.rectangle.on.rectangle", 12, "#C4B5FD"), txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")], { gap: 4 }),
+    ...(rows.length ? rows : [txt(t("noData"), 10, "medium", "rgba(255,255,255,0.72)")])
+  ], { gap: 4, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
 }
 
 function renderSystemSmall(model) {
   const children = [
-    headerBar(model, 13, 14), spacer(6), divider(), spacer(8),
-    sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#93C5FD", maxLines: 3 }),
+    headerBar(model, 13, 14, true), spacer(6), divider(), spacer(8),
+    sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", maxLines: 3 }),
     spacer(8),
-    riskCard(model),
-    spacer(),
-    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+    riskCard(model, true)
   ];
   return makeRoot(children, ["#0D1323", "#11213D", "#1A2A4E"], [12, 14, 10, 14]);
 }
 
 function renderSystemMedium(model) {
-  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", width: 106, maxLines: 3 });
+  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", maxLines: 3 });
   const entData = model.entrance?.ip || model.entrance?.loc1 || model.entrance?.isp1 ? model.entrance : {};
-  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", width: 106, maxLines: 3, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
-  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", width: 106, maxLines: 3 });
+  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", maxLines: 3, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
+  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", maxLines: 3 });
   const children = [
-    headerBar(model, 14, 16), spacer(6), divider(), spacer(8),
-    hstack([localCard, entranceCard, landingCard], { gap: 8, alignItems: "start" }),
+    headerBar(model, 14, 16, false), spacer(6), divider(), spacer(8),
+    hstack([localCard, landingCard], { gap: 8, distribution: "fillEqually" }),
     spacer(8),
-    hstack([riskCard(model), servicesRow(model, 4)], { gap: 8, alignItems: "start" }),
-    spacer(),
-    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+    hstack([entranceCard, riskCard(model, true)], { gap: 8, distribution: "fillEqually" }),
+    spacer(8),
+    servicesGrid(model, 4)
   ];
   return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [12, 14, 10, 14]);
-}
-
-function serviceListCard(model, maxItems) {
-  const rows = (model.services || []).slice(0, maxItems || 8).map((x) => hstack([
-    txt(x.icon, 12),
-    txt(x.name, 10, "medium", "rgba(255,255,255,0.86)", { width: 76, maxLines: 1, minScale: 0.75 }),
-    spacer(),
-    txt(x.region || "-", 9, "medium", "rgba(255,255,255,0.62)", { maxLines: 1, minScale: 0.7 })
-  ], { gap: 5 }));
-  return vstack([
-    hstack([icon("play.rectangle.on.rectangle", 12, "#C4B5FD"), txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")], { gap: 4 }),
-    ...rows
-  ], { gap: 4, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
 }
 
 function renderSystemLarge(model) {
@@ -1144,26 +1153,35 @@ function renderSystemLarge(model) {
   const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", maxLines: 4, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
   const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", maxLines: 4 });
   const children = [
-    headerBar(model, 16, 18), spacer(6), divider(), spacer(8),
-    hstack([vstack([localCard, spacer(8), entranceCard], { gap: 0 }), vstack([landingCard, spacer(8), riskCard(model)], { gap: 0 })], { gap: 8, alignItems: "start" }),
+    headerBar(model, 16, 18, false), spacer(6), divider(), spacer(8),
+    hstack([localCard, entranceCard], { gap: 8, distribution: "fillEqually" }),
     spacer(8),
-    serviceListCard(model, 8),
-    spacer(),
-    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+    hstack([landingCard, riskCard(model, false)], { gap: 8, distribution: "fillEqually" }),
+    spacer(8),
+    serviceListCard(model, 6)
   ];
   return makeRoot(children, ["#0A1120", "#0D1C36", "#17335A"], [12, 14, 10, 14]);
 }
 
+function normalizeFamilyName(name) {
+  const s = String(name || "systemMedium").toLowerCase();
+  if (s.includes("accessoryinline")) return "accessoryInline";
+  if (s.includes("accessorycircular")) return "accessoryCircular";
+  if (s.includes("accessoryrectangular")) return "accessoryRectangular";
+  if (s.includes("small")) return "systemSmall";
+  if (s.includes("large") || s.includes("extra")) return "systemLarge";
+  return "systemMedium";
+}
+
 function renderByFamily(model) {
-  const family = S().RT.widgetFamily || "systemMedium";
+  const family = normalizeFamilyName(S().RT.widgetFamily);
   if (family === "accessoryInline") return renderAccessoryInline(model);
   if (family === "accessoryCircular") return renderAccessoryCircular(model);
   if (family === "accessoryRectangular") return renderAccessoryRectangular(model);
   if (family === "systemSmall") return renderSystemSmall(model);
-  if (family === "systemLarge" || family === "systemExtraLarge") return renderSystemLarge(model);
+  if (family === "systemLarge") return renderSystemLarge(model);
   return renderSystemMedium(model);
 }
-
 async function buildModel(ctx) {
   const box = await readBoxSettings(ctx);
   const cfg = buildCFG(ctx, box);
