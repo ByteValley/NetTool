@@ -1,13 +1,14 @@
 /* =========================================================
- * 模块分类 · 网络信息 + 服务检测（Dual Runtime）
+ * 模块分类 · 网络信息 + 服务检测（Dual Runtime Panel）
  * 作者 · ByteValley
  * 版本 · 2026-03-12R2
  *
  * 模块分类 · 说明
  * · Legacy 运行时：Surge / Loon / QuanX / 旧 Egern Panel 风格
- * · Egern 新运行时：export default async function(ctx) + Widget DSL
- * · 修复 Egern HTTP 响应对象适配，避免 resp.text is not a function 导致空白
- * · 补充 Egern 总兜底异常回显，脚本异常时不再白板
+ * · Legacy 运行时：Surge / Loon / QuanX / 旧 Egern Panel 风格
+ * · Egern 新 API：通过 ctx.http / ctx.storage / ctx.device / ctx.notify 兼容旧面板脚本
+ * · 保持原有业务逻辑与文本面板结构，Egern 下仍输出 title/content 面板对象
+ * · /v1/requests/recent 在 Egern 公开 API 中未文档化，这里支持用 env 合成入口回放：PROXY_POLICY / ENTRANCE4 / ENTRANCE6
  * ========================================================= */
 
 /* =========================================================
@@ -409,6 +410,18 @@ function createLegacyRuntime() {
     widgetFamily: undefined
   };
 }
+function makeSyntheticRecent(env = {}) {
+  const policy = String(env.PROXY_POLICY || "").trim();
+  const ip4 = String(env.ENTRANCE4 || "").trim();
+  const ip6 = String(env.ENTRANCE6 || "").trim();
+  const requests = [];
+  const mk = (URL, remoteAddress) => ({ URL, remoteAddress, policyName: policy || "" });
+  if (ip4) requests.push(mk("http://ip-api.com/json?lang=zh-CN", `${ip4} (Proxy)`));
+  if (ip6) requests.push(mk("https://api-ipv6.ip.sb/ip", `[${ip6}] (Proxy)`));
+  if (!requests.length && policy) requests.push(mk("http://ip-api.com/json?lang=zh-CN", "(Proxy)"));
+  return { requests };
+}
+
 function createEgernRuntime(ctx) {
   return {
     kind: "egern",
@@ -455,7 +468,10 @@ function createEgernRuntime(ctx) {
       });
       return wrapEgernResp(r);
     },
-    async httpAPI(_path) { return null; },
+    async httpAPI(path) {
+      if (String(path || "") === "/v1/requests/recent") return makeSyntheticRecent(ctx?.env || {});
+      return null;
+    },
     finishPanel(payload) { return payload; },
     widgetFamily: ctx?.widgetFamily || "systemMedium"
   };
@@ -1641,7 +1657,6 @@ async function runMain(RT) {
   const content = buildPanelText(parts);
   log("info", "Done", `${Date.now() - (S().DEADLINE - S().BUDGET_MS)}ms`);
 
-  if (RT.kind === "egern") return renderEgernWidget({ title, parts });
   return renderLegacyPanel({ title, content });
 }
 
