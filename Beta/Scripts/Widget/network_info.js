@@ -982,17 +982,16 @@ function sectionCard(title, iconName, lines, opts = {}) {
       spacer()
     ], { gap: 4 })
   ];
-  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) {
-    children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
-  }
+  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
   
   return vstack(children, {
     gap: 3,
     padding: [9, 10, 9, 10],
     backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
     borderRadius: 12,
-    flex: 1, // 关键修改：允许卡片自动拉宽填满留白
-    height: opts.height
+    // width: opts.width,  <-- 移除或注释掉这一行，让它自适应容器宽度
+    height: opts.height,
+    flex: 1 // 确保在 hstack 中能平分空间
   });
 }
 
@@ -1046,7 +1045,7 @@ function renderAccessoryRectangular(model) {
 function makeRoot(children, gradientColors, padding) {
   return {
     type: "widget",
-    padding: padding || [8, 12, 6, 12], // 调整为更紧凑的上下边距
+    padding: padding || [10, 12, 8, 12], // 调整为 [上, 右, 下, 左]
     gap: 0,
     backgroundGradient: {
       type: "linear",
@@ -1076,10 +1075,9 @@ function headerBar(model, titleSize, iconSize) {
 
 function riskCard(model) {
   const risk = model.risk;
-  if (!risk) return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], { iconColor: "#FCA5A5" });
+  if (!risk) return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], { iconColor: "#FCA5A5", backgroundColor: "rgba(255,255,255,0.06)" });
   const riskText = `${risk.riskValue}%`;
   const color = risk.riskValue >= 80 ? "#F87171" : risk.riskValue >= 50 ? "#FBBF24" : "#34D399";
-  
   return vstack([
     hstack([icon("shield.lefthalf.filled", 12, color), txt(t("risk"), 10, "bold", "rgba(255,255,255,0.88)"), spacer(), pill(riskText, color + "33", color)], { gap: 4 }),
     txt(`${risk.lineType} · ${risk.nativeHint}`, 10, "medium", "rgba(255,255,255,0.8)", { maxLines: 1, minScale: 0.75 }),
@@ -1090,7 +1088,7 @@ function riskCard(model) {
     padding: [9, 10, 9, 10], 
     backgroundColor: "rgba(255,255,255,0.06)", 
     borderRadius: 12,
-    flex: 1.2 // 稍微比服务卡片宽一点，确保显示完整
+    flex: 1 // 增加这一行
   });
 }
 
@@ -1120,7 +1118,6 @@ function renderSystemSmall(model) {
 }
 
 function renderSystemMedium(model) {
-  // 移除所有 width 限制
   const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", maxLines: 3 });
   
   const entData = model.entrance?.ip || model.entrance?.loc1 || model.entrance?.isp1 ? model.entrance : {};
@@ -1130,19 +1127,19 @@ function renderSystemMedium(model) {
 
   const children = [
     headerBar(model, 14, 16), 
-    spacer(4), 
+    spacer(4), // 减小间距防止溢出
     divider(), 
     spacer(6), 
-    // 使用 hstack 包裹，flex:1 会自动平分布局
-    hstack([localCard, entranceCard, landingCard], { gap: 8, alignItems: "stretch" }),
+    // 使用 gap 均匀分配三个卡片
+    hstack([localCard, entranceCard, landingCard], { gap: 6, alignItems: "start" }),
     spacer(6),
-    hstack([riskCard(model), servicesRow(model, 4)], { gap: 8, alignItems: "stretch" }),
+    hstack([riskCard(model), servicesRow(model, 4)], { gap: 6, alignItems: "start" }),
     spacer(),
     txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
   ];
   
-  // 缩小上下 Padding 解决顶部网络和底部截断问题
-  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [8, 12, 6, 12]);
+  // 调整 padding 确保上下不被截断
+  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [10, 12, 8, 12]);
 }
 
 function serviceListCard(model, maxItems) {
