@@ -977,34 +977,15 @@ function pill(textStr, bg, fg) { return vstack([txt(textStr, 9, "semibold", fg |
 function sectionCard(title, iconName, lines, opts = {}) {
   const children = [
     hstack([
-      icon(iconName, 12, opts.iconColor || "#93C5FD"),
-      txt(title, 11, "bold", "rgba(255,255,255,0.9)"),
+      icon(iconName, 11, opts.iconColor || "#93C5FD"),
+      txt(title, 10, "bold", "rgba(255,255,255,0.88)"),
       spacer()
-    ], { gap: 5 })
+    ], { gap: 4 })
   ];
-
-  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 4)) {
-    children.push(
-      txt(line, 10, "medium", "rgba(255,255,255,0.8)", {
-        maxLines: 1,
-        minScale: 0.72
-      })
-    );
-  }
-
+  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
   return vstack(children, {
-    gap: 4,
-    padding: [11, 12, 11, 12],
-    backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
-    borderRadius: 14,
-    width: opts.width,
-    height: opts.height
-  });
-}
-
-  return vstack(children, {
-    gap: 2,
-    padding: [8, 9, 8, 9],
+    gap: 3,
+    padding: [9, 10, 9, 10],
     backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
     borderRadius: 12,
     width: opts.width,
@@ -1074,114 +1055,46 @@ function makeRoot(children, gradientColors, padding) {
     children
   };
 }
+
 function headerBar(model, titleSize, iconSize) {
   return hstack([
     icon(S().CFG.ICON_NAME, iconSize, S().CFG.IconColor),
-    txt(netTypeLine(), 11, "medium", "rgba(255,255,255,0.72)", {
-      maxLines: 1,
-      minScale: 0.72
-    }),
+    vstack([
+      txt(t("title"), titleSize, "heavy", "#FFFFFF"),
+      txt(netTypeLine(), Math.max(9, titleSize - 4), "medium", "rgba(255,255,255,0.65)", { maxLines: 1, minScale: 0.8 })
+    ], { gap: 0 }),
     spacer(),
-    txt(model.runAt.slice(6), 10, "medium", "rgba(255,255,255,0.58)", {
-      maxLines: 1,
-      minScale: 0.78
-    })
-  ], { gap: 6, alignItems: "center" });
+    vstack([
+      txt(model.policy || "-", 10, "bold", "#BFDBFE", { maxLines: 1, minScale: 0.75 }),
+      txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)")
+    ], { alignItems: "end", gap: 1 })
+  ], { gap: 8 });
 }
 
 function riskCard(model) {
   const risk = model.risk;
-  if (!risk) {
-    return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], {
-      iconColor: "#34D399",
-      backgroundColor: "rgba(255,255,255,0.06)"
-    });
-  }
-
+  if (!risk) return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], { iconColor: "#FCA5A5", backgroundColor: "rgba(255,255,255,0.06)" });
   const riskText = `${risk.riskValue}%`;
   const color = risk.riskValue >= 80 ? "#F87171" : risk.riskValue >= 50 ? "#FBBF24" : "#34D399";
-
   return vstack([
-    hstack([
-      icon("shield.lefthalf.filled", 12, color),
-      txt(t("risk"), 11, "bold", "rgba(255,255,255,0.9)"),
-      spacer(),
-      pill(riskText, color + "33", color)
-    ], { gap: 5 }),
-    txt(`${risk.lineType} · ${risk.nativeHint}`, 10, "medium", "rgba(255,255,255,0.82)", {
-      maxLines: 1,
-      minScale: 0.72
-    }),
-    txt(risk.tunnelHint, 9, "medium", "rgba(255,255,255,0.62)", {
-      maxLines: 1,
-      minScale: 0.72
-    }),
-    txt((risk.reasons || []).slice(0, 1).join(" · ") || "-", 8, "medium", "rgba(255,255,255,0.46)", {
-      maxLines: 1,
-      minScale: 0.7
-    })
-  ], {
-    gap: 4,
-    padding: [10, 12, 10, 12],
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 14,
-    height: 96
-  });
+    hstack([icon("shield.lefthalf.filled", 12, color), txt(t("risk"), 10, "bold", "rgba(255,255,255,0.88)"), spacer(), pill(riskText, color + "33", color)], { gap: 4 }),
+    txt(`${risk.lineType} · ${risk.nativeHint}`, 10, "medium", "rgba(255,255,255,0.8)", { maxLines: 1, minScale: 0.75 }),
+    txt(risk.tunnelHint, 9, "medium", "rgba(255,255,255,0.58)", { maxLines: 1, minScale: 0.75 }),
+    txt((risk.reasons || []).slice(0, 2).join(" · ") || "-", 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+  ], { gap: 3, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
 }
 
 function servicesRow(model, maxItems) {
-  const items = (model.services || []).slice(0, maxItems || 3).map((x) => vstack([
-    txt(x.icon, 14, "regular", null),
-    txt(x.name.replace(/\(.+?\)/g, ""), 8, "medium", "rgba(255,255,255,0.8)", {
-      maxLines: 1,
-      minScale: 0.72
-    }),
-    txt(x.cc ? x.cc : "-", 8, "medium", "rgba(255,255,255,0.52)", {
-      maxLines: 1,
-      minScale: 0.72
-    })
-  ], {
-    alignItems: "center",
-    gap: 2,
-    padding: [8, 6, 8, 6],
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 11,
-    width: 64
-  }));
-
-  if (!items.length) {
-    return sectionCard(t("services"), "play.rectangle.on.rectangle", [t("noData")], {
-      iconColor: "#C4B5FD"
-    });
-  }
-
+  const items = (model.services || []).slice(0, maxItems || 4).map((x) => vstack([
+    txt(x.icon, 13, "regular", null),
+    txt(x.name.replace(/\(.+?\)/g, ""), 8, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.7 }),
+    txt(x.cc ? x.cc : "-", 8, "medium", "rgba(255,255,255,0.5)", { maxLines: 1, minScale: 0.7 })
+  ], { alignItems: "center", gap: 1, padding: [6, 4, 6, 4], backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10, width: 58 }));
+  if (!items.length) return sectionCard(t("services"), "play.rectangle.on.rectangle", [t("noData")], { iconColor: "#C4B5FD" });
   return vstack([
-    hstack([
-      icon("play.rectangle.on.rectangle", 12, "#C4B5FD"),
-      txt(t("services"), 11, "bold", "rgba(255,255,255,0.9)")
-    ], { gap: 5 }),
-    hstack(items, { gap: 8 })
-  ], {
-    gap: 7,
-    padding: [10, 12, 10, 12],
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 14,
-    height: 96
-  });
-}
-
-  return vstack([
-    hstack([
-      icon("play.rectangle.on.rectangle", 12, "#C4B5FD"),
-      txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")
-    ], { gap: 4 }),
-    hstack(items, { gap: 4 })
-  ], {
-    gap: 5,
-    padding: [8, 9, 8, 9],
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 12
-  });
+    hstack([icon("play.rectangle.on.rectangle", 12, "#C4B5FD"), txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")], { gap: 4 }),
+    hstack(items, { gap: 6 })
+  ], { gap: 6, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
 }
 
 function renderSystemSmall(model) {
@@ -1194,6 +1107,22 @@ function renderSystemSmall(model) {
     txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
   ];
   return makeRoot(children, ["#0D1323", "#11213D", "#1A2A4E"], [12, 14, 10, 14]);
+}
+
+function renderSystemMedium(model) {
+  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", width: 106, maxLines: 3 });
+  const entData = model.entrance?.ip || model.entrance?.loc1 || model.entrance?.isp1 ? model.entrance : {};
+  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", width: 106, maxLines: 3, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
+  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", width: 106, maxLines: 3 });
+  const children = [
+    headerBar(model, 14, 16), spacer(6), divider(), spacer(8),
+    hstack([localCard, entranceCard, landingCard], { gap: 8, alignItems: "start" }),
+    spacer(8),
+    hstack([riskCard(model), servicesRow(model, 4)], { gap: 8, alignItems: "start" }),
+    spacer(),
+    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+  ];
+  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [12, 14, 10, 14]);
 }
 
 function serviceListCard(model, maxItems) {
