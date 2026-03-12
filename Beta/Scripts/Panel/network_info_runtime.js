@@ -1,14 +1,13 @@
 /* =========================================================
  * 模块分类 · 网络信息 + 服务检测（Dual Runtime）
  * 作者 · ByteValley
- * 版本 · 2026-03-12R1
+ * 版本 · 2026-03-12R2
  *
  * 模块分类 · 说明
  * · Legacy 运行时：Surge / Loon / QuanX / 旧 Egern Panel 风格
  * · Egern 新运行时：export default async function(ctx) + Widget DSL
- * · 尽量保留原脚本功能与参数；Egern 公开 API 不提供 $httpAPI recent-requests，
- *   因此“入口 IP / policyName 自动回溯”仅在 Legacy 可完整工作；
- *   Egern 下可通过 PROXY_POLICY / ENTRANCE4 / ENTRANCE6 手动补齐。
+ * · 修复 Egern HTTP 响应对象适配，避免 resp.text is not a function 导致空白
+ * · 补充 Egern 总兜底异常回显，脚本异常时不再白板
  * ========================================================= */
 
 /* =========================================================
@@ -349,6 +348,29 @@ function wrapLegacyResp(r) {
     async json() { return safeJSON(r?.body || "", {}); }
   };
 }
+function wrapEgernResp(r) {
+  return {
+    status: r?.status ?? r?.statusCode ?? 0,
+    headers: normalizeHeadersObject(r?.headers || {}),
+    async text() {
+      if (typeof r?.body === "string") return r.body;
+      if (typeof r?.data === "string") return r.data;
+      if (r?.body != null) return JSON.stringify(r.body);
+      if (r?.data != null) return JSON.stringify(r.data);
+      return "";
+    },
+    async json() {
+      if (typeof r?.body === "object" && r.body !== null) return r.body;
+      if (typeof r?.data === "object" && r.data !== null) return r.data;
+      const txt = typeof r?.body === "string"
+        ? r.body
+        : typeof r?.data === "string"
+          ? r.data
+          : "";
+      return safeJSON(txt, {});
+    }
+  };
+}
 function createLegacyRuntime() {
   const n = (typeof $network !== "undefined" && $network) ? $network : {};
   return {
@@ -392,24 +414,46 @@ function createEgernRuntime(ctx) {
     kind: "egern",
     env: ctx?.env || {},
     device: ctx?.device || {
-      cellular: { carrier: null, radio: null }, wifi: { ssid: null, bssid: null },
-      ipv4: { address: null, gateway: null, interface: null }, ipv6: { address: null, interface: null }, dnsServers: []
+      cellular: { carrier: null, radio: null },
+      wifi: { ssid: null, bssid: null },
+      ipv4: { address: null, gateway: null, interface: null },
+      ipv6: { address: null, interface: null },
+      dnsServers: []
     },
-    storage: ctx.storage,
+    storage: ctx?.storage || {
+      get: async () => null,
+      set: async () => {},
+      getJSON: async () => null,
+      setJSON: async () => {},
+      delete: async () => {}
+    },
     notify({ title, subtitle = "", body = "" }) {
-      try { ctx.notify({ title, subtitle, body, sound: false, duration: 4 }); } catch (_) {}
+      try { ctx?.notify?.({ title, subtitle, body, sound: false, duration: 4 }); } catch (_) {}
     },
     async httpGet(url, options = {}) {
-      return await ctx.http.get(url, {
-        headers: options.headers, timeout: options.timeout, policy: options.policy, policyDescriptor: options.policyDescriptor,
-        redirect: options.redirect || "follow", credentials: options.credentials || "include", insecureTls: !!options.insecureTls
+      const r = await ctx.http.get(url, {
+        headers: options.headers,
+        timeout: options.timeout,
+        policy: options.policy,
+        policyDescriptor: options.policyDescriptor,
+        redirect: options.redirect || "follow",
+        credentials: options.credentials || "include",
+        insecureTls: !!options.insecureTls
       });
+      return wrapEgernResp(r);
     },
     async httpPost(url, options = {}) {
-      return await ctx.http.post(url, {
-        headers: options.headers, body: options.body, timeout: options.timeout, policy: options.policy, policyDescriptor: options.policyDescriptor,
-        redirect: options.redirect || "follow", credentials: options.credentials || "include", insecureTls: !!options.insecureTls
+      const r = await ctx.http.post(url, {
+        headers: options.headers,
+        body: options.body,
+        timeout: options.timeout,
+        policy: options.policy,
+        policyDescriptor: options.policyDescriptor,
+        redirect: options.redirect || "follow",
+        credentials: options.credentials || "include",
+        insecureTls: !!options.insecureTls
       });
+      return wrapEgernResp(r);
     },
     async httpAPI(_path) { return null; },
     finishPanel(payload) { return payload; },
@@ -1445,7 +1489,7 @@ function buildPanelText(parts) {
 function renderLegacyPanel({ title, content }) {
   return { title, content, icon: S().ICON_NAME, "icon-color": S().ICON_COLOR };
 }
-function renderEgernWidget({ title, parts, updatedAt }) {
+function renderEgernWidget({ title, parts }) {
   const rows = [];
   for (const line of parts.slice(0, 20)) {
     rows.push({
@@ -1459,7 +1503,12 @@ function renderEgernWidget({ title, parts, updatedAt }) {
   }
   const family = S().RT.widgetFamily || "systemMedium";
   if (family === "accessoryInline") {
-    return { type: "widget", children: [{ type: "text", text: String(parts.filter(Boolean)[0] || title), font: { size: "caption2", weight: "semibold" } }] };
+    return {
+      type: "widget",
+      children: [
+        { type: "text", text: String(parts.filter(Boolean)[0] || title), font: { size: "caption2", weight: "semibold" } }
+      ]
+    };
   }
   if (family === "accessoryCircular") {
     return {
@@ -1482,7 +1531,7 @@ function renderEgernWidget({ title, parts, updatedAt }) {
           { type: "image", src: `sf-symbol:${S().ICON_NAME}`, color: "#60A5FA", width: 16, height: 16 },
           { type: "text", text: title, font: { size: "headline", weight: "bold" }, textColor: "#FFFFFF" },
           { type: "spacer" },
-          { type: "date", date: updatedAt, format: "time", font: { size: "caption2" }, textColor: "#9CA3AF" }
+          { type: "text", text: now(), font: { size: "caption2" }, textColor: "#9CA3AF" }
         ]
       },
       { type: "stack", direction: "column", gap: 3, children: rows }
@@ -1592,7 +1641,7 @@ async function runMain(RT) {
   const content = buildPanelText(parts);
   log("info", "Done", `${Date.now() - (S().DEADLINE - S().BUDGET_MS)}ms`);
 
-  if (RT.kind === "egern") return renderEgernWidget({ title, parts, updatedAt: new Date().toISOString() });
+  if (RT.kind === "egern") return renderEgernWidget({ title, parts });
   return renderLegacyPanel({ title, content });
 }
 
@@ -1600,7 +1649,21 @@ async function runMain(RT) {
  * 模块分类 · 导出与 Legacy 启动
  * ========================================================= */
 export default async function(ctx) {
-  return await runMain(createEgernRuntime(ctx));
+  try {
+    return await runMain(createEgernRuntime(ctx));
+  } catch (err) {
+    const RT = createEgernRuntime(ctx);
+    G_STATE = G_STATE || buildState(RT);
+    const msg = String(err && err.stack ? err.stack : err);
+    try { RT.notify({ title: t("panelTitle"), body: msg.slice(0, 200) }); } catch (_) {}
+    return renderEgernWidget({
+      title: t("panelTitle"),
+      parts: [
+        `${t("debug")}: Egern runtime error`,
+        msg.slice(0, 300)
+      ]
+    });
+  }
 }
 
 if (typeof $done !== "undefined") {
@@ -1610,7 +1673,7 @@ if (typeof $done !== "undefined") {
       $done(out);
     } catch (err) {
       G_STATE = G_STATE || buildState(createLegacyRuntime());
-      const msg = String(err);
+      const msg = String(err && err.stack ? err.stack : err);
       logErrPush(t("panelTitle"), msg);
       $done({ title: t("panelTitle"), content: (S().CFG.SD_LANG === "zh-Hant" ? zhHansToHantOnce(msg) : msg), icon: S().ICON_NAME, "icon-color": S().ICON_COLOR });
     }
