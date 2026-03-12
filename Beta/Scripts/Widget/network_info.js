@@ -982,10 +982,19 @@ function sectionCard(title, iconName, lines, opts = {}) {
       spacer()
     ], { gap: 4 })
   ];
-  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
+
+  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) {
+    children.push(
+      txt(line, 9, "medium", "rgba(255,255,255,0.78)", {
+        maxLines: 1,
+        minScale: 0.62
+      })
+    );
+  }
+
   return vstack(children, {
-    gap: 3,
-    padding: [9, 10, 9, 10],
+    gap: 2,
+    padding: [8, 9, 8, 9],
     backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
     borderRadius: 12,
     width: opts.width,
