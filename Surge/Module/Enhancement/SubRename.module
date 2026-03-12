@@ -1,0 +1,11 @@
+#!name=订阅节点重命名
+#!desc=本地订阅节点重命名
+#!author=ByteValley
+#!version=2026-03-12R1
+#!arguments=domain:'',rules:''
+
+[Script]
+节点重命名 = type=http-response,pattern=^https?:\/\/[^\/]+\/.*,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/sub-rename.js,argument={{{rules}}}
+
+[MITM]
+hostname = %APPEND% {{{domain}}
