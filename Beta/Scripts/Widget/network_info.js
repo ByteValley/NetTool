@@ -1,116 +1,269 @@
 /* =========================================================
- * 模块分类 · 网络信息 + 服务检测（Pure Egern Widget）
- * 作者 · ByteValley / OpenAI
+ * 模块分类 · 网络信息小组件
+ * 作者 · ByteValley
  * 版本 · 2026-03-12R1
  *
  * 模块分类 · 说明
- * · 这是面向 Egern Generic Widget 的纯净版本，仅使用 ctx/env/device/http/storage/widgetFamily
- * · 尽量保持原脚本功能、参数、数据源、服务检测、风险评估与展示逻辑
- * · 受限于 Egern 当前公开 JavaScript API 未提供 recent-requests / policyName 回溯能力，
- *   “入口 IP / 代理策略 自动回溯”无法做到旧版那种 1:1 自动捕获；可通过 env 手动补齐：
+ * · 纯 Egern Generic Script + Widget DSL
+ * · 重新设计为卡片式信息架构，不再按旧 Panel 长文本硬搬
+ * · 保留核心能力：本地 / 入口 / 落地 / 风险 / 服务检测 / BoxJS / _compat.$argument
+ * · Egern 当前无 recent-requests 公共 API，策略名 / 入口 IP 改为 env 手动传入：
  *   PROXY_POLICY / ENTRANCE4 / ENTRANCE6
  * ========================================================= */
 
 const CONSTS = Object.freeze({
   SD_MIN_TIMEOUT: 2000,
-  LOG_RING_MAX: 160,
-  DEBUG_TAIL_LINES: 18,
-  ENT_MIN_TTL: 30,
-  ENT_MAX_TTL: 3600,
   V6_PROBE_TO_MS: 1200,
   BUDGET_HARD_MS: 10000,
-  BUDGET_SOFT_GUARD_MS: 260
+  BUDGET_SOFT_GUARD_MS: 260,
+  ENT_MIN_TTL: 30,
+  ENT_MAX_TTL: 3600,
+  LOG_RING_MAX: 120
 });
 
 const SD_STR = {
   "zh-Hans": {
-    panelTitle: "网络信息 𝕏",
-    wifi: "Wi‑Fi",
-    cellular: "蜂窝网络",
-    unknownNet: "网络 | 未知",
-    gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
+    title: "网络信息",
+    runAt: "执行时间",
     policy: "代理策略",
+    local: "本地",
+    entrance: "入口",
+    landing: "落地",
     location: "位置",
     isp: "运营商",
-    runAt: "执行时间",
-    region: "区域",
+    risk: "风险",
+    services: "服务",
+    nativeLike: "更像原生",
+    nonNative: "可能非原生",
+    home: "家宽",
+    nonHome: "非家宽",
+    weakTunnel: "代理特征偏弱",
+    strongTunnel: "代理特征偏强",
+    noData: "暂无数据",
+    manualPolicyHint: "策略名请用 PROXY_POLICY 传入",
+    wifi: "Wi-Fi",
+    cellular: "蜂窝",
+    unknownNet: "未知网络",
     unlocked: "已解锁",
     partialUnlocked: "部分解锁",
     notReachable: "不可达",
     timeout: "超时",
-    fail: "检测失败",
+    fail: "失败",
     regionBlocked: "区域受限",
-    nfFull: "已完整解锁",
-    nfOriginals: "仅解锁自制剧",
-    debug: "调试"
+    nfFull: "完整解锁",
+    nfOriginals: "仅自制剧"
   },
   "zh-Hant": {
-    panelTitle: "網路資訊 𝕏",
-    wifi: "Wi‑Fi",
-    cellular: "行動服務",
-    unknownNet: "網路 | 未知",
-    gen: (g, r) => `${g ? `${g} - ${r}` : r}`,
+    title: "網路資訊",
+    runAt: "執行時間",
     policy: "代理策略",
+    local: "本地",
+    entrance: "入口",
+    landing: "落地",
     location: "位置",
     isp: "運營商",
-    runAt: "執行時間",
-    region: "區域",
+    risk: "風險",
+    services: "服務",
+    nativeLike: "更像原生",
+    nonNative: "可能非原生",
+    home: "家寬",
+    nonHome: "非家寬",
+    weakTunnel: "代理特徵偏弱",
+    strongTunnel: "代理特徵偏強",
+    noData: "暫無資料",
+    manualPolicyHint: "策略名請用 PROXY_POLICY 傳入",
+    wifi: "Wi-Fi",
+    cellular: "行動網路",
+    unknownNet: "未知網路",
     unlocked: "已解鎖",
     partialUnlocked: "部分解鎖",
     notReachable: "不可達",
     timeout: "逾時",
-    fail: "檢測失敗",
+    fail: "失敗",
     regionBlocked: "區域受限",
-    nfFull: "已完整解鎖",
-    nfOriginals: "僅解鎖自製劇",
-    debug: "除錯"
+    nfFull: "完整解鎖",
+    nfOriginals: "僅自製劇"
   }
 };
 
-function safeJSON(s, d = {}) { try { return JSON.parse(s || ""); } catch { return d; } }
+let G = null;
+function S() { return G; }
+function t(key) {
+  const pack = SD_STR[S()?.CFG?.SD_LANG || "zh-Hans"] || SD_STR["zh-Hans"];
+  return pack[key] != null ? pack[key] : key;
+}
+
+function safeJSON(s, d = {}) { try { return JSON.parse(s || ""); } catch (_) { return d; } }
 function toBool(v, d = false) {
   if (v == null || v === "") return d;
   if (typeof v === "boolean") return v;
   const s = String(v).trim().toLowerCase();
-  if (["1","true","on","yes","y"].includes(s)) return true;
-  if (["0","false","off","no","n"].includes(s)) return false;
+  if (["1", "true", "on", "yes", "y"].includes(s)) return true;
+  if (["0", "false", "off", "no", "n"].includes(s)) return false;
   return d;
 }
-function toNum(v, d) { const n = Number(v); return Number.isFinite(n) ? n : d; }
-function joinNonEmpty(arr, sep = " ") { return (arr || []).filter(Boolean).join(sep); }
+function toNum(v, d) {
+  if (v == null || v === "") return d;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+}
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+function joinNonEmpty(arr, sep = " ") { return arr.filter(Boolean).join(sep); }
+function pad2(n) { return String(n).padStart(2, "0"); }
+function nowStr() {
+  const d = new Date();
+  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
 function parseArgs(raw) {
   if (!raw) return {};
   if (typeof raw === "object") return raw;
   return String(raw).split("&").reduce((acc, kv) => {
     if (!kv) return acc;
-    const [k, v = ""] = kv.split("=");
+    const i = kv.indexOf("=");
+    const k = i >= 0 ? kv.slice(0, i) : kv;
+    const v = i >= 0 ? kv.slice(i + 1) : "";
     acc[decodeURIComponent(k || "")] = decodeURIComponent(String(v).replace(/\+/g, "%20"));
     return acc;
   }, {});
 }
 
-const SUBTITLE_STYLES = Object.freeze({
-  line: (s) => `——${s}——`,
-  cnBracket: (s) => `【${s}】`,
-  cnQuote: (s) => `「${s}」`,
-  square: (s) => `[${s}]`,
-  curly: (s) => `{${s}}`,
-  angle: (s) => `《${s}》`,
-  pipe: (s) => `║${s}║`,
-  bullet: (s) => `·${s}·`,
-  plain: (s) => `${s}`
-});
-function normalizeSubStyle(v) { const k = String(v ?? "line").trim(); return SUBTITLE_STYLES[k] ? k : "line"; }
-function makeSubTitleRenderer(styleKey, minimal = false) { const fn = SUBTITLE_STYLES[normalizeSubStyle(styleKey)] || SUBTITLE_STYLES.line; return minimal ? (s) => String(s) : (s) => fn(String(s)); }
+const KVCompat = {
+  async read(ctx, key) {
+    try {
+      if (ctx.storage?.get) return await ctx.storage.get(key);
+    } catch (_) {}
+    try {
+      const v = ctx.storage?.getJSON?.(key);
+      if (typeof v === "string") return v;
+    } catch (_) {}
+    return null;
+  },
+  async readJSON(ctx, key) {
+    try {
+      if (ctx.storage?.getJSON) {
+        const v = await ctx.storage.getJSON(key);
+        if (v != null) return v;
+      }
+    } catch (_) {}
+    try {
+      const raw = await this.read(ctx, key);
+      return safeJSON(raw, null);
+    } catch (_) {}
+    return null;
+  },
+  async writeJSON(ctx, key, value) {
+    try { if (ctx.storage?.setJSON) return await ctx.storage.setJSON(key, value); } catch (_) {}
+    try { if (ctx.storage?.set) return await ctx.storage.set(key, JSON.stringify(value)); } catch (_) {}
+  }
+};
 
-const ICON_PRESET_MAP = Object.freeze({
-  wifi: "wifi.router",
-  globe: "globe.asia.australia",
-  dots: "dot.radiowaves.left.and.right",
-  antenna: "antenna.radiowaves.left.and.right",
-  point: "point.3.connected.trianglepath.dotted"
-});
+async function readBoxSettings(ctx) {
+  const panel = await KVCompat.readJSON(ctx, "Panel");
+  if (!panel || typeof panel !== "object") return {};
+  if (panel.NetworkInfo && panel.NetworkInfo.Settings && typeof panel.NetworkInfo.Settings === "object") return panel.NetworkInfo.Settings;
+  if (panel.Settings && typeof panel.Settings === "object") return panel.Settings;
+  return {};
+}
+
+function buildENV(ctx, box) {
+  const compatArgs = parseArgs(ctx?.env?._compat?.$argument || ctx?.env?.["_compat.$argument"] || "");
+  const directEnv = ctx?.env || {};
+  const read = (key, defVal, opt = {}) => {
+    const typeHint = typeof defVal;
+    const argKeys = [key].concat(opt.argAlias || []);
+    const boxKeys = [key].concat(opt.boxAlias || []);
+    let envRaw, hasEnv = false;
+    for (const k of argKeys) {
+      const v = directEnv[k];
+      if (v !== undefined && v !== null && v !== "") { envRaw = v; hasEnv = true; break; }
+    }
+    let argRaw, hasArg = false;
+    for (const k of argKeys) {
+      const v = compatArgs[k];
+      if (v !== undefined && v !== null && v !== "") { argRaw = v; hasArg = true; break; }
+    }
+    let boxRaw, hasBox = false;
+    for (const k of boxKeys) {
+      const v = box?.[k];
+      if (v !== undefined && v !== null && v !== "") { boxRaw = v; hasBox = true; break; }
+    }
+    const convert = (val) => {
+      if (typeHint === "boolean") return toBool(val, defVal);
+      if (typeHint === "number") return toNum(val, defVal);
+      return val;
+    };
+    if (hasEnv) return convert(envRaw);
+    if (hasArg) return convert(argRaw);
+    if (hasBox) return convert(boxRaw);
+    return defVal;
+  };
+  return { read, compatArgs, directEnv };
+}
+
+function buildCFG(ctx, box) {
+  const ENV = buildENV(ctx, box);
+  const cfg = {
+    Update: toNum(ENV.read("Update", 10), 10),
+    Timeout: toNum(ENV.read("Timeout", 12), 12),
+    BUDGET_SEC_RAW: ENV.read("BUDGET", 0),
+    MASK_IP: toBool(ENV.read("MASK_IP", true), true),
+    MASK_POS_MODE: ENV.read("MASK_POS", "auto"),
+    IPv6: toBool(ENV.read("IPv6", true), true),
+    DOMESTIC_IPv4: ENV.read("DOMESTIC_IPv4", "ipip"),
+    DOMESTIC_IPv6: ENV.read("DOMESTIC_IPv6", "ddnspod"),
+    LANDING_IPv4: ENV.read("LANDING_IPv4", "ipapi"),
+    LANDING_IPv6: ENV.read("LANDING_IPv6", "ipsb"),
+    TW_FLAG_MODE: toNum(ENV.read("TW_FLAG_MODE", 1), 1),
+    IconPreset: ENV.read("IconPreset", "globe"),
+    Icon: ENV.read("Icon", ""),
+    IconColor: ENV.read("IconColor", "#60A5FA"),
+    SD_STYLE: ENV.read("SD_STYLE", "icon"),
+    SD_LANG: String(ENV.read("SD_LANG", "zh-Hans")).toLowerCase() === "zh-hant" ? "zh-Hant" : "zh-Hans",
+    SD_TIMEOUT_SEC_RAW: ENV.read("SD_TIMEOUT", 0),
+    SD_CONCURRENCY: clamp(toNum(ENV.read("SD_CONCURRENCY", 6), 6), 1, 8),
+    SD_REGION_MODE: ENV.read("SD_REGION_MODE", "full"),
+    SD_ICON_THEME: ENV.read("SD_ICON_THEME", "check"),
+    SD_ARROW: toBool(ENV.read("SD_ARROW", true), true),
+    SD_SHOW_LAT: toBool(ENV.read("SD_SHOW_LAT", true), true),
+    SD_SHOW_HTTP: toBool(ENV.read("SD_SHOW_HTTP", true), true),
+    LOG: toBool(ENV.read("LOG", true), true),
+    LOG_LEVEL: String(ENV.read("LOG_LEVEL", "info")).toLowerCase(),
+    PROXY_POLICY: String(ENV.read("PROXY_POLICY", "")).trim(),
+    ENTRANCE4: String(ENV.read("ENTRANCE4", "")).trim(),
+    ENTRANCE6: String(ENV.read("ENTRANCE6", "")).trim(),
+    SERVICES_BOX_CHECKED_RAW: (() => {
+      const v = box?.SERVICES;
+      if (v == null) return null;
+      if (Array.isArray(v)) return v.length ? JSON.stringify(v) : null;
+      const s = String(v).trim();
+      return s && s !== "[]" ? s : null;
+    })(),
+    SERVICES_BOX_TEXT: box?.SERVICES_TEXT != null ? String(box.SERVICES_TEXT).trim() : "",
+    SERVICES_ARG_TEXT: (() => {
+      const v = ENV.directEnv.SERVICES ?? ENV.compatArgs.SERVICES;
+      return v != null ? String(v).trim() : "";
+    })()
+  };
+  const baseSec = Number(cfg.Timeout) || 8;
+  const secRaw = Number(cfg.SD_TIMEOUT_SEC_RAW);
+  cfg.SD_TIMEOUT_MS = Math.max(CONSTS.SD_MIN_TIMEOUT, ((Number.isFinite(secRaw) && secRaw > 0) ? secRaw : baseSec) * 1000);
+  cfg.BUDGET_MS = (() => {
+    const raw = Number(cfg.BUDGET_SEC_RAW);
+    const base = Math.max(1, Number(cfg.Timeout) || 8) * 1000;
+    if (Number.isFinite(raw) && raw > 0) return Math.max(3500, raw * 1000);
+    return Math.min(CONSTS.BUDGET_HARD_MS, Math.max(5500, base));
+  })();
+  cfg.MASK_POS = ["", "auto", "follow", "same"].includes(String(cfg.MASK_POS_MODE).trim().toLowerCase()) ? cfg.MASK_IP : toBool(cfg.MASK_POS_MODE, true);
+  cfg.ICON_NAME = String(cfg.Icon || "").trim() || ({
+    wifi: "wifi.router",
+    globe: "globe.asia.australia",
+    dots: "dot.radiowaves.left.and.right",
+    antenna: "antenna.radiowaves.left.and.right",
+    point: "point.3.connected.trianglepath.dotted"
+  }[String(cfg.IconPreset).trim()] || "globe.asia.australia");
+  return cfg;
+}
 
 const IPV4_RE = /^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)(\.(?!$)|$)){4}$/;
 const IPV6_SRC = [
@@ -127,16 +280,401 @@ const IPV6_RE = new RegExp(`^${IPV6_SRC}$`);
 const isIPv4 = (ip) => IPV4_RE.test(ip || "");
 const isIPv6 = (ip) => IPV6_RE.test(ip || "");
 
+function maskIP(ip) {
+  if (!ip || !S().CFG.MASK_IP) return ip || "";
+  if (isIPv4(ip)) { const p = ip.split("."); return `${p[0]}.${p[1]}.*.*`; }
+  if (isIPv6(ip)) { const p = ip.split(":"); return [...p.slice(0, 4), "*", "*", "*", "*"].join(":"); }
+  return ip;
+}
+
+function splitFlagRaw(s) {
+  const re = /^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u;
+  const m = String(s || "").match(re);
+  let flag = m ? m[0] : "";
+  const text = String(s || "").replace(re, "");
+  if (flag.includes("🇹🇼")) {
+    if (S().CFG.TW_FLAG_MODE === 0) flag = "🇨🇳";
+    else if (S().CFG.TW_FLAG_MODE === 2) flag = "🇼🇸";
+  }
+  return { flag, text };
+}
+function onlyFlag(loc) { return splitFlagRaw(loc).flag || "-"; }
+function flagFirst(loc) { const x = splitFlagRaw(loc); return (x.flag || "") + (x.text || ""); }
+function flagOf(code) {
+  let cc = String(code || "").trim();
+  if (!cc) return "";
+  if (/^中国$|^CN$/i.test(cc)) cc = "CN";
+  if (!/^[A-Za-z]{2}$/.test(cc)) return "";
+  try {
+    if (cc.toUpperCase() === "TW") {
+      if (S().CFG.TW_FLAG_MODE === 0) return "🇨🇳";
+      if (S().CFG.TW_FLAG_MODE === 2) return "🇼🇸";
+    }
+    return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 127397 + ch.charCodeAt(0)));
+  } catch (_) { return ""; }
+}
+
+function fmtISP(isp, locStr) {
+  const raw = String(isp || "").trim();
+  if (!raw) return "";
+  const txt = String(locStr || "");
+  const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt);
+  if (!isMainland) return raw;
+  const norm = raw.replace(/\s*\(中国\)\s*/, "").replace(/\s+/g, " ").trim();
+  const s = norm.toLowerCase();
+  if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm)) return S().CFG.SD_LANG === "zh-Hant" ? "中國移動" : "中国移动";
+  if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /电信/.test(norm)) return S().CFG.SD_LANG === "zh-Hant" ? "中國電信" : "中国电信";
+  if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /联通/.test(norm)) return S().CFG.SD_LANG === "zh-Hant" ? "中國聯通" : "中国联通";
+  if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /广电/.test(norm)) return S().CFG.SD_LANG === "zh-Hant" ? "中國廣電" : "中国广电";
+  return raw;
+}
+
+function radioToGen(r) {
+  if (!r) return "";
+  const x = String(r).toUpperCase().replace(/\s+/g, "");
+  const alias = { NR5G: "NR", NRSA: "NR", NRNSA: "NRNSA", LTEA: "LTE", "LTE+": "LTE", LTEPLUS: "LTE" };
+  const k = alias[x] || x;
+  const MAP = { GPRS: "2.5G", EDGE: "2.75G", CDMA1X: "2.5G", WCDMA: "3G", HSDPA: "3.5G", HSUPA: "3.75G", EHRPD: "3.9G", LTE: "4G", NRNSA: "5G", NR: "5G" };
+  return MAP[k] || "";
+}
+
+function netTypeLine() {
+  const n = S().RT.device || {};
+  const ssid = n.wifi?.ssid;
+  if (ssid) return `${t("wifi")} | ${ssid}`;
+  const radio = n.cellular?.radio;
+  if (radio) return `${t("cellular")} | ${radioToGen(radio) || radio}`;
+  const iface = n.ipv4?.interface || n.ipv6?.interface || "";
+  if (/^pdp/i.test(iface)) return `${t("cellular")} | -`;
+  if (/^(en|eth|wlan)/i.test(iface)) return `${t("wifi")} | -`;
+  return t("unknownNet");
+}
+
+function log(level, ...args) {
+  if (!S().CFG.LOG) return;
+  const map = { debug: 10, info: 20, warn: 30, error: 40 };
+  if ((map[level] ?? 20) < (map[S().CFG.LOG_LEVEL] ?? 20)) return;
+  const line = `[NI][${level.toUpperCase()}] ${args.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ')}`;
+  try { console.log(line); } catch (_) {}
+  S().DEBUG.push(line);
+  if (S().DEBUG.length > CONSTS.LOG_RING_MAX) S().DEBUG.shift();
+}
+
+function budgetLeft() { return Math.max(0, S().DEADLINE - Date.now()); }
+function capByBudget(capMs, floorMs = 220) {
+  const left = budgetLeft();
+  if (left <= CONSTS.BUDGET_SOFT_GUARD_MS) return Math.max(120, floorMs);
+  const room = Math.max(120, left - CONSTS.BUDGET_SOFT_GUARD_MS);
+  return Math.max(120, Math.min(Number(capMs) || room, room));
+}
+async function withTimeout(promise, ms, onTimeoutValue) {
+  const lim = Math.max(120, Number(ms) || 0);
+  let tmr;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise((resolve) => { tmr = setTimeout(() => resolve(onTimeoutValue), lim); })
+    ]);
+  } finally { if (tmr) clearTimeout(tmr); }
+}
+
+async function httpGetRT(url, headers = {}, timeoutMs = null, followRedirect = false) {
+  const start = Date.now();
+  const resp = await S().RT.http.get(url, {
+    headers,
+    timeout: timeoutMs == null ? capByBudget(3500) : Math.min(Number(timeoutMs) || 3500, capByBudget(3500)),
+    redirect: followRedirect ? "follow" : "manual",
+    policy: S().CFG.PROXY_POLICY || undefined
+  });
+  const body = await resp.text();
+  return { status: resp.status || 0, headers: resp.headers || {}, body, cost: Date.now() - start };
+}
+async function httpPostRT(url, headers = {}, body = "", timeoutMs = null) {
+  const start = Date.now();
+  const resp = await S().RT.http.post(url, {
+    headers,
+    body,
+    timeout: timeoutMs == null ? capByBudget(3500) : Math.min(Number(timeoutMs) || 3500, capByBudget(3500)),
+    redirect: "follow",
+    policy: S().CFG.PROXY_POLICY || undefined
+  });
+  const text = await resp.text();
+  return { status: resp.status || 0, headers: resp.headers || {}, body: text, cost: Date.now() - start };
+}
+
+const DIRECT_V4_SOURCES = Object.freeze({
+  ipip: {
+    url: "https://myip.ipip.net/json",
+    parse: (r) => {
+      const j = safeJSON(r.body, {});
+      const loc = j?.data?.location || [];
+      const c0 = loc[0];
+      const flag = flagOf(c0 === "中国" ? "CN" : c0);
+      let isp = "";
+      if (Array.isArray(loc)) {
+        if (loc.length >= 5) isp = loc[4] || "";
+        else if (loc.length >= 4) isp = loc[3] || "";
+      }
+      return { ip: j?.data?.ip || "", loc: joinNonEmpty([flag, loc[0], loc[1], loc[2]], " ").replace(/\s*中国\s*/, ""), isp: String(isp || "").trim() };
+    }
+  },
+  cip: {
+    url: "http://cip.cc/",
+    parse: (r) => {
+      const b = String(r.body || "");
+      const ip = (b.match(/IP.*?:\s*(\S+)/) || [])[1] || "";
+      const addr = (b.match(/地址.*?:\s*(.+)/) || [])[1] || "";
+      const isp = (b.match(/运营商.*?:\s*(.+)/) || [])[1] || "";
+      const isCN = /中国/.test(addr);
+      return { ip, loc: joinNonEmpty([flagOf(isCN ? "CN" : ""), addr.replace(/中国\s*/, "")], " "), isp: isp.replace(/中国\s*/, "") };
+    }
+  },
+  "163": {
+    url: "https://dashi.163.com/fgw/mailsrv-ipdetail/detail",
+    parse: (r) => {
+      const d = safeJSON(r.body, {})?.result || {};
+      return { ip: d.ip || "", loc: joinNonEmpty([flagOf(d.countryCode), d.country, d.province, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.isp || d.org || "" };
+    }
+  },
+  bilibili: {
+    url: "https://api.bilibili.com/x/web-interface/zone",
+    parse: (r) => {
+      const d = safeJSON(r.body, {})?.data || {};
+      const flag = flagOf(d.country === "中国" ? "CN" : d.country);
+      return { ip: d.addr || "", loc: joinNonEmpty([flag, d.country, d.province, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.isp || "" };
+    }
+  },
+  "126": {
+    url: "https://ipservice.ws.126.net/locate/api/getLocByIp",
+    parse: (r) => {
+      const d = safeJSON(r.body, {})?.result || {};
+      return { ip: d.ip || "", loc: joinNonEmpty([flagOf(d.countrySymbol), d.country, d.province, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.operator || "" };
+    }
+  },
+  pingan: {
+    url: "https://rmb.pingan.com.cn/itam/mas/linden/ip/request",
+    parse: (r) => {
+      const d = safeJSON(r.body, {})?.data || {};
+      return { ip: d.ip || "", loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.isp || d.ispName || d.operator || d.org || d.as || "" };
+    }
+  }
+});
+
+const LANDING_V4_SOURCES = Object.freeze({
+  ipapi: {
+    url: "http://ip-api.com/json?lang=zh-CN",
+    parse: (r) => {
+      const j = safeJSON(r.body, {});
+      return { ip: j.query || "", loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ""), j.regionName?.split(/\s+or\s+/)[0], j.city], " "), isp: j.isp || j.org || "", org: j.org || "", as: j.as || "", country: j.country || "" };
+    }
+  },
+  ipwhois: {
+    url: "https://ipwhois.app/widget.php?lang=zh-CN",
+    parse: (r) => {
+      const j = safeJSON(r.body, {});
+      const asn = j.asn || j.as || (j?.connection?.asn) || "";
+      return { ip: j.ip || "", loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ""), j.region, j.city], " "), isp: (j?.connection?.isp) || "", org: j.org || (j?.connection?.org) || "", as: asn || "", country: j.country || "" };
+    }
+  },
+  ipsb: {
+    url: "https://api-ipv4.ip.sb/geoip",
+    parse: (r) => {
+      const j = safeJSON(r.body, {});
+      const as = j.asn ? (`AS${j.asn}` + (j.asn_organization ? ` ${j.asn_organization}` : "")) : "";
+      return { ip: j.ip || "", loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], " ").replace(/\s*中国\s*/, ""), isp: j.isp || j.organization || "", org: j.organization || j.asn_organization || "", as, country: j.country || "" };
+    }
+  }
+});
+
+const IPV6_IP_ENDPOINTS = Object.freeze({
+  ddnspod: "https://ipv6.ddnspod.com",
+  neu6: "https://speed.neu6.edu.cn/getIP.php",
+  ipsb: "https://api-ipv6.ip.sb/ip",
+  ident: "https://v6.ident.me",
+  ipify: "https://api6.ipify.org"
+});
+
+const ORDER = Object.freeze({
+  directV4: ["cip", "163", "126", "bilibili", "pingan", "ipip"],
+  landingV4: ["ipapi", "ipwhois", "ipsb"],
+  directV6: ["ddnspod", "neu6"],
+  landingV6: ["ipsb", "ident", "ipify"]
+});
+function makeTryOrder(prefer, fallbackList) { return [prefer, ...fallbackList].filter((x, i, a) => x && a.indexOf(x) === i); }
+function hasCityLevel(loc) {
+  if (!loc) return false;
+  try {
+    const s = String(loc).replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, "").trim();
+    if (/市|区|縣|县|州|市辖/.test(s)) return true;
+    return s.split(/\s+/).filter(Boolean).length >= 3;
+  } catch (_) { return false; }
+}
+async function trySources(order, sourceMap, { needCityPrefer = false, acceptIp = null }) {
+  let firstOK = null;
+  for (const key of order) {
+    if (budgetLeft() <= 300) break;
+    const def = sourceMap[key];
+    if (!def) continue;
+    try {
+      const r = await httpGetRT(def.url, {}, null, false);
+      const res = def.parse(r) || {};
+      const ip = String(res.ip || "").trim();
+      const ok = acceptIp ? acceptIp(ip) : !!ip;
+      const cityOK = ok && hasCityLevel(res.loc);
+      if (ok) {
+        res.ip = ip;
+        if (!firstOK) firstOK = res;
+        if (!needCityPrefer || cityOK) return res;
+      }
+    } catch (_) {}
+  }
+  return firstOK || {};
+}
+async function tryIPv6Ip(order, opt = {}) {
+  const timeoutMs = opt.timeoutMs != null ? opt.timeoutMs : Math.min(Math.max(CONSTS.SD_MIN_TIMEOUT, S().CFG.SD_TIMEOUT_MS), 2500);
+  const maxTries = Math.max(1, Math.min(Number(opt.maxTries || order.length), order.length));
+  for (const key of order.slice(0, maxTries)) {
+    if (budgetLeft() <= 260) break;
+    const url = IPV6_IP_ENDPOINTS[key];
+    if (!url) continue;
+    try {
+      const r = await httpGetRT(url, {}, timeoutMs, false);
+      const ip = String(r.body || "").trim();
+      if (isIPv6(ip)) return { ip };
+    } catch (_) {}
+  }
+  return {};
+}
+async function fillDirectIspSameIp(targetIp, skipKey) {
+  const ip = String(targetIp || "").trim();
+  if (!ip) return "";
+  for (const key of ORDER.directV4.filter((k) => k && k !== skipKey)) {
+    if (budgetLeft() <= 320) break;
+    const def = DIRECT_V4_SOURCES[key];
+    if (!def) continue;
+    try {
+      const r = await httpGetRT(def.url, {}, null, false);
+      const x = def.parse(r) || {};
+      if (String(x.ip || "").trim() === ip && String(x.isp || "").trim()) return String(x.isp || "").trim();
+    } catch (_) {}
+  }
+  return "";
+}
+async function getDirectV4(preferKey) {
+  const res = await trySources(makeTryOrder(preferKey, ORDER.directV4), DIRECT_V4_SOURCES, { needCityPrefer: true, acceptIp: isIPv4 });
+  if (res && res.ip && !String(res.isp || "").trim()) {
+    const filled = await fillDirectIspSameIp(res.ip, preferKey).catch(() => "");
+    if (filled) res.isp = filled;
+  }
+  return res || {};
+}
+async function getDirectV6(preferKey) { return await tryIPv6Ip(makeTryOrder(preferKey, ORDER.directV6), { timeoutMs: 2200 }); }
+async function getLandingV4(preferKey) { return await trySources(makeTryOrder(preferKey, ORDER.landingV4), LANDING_V4_SOURCES, { acceptIp: isIPv4 }); }
+async function probeLandingV6(preferKey) {
+  const r = await tryIPv6Ip(makeTryOrder(preferKey, ORDER.landingV6), { timeoutMs: Math.min(CONSTS.V6_PROBE_TO_MS, 900), maxTries: 2 });
+  return { ok: !!r.ip, ip: r.ip || "" };
+}
+
+function ipToPtrName(ip) {
+  const s = String(ip || "").trim();
+  if (isIPv4(s)) return s.split(".").reverse().join(".") + ".in-addr.arpa";
+  if (isIPv6(s)) {
+    const raw = s.toLowerCase().split("%")[0];
+    const halves = raw.split("::");
+    const left = (halves[0] || "").split(":").filter(Boolean);
+    const right = (halves[1] || "").split(":").filter(Boolean);
+    const missing = (halves.length === 2) ? Math.max(0, 8 - (left.length + right.length)) : 0;
+    const groups = [];
+    for (const g of left) groups.push(g.padStart(4, "0"));
+    for (let i = 0; i < missing; i++) groups.push("0000");
+    for (const g of right) groups.push(g.padStart(4, "0"));
+    while (groups.length < 8) groups.push("0000");
+    return groups.join("").split("").reverse().join(".") + ".ip6.arpa";
+  }
+  return "";
+}
+async function queryPTRMaybe(ip) {
+  if (!ip || budgetLeft() <= 800) return "";
+  return await withTimeout((async () => {
+    const name = ipToPtrName(ip);
+    if (!name) return "";
+    const r = await httpGetRT("https://dns.google/resolve?name=" + encodeURIComponent(name) + "&type=PTR", { Accept: "application/dns-json" }, Math.min(900, capByBudget(900)), true).catch(() => null);
+    if (!r || r.status !== 200) return "";
+    const j = safeJSON(r.body, {});
+    const ans = Array.isArray(j.Answer) ? j.Answer : [];
+    const first = ans.find((x) => x && (x.type === 12 || String(x.type) === "12") && x.data);
+    return first ? String(first.data).trim().replace(/\.$/, "") : "";
+  })(), Math.min(950, capByBudget(950)), "");
+}
+
+function normStr(x) { return String(x == null ? "" : x).replace(/\s+/g, " ").replace(/[（(].*?[）)]/g, " ").trim().toLowerCase(); }
+function parseASNNumber(s) {
+  const str = String(s || "");
+  const m = str.match(/\bAS(\d{1,10})\b/i);
+  if (m) return Number(m[1]) || 0;
+  const m2 = str.match(/\b(\d{1,10})\b/);
+  return m2 ? (Number(m2[1]) || 0) : 0;
+}
 const RISK_RULES = Object.freeze({
-  dataCenterKeywords: ["datacenter","data center","hosting","cloud","cdn","edge","vps","colo","colocation","proxy","vpn","tunnel","relay","compute","server","amazon","aws","google","gcp","microsoft","azure","digitalocean","linode","ovh","hetzner","vultr","oracle","alibaba cloud","tencent cloud","cloudflare","fastly","akamai","leaseweb","choopa","dmit","racknerd"],
-  homeBroadbandKeywords: ["china telecom","chinanet","ctcc","as4134","as4809","china mobile","cmcc","cmnet","cmi","as9808","china unicom","unicom","cucc","as4837","cernet","china education","comcast","xfinity","verizon","at&t","charter","spectrum","cox","rogers","bell canada","telus","bt","virgin media","sky broadband","deutsche telekom","telefonica","orange","vodafone","isp","broadband","fiber","ftth","residential","cable","docsis","pppoe","dsl","adsl","vdsl","pon","gpon","epon","cpe","dynamic","dyn","pool","subscriber","cust","customer","telecom","communications","chunghwa","cht","hinet","kbro","formosabroadband","formosa broadband","seednet","taiwan broadband","tbc","cable tv","cablemodem"],
-  mobileKeywords: ["mobile","lte","4g","5g","cell","cellular","wireless","epc","ims","gprs","wimax"],
-  rdnsDatacenterSuffix: ["amazonaws.com","compute.amazonaws.com","googleusercontent.com","cloudapp.azure.com","digitalocean.com","linodeusercontent.com","ovh.net","kimsufi.com","online.net","hetzner.de","hetzner.com","vultrusercontent.com","leaseweb.net","choopa.net","cloudflare.com","cloudflarenet.com","fastly.net","akamai.net"],
-  rdnsHomeKeywords: ["dynamic","dyn","pppoe","dsl","adsl","vdsl","cable","docsis","fiber","ftth","fios","broadband","res","home","cust","customer","subscriber","pool","cpe","hinet","formosabroadband","kbro","cht","seednet"],
-  rdnsMobileKeywords: ["lte","5g","4g","mobile","cell","wireless","epc"],
-  highRiskCountries: ["俄罗斯","russia","印度","india","乌克兰","ukraine"]
+  dataCenterKeywords: ["datacenter", "data center", "hosting", "cloud", "cdn", "edge", "vps", "colo", "colocation", "proxy", "vpn", "tunnel", "relay", "compute", "server", "amazon", "aws", "google", "gcp", "microsoft", "azure", "digitalocean", "linode", "ovh", "hetzner", "vultr", "oracle", "alibaba cloud", "tencent cloud", "cloudflare", "fastly", "akamai", "leaseweb", "choopa", "dmit", "racknerd"],
+  homeBroadbandKeywords: ["china telecom", "chinanet", "ctcc", "as4134", "as4809", "china mobile", "cmcc", "cmnet", "cmi", "as9808", "china unicom", "unicom", "cucc", "as4837", "cernet", "china education", "comcast", "xfinity", "verizon", "at&t", "charter", "spectrum", "cox", "rogers", "bell canada", "telus", "bt", "virgin media", "sky broadband", "deutsche telekom", "telefonica", "orange", "vodafone", "isp", "broadband", "fiber", "ftth", "residential", "cable", "docsis", "pppoe", "dsl", "adsl", "vdsl", "pon", "gpon", "epon", "cpe", "dynamic", "dyn", "pool", "subscriber", "cust", "customer", "telecom", "communications", "chunghwa", "cht", "hinet", "kbro", "formosabroadband", "formosa broadband", "seednet", "taiwan broadband", "tbc", "cable tv", "cablemodem"],
+  mobileKeywords: ["mobile", "lte", "4g", "5g", "cell", "cellular", "wireless", "epc", "ims", "gprs", "wimax"],
+  rdnsDatacenterSuffix: ["amazonaws.com", "compute.amazonaws.com", "googleusercontent.com", "cloudapp.azure.com", "digitalocean.com", "linodeusercontent.com", "ovh.net", "kimsufi.com", "online.net", "hetzner.de", "hetzner.com", "vultrusercontent.com", "leaseweb.net", "choopa.net", "cloudflare.com", "cloudflarenet.com", "fastly.net", "akamai.net"],
+  rdnsHomeKeywords: ["dynamic", "dyn", "pppoe", "dsl", "adsl", "vdsl", "cable", "docsis", "fiber", "ftth", "fios", "broadband", "res", "home", "cust", "customer", "subscriber", "pool", "cpe", "hinet", "formosabroadband", "kbro", "cht", "seednet"],
+  rdnsMobileKeywords: ["lte", "5g", "4g", "mobile", "cell", "wireless", "epc"],
+  highRiskCountries: ["俄罗斯", "russia", "印度", "india", "乌克兰", "ukraine"]
 });
 const ASN_HOME_STRONG = new Set([38841]);
+function _hasAny(hay, list) {
+  const H = normStr(hay);
+  if (!H) return false;
+  for (const kw of list || []) {
+    const K = normStr(kw);
+    if (K && H.includes(K)) return true;
+  }
+  return false;
+}
+function _rdnsLooksDatacenter(ptrHost) {
+  const host = normStr(ptrHost).replace(/\.$/, "");
+  if (!host) return false;
+  return RISK_RULES.rdnsDatacenterSuffix.some((suf) => host.endsWith(normStr(suf)));
+}
+function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
+  const ISP = normStr(isp), ORG = normStr(org), CTRY = normStr(country), AS = normStr(asField);
+  const hay = joinNonEmpty([ISP, ORG, AS], " | ");
+  const asn = parseASNNumber(asField);
+  const reasons = [];
+  let riskValue = 0;
+  const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost);
+  const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
+  const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.rdnsMobileKeywords);
+  if (rdnsHitDC) { riskValue += 75; reasons.push("PTR命中机房"); }
+  if (rdnsHitHB) { const delta = rdnsHitDC ? -6 : -26; riskValue += delta; reasons.push(`PTR住宅${delta}`); }
+  if (rdnsHitMobile) { const delta = rdnsHitDC ? 0 : -8; riskValue += delta; reasons.push(`PTR移动${delta}`); }
+  const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
+  const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
+  const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
+  if (dcHit) { riskValue += 55; reasons.push("ORG/ISP机房+55"); }
+  if (hbHit) { const delta = (rdnsHitDC || dcHit) ? -10 : -22; riskValue += delta; reasons.push(`ORG/ISP家宽${delta}`); }
+  if (mobileHit) { const delta = (rdnsHitDC || dcHit) ? 0 : -10; riskValue += delta; reasons.push(`ORG/ISP移动${delta}`); }
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(normStr(x)))) { riskValue += 18; reasons.push("国家+18"); }
+  if (!ORG && !AS && ISP.length <= 3) { riskValue += 10; reasons.push("信息不足+10"); }
+  riskValue = clamp(Math.round(riskValue), 0, 100);
+  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (ASN_HOME_STRONG.has(asn) ? 1 : 0);
+  const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
+  const tunnelLike = (dcEvidence >= 2) || (riskValue >= 70) || rdnsHitDC;
+  const homeLikeStrong = (hbEvidence >= 2) && !tunnelLike && (riskValue <= 50);
+  const homeLikeSoft = (hbEvidence >= 1) && (dcEvidence === 0) && !tunnelLike && (riskValue <= 38);
+  const isHomeBroadband = homeLikeStrong || homeLikeSoft;
+  return {
+    riskValue,
+    isHomeBroadband,
+    lineType: isHomeBroadband ? t("home") : t("nonHome"),
+    nativeHint: (!tunnelLike && riskValue < 55) ? t("nativeLike") : t("nonNative"),
+    tunnelHint: tunnelLike ? t("strongTunnel") : t("weakTunnel"),
+    reasons
+  };
+}
 
 const SD_ALIAS = {
   yt: "youtube", youtube: "youtube", "youtube premium": "youtube", 油管: "youtube",
@@ -147,412 +685,541 @@ const SD_ALIAS = {
   hulu: "hulu_us", 葫芦: "hulu_us", 葫蘆: "hulu_us", huluus: "hulu_us", hulujp: "hulu_jp",
   hbo: "hbo", max: "hbo"
 };
-
-const DIRECT_V4_SOURCES = Object.freeze({
-  ipip: { url: "https://myip.ipip.net/json", parse: (j) => {
-    const d = safeJSON(j, {}); const loc = d?.data?.location || []; const c0 = loc[0]; const flag = flagOfGlobal(c0 === "中国" ? "CN" : c0);
-    let isp = ""; if (Array.isArray(loc)) { if (loc.length >= 5) isp = loc[4] || ""; else if (loc.length >= 4) isp = loc[3] || ""; }
-    return { ip: d?.data?.ip || "", loc: joinNonEmpty([flag, loc[0], loc[1], loc[2]], " ").replace(/\s*中国\s*/, ""), isp: String(isp || "").trim() };
-  } },
-  cip: { url: "http://cip.cc/", parse: (b) => {
-    const s = String(b || ""); const ip = (s.match(/IP.*?:\s*(\S+)/) || [])[1] || ""; const addr = (s.match(/地址.*?:\s*(.+)/) || [])[1] || ""; const isp = (s.match(/运营商.*?:\s*(.+)/) || [])[1] || ""; const isCN = /中国/.test(addr);
-    return { ip, loc: joinNonEmpty([flagOfGlobal(isCN ? "CN" : ""), addr.replace(/中国\s*/, "")], " "), isp: isp.replace(/中国\s*/, "") };
-  } },
-  "163": { url: "https://dashi.163.com/fgw/mailsrv-ipdetail/detail", parse: (b) => { const d = safeJSON(b, {})?.result || {}; return { ip: d.ip || "", loc: joinNonEmpty([flagOfGlobal(d.countryCode), d.country, d.province, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.isp || d.org || "" }; } },
-  bilibili: { url: "https://api.bilibili.com/x/web-interface/zone", parse: (b) => { const d = safeJSON(b, {})?.data || {}; const flag = flagOfGlobal(d.country === "中国" ? "CN" : d.country); return { ip: d.addr || "", loc: joinNonEmpty([flag, d.country, d.province, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.isp || "" }; } },
-  "126": { url: "https://ipservice.ws.126.net/locate/api/getLocByIp", parse: (b) => { const d = safeJSON(b, {})?.result || {}; return { ip: d.ip || "", loc: joinNonEmpty([flagOfGlobal(d.countrySymbol), d.country, d.province, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.operator || "" }; } },
-  pingan: { url: "https://rmb.pingan.com.cn/itam/mas/linden/ip/request", parse: (b) => { const d = safeJSON(b, {})?.data || {}; return { ip: d.ip || "", loc: joinNonEmpty([flagOfGlobal(d.countryIsoCode), d.country, d.region, d.city], " ").replace(/\s*中国\s*/, ""), isp: d.isp || d.ispName || d.operator || d.org || d.as || "" }; } }
-});
-
-const LANDING_V4_SOURCES = Object.freeze({
-  ipapi: { url: "http://ip-api.com/json?lang=zh-CN", parse: (b) => { const j = safeJSON(b, {}); return { ip: j.query || "", loc: joinNonEmpty([flagOfGlobal(j.countryCode), j.country?.replace(/\s*中国\s*/, ""), j.regionName?.split(/\s+or\s+/)[0], j.city], " "), isp: j.isp || j.org || "", org: j.org || "", as: j.as || "", country: j.country || "", countryCode: String(j.countryCode || "").toUpperCase() }; } },
-  ipwhois: { url: "https://ipwhois.app/widget.php?lang=zh-CN", parse: (b) => { const j = safeJSON(b, {}); const asn = j.asn || j.as || (j?.connection?.asn) || ""; return { ip: j.ip || "", loc: joinNonEmpty([flagOfGlobal(j.country_code), j.country?.replace(/\s*中国\s*/, ""), j.region, j.city], " "), isp: (j?.connection?.isp) || "", org: j.org || (j?.connection?.org) || "", as: asn || "", country: j.country || "", countryCode: String(j.country_code || "").toUpperCase() }; } },
-  ipsb: { url: "https://api-ipv4.ip.sb/geoip", parse: (b) => { const j = safeJSON(b, {}); const as = j.asn ? (`AS${j.asn}` + (j.asn_organization ? ` ${j.asn_organization}` : "")) : ""; return { ip: j.ip || "", loc: joinNonEmpty([flagOfGlobal(j.country_code), j.country, j.region, j.city], " ").replace(/\s*中国\s*/, ""), isp: j.isp || j.organization || "", org: j.organization || j.asn_organization || "", as, country: j.country || "", countryCode: String(j.country_code || "").toUpperCase() }; } }
-});
-
-const IPV6_IP_ENDPOINTS = Object.freeze({ ddnspod: "https://ipv6.ddnspod.com", neu6: "https://speed.neu6.edu.cn/getIP.php", ipsb: "https://api-ipv6.ip.sb/ip", ident: "https://v6.ident.me", ipify: "https://api6.ipify.org" });
-const ORDER = Object.freeze({ directV4: ["cip", "163", "126", "bilibili", "pingan", "ipip"], landingV4: ["ipapi", "ipwhois", "ipsb"], directV6: ["ddnspod", "neu6"], landingV6: ["ipsb", "ident", "ipify"] });
-
-function buildState(ctx) {
-  const compatArgs = parseArgs(ctx.env?._compat?.$argument || ctx.env?._compat?.argument || ctx.env?._compat_$argument || ctx.env?._compatArgument || "");
-  const readBoxSettings = () => {
-    const raw = ctx.storage?.get?.("Panel");
-    if (raw == null || raw === "") return {};
-    const panel = typeof raw === "string" ? safeJSON(raw, {}) : raw;
-    if (panel?.NetworkInfo?.Settings && typeof panel.NetworkInfo.Settings === "object") return panel.NetworkInfo.Settings;
-    if (panel?.Settings && typeof panel.Settings === "object") return panel.Settings;
-    return {};
-  };
-  const BOX = readBoxSettings();
-  const readBoxKey = (key) => {
-    if (!BOX || typeof BOX !== "object") return undefined;
-    if (!Object.prototype.hasOwnProperty.call(BOX, key)) return undefined;
-    const v = BOX[key]; return v === "" || v == null ? undefined : v;
-  };
-  const readArgRaw = (name) => Object.prototype.hasOwnProperty.call(compatArgs, name) ? compatArgs[name] : undefined;
-  const ENV = (key, defVal, opt = {}) => {
-    const typeHint = typeof defVal;
-    const argKeys = [key].concat(opt.argAlias || []);
-    const boxKeys = [key].concat(opt.boxAlias || []);
-    let envRaw; let hasEnv = false;
-    for (const k of argKeys) {
-      if (ctx.env && Object.prototype.hasOwnProperty.call(ctx.env, k)) {
-        const v = ctx.env[k]; if (v !== undefined && v !== null && v !== "") { envRaw = v; hasEnv = true; break; }
-      }
-    }
-    let argRaw; let hasArg = false;
-    for (const k of argKeys) {
-      const v = readArgRaw(k); if (v !== undefined && v !== null && v !== "") { argRaw = v; hasArg = true; break; }
-    }
-    let boxRaw; let hasBox = false;
-    for (const bk of boxKeys) {
-      const v = readBoxKey(bk); if (v !== undefined && v !== null && v !== "") { boxRaw = v; hasBox = true; break; }
-    }
-    const convert = (val) => typeHint === "number" ? toNum(val, defVal) : typeHint === "boolean" ? toBool(val, defVal) : val;
-    const canon = (val) => typeHint === "number" ? String(toNum(val, defVal)) : typeHint === "boolean" ? (toBool(val, defVal) ? "true" : "false") : String(val);
-    const changed = (raw) => canon(raw) !== canon(defVal);
-    if (hasEnv && changed(envRaw)) return convert(envRaw);
-    if (hasArg && changed(argRaw)) return convert(argRaw);
-    if (hasBox) return convert(boxRaw);
-    if (hasEnv) return convert(envRaw);
-    if (hasArg) return convert(argRaw);
-    return defVal;
-  };
-
-  const CFG = {
-    Update: toNum(ENV("Update", 10), 10),
-    Timeout: toNum(ENV("Timeout", 12), 12),
-    BUDGET_SEC_RAW: ENV("BUDGET", 0),
-    MASK_IP: toBool(ENV("MASK_IP", true), true),
-    MASK_POS_MODE: ENV("MASK_POS", "auto"),
-    IPv6: toBool(ENV("IPv6", true), true),
-    DOMESTIC_IPv4: (() => { const v = ENV("DOMESTIC_IPv4", "ipip"); return v !== "" && v != null ? v : ctx.env?.DOMIC_IPv4 || compatArgs.DOMIC_IPv4 || "ipip"; })(),
-    DOMESTIC_IPv6: (() => { const v = ENV("DOMESTIC_IPv6", "ddnspod"); return v !== "" && v != null ? v : ctx.env?.DOMIC_IPv6 || compatArgs.DOMIC_IPv6 || "ddnspod"; })(),
-    LANDING_IPv4: ENV("LANDING_IPv4", "ipapi"),
-    LANDING_IPv6: ENV("LANDING_IPv6", "ipsb"),
-    TW_FLAG_MODE: toNum(ENV("TW_FLAG_MODE", 1), 1),
-    IconPreset: ENV("IconPreset", "globe"),
-    Icon: ENV("Icon", ""),
-    IconColor: ENV("IconColor", "#1E90FF"),
-    SUBTITLE_STYLE: normalizeSubStyle(ENV("SUBTITLE_STYLE", "line")),
-    SUBTITLE_MINIMAL: toBool(ENV("SUBTITLE_MINIMAL", false), false),
-    GAP_LINES: clamp(toNum(ENV("GAP_LINES", 1), 1), 0, 2),
-    SD_STYLE: ENV("SD_STYLE", "icon"),
-    SD_REGION_MODE: ENV("SD_REGION_MODE", "full"),
-    SD_ICON_THEME: ENV("SD_ICON_THEME", "check"),
-    SD_ARROW: toBool(ENV("SD_ARROW", true), true),
-    SD_SHOW_LAT: toBool(ENV("SD_SHOW_LAT", true), true),
-    SD_SHOW_HTTP: toBool(ENV("SD_SHOW_HTTP", true), true),
-    SD_LANG: String(ENV("SD_LANG", "zh-Hans")).toLowerCase() === "zh-hant" ? "zh-Hant" : "zh-Hans",
-    SD_TIMEOUT_SEC_RAW: ENV("SD_TIMEOUT", 0),
-    SD_CONCURRENCY: toNum(ENV("SD_CONCURRENCY", 6), 6),
-    SERVICES_BOX_CHECKED_RAW: (() => { const v = readBoxKey("SERVICES"); if (v == null) return null; if (Array.isArray(v)) return v.length ? JSON.stringify(v) : null; const s = String(v).trim(); return !s || s === "[]" ? null : s; })(),
-    SERVICES_BOX_TEXT: (() => { const v = readBoxKey("SERVICES_TEXT"); return v != null ? String(v).trim() : ""; })(),
-    SERVICES_ARG_TEXT: (() => { let v = ctx.env?.SERVICES; if (Array.isArray(v)) return JSON.stringify(v); if (v == null || v === "") v = readArgRaw("SERVICES"); return v != null ? String(v).trim() : ""; })(),
-    LOG: toBool(ENV("LOG", true), true),
-    LOG_LEVEL: (ENV("LOG_LEVEL", "info") + "").toLowerCase(),
-    LOG_TO_PANEL: toBool(ENV("LOG_TO_PANEL", false), false),
-    LOG_PUSH: toBool(ENV("LOG_PUSH", true), true),
-    PROXY_POLICY: ENV("PROXY_POLICY", ""),
-    ENTRANCE4: ENV("ENTRANCE4", ""),
-    ENTRANCE6: ENV("ENTRANCE6", "")
-  };
-
-  const WANT_V6 = !!CFG.IPv6;
-  const HAS_V6 = !!ctx.device?.ipv6?.address;
-  const IPV6_EFF = WANT_V6 && HAS_V6;
-  const _maskPosMode = String(CFG.MASK_POS_MODE ?? "auto").trim().toLowerCase();
-  CFG.MASK_POS = (_maskPosMode === "" || _maskPosMode === "auto" || _maskPosMode === "follow" || _maskPosMode === "same") ? !!CFG.MASK_IP : toBool(_maskPosMode, true);
-  const SD_TIMEOUT_MS = (() => { const baseSec = Number(CFG.Timeout) || 8; const secRaw = Number(CFG.SD_TIMEOUT_SEC_RAW); const sec = (Number.isFinite(secRaw) && secRaw > 0) ? secRaw : baseSec; return Math.max(CONSTS.SD_MIN_TIMEOUT, sec * 1000); })();
-  const BUDGET_MS = (() => { const raw = Number(CFG.BUDGET_SEC_RAW); const base = Math.max(1, Number(CFG.Timeout) || 8) * 1000; if (Number.isFinite(raw) && raw > 0) return Math.max(3500, raw * 1000); return Math.min(CONSTS.BUDGET_HARD_MS, Math.max(5500, base)); })();
-  const V6_TO = Math.min(Math.max(CONSTS.SD_MIN_TIMEOUT, SD_TIMEOUT_MS), 2500);
-  const LOG_LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
-  const SD_STYLE = String(CFG.SD_STYLE).toLowerCase() === "text" ? "text" : "icon";
-  const SD_REGION_MODE = ["full","abbr","flag"].includes(String(CFG.SD_REGION_MODE)) ? CFG.SD_REGION_MODE : "full";
-  const SD_ICON_THEME = ["lock","circle","check"].includes(String(CFG.SD_ICON_THEME)) ? CFG.SD_ICON_THEME : "check";
-  const SD_ICONS = SD_ICON_THEME === "lock" ? { full: "🔓", partial: "🔐", blocked: "🔒" } : SD_ICON_THEME === "circle" ? { full: "⭕️", partial: "⛔️", blocked: "🚫" } : { full: "✅", partial: "❇️", blocked: "❎" };
-
-  return {
-    ctx, BOX, readBoxKey, CFG, WANT_V6, HAS_V6, IPV6_EFF, SD_TIMEOUT_MS, BUDGET_MS, DEADLINE: Date.now() + BUDGET_MS, V6_TO,
-    LOG_LEVELS, DEBUG_LINES: [], ENT_CACHE: { ip: "", t: 0, data: null }, SD_STYLE, SD_REGION_MODE, SD_ICON_THEME, SD_ICONS,
-    TW_FLAG_MODE: Number(CFG.TW_FLAG_MODE) || 0, ICON_NAME: (CFG.Icon || "").trim() || ICON_PRESET_MAP[String(CFG.IconPreset).trim()] || "globe.asia.australia", ICON_COLOR: CFG.IconColor
-  };
+const SD_TEST_KEYS = ["youtube", "netflix", "disney", "chatgpt_web", "chatgpt_app", "hulu_us", "hulu_jp", "hbo"];
+function parseServices(raw) {
+  if (raw == null) return [];
+  let s = String(raw).trim();
+  if (!s || s === "[]" || s === "{}" || /^null$/i.test(s) || /^undefined$/i.test(s)) return [];
+  try {
+    const arr = JSON.parse(s);
+    if (Array.isArray(arr)) return normSvcList(arr);
+  } catch (_) {}
+  return normSvcList(s.split(/[,\uFF0C;|\/ \t\r\n]+/));
+}
+function normSvcList(list) {
+  const out = [];
+  for (let x of list) {
+    let k = String(x ?? "").trim().toLowerCase();
+    if (!k) continue;
+    k = SD_ALIAS[k] || k;
+    if (!SD_TEST_KEYS.includes(k)) continue;
+    if (!out.includes(k)) out.push(k);
+  }
+  return out;
+}
+function selectServices() {
+  const cfg = S().CFG;
+  const argList = parseServices(cfg.SERVICES_ARG_TEXT);
+  if (argList.length) return argList;
+  const boxCheckedList = parseServices(cfg.SERVICES_BOX_CHECKED_RAW);
+  if (boxCheckedList.length) return boxCheckedList;
+  const boxTextList = parseServices(cfg.SERVICES_BOX_TEXT);
+  if (boxTextList.length) return boxTextList;
+  return SD_TEST_KEYS.slice();
 }
 
-let S = null;
-function t(key, ...args) { const pack = SD_STR[S?.CFG?.SD_LANG || "zh-Hans"] || SD_STR["zh-Hans"]; const v = pack[key]; return typeof v === "function" ? v(...args) : (v != null ? v : key); }
-function flagOfGlobal(code) { return flagOf(code); }
-
-function budgetLeft() { return Math.max(0, S.DEADLINE - Date.now()); }
-function capByBudget(capMs, floorMs = 220) { const left = budgetLeft(); if (left <= CONSTS.BUDGET_SOFT_GUARD_MS) return Math.max(120, floorMs); const room = Math.max(120, left - CONSTS.BUDGET_SOFT_GUARD_MS); return Math.max(120, Math.min(Number(capMs) || room, room)); }
-async function withTimeout(promise, ms, onTimeoutValue) { const lim = Math.max(120, Number(ms) || 0); let tmr; try { return await Promise.race([Promise.resolve(promise), new Promise((resolve) => { tmr = setTimeout(() => resolve(onTimeoutValue), lim); })]); } finally { if (tmr) clearTimeout(tmr); } }
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function log(level, ...args) {
-  if (!S.CFG.LOG) return;
-  const L = S.LOG_LEVELS[level] ?? 20;
-  if (L < (S.LOG_LEVELS[S.CFG.LOG_LEVEL] ?? 20)) return;
-  const line = `[NI][${level.toUpperCase()}] ` + args.map((x) => typeof x === "string" ? x : JSON.stringify(x)).join(" ");
-  try { console.log(line); } catch {}
-  S.DEBUG_LINES.push(line);
-  if (S.DEBUG_LINES.length > CONSTS.LOG_RING_MAX) S.DEBUG_LINES.shift();
-}
-
-function normStr(x) { return String(x == null ? "" : x).replace(/\s+/g, " ").replace(/[（(].*?[）)]/g, " ").trim().toLowerCase(); }
-function parseASNNumber(s) { const str = String(s || ""); const m = str.match(/\bAS(\d{1,10})\b/i); if (m) return Number(m[1]) || 0; const m2 = str.match(/\b(\d{1,10})\b/); return m2 ? (Number(m2[1]) || 0) : 0; }
-function _hasAny(hay, list) { const H = normStr(hay); if (!H) return false; for (const kw of (list || [])) { const K = normStr(kw); if (K && H.includes(K)) return true; } return false; }
-function _rdnsLooksDatacenter(ptrHost) { const host = normStr(ptrHost).replace(/\.$/, ""); if (!host) return false; return RISK_RULES.rdnsDatacenterSuffix.some((suf) => host.endsWith(normStr(suf))); }
-function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
-  const ISP = normStr(isp), ORG = normStr(org), CTRY = normStr(country), AS = normStr(asField); const hay = joinNonEmpty([ISP, ORG, AS], " | "); const asn = parseASNNumber(asField); const reasons = []; let riskValue = 0;
-  const rdnsHitDC = _rdnsLooksDatacenter(rdnsHost), rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords), rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.rdnsMobileKeywords);
-  if (rdnsHitDC) { riskValue += 75; reasons.push("PTR 命中机房域名后缀"); }
-  if (rdnsHitHB) { const delta = rdnsHitDC ? -6 : -26; riskValue += delta; reasons.push(`PTR 命中住宅/接入网关键词(${delta})`); }
-  if (rdnsHitMobile) { const delta = rdnsHitDC ? 0 : -8; riskValue += delta; reasons.push(`PTR 命中移动网络关键词(${delta})`); }
-  const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords), hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords), mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
-  if (dcHit) { riskValue += 55; reasons.push("ORG/ISP/AS 命中机房/云/托管关键词(+55)"); }
-  if (hbHit) { const delta = (rdnsHitDC || dcHit) ? -10 : -22; riskValue += delta; reasons.push(`ORG/ISP/AS 命中家宽/接入关键词(${delta})`); }
-  if (mobileHit) { const delta = (rdnsHitDC || dcHit) ? 0 : -10; riskValue += delta; reasons.push(`ORG/ISP/AS 命中移动网络关键词(${delta})`); }
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(normStr(x)))) { riskValue += 18; reasons.push("国家风险加成(+18)"); }
-  if (!ORG && !AS && ISP.length <= 3) { riskValue += 10; reasons.push("信息不足惩罚(+10)"); }
-  riskValue = clamp(Math.round(riskValue), 0, 100);
-  const hbEvidence = [hbHit, rdnsHitHB].filter(Boolean).length + (ASN_HOME_STRONG.has(asn) ? 1 : 0);
-  const dcEvidence = [dcHit, rdnsHitDC].filter(Boolean).length;
-  const isHant = S.CFG.SD_LANG === "zh-Hant"; const zh = (h, t2) => isHant ? t2 : h;
-  const tunnelLike = (dcEvidence >= 2) || (riskValue >= 70) || rdnsHitDC;
-  const homeLikeStrong = (hbEvidence >= 2) && !tunnelLike && (riskValue <= 50);
-  const homeLikeSoft = (hbEvidence >= 1) && (dcEvidence === 0) && !tunnelLike && (riskValue <= 38);
-  const isHomeBroadband = homeLikeStrong || homeLikeSoft;
-  return {
-    riskValue,
-    lineType: isHomeBroadband ? zh("家宽", "家寬") : zh("非家宽", "非家寬"),
-    subtype: rdnsHitMobile || mobileHit ? zh("移动网络", "行動網路") : (tunnelLike || dcEvidence >= 1) ? zh("机房/专线特征", "機房/專線特徵") : isHomeBroadband ? zh("住宅/接入特征", "住宅/接入特徵") : (hbEvidence >= 1 ? zh("运营商/接入", "運營商/接入") : zh("普通 ISP", "一般 ISP")),
-    isHomeBroadband,
-    nativeHint: (!tunnelLike && riskValue < 55) ? zh("更像原生", "更像原生") : zh("可能非原生", "可能非原生"),
-    tunnelHint: tunnelLike ? zh("机房/代理特征偏强", "機房/代理特徵偏強") : zh("机房/代理特征偏弱", "機房/代理特徵偏弱"),
-    reasons,
-    _raw: { asn, rdnsHost: rdnsHost || "", dcHit, hbHit, mobileHit, rdnsHitDC, rdnsHitHB, rdnsHitMobile, hbEvidence, dcEvidence }
-  };
-}
-
-function pad2(n) { return String(n).padStart(2, "0"); }
-function now() { const d = new Date(); return `${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; }
-function maskIP(ip) { if (!ip || !S.CFG.MASK_IP) return ip || ""; if (isIPv4(ip)) { const p = ip.split("."); return [p[0], p[1], "*", "*"].join("."); } if (isIPv6(ip)) { const p = ip.split(":"); return [...p.slice(0,4),"*","*","*","*"].join(":"); } return ip; }
-function ipLine(label, ip) { if (!ip) return null; const s = String(ip).trim(); if (!s) return null; if (/ipv4/i.test(label) && !isIPv4(s)) return null; if (/ipv6/i.test(label) && !isIPv6(s)) return null; return `${label}: ${maskIP(s)}`; }
-function hasCityLevel(loc) { if (!loc) return false; try { const s = String(loc).replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, "").trim(); if (/市|区|縣|县|州|市辖/.test(s)) return true; return s.split(/\s+/).filter(Boolean).length >= 3; } catch { return false; } }
-
-function splitFlagRaw(s) { const re = /^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u; const m = String(s || "").match(re); let flag = m ? m[0] : ""; const text = String(s || "").replace(re, ""); if (flag.includes("🇹🇼")) { if (S.TW_FLAG_MODE === 0) flag = "🇨🇳"; else if (S.TW_FLAG_MODE === 2) flag = "🇼🇸"; } return { flag, text }; }
-const onlyFlag = (loc) => splitFlagRaw(loc).flag || "-";
-const flagFirst = (loc) => { const { flag, text } = splitFlagRaw(loc); return (flag || "") + (text || ""); };
-function flagOf(code) { let cc = String(code || "").trim(); if (!cc) return ""; if (/^中国$|^CN$/i.test(cc)) cc = "CN"; if (cc.length !== 2 || !/^[A-Za-z]{2}$/.test(cc)) return ""; try { if (cc.toUpperCase() === "TW") { if (S.TW_FLAG_MODE === 0) return "🇨🇳"; if (S.TW_FLAG_MODE === 2) return "🇼🇸"; } return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 127397 + ch.charCodeAt(0))); } catch { return ""; } }
-function fmtISP(isp, locStr) { const raw = String(isp || "").trim(); if (!raw) return ""; const txt = String(locStr || ""); const isMainland = /^🇨🇳/.test(txt) || /(^|\s)中国(?!香港|澳门|台湾)/.test(txt); if (!isMainland) return raw; const norm = raw.replace(/\s*\(中国\)\s*/, "").replace(/\s+/g, " ").trim(); const s = norm.toLowerCase(); if (/(^|[\s-])(cmcc|cmnet|cmi)\b/.test(s) || /china\s*mobile/.test(s) || /移动/.test(norm)) return "中国移动"; if (/(^|[\s-])(chinanet|china\s*telecom|ctcc|ct)\b/.test(s) || /电信/.test(norm)) return "中国电信"; if (/(^|[\s-])(china\s*unicom|cncgroup|netcom)\b/.test(s) || /联通/.test(norm)) return "中国联通"; if (/(^|[\s-])(cbn|china\s*broadcast)/.test(s) || /广电/.test(norm)) return "中国广电"; if (/cernet|china\s*education/.test(s) || /教育网/.test(norm)) return "中国教育网"; if (/^中国(移动|联通|电信|广电)$/.test(norm)) return norm; return raw; }
-
-async function httpGet(url, headers = {}, timeoutMs = null, followRedirect = false, ext = {}) {
+const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const SD_BASE_HEADERS = { "User-Agent": SD_UA, "Accept-Language": "en" };
+async function sd_httpGet(url, headers = {}, followRedirect = true) {
   const start = Date.now();
-  const resp = await S.ctx.http.get(url, { headers, timeout: timeoutMs == null ? capByBudget(3500) : Math.min(Number(timeoutMs) || 3500, capByBudget(3500)), redirect: followRedirect ? "follow" : "manual", policy: ext.policy, policyDescriptor: ext.policyDescriptor, insecureTls: !!ext.insecureTls, credentials: ext.credentials || "include" });
-  return { status: resp.status || 0, headers: resp.headers || {}, body: await resp.text(), cost: Date.now() - start };
+  return await httpGetRT(url, { ...SD_BASE_HEADERS, ...headers }, S().CFG.SD_TIMEOUT_MS, followRedirect)
+    .then((r) => ({ ok: true, status: r.status, headers: r.headers || {}, data: r.body || "", cost: Date.now() - start }))
+    .catch((e) => ({ ok: false, status: 0, headers: {}, data: "", cost: Date.now() - start, err: String(e || "") }));
 }
-async function httpPost(url, headers = {}, body = "", timeoutMs = null, ext = {}) {
+async function sd_httpPost(url, headers = {}, body = "") {
   const start = Date.now();
-  const resp = await S.ctx.http.post(url, { headers, body, timeout: timeoutMs == null ? capByBudget(3500) : Math.min(Number(timeoutMs) || 3500, capByBudget(3500)), redirect: "follow", policy: ext.policy, policyDescriptor: ext.policyDescriptor, insecureTls: !!ext.insecureTls, credentials: ext.credentials || "include" });
-  return { status: resp.status || 0, headers: resp.headers || {}, body: await resp.text(), cost: Date.now() - start };
+  return await httpPostRT(url, { ...SD_BASE_HEADERS, ...headers }, body, S().CFG.SD_TIMEOUT_MS)
+    .then((r) => ({ ok: true, status: r.status, headers: r.headers || {}, data: r.body || "", cost: Date.now() - start }))
+    .catch((e) => ({ ok: false, status: 0, headers: {}, data: "", cost: Date.now() - start, err: String(e || "") }));
 }
-
-function radioToGen(r) { if (!r) return ""; const x = String(r).toUpperCase().replace(/\s+/g, ""); const alias = { NR5G: "NR", NRSA: "NR", NRNSA: "NRNSA", LTEA: "LTE", "LTE+": "LTE", LTEPLUS: "LTE" }; const k = alias[x] || x; const MAP = { GPRS: "2.5G", EDGE: "2.75G", CDMA1X: "2.5G", WCDMA: "3G", HSDPA: "3.5G", HSUPA: "3.75G", EHRPD: "3.9G", LTE: "4G", NRNSA: "5G", NR: "5G" }; return MAP[k] || ""; }
-function netTypeLine() { try { const n = S.ctx.device || {}; const ssid = n.wifi?.ssid, bssid = n.wifi?.bssid; if (ssid || bssid) return `${t("wifi")} | ${ssid || "-"}`; const radio = n.cellular?.radio; if (radio) return `${t("cellular")} | ${t("gen", radioToGen(radio), radio)}`; const iface = n.ipv4?.interface || n.ipv6?.interface || ""; if (/^pdp/i.test(iface)) return `${t("cellular")} | -`; if (/^(en|eth|wlan)/i.test(iface)) return `${t("wifi")} | -`; } catch {} return t("unknownNet"); }
-
-function ipToPtrName(ip) {
-  const s = String(ip || "").trim();
-  if (isIPv4(s)) return s.split(".").reverse().join(".") + ".in-addr.arpa";
-  if (isIPv6(s)) {
-    const raw = s.toLowerCase().split("%")[0]; const halves = raw.split("::"); const left = (halves[0] || "").split(":").filter(Boolean); const right = (halves[1] || "").split(":").filter(Boolean); const missing = (halves.length === 2) ? Math.max(0, 8 - (left.length + right.length)) : 0;
-    const groups = []; for (const g of left) groups.push(g.padStart(4, "0")); for (let i = 0; i < missing; i++) groups.push("0000"); for (const g of right) groups.push(g.padStart(4, "0")); while (groups.length < 8) groups.push("0000");
-    return groups.slice(0, 8).join("").split("").reverse().join(".") + ".ip6.arpa";
+function sd_flagFromCC(cc) {
+  cc = (cc || "").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  if (cc === "TW") {
+    if (S().CFG.TW_FLAG_MODE === 0) return "🇨🇳";
+    if (S().CFG.TW_FLAG_MODE === 2) return "🇼🇸";
+  }
+  try { return String.fromCodePoint(...[...cc].map((c) => 0x1F1E6 + (c.charCodeAt(0) - 65))); } catch (_) { return ""; }
+}
+const SD_CC_NAME = {
+  "zh-Hans": { CN: "中国", TW: "台湾", HK: "中国香港", MO: "中国澳门", JP: "日本", KR: "韩国", US: "美国", SG: "新加坡", MY: "马来西亚", TH: "泰国", VN: "越南", PH: "菲律宾", ID: "印度尼西亚", IN: "印度", AU: "澳大利亚", NZ: "新西兰", CA: "加拿大", GB: "英国", DE: "德国", FR: "法国", NL: "荷兰", ES: "西班牙", IT: "意大利", BR: "巴西" },
+  "zh-Hant": { CN: "中國", TW: "台灣", HK: "中國香港", MO: "中國澳門", JP: "日本", KR: "南韓", US: "美國", SG: "新加坡", MY: "馬來西亞", TH: "泰國", VN: "越南", PH: "菲律賓", ID: "印尼", IN: "印度", AU: "澳洲", NZ: "紐西蘭", CA: "加拿大", GB: "英國", DE: "德國", FR: "法國", NL: "荷蘭", ES: "西班牙", IT: "義大利", BR: "巴西" }
+};
+function sd_ccPretty(cc) {
+  cc = (cc || "").toUpperCase();
+  const flag = sd_flagFromCC(cc);
+  const name = SD_CC_NAME[S().CFG.SD_LANG][cc];
+  if (!cc) return "—";
+  if (S().CFG.SD_REGION_MODE === "flag") return flag || "—";
+  if (S().CFG.SD_REGION_MODE === "abbr") return (flag || "") + cc;
+  if (flag && name) return `${flag} ${name}`;
+  if (flag) return `${flag} ${cc}`;
+  return cc;
+}
+function serviceStateMeta(ok, tag, state) {
+  const st = state ? state : (ok ? (/自制|自製|original/i.test(String(tag || "")) || /部分/i.test(String(tag || "")) ? "partial" : "full") : "blocked");
+  const icons = S().CFG.SD_ICON_THEME === "lock" ? { full: "🔓", partial: "🔐", blocked: "🔒" } : S().CFG.SD_ICON_THEME === "circle" ? { full: "⭕️", partial: "⛔️", blocked: "🚫" } : { full: "✅", partial: "❇️", blocked: "❎" };
+  return { st, icon: icons[st] };
+}
+function sd_nameOfKey(key) {
+  const map = {
+    youtube: "YouTube",
+    netflix: "Netflix",
+    disney: "Disney+",
+    chatgpt_web: "ChatGPT Web",
+    chatgpt_app: "ChatGPT",
+    hulu_us: "Hulu(美)",
+    hulu_jp: "Hulu(日)",
+    hbo: "Max(HBO)"
+  };
+  return map[key] || key;
+}
+function sd_compact(key, ok, cc, tag, state) {
+  const meta = serviceStateMeta(ok, tag, state);
+  return { key, name: sd_nameOfKey(key), ok, cc, tag: tag || "", state: meta.st, icon: meta.icon, region: cc ? sd_ccPretty(cc) : "—" };
+}
+async function sd_queryLandingCCMulti() {
+  for (const url of ["http://ip-api.com/json", "https://api.ip.sb/geoip", "https://ipinfo.io/json", "https://ifconfig.co/json"]) {
+    const r = await sd_httpGet(url, { "Accept-Language": "en" }, true);
+    if (r.ok && r.status === 200) {
+      try {
+        const j = safeJSON(r.data, {});
+        const cc = (j.countryCode || j.country_code || j.country || j.country_iso || "").toUpperCase();
+        if (/^[A-Z]{2}$/.test(cc)) return cc;
+      } catch (_) {}
+    }
   }
   return "";
 }
-async function queryPTR(ip) { const name = ipToPtrName(ip); if (!name) return ""; const r = await httpGet("https://dns.google/resolve?name=" + encodeURIComponent(name) + "&type=PTR", { "Accept": "application/dns-json" }, Math.min(900, capByBudget(900)), true).catch(() => null); if (!r || r.status !== 200) return ""; try { const j = safeJSON(r.body, {}); const ans = Array.isArray(j.Answer) ? j.Answer : []; const first = ans.find((x) => x && (x.type === 12 || String(x.type) === "12") && x.data); return first ? String(first.data).trim().replace(/\.$/, "") : ""; } catch { return ""; } }
-async function queryPTRMaybe(ip) { if (!ip || budgetLeft() <= 800) return ""; return await withTimeout(queryPTR(ip), Math.min(950, capByBudget(950)), ""); }
-
-function makeTryOrder(prefer, fallbackList) { return [prefer, ...fallbackList].filter((x, i, a) => x && a.indexOf(x) === i); }
-async function trySources(order, sourceMap, { preferLogTag, needCityPrefer = false, acceptIp = null, ext = {} }) {
-  let firstOK = null;
-  for (const key of order) {
-    if (budgetLeft() <= 300) break;
-    const def = sourceMap[key]; if (!def) continue;
-    try {
-      const r = await httpGet(def.url, {}, null, false, ext);
-      const res = def.parse(r.body) || {}; const ip = String(res.ip || "").trim(); const ok = acceptIp ? acceptIp(ip) : !!ip; const cityOK = ok && hasCityLevel(res.loc);
-      if (ok) { res.ip = ip; if (!firstOK) firstOK = res; if (!needCityPrefer || cityOK) return res; }
-    } catch (e) { log("warn", `${preferLogTag} fail`, key, String(e)); }
-  }
-  return firstOK || {};
+function sd_parseNFRegion(resp) {
+  try {
+    const xo = resp?.headers?.["x-originating-url"] || resp?.headers?.["X-Originating-URL"];
+    if (xo) {
+      const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i);
+      if (m) return m[1].toUpperCase();
+    }
+    const m2 = String(resp?.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i);
+    if (m2) return m2[1].toUpperCase();
+  } catch (_) {}
+  return "";
 }
-async function tryIPv6Ip(order, opt = {}, ext = {}) { const timeoutMs = (opt.timeoutMs != null) ? opt.timeoutMs : S.V6_TO; const maxTries = Math.max(1, Math.min(Number(opt.maxTries || order.length), order.length)); for (const key of order.slice(0, maxTries)) { if (budgetLeft() <= 260) break; const url = IPV6_IP_ENDPOINTS[key]; if (!url) continue; try { const r = await httpGet(url, {}, timeoutMs, false, ext); const ip = String(r.body || "").trim(); if (isIPv6(ip)) return { ip }; } catch {} } return {}; }
-async function fillDirectIspSameIp(targetIp, skipKey, ext = {}) { const ip = String(targetIp || "").trim(); if (!ip) return ""; const order = (ORDER.directV4 || []).filter((k) => k && k !== skipKey); for (const key of order) { if (budgetLeft() <= 320) break; const def = DIRECT_V4_SOURCES[key]; if (!def) continue; try { const r = await httpGet(def.url, {}, null, false, ext); const x = def.parse(r.body) || {}; if (String(x.ip || "").trim() === ip && String(x.isp || "").trim()) return String(x.isp || "").trim(); } catch {} } return ""; }
-async function getDirectV4(preferKey) { const ext = { policy: "DIRECT" }; const res = await trySources(makeTryOrder(preferKey, ORDER.directV4), DIRECT_V4_SOURCES, { preferLogTag: "DirectV4", needCityPrefer: true, acceptIp: isIPv4, ext }); if (!res || !res.ip) return {}; if (!String(res.isp || "").trim()) { const filled = await fillDirectIspSameIp(res.ip, preferKey, ext).catch(() => ""); if (filled) res.isp = filled; } return res; }
-async function getDirectV6(preferKey) { return await tryIPv6Ip(makeTryOrder(preferKey, ORDER.directV6), { timeoutMs: S.V6_TO }, { policy: "DIRECT" }); }
-async function getLandingV4(preferKey) { return await trySources(makeTryOrder(preferKey, ORDER.landingV4), LANDING_V4_SOURCES, { preferLogTag: "LandingV4", needCityPrefer: false, acceptIp: isIPv4, ext: { policy: S.CFG.PROXY_POLICY || undefined } }); }
-async function probeLandingV6(preferKey) { const r = await tryIPv6Ip(makeTryOrder(preferKey, ORDER.landingV6), { timeoutMs: Math.min(CONSTS.V6_PROBE_TO_MS, 900), maxTries: 2 }, { policy: S.CFG.PROXY_POLICY || undefined }); return { ok: !!r.ip, ip: r.ip || "" }; }
+const SD_NF_ORIGINAL = "80018499";
+const SD_NF_NONORIG = "81280792";
+const sd_nfGet = (id) => sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true);
+async function sd_testYouTube() {
+  const r = await sd_httpGet("https://www.youtube.com/premium?hl=en", {}, true);
+  if (!r.ok) return sd_compact("youtube", false, "", t("notReachable"));
+  let cc = "US";
+  try { let m = r.data.match(/"countryCode":"([A-Z]{2})"/); if (!m) m = r.data.match(/["']GL["']\s*:\s*["']([A-Z]{2})["']/); if (m) cc = m[1]; } catch (_) {}
+  return sd_compact("youtube", true, cc, "");
+}
+async function sd_testChatGPTWeb() {
+  const r = await sd_httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true);
+  if (!r.ok) return sd_compact("chatgpt_web", false, "", t("notReachable"));
+  let cc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch (_) {}
+  return sd_compact("chatgpt_web", true, cc, "");
+}
+async function sd_testChatGPTAppAPI() {
+  const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true);
+  if (!r.ok) return sd_compact("chatgpt_app", false, "", t("notReachable"));
+  let cc = "";
+  try { const h = r.headers || {}; cc = (h["cf-ipcountry"] || h["CF-IPCountry"] || h["Cf-IpCountry"] || "").toString().toUpperCase(); if (!/^[A-Z]{2}$/.test(cc)) cc = ""; } catch (_) {}
+  if (!cc) cc = await sd_queryLandingCCMulti();
+  return sd_compact("chatgpt_app", true, cc, "");
+}
+async function sd_testNetflix() {
+  const r1 = await sd_nfGet(SD_NF_NONORIG);
+  if (!r1.ok) return sd_compact("netflix", false, "", t("fail"));
+  if (r1.status === 403) return sd_compact("netflix", false, "", t("regionBlocked"));
+  if (r1.status === 404) {
+    const r2 = await sd_nfGet(SD_NF_ORIGINAL);
+    if (!r2.ok) return sd_compact("netflix", false, "", t("fail"));
+    if (r2.status === 404) return sd_compact("netflix", false, "", t("regionBlocked"));
+    return sd_compact("netflix", true, sd_parseNFRegion(r2) || "", t("nfOriginals"), "partial");
+  }
+  if (r1.status === 200) return sd_compact("netflix", true, sd_parseNFRegion(r1) || "", t("nfFull"), "full");
+  return sd_compact("netflix", false, "", `HTTP ${r1.status}`);
+}
+async function sd_testDisney() {
+  const rHome = await sd_httpGet("https://www.disneyplus.com/", { "Accept-Language": "en" }, true);
+  if (!rHome.ok || rHome.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(rHome.data || "")) return sd_compact("disney", false, "", (!rHome.ok) ? t("timeout") : t("regionBlocked"));
+  let homeCC = "";
+  try { const m = rHome.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || rHome.data.match(/data-country=["']([A-Z]{2})["']/i); if (m) homeCC = m[1].toUpperCase(); } catch (_) {}
+  const headers = { "Accept-Language": "en", "Authorization": "ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84", "Content-Type": "application/json", "User-Agent": SD_UA };
+  const body = JSON.stringify({ query: "mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }", variables: { input: { applicationRuntime: "chrome", attributes: { browserName: "chrome", browserVersion: "120.0.0.0", manufacturer: "apple", model: null, operatingSystem: "macintosh", operatingSystemVersion: "10.15.7", osDeviceIds: [] }, deviceFamily: "browser", deviceLanguage: "en", deviceProfile: "macosx" } } });
+  const rBam = await sd_httpPost("https://disney.api.edge.bamgrid.com/graph/v1/device/graphql", headers, body);
+  if (!rBam.ok || rBam.status !== 200) return sd_compact("disney", true, homeCC || (await sd_queryLandingCCMulti()) || "", "");
+  const d = safeJSON(rBam.data, {});
+  if (d?.errors) return sd_compact("disney", true, homeCC || (await sd_queryLandingCCMulti()) || "", "");
+  const inLoc = d?.extensions?.sdk?.session?.inSupportedLocation;
+  const bamCC = d?.extensions?.sdk?.session?.location?.countryCode;
+  const blocked = inLoc === false;
+  return sd_compact("disney", !blocked, blocked ? "" : ((bamCC || homeCC || (await sd_queryLandingCCMulti()) || "").toUpperCase()), blocked ? t("regionBlocked") : "");
+}
+async function sd_testHuluUS() {
+  const r = await sd_httpGet("https://www.hulu.com/", {}, true);
+  if (!r.ok) return sd_compact("hulu_us", false, "", t("notReachable"));
+  const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || "");
+  return sd_compact("hulu_us", !blocked, blocked ? "" : "US", blocked ? t("regionBlocked") : "");
+}
+async function sd_testHuluJP() {
+  const r = await sd_httpGet("https://www.hulu.jp/", { "Accept-Language": "ja" }, true);
+  if (!r.ok) return sd_compact("hulu_jp", false, "", t("notReachable"));
+  const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || "");
+  return sd_compact("hulu_jp", !blocked, blocked ? "" : "JP", blocked ? t("regionBlocked") : "");
+}
+async function sd_testHBO() {
+  const r = await sd_httpGet("https://www.max.com/", {}, true);
+  if (!r.ok) return sd_compact("hbo", false, "", t("notReachable"));
+  const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || "");
+  let cc = ""; try { const m = String(r.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch (_) {}
+  if (!cc) cc = await sd_queryLandingCCMulti();
+  return sd_compact("hbo", !blocked, blocked ? "" : cc, blocked ? t("regionBlocked") : "");
+}
+function buildServiceTests() {
+  return { youtube: sd_testYouTube, netflix: sd_testNetflix, disney: sd_testDisney, chatgpt_web: sd_testChatGPTWeb, chatgpt_app: sd_testChatGPTAppAPI, hulu_us: sd_testHuluUS, hulu_jp: sd_testHuluJP, hbo: sd_testHBO };
+}
+async function runServiceChecks() {
+  const order = selectServices();
+  if (!order.length) return [];
+  const map = buildServiceTests();
+  const conc = S().CFG.SD_CONCURRENCY;
+  const stageCap = Math.max(800, Math.min(5200, capByBudget(5200)));
+  const results = new Array(order.length);
+  let cursor = 0, inflight = 0, finished = 0, doneFlag = false;
+  const finish = () => { doneFlag = true; };
+  const tryLaunch = () => {
+    while (!doneFlag && inflight < conc && cursor < order.length) {
+      if (budgetLeft() <= 320) break;
+      const idx = cursor++;
+      const key = order[idx];
+      const fn = map[key];
+      if (!fn) { results[idx] = sd_compact(key, false, "", t("fail")); finished++; continue; }
+      inflight++;
+      Promise.resolve(fn()).then((line) => { results[idx] = line; }).catch(() => { results[idx] = sd_compact(key, false, "", t("fail")); }).finally(() => { inflight--; finished++; if (finished >= order.length) finish(); else tryLaunch(); });
+    }
+  };
+  tryLaunch();
+  await withTimeout(new Promise((r) => {
+    const tick = () => { if (doneFlag || finished >= order.length || budgetLeft() <= 260) return r(true); setTimeout(tick, 30); };
+    tick();
+  }), stageCap, false);
+  finish();
+  for (let i = 0; i < results.length; i++) if (!results[i]) results[i] = sd_compact(order[i], false, "", t("timeout"));
+  return results.filter(Boolean);
+}
 
 const ENT_LOC_CHAIN = Object.freeze({
-  pingan: async (ip, ext = {}) => { const r = await httpGet("https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=" + encodeURIComponent(ip), {}, Math.min(2200, Math.max(1200, S.SD_TIMEOUT_MS || 0)), false, ext); const d = safeJSON(r.body, {})?.data || {}; if (!d || (!d.countryIsoCode && !d.country)) throw new Error("pingan-empty"); return { loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], " ").replace(/\s*中国\s*/, ""), isp: String(d.isp || d.ispName || d.operator || d.org || d.as || "").trim() }; },
-  ipapi: async (ip, ext = {}) => { const r = await httpGet(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, Math.min(2200, Math.max(1200, S.SD_TIMEOUT_MS || 0)), false, ext); const j = safeJSON(r.body, {}); return { loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ""), j.regionName?.split(/\s+or\s+/)[0], j.city], " "), isp: String(j.isp || j.org || j.as || "").trim() }; },
-  ipwhois: async (ip, ext = {}) => { const r = await httpGet(`https://ipwhois.app/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, Math.min(2200, Math.max(1200, S.SD_TIMEOUT_MS || 0)), false, ext); const j = safeJSON(r.body, {}); return { loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ""), j.region, j.city], " "), isp: String((j.connection && j.connection.isp) || j.org || "").trim() }; },
-  ipsb: async (ip, ext = {}) => { const r = await httpGet(`https://api.ip.sb/geoip/${encodeURIComponent(ip)}`, {}, Math.min(2200, Math.max(1200, S.SD_TIMEOUT_MS || 0)), false, ext); const j = safeJSON(r.body, {}); return { loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], " ").replace(/\s*中国\s*/, ""), isp: String(j.isp || j.organization || "").trim() }; }
+  pingan: async (ip) => {
+    const r = await httpGetRT("https://rmb.pingan.com.cn/itam/mas/linden/ip/request?ip=" + encodeURIComponent(ip), {}, Math.min(2200, Math.max(1200, S().CFG.SD_TIMEOUT_MS || 0)), false);
+    const d = safeJSON(r.body, {})?.data || {};
+    if (!d || (!d.countryIsoCode && !d.country)) throw new Error("pingan-empty");
+    return { loc: joinNonEmpty([flagOf(d.countryIsoCode), d.country, d.region, d.city], " ").replace(/\s*中国\s*/, ""), isp: String(d.isp || d.ispName || d.operator || d.org || d.as || "").trim() };
+  },
+  ipapi: async (ip) => {
+    const r = await httpGetRT(`http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, Math.min(2200, Math.max(1200, S().CFG.SD_TIMEOUT_MS || 0)), false);
+    const j = safeJSON(r.body, {});
+    return { loc: joinNonEmpty([flagOf(j.countryCode), j.country?.replace(/\s*中国\s*/, ""), j.regionName?.split(/\s+or\s+/)[0], j.city], " "), isp: String(j.isp || j.org || j.as || "").trim() };
+  },
+  ipwhois: async (ip) => {
+    const r = await httpGetRT(`https://ipwhois.app/json/${encodeURIComponent(ip)}?lang=zh-CN`, {}, Math.min(2200, Math.max(1200, S().CFG.SD_TIMEOUT_MS || 0)), false);
+    const j = safeJSON(r.body, {});
+    return { loc: joinNonEmpty([flagOf(j.country_code), j.country?.replace(/\s*中国\s*/, ""), j.region, j.city], " "), isp: String((j.connection && j.connection.isp) || j.org || "").trim() };
+  },
+  ipsb: async (ip) => {
+    const r = await httpGetRT(`https://api.ip.sb/geoip/${encodeURIComponent(ip)}`, {}, Math.min(2200, Math.max(1200, S().CFG.SD_TIMEOUT_MS || 0)), false);
+    const j = safeJSON(r.body, {});
+    return { loc: joinNonEmpty([flagOf(j.country_code), j.country, j.region, j.city], " ").replace(/\s*中国\s*/, ""), isp: String(j.isp || j.organization || "").trim() };
+  }
 });
-function _sameLoc(a, b) { const A = String(a || "").trim(), B = String(b || "").trim(); if (!A || !B) return false; const strip = (s) => String(s).replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, "").trim(); return strip(A) === strip(B); }
-async function getEntranceBundle(ip) { const nowT = Date.now(); const fresh = (nowT - S.ENT_CACHE.t) < Math.max(CONSTS.ENT_MIN_TTL, Math.min(Number(S.CFG.Update) || 10, CONSTS.ENT_MAX_TTL)) * 1000; if (S.ENT_CACHE.ip === ip && fresh && S.ENT_CACHE.data) return S.ENT_CACHE.data; const ext = { policy: "DIRECT" }; const [p, a, w, s] = await Promise.allSettled([ENT_LOC_CHAIN.pingan(ip, ext), ENT_LOC_CHAIN.ipapi(ip, ext), ENT_LOC_CHAIN.ipwhois(ip, ext), ENT_LOC_CHAIN.ipsb(ip, ext)]); const pick = (arr) => { for (const x of arr) if (x.status === "fulfilled") return x.value || {}; return {}; }; const p1 = p.status === "fulfilled" ? (p.value || {}) : {}; const c2 = pick([a, w, s]); let loc1 = String(p1.loc || "").trim(), isp1 = String(p1.isp || "").trim(), loc2 = String(c2.loc || "").trim(), isp2 = String(c2.isp || "").trim(); if (!loc1 && loc2) { loc1 = loc2; isp1 = isp2; loc2 = ""; isp2 = ""; } if (loc1 && !isp1 && isp2) isp1 = isp2; if (_sameLoc(loc1, loc2)) loc2 = ""; const res = { ip, loc1, isp1, loc2, isp2 }; S.ENT_CACHE = { ip, t: nowT, data: res }; return res; }
+function _sameLoc(a, b) {
+  const A = String(a || "").trim(), B = String(b || "").trim();
+  if (!A || !B) return false;
+  const strip = (s) => String(s).replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, "").trim();
+  return strip(A) === strip(B);
+}
+async function getEntranceBundle(ip) {
+  const nowT = Date.now();
+  const fresh = (nowT - S().ENT_CACHE.t) < Math.max(CONSTS.ENT_MIN_TTL, Math.min(Number(S().CFG.Update) || 10, CONSTS.ENT_MAX_TTL)) * 1000;
+  if (S().ENT_CACHE.ip === ip && fresh && S().ENT_CACHE.data) return S().ENT_CACHE.data;
+  const [p, a, w, s] = await Promise.allSettled([ENT_LOC_CHAIN.pingan(ip), ENT_LOC_CHAIN.ipapi(ip), ENT_LOC_CHAIN.ipwhois(ip), ENT_LOC_CHAIN.ipsb(ip)]);
+  const pick = (arr) => { for (const x of arr) if (x.status === "fulfilled") return x.value || {}; return {}; };
+  const p1 = (p.status === "fulfilled") ? (p.value || {}) : {};
+  const c2 = pick([a, w, s]);
+  let loc1 = String(p1.loc || "").trim(), isp1 = String(p1.isp || "").trim();
+  let loc2 = String(c2.loc || "").trim(), isp2 = String(c2.isp || "").trim();
+  if (!loc1 && loc2) { loc1 = loc2; isp1 = isp2; loc2 = ""; isp2 = ""; }
+  if (loc1 && !isp1 && isp2) isp1 = isp2;
+  if (_sameLoc(loc1, loc2)) loc2 = "";
+  const res = { ip, loc1, isp1, loc2, isp2 };
+  S().ENT_CACHE = { ip, t: nowT, data: res };
+  return res;
+}
 
-function parseServices(raw) { if (raw == null) return []; let s = String(raw).trim(); if (!s || s === "[]" || s === "{}" || /^null$/i.test(s) || /^undefined$/i.test(s)) return []; try { const arr = JSON.parse(s); if (Array.isArray(arr)) return normSvcList(arr); } catch {} return normSvcList(s.split(/[,\uFF0C;|\/ \t\r\n]+/)); }
-function normSvcList(list) { const out = []; for (let x of list) { let k = String(x ?? "").trim().toLowerCase(); if (!k) continue; k = SD_ALIAS[k] || k; if (!["youtube","netflix","disney","chatgpt_web","chatgpt_app","hulu_us","hulu_jp","hbo"].includes(k)) continue; if (!out.includes(k)) out.push(k); } return out; }
-function selectServices() { const argList = parseServices(S.CFG.SERVICES_ARG_TEXT); if (argList.length) return argList; const boxCheckedList = parseServices(S.CFG.SERVICES_BOX_CHECKED_RAW); if (boxCheckedList.length) return boxCheckedList; const boxTextList = parseServices(S.CFG.SERVICES_BOX_TEXT); if (boxTextList.length) return boxTextList; return ["youtube", "netflix", "disney", "chatgpt_web", "chatgpt_app", "hulu_us", "hulu_jp", "hbo"]; }
-function SD_I18N() { return { youTube: "YouTube", chatgpt_app: "ChatGPT", chatgpt: "ChatGPT Web", netflix: "Netflix", disney: "Disney+", huluUS: "Hulu(美)", huluJP: "Hulu(日)", hbo: "Max(HBO)" }; }
-function sd_nameOfKey(key) { const i = SD_I18N(); return key === "youtube" ? i.youTube : key === "netflix" ? i.netflix : key === "disney" ? i.disney : key === "hulu_us" ? i.huluUS : key === "hulu_jp" ? i.huluJP : key === "hbo" ? i.hbo : key === "chatgpt_web" ? i.chatgpt : key === "chatgpt_app" ? i.chatgpt_app : key; }
-const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-const SD_BASE_HEADERS = { "User-Agent": SD_UA, "Accept-Language": "en" };
-async function sd_httpGet(url, headers = {}, followRedirect = true) { const start = Date.now(); return await httpGet(url, { ...SD_BASE_HEADERS, ...headers }, S.SD_TIMEOUT_MS, followRedirect, { policy: S.CFG.PROXY_POLICY || undefined }).then((r) => ({ ok: true, status: r.status, headers: r.headers || {}, data: r.body || "", cost: Date.now() - start })).catch((e) => ({ ok: false, status: 0, headers: {}, data: "", cost: Date.now() - start, err: String(e || "") })); }
-async function sd_httpPost(url, headers = {}, body = "") { const start = Date.now(); return await httpPost(url, { ...SD_BASE_HEADERS, ...headers }, body, S.SD_TIMEOUT_MS, { policy: S.CFG.PROXY_POLICY || undefined }).then((r) => ({ ok: true, status: r.status, headers: r.headers || {}, data: r.body || "", cost: Date.now() - start })).catch((e) => ({ ok: false, status: 0, headers: {}, data: "", cost: Date.now() - start, err: String(e || "") })); }
+function txt(text, fontSize, weight, color, opts) {
+  const el = { type: "text", text: String(text ?? ""), font: { size: fontSize, weight: weight || "regular" } };
+  if (color) el.textColor = color;
+  if (opts) Object.assign(el, opts);
+  return el;
+}
+function icon(name, size, color, opts) {
+  const el = { type: "image", src: `sf-symbol:${name}`, width: size, height: size };
+  if (color) el.color = color;
+  if (opts) Object.assign(el, opts);
+  return el;
+}
+function hstack(children, opts) { const el = { type: "stack", direction: "row", alignItems: "center", children }; if (opts) Object.assign(el, opts); return el; }
+function vstack(children, opts) { const el = { type: "stack", direction: "column", alignItems: "start", children }; if (opts) Object.assign(el, opts); return el; }
+function spacer(length) { const el = { type: "spacer" }; if (length != null) el.length = length; return el; }
+function divider() { return hstack([spacer()], { height: 1, backgroundColor: "rgba(255,255,255,0.08)" }); }
+function pill(textStr, bg, fg) { return vstack([txt(textStr, 9, "semibold", fg || "#FFFFFF")], { padding: [4, 7, 4, 7], backgroundColor: bg, borderRadius: 999 }); }
 
-const SD_CC_NAME = { "zh-Hans": { CN: "中国", TW: "台湾", HK: "中国香港", MO: "中国澳门", JP: "日本", KR: "韩国", US: "美国", SG: "新加坡", MY: "马来西亚", TH: "泰国", VN: "越南", PH: "菲律宾", ID: "印度尼西亚", IN: "印度", AU: "澳大利亚", NZ: "新西兰", CA: "加拿大", GB: "英国", DE: "德国", FR: "法国", NL: "荷兰", ES: "西班牙", IT: "意大利", BR: "巴西", AR: "阿根廷", MX: "墨西哥", RU: "俄罗斯" }, "zh-Hant": { CN: "中國", TW: "台灣", HK: "中國香港", MO: "中國澳門", JP: "日本", KR: "南韓", US: "美國", SG: "新加坡", MY: "馬來西亞", TH: "泰國", VN: "越南", PH: "菲律賓", ID: "印尼", IN: "印度", AU: "澳洲", NZ: "紐西蘭", CA: "加拿大", GB: "英國", DE: "德國", FR: "法國", NL: "荷蘭", ES: "西班牙", IT: "義大利", BR: "巴西", AR: "阿根廷", MX: "墨西哥", RU: "俄羅斯" } };
-function sd_flagFromCC(cc) { cc = (cc || "").toUpperCase(); if (!/^[A-Z]{2}$/.test(cc)) return ""; if (cc === "TW") { if (S.TW_FLAG_MODE === 0) return "🇨🇳"; if (S.TW_FLAG_MODE === 2) return "🇼🇸"; } try { return String.fromCodePoint(...[...cc].map((c) => 0x1F1E6 + (c.charCodeAt(0) - 65))); } catch { return ""; } }
-function sd_ccPretty(cc) { cc = (cc || "").toUpperCase(); const flag = sd_flagFromCC(cc); const name = SD_CC_NAME[S.CFG.SD_LANG][cc]; if (!cc) return "—"; if (S.SD_REGION_MODE === "flag") return flag || "—"; if (S.SD_REGION_MODE === "abbr") return (flag || "") + cc; if (flag && name) return `${flag} ${cc} | ${name}`; if (flag) return `${flag} ${cc}`; return cc; }
-const isPartial = (tag) => /自制|自製|original/i.test(String(tag || "")) || /部分/i.test(String(tag || ""));
-function sd_renderLine({ name, ok, cc, cost, status, tag, state }) { const st = state ? state : (ok ? (isPartial(tag) ? "partial" : "full") : "blocked"); const icon = S.SD_ICONS[st]; const regionText = cc ? sd_ccPretty(cc) : "-"; const blockedText = t("notReachable"); const isNetflix = /netflix/i.test(String(name)); const stateTextLong = (st === "full") ? t("nfFull") : (st === "partial") ? t("nfOriginals") : blockedText; const stateTextShort = (st === "blocked") ? blockedText : t("unlocked"); const showTag = (isNetflix && S.SD_STYLE === "text" && !S.CFG.SD_ARROW) ? "" : (tag || ""); if (S.SD_STYLE === "text" && !S.CFG.SD_ARROW) { const left = `${name}: ${isNetflix ? stateTextLong : stateTextShort}`; const head = `${left}，${t("region")}: ${regionText}`; const tail = [showTag, (S.CFG.SD_SHOW_LAT && cost != null) ? `${cost}ms` : "", (S.CFG.SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ "); return tail ? `${head} ｜ ${tail}` : head; } if (S.SD_STYLE === "text") { const left = `${name}: ${st === "full" ? t("unlocked") : st === "partial" ? t("partialUnlocked") : t("notReachable")}`; const head = S.CFG.SD_ARROW ? `${left} ➟ ${regionText}` : `${left} ｜ ${regionText}`; const tail = [showTag, (S.CFG.SD_SHOW_LAT && cost != null) ? `${cost}ms` : "", (S.CFG.SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ "); return tail ? `${head} ｜ ${tail}` : head; } const head = S.CFG.SD_ARROW ? `${icon} ${name} ➟ ${regionText}` : `${icon} ${name} ｜ ${regionText}`; const tail = [showTag, (S.CFG.SD_SHOW_LAT && cost != null) ? `${cost}ms` : "", (S.CFG.SD_SHOW_HTTP && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ "); return tail ? `${head} ｜ ${tail}` : head; }
+function sectionCard(title, iconName, lines, opts = {}) {
+  const children = [
+    hstack([
+      icon(iconName, 11, opts.iconColor || "#93C5FD"),
+      txt(title, 10, "bold", "rgba(255,255,255,0.88)"),
+      spacer()
+    ], { gap: 4 })
+  ];
+  for (const line of lines.filter(Boolean).slice(0, opts.maxLines || 3)) children.push(txt(line, 10, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.75 }));
+  return vstack(children, {
+    gap: 3,
+    padding: [9, 10, 9, 10],
+    backgroundColor: opts.backgroundColor || "rgba(255,255,255,0.06)",
+    borderRadius: 12,
+    width: opts.width,
+    height: opts.height
+  });
+}
 
-const SD_NF_ORIGINAL = "80018499", SD_NF_NONORIG = "81280792";
-const sd_nfGet = (id) => sd_httpGet(`https://www.netflix.com/title/${id}`, {}, true);
-function sd_parseNFRegion(resp) { try { const xo = resp?.headers?.["x-originating-url"] || resp?.headers?.["X-Originating-URL"] || resp?.headers?.get?.("x-originating-url"); if (xo) { const m = String(xo).match(/\/([A-Z]{2})(?:[-/]|$)/i); if (m) return m[1].toUpperCase(); } const m2 = String(resp?.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m2) return m2[1].toUpperCase(); } catch {} return ""; }
-async function sd_queryLandingCC() { const r = await sd_httpGet("http://ip-api.com/json", {}, true); if (r.ok && r.status === 200) { try { const j = safeJSON(r.data, {}); return (j.countryCode || "").toUpperCase(); } catch {} } return ""; }
-async function sd_queryLandingCCMulti() { let cc = await sd_queryLandingCC(); if (cc) return cc; for (const url of ["https://api.ip.sb/geoip", "https://ipinfo.io/json", "https://ifconfig.co/json"]) { const r = await sd_httpGet(url, { "Accept-Language": "en" }, true); if (r.ok && r.status === 200) { try { const j = safeJSON(r.data, {}); cc = (j.country_code || j.country || j.country_iso || "").toUpperCase(); if (/^[A-Z]{2}$/.test(cc)) return cc; } catch {} } } return ""; }
-async function sd_testYouTube() { const r = await sd_httpGet("https://www.youtube.com/premium?hl=en", {}, true); if (!r.ok) return sd_renderLine({ name: sd_nameOfKey("youtube"), ok: false, cc: "", cost: r.cost, status: r.status, tag: t("notReachable") }); let cc = "US"; try { let m = r.data.match(/"countryCode":"([A-Z]{2})"/); if (!m) m = r.data.match(/["']GL["']\s*:\s*["']([A-Z]{2})["']/); if (m) cc = m[1]; } catch {} return sd_renderLine({ name: sd_nameOfKey("youtube"), ok: true, cc, cost: r.cost, status: r.status, tag: "" }); }
-async function sd_testChatGPTWeb() { const r = await sd_httpGet("https://chatgpt.com/cdn-cgi/trace", {}, true); if (!r.ok) return sd_renderLine({ name: sd_nameOfKey("chatgpt_web"), ok: false, cc: "", cost: r.cost, status: r.status, tag: t("notReachable") }); let cc = ""; try { const m = r.data.match(/loc=([A-Z]{2})/); if (m) cc = m[1]; } catch {} return sd_renderLine({ name: sd_nameOfKey("chatgpt_web"), ok: true, cc, cost: r.cost, status: r.status, tag: "" }); }
-async function sd_testChatGPTAppAPI() { const r = await sd_httpGet("https://api.openai.com/v1/models", {}, true); if (!r.ok) return sd_renderLine({ name: sd_nameOfKey("chatgpt_app"), ok: false, cc: "", cost: r.cost, status: r.status, tag: t("notReachable") }); let cc = ""; try { const h = r.headers || {}; cc = (h["cf-ipcountry"] || h["CF-IPCountry"] || h["Cf-IpCountry"] || h.get?.("cf-ipcountry") || "").toString().toUpperCase(); if (!/^[A-Z]{2}$/.test(cc)) cc = ""; } catch {} if (!cc) cc = await sd_queryLandingCCMulti(); return sd_renderLine({ name: sd_nameOfKey("chatgpt_app"), ok: true, cc, cost: r.cost, status: r.status, tag: "" }); }
-async function sd_testNetflix() { const r1 = await sd_nfGet(SD_NF_NONORIG); if (!r1.ok) return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: false, cc: "", cost: r1.cost, status: r1.status, tag: t("fail") }); if (r1.status === 403) return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: false, cc: "", cost: r1.cost, status: r1.status, tag: t("regionBlocked") }); if (r1.status === 404) { const r2 = await sd_nfGet(SD_NF_ORIGINAL); if (!r2.ok) return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: false, cc: "", cost: r2.cost, status: r2.status, tag: t("fail") }); if (r2.status === 404) return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: false, cc: "", cost: r2.cost, status: r2.status, tag: t("regionBlocked") }); return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: true, cc: sd_parseNFRegion(r2) || "", cost: r2.cost, status: r2.status, tag: t("nfOriginals"), state: "partial" }); } if (r1.status === 200) return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: true, cc: sd_parseNFRegion(r1) || "", cost: r1.cost, status: r1.status, tag: t("nfFull"), state: "full" }); return sd_renderLine({ name: sd_nameOfKey("netflix"), ok: false, cc: "", cost: r1.cost, status: r1.status, tag: `HTTP ${r1.status}` }); }
-async function sd_testDisney() { const rHome = await sd_httpGet("https://www.disneyplus.com/", { "Accept-Language": "en" }, true); if (!rHome.ok || rHome.status !== 200 || /Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(rHome.data || "")) return sd_renderLine({ name: sd_nameOfKey("disney"), ok: false, cc: "", cost: rHome.cost, status: rHome.status, tag: (!rHome.ok) ? t("timeout") : t("regionBlocked") }); let homeCC = ""; try { const m = rHome.data.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) || rHome.data.match(/data-country=["']([A-Z]{2})["']/i); if (m) homeCC = m[1].toUpperCase(); } catch {} const headers = { "Accept-Language": "en", "Authorization": "ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84", "Content-Type": "application/json", "User-Agent": SD_UA }; const body = JSON.stringify({ query: "mutation registerDevice($input: RegisterDeviceInput!) { registerDevice(registerDevice: $input) { grant { grantType assertion } } }", variables: { input: { applicationRuntime: "chrome", attributes: { browserName: "chrome", browserVersion: "120.0.0.0", manufacturer: "apple", model: null, operatingSystem: "macintosh", operatingSystemVersion: "10.15.7", osDeviceIds: [] }, deviceFamily: "browser", deviceLanguage: "en", deviceProfile: "macosx" } } }); const rBam = await sd_httpPost("https://disney.api.edge.bamgrid.com/graph/v1/device/graphql", headers, body); if (!rBam.ok || rBam.status !== 200) { const cc = homeCC || (await sd_queryLandingCCMulti()) || ""; return sd_renderLine({ name: sd_nameOfKey("disney"), ok: true, cc, cost: rHome.cost, status: rHome.status, tag: "" }); } const d = safeJSON(rBam.data, {}); if (d?.errors) { const cc = homeCC || (await sd_queryLandingCCMulti()) || ""; return sd_renderLine({ name: sd_nameOfKey("disney"), ok: true, cc, cost: rHome.cost, status: rHome.status, tag: "" }); } const inLoc = d?.extensions?.sdk?.session?.inSupportedLocation; const bamCC = d?.extensions?.sdk?.session?.location?.countryCode; const blocked = (inLoc === false); const cc = blocked ? "" : ((bamCC || homeCC || (await sd_queryLandingCCMulti()) || "").toUpperCase()); return sd_renderLine({ name: sd_nameOfKey("disney"), ok: !blocked, cc, cost: Math.min(rHome.cost || 0, rBam.cost || 0) || (rBam.cost || rHome.cost || 0), status: rBam.status || rHome.status || 0, tag: blocked ? t("regionBlocked") : "" }); }
-async function sd_testHuluUS() { const r = await sd_httpGet("https://www.hulu.com/", {}, true); if (!r.ok) return sd_renderLine({ name: sd_nameOfKey("hulu_us"), ok: false, cc: "", cost: r.cost, status: r.status, tag: t("notReachable") }); const blocked = /not\s+available\s+in\s+your\s+region/i.test(r.data || ""); return sd_renderLine({ name: sd_nameOfKey("hulu_us"), ok: !blocked, cc: blocked ? "" : "US", cost: r.cost, status: r.status, tag: blocked ? t("regionBlocked") : "" }); }
-async function sd_testHuluJP() { const r = await sd_httpGet("https://www.hulu.jp/", { "Accept-Language": "ja" }, true); if (!r.ok) return sd_renderLine({ name: sd_nameOfKey("hulu_jp"), ok: false, cc: "", cost: r.cost, status: r.status, tag: t("notReachable") }); const blocked = /ご利用いただけません|サービスをご利用いただけません|not available/i.test(r.data || ""); return sd_renderLine({ name: sd_nameOfKey("hulu_jp"), ok: !blocked, cc: blocked ? "" : "JP", cost: r.cost, status: r.status, tag: blocked ? t("regionBlocked") : "" }); }
-async function sd_testHBO() { const r = await sd_httpGet("https://www.max.com/", {}, true); if (!r.ok) return sd_renderLine({ name: sd_nameOfKey("hbo"), ok: false, cc: "", cost: r.cost, status: r.status, tag: t("notReachable") }); const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.data || ""); let cc = ""; try { const m = String(r.data || "").match(/"countryCode"\s*:\s*"([A-Z]{2})"/i); if (m) cc = m[1].toUpperCase(); } catch {} if (!cc) cc = await sd_queryLandingCCMulti(); return sd_renderLine({ name: sd_nameOfKey("hbo"), ok: !blocked, cc: blocked ? "" : cc, cost: r.cost, status: r.status, tag: blocked ? t("regionBlocked") : "" }); }
-function buildServiceTests() { return { youtube: () => sd_testYouTube(), netflix: () => sd_testNetflix(), disney: () => sd_testDisney(), chatgpt_web: () => sd_testChatGPTWeb(), chatgpt_app: () => sd_testChatGPTAppAPI(), hulu_us: () => sd_testHuluUS(), hulu_jp: () => sd_testHuluJP(), hbo: () => sd_testHBO() }; }
-async function runServiceChecks() { const order = selectServices(); if (!order.length) return []; const map = buildServiceTests(); const conc = clamp(Number(S.CFG.SD_CONCURRENCY) || 6, 1, 8); const stageCap = Math.max(800, Math.min(5200, capByBudget(5200))); const results = new Array(order.length); let cursor = 0, inflight = 0, finished = 0, doneFlag = false; const finish = () => { doneFlag = true; }; const tryLaunch = () => { while (!doneFlag && inflight < conc && cursor < order.length) { if (budgetLeft() <= 320) break; const idx = cursor++; const key = order[idx]; const fn = map[key]; if (!fn) { results[idx] = sd_renderLine({ name: sd_nameOfKey(key), ok: false, cc: "", cost: 0, status: 0, tag: t("fail") }); finished++; continue; } inflight++; Promise.resolve(fn()).then((line) => { results[idx] = line; }).catch(() => { results[idx] = sd_renderLine({ name: sd_nameOfKey(key), ok: false, cc: "", cost: null, status: 0, tag: t("fail") }); }).finally(() => { inflight--; finished++; if (finished >= order.length) finish(); else tryLaunch(); }); } }; tryLaunch(); await withTimeout(new Promise((r) => { const tick = () => { if (doneFlag || finished >= order.length || budgetLeft() <= 260) return r(true); setTimeout(tick, 30); }; tick(); }), stageCap, false); finish(); for (let i = 0; i < results.length; i++) if (!results[i]) results[i] = sd_renderLine({ name: sd_nameOfKey(order[i]), ok: false, cc: "", cost: null, status: 0, tag: t("timeout") }); return results.filter(Boolean); }
-
-function zhHansToHantOnce(s) { if (!s) return s; const phraseMap = [["网络信息","網路資訊"],["服务检测","服務檢測"],["执行时间","執行時間"],["蜂窝网络","行動服務"],["蜂窝","行動"],["网络","網路"],["运营商","運營商"],["区域受限","區域受限"],["区域","區域"],["不可达","不可達"],["检测失败","檢測失敗"],["超时","逾時"],["已完整解锁","已完整解鎖"],["仅解锁自制剧","僅解鎖自製劇"],["部分解锁","部分解鎖"],["已解锁","已解鎖"],["风险值","風險值"],["网络类型","網路類型"],["家宽","家寬"],["非家宽","非家寬"],["中国香港","中國香港"],["中国澳门","中國澳門"],["中国移动","中國移動"],["中国联通","中國聯通"],["中国电信","中國電信"],["中国广电","中國廣電"],["中国教育网","中國教育網"]]; for (const [hans, hant] of phraseMap) s = s.replace(new RegExp(hans, "g"), hant); const charMap = { "网": "網", "络": "絡", "执": "執", "时": "時", "运": "運", "营": "營", "区": "區", "险": "險", "类": "類", "态": "態", "检": "檢", "测": "測", "达": "達" }; return s.replace(/[\u4E00-\u9FFF]/g, (ch) => charMap[ch] || ch); }
-function maybeTifyLine(line) { if (S.CFG.SD_LANG !== "zh-Hant") return line; const prefix = t("policy") + ": "; if (String(line || "").startsWith(prefix)) return line; return zhHansToHantOnce(line); }
-
-function pushGroupTitle(parts, title) { for (let i = 0; i < S.CFG.GAP_LINES; i++) parts.push(""); const render = makeSubTitleRenderer(S.CFG.SUBTITLE_STYLE, S.CFG.SUBTITLE_MINIMAL); parts.push(render(title)); }
-
-function txt(text, font, color, opts = {}) { return { type: "text", text: String(text ?? ""), font, ...(color ? { textColor: color } : {}), ...opts }; }
-function icon(name, size = 14, color = null, opts = {}) { return { type: "image", src: `sf-symbol:${name}`, width: size, height: size, ...(color ? { color } : {}), ...opts }; }
-function vstack(children, opts = {}) { return { type: "stack", direction: "column", alignItems: opts.alignItems || "start", children, ...opts }; }
-function hstack(children, opts = {}) { return { type: "stack", direction: "row", alignItems: opts.alignItems || "center", children, ...opts }; }
-function spacer(length) { return length == null ? { type: "spacer" } : { type: "spacer", length }; }
-
-function buildLineWidget(title, parts, family) {
-  const shown = parts.filter((x) => x != null).map((x) => String(x));
-  if (family === "accessoryInline") {
-    return { type: "widget", children: [icon(S.ICON_NAME, 11, S.ICON_COLOR), txt((shown[0] || title).slice(0, 36), { size: 11, weight: "medium" }, null, { maxLines: 1, minScale: 0.6 })], refreshAfter: new Date(Date.now() + Math.max(60, Number(S.CFG.Update) || 10) * 1000).toISOString() };
+function buildSectionLines(kind, data, ip6) {
+  const lines = [];
+  if (data?.ip) lines.push(`IPv4 ${maskIP(data.ip)}`);
+  if (ip6?.ip) lines.push(`IPv6 ${maskIP(ip6.ip)}`);
+  if (kind === "local") {
+    if (data?.loc) lines.push((S().CFG.MASK_POS ? onlyFlag(data.loc) : flagFirst(data.loc)) || "-");
+    if (data?.isp) lines.push(fmtISP(data.isp, data.loc));
+  } else if (kind === "landing") {
+    if (data?.loc) lines.push(flagFirst(data.loc));
+    if (data?.isp) lines.push(fmtISP(data.isp, data.loc));
+  } else if (kind === "entrance") {
+    if (data?.loc1) lines.push(flagFirst(data.loc1));
+    if (data?.isp1) lines.push(fmtISP(data.isp1, data.loc1));
   }
-  if (family === "accessoryCircular") {
-    return { type: "widget", gap: 2, children: [spacer(), icon(S.ICON_NAME, 16, S.ICON_COLOR), txt(maskIP(S.ctx.device?.ipv4?.address || "-"), { size: 10, weight: "semibold" }, null, { maxLines: 1, minScale: 0.5, textAlign: "center" }), txt((shown.find((x) => x.includes("风险值")) || shown.find((x) => x.includes("風險值")) || "").replace(/^.*?:\s*/, ""), { size: 9, weight: "medium" }, null, { maxLines: 1, minScale: 0.5, textAlign: "center" }), spacer()], refreshAfter: new Date(Date.now() + Math.max(60, Number(S.CFG.Update) || 10) * 1000).toISOString() };
-  }
-  if (family === "accessoryRectangular") {
-    const lines = shown.slice(0, 4).map((line) => txt(line, { size: 11, weight: "regular" }, null, { maxLines: 1, minScale: 0.6 }));
-    return { type: "widget", gap: 2, children: [txt(title, { size: "caption1", weight: "bold" }, null, { maxLines: 1 }), ...lines], refreshAfter: new Date(Date.now() + Math.max(60, Number(S.CFG.Update) || 10) * 1000).toISOString() };
-  }
-  const maxLines = family === "systemSmall" ? 8 : family === "systemMedium" ? 16 : 24;
-  const lineViews = shown.slice(0, maxLines).map((line) => txt(line || " ", { size: 11, weight: line.includes("——") || line.includes("【") ? "semibold" : "regular" }, "#E5E7EB", { maxLines: line.includes("\n") ? 3 : 1, minScale: 0.7 }));
+  return lines.filter(Boolean);
+}
+
+function renderAccessoryInline(model) {
+  const textStr = `${netTypeLine()} · ${model.policy || "-"} · ${model.landing?.ip ? maskIP(model.landing.ip) : t("noData")}`;
+  return { type: "widget", children: [icon(S().CFG.ICON_NAME, 12, S().CFG.IconColor), txt(textStr, 12, "medium", null, { maxLines: 1, minScale: 0.65 })] };
+}
+function renderAccessoryCircular(model) {
   return {
     type: "widget",
-    padding: [12, 14],
-    gap: 4,
-    backgroundGradient: { type: "linear", colors: ["#0F172A", "#132238", "#1E293B"], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } },
+    gap: 2,
     children: [
-      hstack([icon(S.ICON_NAME, 16, S.ICON_COLOR), txt(title, { size: "headline", weight: "bold" }, "#FFFFFF", { maxLines: 1, minScale: 0.7 }), spacer(), { type: "date", date: new Date().toISOString(), format: "time", font: { size: "caption2", weight: "medium" }, textColor: "#94A3B8" }], { gap: 6 }),
-      ...lineViews
-    ],
-    refreshAfter: new Date(Date.now() + Math.max(60, Number(S.CFG.Update) || 10) * 1000).toISOString()
+      spacer(),
+      icon(S().CFG.ICON_NAME, 18, S().CFG.IconColor),
+      txt(model.risk ? `${model.risk.riskValue}%` : "--", 12, "bold", null, { minScale: 0.6 }),
+      txt(model.risk ? model.risk.lineType : t("risk"), 9, "medium", null, { minScale: 0.6 }),
+      spacer()
+    ]
+  };
+}
+function renderAccessoryRectangular(model) {
+  const sv = (model.services || []).slice(0, 3).map((x) => `${x.icon}${x.name.replace(/\(.+?\)/g, "")}`);
+  return {
+    type: "widget",
+    gap: 3,
+    children: [
+      hstack([icon(S().CFG.ICON_NAME, 11, S().CFG.IconColor), txt(model.policy || "-", 11, "bold", null, { maxLines: 1, minScale: 0.7 }), spacer(), txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)")], { gap: 4 }),
+      txt(model.landing?.loc ? flagFirst(model.landing.loc) : t("noData"), 10, "medium", null, { maxLines: 1, minScale: 0.7 }),
+      txt(sv.join("  ") || t("noData"), 9, "medium", null, { maxLines: 1, minScale: 0.65 })
+    ]
   };
 }
 
-async function runMain(ctx) {
-  S = buildState(ctx);
-  log("info", "Start", JSON.stringify({ Update: S.CFG.Update, Timeout: S.CFG.Timeout, Budget_ms: S.BUDGET_MS, IPv6_local: S.IPV6_EFF, WANT_V6: S.WANT_V6, HAS_V6: S.HAS_V6, SD_TIMEOUT_MS: S.SD_TIMEOUT_MS, SD_STYLE: S.SD_STYLE, SD_REGION_MODE: S.SD_REGION_MODE, TW_FLAG_MODE: S.TW_FLAG_MODE }));
+function makeRoot(children, gradientColors, padding) {
+  return {
+    type: "widget",
+    padding: padding || [12, 14, 12, 14],
+    gap: 0,
+    backgroundGradient: {
+      type: "linear",
+      colors: gradientColors || ["#0B1220", "#0E1A32", "#10233F"],
+      startPoint: { x: 0, y: 0 },
+      endPoint: { x: 1, y: 1 }
+    },
+    refreshAfter: new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString(),
+    children
+  };
+}
 
+function headerBar(model, titleSize, iconSize) {
+  return hstack([
+    icon(S().CFG.ICON_NAME, iconSize, S().CFG.IconColor),
+    vstack([
+      txt(t("title"), titleSize, "heavy", "#FFFFFF"),
+      txt(netTypeLine(), Math.max(9, titleSize - 4), "medium", "rgba(255,255,255,0.65)", { maxLines: 1, minScale: 0.8 })
+    ], { gap: 0 }),
+    spacer(),
+    vstack([
+      txt(model.policy || "-", 10, "bold", "#BFDBFE", { maxLines: 1, minScale: 0.75 }),
+      txt(model.runAt.slice(6), 9, "medium", "rgba(255,255,255,0.55)")
+    ], { alignItems: "end", gap: 1 })
+  ], { gap: 8 });
+}
+
+function riskCard(model) {
+  const risk = model.risk;
+  if (!risk) return sectionCard(t("risk"), "shield.lefthalf.filled", [t("noData")], { iconColor: "#FCA5A5", backgroundColor: "rgba(255,255,255,0.06)" });
+  const riskText = `${risk.riskValue}%`;
+  const color = risk.riskValue >= 80 ? "#F87171" : risk.riskValue >= 50 ? "#FBBF24" : "#34D399";
+  return vstack([
+    hstack([icon("shield.lefthalf.filled", 12, color), txt(t("risk"), 10, "bold", "rgba(255,255,255,0.88)"), spacer(), pill(riskText, color + "33", color)], { gap: 4 }),
+    txt(`${risk.lineType} · ${risk.nativeHint}`, 10, "medium", "rgba(255,255,255,0.8)", { maxLines: 1, minScale: 0.75 }),
+    txt(risk.tunnelHint, 9, "medium", "rgba(255,255,255,0.58)", { maxLines: 1, minScale: 0.75 }),
+    txt((risk.reasons || []).slice(0, 2).join(" · ") || "-", 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+  ], { gap: 3, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
+}
+
+function servicesRow(model, maxItems) {
+  const items = (model.services || []).slice(0, maxItems || 4).map((x) => vstack([
+    txt(x.icon, 13, "regular", null),
+    txt(x.name.replace(/\(.+?\)/g, ""), 8, "medium", "rgba(255,255,255,0.78)", { maxLines: 1, minScale: 0.7 }),
+    txt(x.cc ? x.cc : "-", 8, "medium", "rgba(255,255,255,0.5)", { maxLines: 1, minScale: 0.7 })
+  ], { alignItems: "center", gap: 1, padding: [6, 4, 6, 4], backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10, width: 58 }));
+  if (!items.length) return sectionCard(t("services"), "play.rectangle.on.rectangle", [t("noData")], { iconColor: "#C4B5FD" });
+  return vstack([
+    hstack([icon("play.rectangle.on.rectangle", 12, "#C4B5FD"), txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")], { gap: 4 }),
+    hstack(items, { gap: 6 })
+  ], { gap: 6, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
+}
+
+function renderSystemSmall(model) {
+  const children = [
+    headerBar(model, 13, 14), spacer(6), divider(), spacer(8),
+    sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#93C5FD", maxLines: 3 }),
+    spacer(8),
+    riskCard(model),
+    spacer(),
+    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+  ];
+  return makeRoot(children, ["#0D1323", "#11213D", "#1A2A4E"], [12, 14, 10, 14]);
+}
+
+function renderSystemMedium(model) {
+  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", width: 106, maxLines: 3 });
+  const entData = model.entrance?.ip || model.entrance?.loc1 || model.entrance?.isp1 ? model.entrance : {};
+  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", width: 106, maxLines: 3, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
+  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", width: 106, maxLines: 3 });
+  const children = [
+    headerBar(model, 14, 16), spacer(6), divider(), spacer(8),
+    hstack([localCard, entranceCard, landingCard], { gap: 8, alignItems: "start" }),
+    spacer(8),
+    hstack([riskCard(model), servicesRow(model, 4)], { gap: 8, alignItems: "start" }),
+    spacer(),
+    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+  ];
+  return makeRoot(children, ["#0B1220", "#0F1C34", "#182E52"], [12, 14, 10, 14]);
+}
+
+function serviceListCard(model, maxItems) {
+  const rows = (model.services || []).slice(0, maxItems || 8).map((x) => hstack([
+    txt(x.icon, 12),
+    txt(x.name, 10, "medium", "rgba(255,255,255,0.86)", { width: 76, maxLines: 1, minScale: 0.75 }),
+    spacer(),
+    txt(x.region || "-", 9, "medium", "rgba(255,255,255,0.62)", { maxLines: 1, minScale: 0.7 })
+  ], { gap: 5 }));
+  return vstack([
+    hstack([icon("play.rectangle.on.rectangle", 12, "#C4B5FD"), txt(t("services"), 10, "bold", "rgba(255,255,255,0.88)")], { gap: 4 }),
+    ...rows
+  ], { gap: 4, padding: [9, 10, 9, 10], backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12 });
+}
+
+function renderSystemLarge(model) {
+  const localCard = sectionCard(t("local"), "house.fill", buildSectionLines("local", model.local, model.local6), { iconColor: "#60A5FA", maxLines: 4 });
+  const entData = model.entrance?.ip || model.entrance?.loc1 || model.entrance?.isp1 ? model.entrance : {};
+  const entranceCard = sectionCard(t("entrance"), "point.3.connected.trianglepath.dotted", buildSectionLines("entrance", entData, model.entrance6), { iconColor: "#A78BFA", maxLines: 4, backgroundColor: entData.ip || entData.loc1 ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)" });
+  const landingCard = sectionCard(t("landing"), "paperplane.circle.fill", buildSectionLines("landing", model.landing, model.landing6), { iconColor: "#34D399", maxLines: 4 });
+  const children = [
+    headerBar(model, 16, 18), spacer(6), divider(), spacer(8),
+    hstack([vstack([localCard, spacer(8), entranceCard], { gap: 0 }), vstack([landingCard, spacer(8), riskCard(model)], { gap: 0 })], { gap: 8, alignItems: "start" }),
+    spacer(8),
+    serviceListCard(model, 8),
+    spacer(),
+    txt(model.policy ? `${t("policy")}: ${model.policy}` : t("manualPolicyHint"), 8, "medium", "rgba(255,255,255,0.45)", { maxLines: 1, minScale: 0.7 })
+  ];
+  return makeRoot(children, ["#0A1120", "#0D1C36", "#17335A"], [12, 14, 10, 14]);
+}
+
+function renderByFamily(model) {
+  const family = S().RT.widgetFamily || "systemMedium";
+  if (family === "accessoryInline") return renderAccessoryInline(model);
+  if (family === "accessoryCircular") return renderAccessoryCircular(model);
+  if (family === "accessoryRectangular") return renderAccessoryRectangular(model);
+  if (family === "systemSmall") return renderSystemSmall(model);
+  if (family === "systemLarge" || family === "systemExtraLarge") return renderSystemLarge(model);
+  return renderSystemMedium(model);
+}
+
+async function buildModel(ctx) {
+  const box = await readBoxSettings(ctx);
+  const cfg = buildCFG(ctx, box);
+  G = {
+    RT: ctx,
+    CFG: cfg,
+    DEADLINE: Date.now() + cfg.BUDGET_MS,
+    DEBUG: [],
+    ENT_CACHE: { ip: "", t: 0, data: null }
+  };
+  log("info", "start", { family: ctx.widgetFamily || "systemMedium", policy: cfg.PROXY_POLICY || "-" });
   const sdPromise = runServiceChecks().catch(() => []);
-  const cn = await getDirectV4(S.CFG.DOMESTIC_IPv4).catch(() => ({}));
-  const probe = await probeLandingV6(S.CFG.LANDING_IPv6).catch(() => ({ ok: false, ip: "" }));
-  const V6_READY = probe.ok;
-  const cn6 = S.IPV6_EFF ? await getDirectV6(S.CFG.DOMESTIC_IPv6).catch(() => ({})) : {};
-  const px = await getLandingV4(S.CFG.LANDING_IPv4).catch(() => ({}));
-  const px6 = (V6_READY && probe && probe.ip) ? { ip: probe.ip } : {};
-
-  const policyName = S.CFG.PROXY_POLICY || "-";
-  const entrance4 = S.CFG.ENTRANCE4 || "";
-  const entrance6 = V6_READY ? (S.CFG.ENTRANCE6 || "") : "";
-  const ent4 = isIPv4(entrance4 || "") ? await getEntranceBundle(entrance4).catch(() => ({ ip: entrance4 })) : {};
-  const ent6 = (V6_READY && isIPv6(entrance6 || "")) ? await getEntranceBundle(entrance6).catch(() => ({ ip: entrance6 })) : {};
-
-  const rdnsHost = await queryPTRMaybe(px.ip).catch(() => "");
-  const asField = px && (px.as || px.asn) ? (px.as || px.asn) : "";
-  const risk = calculateRiskValueSafe(px.isp, px.org, px.country, asField, rdnsHost);
-
-  const title = netTypeLine() || t("unknownNet");
-  const parts = [];
-  parts.push(`${t("runAt")}: ${now()}`);
-  parts.push(`${t("policy")}: ${policyName || "-"}`);
-  if (!S.CFG.PROXY_POLICY) parts.push(S.CFG.SD_LANG === "zh-Hant" ? "提示: Egern 無 recent-requests 回溯，策略名請用 PROXY_POLICY 手動填入" : "提示: Egern 无 recent-requests 回溯，策略名请用 PROXY_POLICY 手动填入");
-
-  pushGroupTitle(parts, "本地");
-  const directIPv4 = ipLine("IPv4", cn.ip); const directIPv6 = ipLine("IPv6", cn6.ip); if (directIPv4) parts.push(directIPv4); if (directIPv6) parts.push(directIPv6);
-  parts.push(`${t("location")}: ${cn.loc ? (S.CFG.MASK_POS ? onlyFlag(cn.loc) : flagFirst(cn.loc)) : "-"}`);
-  if (cn.isp) parts.push(`${t("isp")}: ${fmtISP(cn.isp, cn.loc)}`);
-
-  if ((ent4 && (ent4.ip || ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) || (ent6 && (ent6.ip || ent6.loc1 || ent6.loc2 || ent6.isp1 || ent6.isp2))) {
-    pushGroupTitle(parts, "入口");
-    const entIPv4 = ipLine("IPv4", ent4.ip && isIPv4(ent4.ip) ? ent4.ip : "");
-    const entIPv6 = ipLine("IPv6", ent6.ip && isIPv6(ent6.ip) ? ent6.ip : "");
-    if (entIPv4) parts.push(entIPv4); if (entIPv6) parts.push(entIPv6);
-    const entShow = (ent4 && (ent4.loc1 || ent4.loc2 || ent4.isp1 || ent4.isp2)) ? ent4 : ent6;
-    if (entShow?.loc1) parts.push(`${t("location")}¹: ${flagFirst(entShow.loc1)}`);
-    if (entShow?.isp1) parts.push(`${t("isp")}¹: ${fmtISP(entShow.isp1, entShow.loc1)}`);
-    if (entShow?.loc2) parts.push(`${t("location")}²: ${flagFirst(entShow.loc2)}`);
-    if (entShow?.isp2) parts.push(`${t("isp")}²: ${String(entShow.isp2).trim()}`);
-  }
-
-  if (px && (px.ip || (px6 && px6.ip) || px.loc || px.isp)) {
-    pushGroupTitle(parts, "落地");
-    const landIPv4 = ipLine("IPv4", px.ip); const landIPv6 = ipLine("IPv6", (px6 && px6.ip) ? px6.ip : "");
-    if (landIPv4) parts.push(landIPv4); if (landIPv6) parts.push(landIPv6);
-    if (px.loc) parts.push(`${t("location")}: ${flagFirst(px.loc)}`);
-    if (px.isp) parts.push(`${t("isp")}: ${fmtISP(px.isp, px.loc)}`);
-    parts.push(`网络类型: ${risk.lineType} · ${risk.nativeHint}`);
-    parts.push(`代理特征: ${risk.tunnelHint}`);
-    parts.push(`证据: ${(risk.reasons || []).slice(0, 4).join("；") || "-"}`);
-    const rv = Number(risk.riskValue); const riskValue = Number.isFinite(rv) ? clamp(Math.round(rv), 0, 100) : 0; const riskWarn = riskValue >= 80 ? " 🚨" : riskValue >= 50 ? " ⚠️" : "";
-    parts.push(`风险值: ${riskValue}%${riskWarn}`);
-  }
-
-  const sdLines = await sdPromise;
-  if (sdLines.length) { pushGroupTitle(parts, "服务检测"); parts.push(...sdLines); }
-  if (S.CFG.LOG_TO_PANEL && S.DEBUG_LINES.length) { pushGroupTitle(parts, t("debug")); parts.push(...S.DEBUG_LINES.slice(-CONSTS.DEBUG_TAIL_LINES)); }
-
-  const shown = S.CFG.SD_LANG === "zh-Hant" ? parts.map(maybeTifyLine) : parts;
-  return buildLineWidget(title, shown, ctx.widgetFamily || "systemMedium");
+  const local = await getDirectV4(cfg.DOMESTIC_IPv4).catch(() => ({}));
+  const local6 = (cfg.IPv6 && ctx.device?.ipv6?.address) ? await getDirectV6(cfg.DOMESTIC_IPv6).catch(() => ({})) : {};
+  const landing = await getLandingV4(cfg.LANDING_IPv4).catch(() => ({}));
+  const probe = cfg.IPv6 ? await probeLandingV6(cfg.LANDING_IPv6).catch(() => ({ ok: false, ip: "" })) : { ok: false, ip: "" };
+  const landing6 = probe.ok ? { ip: probe.ip } : {};
+  const entrance4 = isIPv4(cfg.ENTRANCE4 || "") ? cfg.ENTRANCE4 : "";
+  const entrance6ip = isIPv6(cfg.ENTRANCE6 || "") ? cfg.ENTRANCE6 : "";
+  const entrance = entrance4 ? await getEntranceBundle(entrance4).catch(() => ({ ip: entrance4 })) : {};
+  const entrance6 = entrance6ip ? await getEntranceBundle(entrance6ip).catch(() => ({ ip: entrance6ip })) : {};
+  const rdnsHost = await queryPTRMaybe(landing.ip).catch(() => "");
+  const risk = landing.ip ? calculateRiskValueSafe(landing.isp, landing.org, landing.country, landing.as || landing.asn || "", rdnsHost) : null;
+  const services = await sdPromise;
+  const model = {
+    runAt: nowStr(),
+    policy: cfg.PROXY_POLICY || "-",
+    local,
+    local6,
+    entrance,
+    entrance6,
+    landing,
+    landing6,
+    risk,
+    services,
+    debug: S().DEBUG.slice(-8)
+  };
+  return model;
 }
 
 export default async function(ctx) {
   try {
-    return await runMain(ctx);
+    const model = await buildModel(ctx);
+    return renderByFamily(model);
   } catch (err) {
     const msg = String(err && err.stack ? err.stack : err);
-    try { ctx.notify?.({ title: "网络信息 𝕏", body: msg.slice(0, 200), sound: false, duration: 5 }); } catch {}
+    try { console.log(msg); } catch (_) {}
     return {
       type: "widget",
       padding: 14,
-      backgroundColor: "#1F2937",
+      backgroundGradient: { type: "linear", colors: ["#1B1B2F", "#16213E"], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } },
       children: [
-        { type: "text", text: "网络信息 𝕏", font: { size: "headline", weight: "bold" }, textColor: "#FFFFFF" },
-        { type: "text", text: "脚本错误", font: { size: "caption1", weight: "semibold" }, textColor: "#FCA5A5" },
-        { type: "text", text: msg.slice(0, 300), font: { size: "caption2", weight: "regular" }, textColor: "#E5E7EB", maxLines: 8, minScale: 0.7 }
+        hstack([icon("exclamationmark.triangle.fill", 14, "#F87171"), txt("网络信息", 14, "bold", "#FFFFFF")], { gap: 6 }),
+        spacer(6),
+        txt("Widget 运行失败", 11, "semibold", "#FCA5A5"),
+        txt(msg.slice(0, 220), 9, "medium", "rgba(255,255,255,0.78)", { maxLines: 8, minScale: 0.6 })
       ]
     };
   }
