@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R3
+ * 版本 · 2026-03-13R4
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -245,8 +245,20 @@ function normalizeArgCompareValue(key, val) {
   return s;
 }
 
-function isExplicitArgumentValue(key, rawValue) {
+function isExplicitArgumentValue(key, rawValue, rawArgString = "") {
   const argNorm = normalizeArgCompareValue(key, rawValue);
+  if (key === "SERVICES") {
+    // SERVICES 继续保留“空值不算显式指定”的语义
+    return argNorm !== "";
+  }
+
+  // 只要 argument 字符串里明确出现该 key，就视为显式覆盖。
+  // 这是为了兼容 Egern 把模块参数默认值整串回填到 _compat.$argument 的行为，
+  // 同时确保用户把 0 / false 这类值写进参数后不会再被 BoxJS 抢走。
+  const esc = String(key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hasKey = rawArgString ? new RegExp(`(?:^|&)${esc}(?:=|&|$)`).test(rawArgString) : false;
+  if (hasKey) return true;
+
   const defNorm = normalizeArgCompareValue(key, MODULE_ARG_DEFAULTS[key]);
   if (argNorm === "") return false;
   return argNorm !== defNorm;
@@ -273,7 +285,7 @@ function buildENV(ctx, box) {
 
     const rawArgHit = pickByKeys(compatArgs, argKeys);
     let argHit = { hit: false, key: "", value: undefined };
-    if (rawArgHit.hit && isExplicitArgumentValue(key, rawArgHit.value)) argHit = rawArgHit;
+    if (rawArgHit.hit && isExplicitArgumentValue(key, rawArgHit.value, rawArgString)) argHit = rawArgHit;
 
     const envView = { ...directEnv };
     delete envView["_compat.$argument"];
@@ -422,7 +434,7 @@ function buildCFG(ctx, box) {
     return Math.min(CONSTS.BUDGET_HARD_MS, Math.max(5500, base));
   })();
   cfg.MASK_POS = ["", "auto", "follow", "same"].includes(String(cfg.MASK_POS_MODE).trim().toLowerCase())
-    ? cfg.MASK_IP
+    ? !!cfg.MASK_IP
     : toBool(cfg.MASK_POS_MODE, true);
   cfg.SUBTITLE_STYLE = normalizeSubStyle(cfg.SUBTITLE_STYLE);
   cfg.ICON_NAME = String(cfg.Icon || "").trim() || ({
@@ -1282,7 +1294,11 @@ async function buildModel(ctx) {
     services,
     debug: S().DEBUG.slice(-CONSTS.DEBUG_TAIL_LINES),
     cfgSource: cfg.SOURCE_MAP,
-    servicesSource: cfg.SERVICES_SOURCE
+    servicesSource: cfg.SERVICES_SOURCE,
+    cfgMaskIp: !!cfg.MASK_IP,
+    cfgMaskPos: !!cfg.MASK_POS,
+    cfgMaskPosMode: String(cfg.MASK_POS_MODE ?? ""),
+    cfgTwFlagMode: String(cfg.TW_FLAG_MODE ?? "")
   };
 }
 
@@ -1299,12 +1315,13 @@ function sourceBlock(model) {
   const src = model.cfgSource || {};
   const arr = [];
   arr.push("┏ 参数来源");
+  arr.push(`┣ MASK_IP：${textOrDash(src.MASK_IP)} → ${model.cfgMaskIp ? "1" : "0"}`);
+  arr.push(`┣ MASK_POS：${textOrDash(src.MASK_POS)} → ${model.cfgMaskPos ? "1" : "0"} (${textOrDash(model.cfgMaskPosMode)})`);
   arr.push(`┣ PROXY_POLICY：${textOrDash(src.PROXY_POLICY)}`);
   arr.push(`┣ ENTRANCE4：${textOrDash(src.ENTRANCE4)}`);
   arr.push(`┣ ENTRANCE6：${textOrDash(src.ENTRANCE6)}`);
   arr.push(`┣ SERVICES：${textOrDash(model.servicesSource)}`);
-  arr.push(`┣ MASK_IP：${textOrDash(src.MASK_IP)}`);
-  arr.push(`┣ TW_FLAG_MODE：${textOrDash(src.TW_FLAG_MODE)}`);
+  arr.push(`┣ TW_FLAG_MODE：${textOrDash(src.TW_FLAG_MODE)} → ${textOrDash(model.cfgTwFlagMode)}`);
   arr.push(`┣ SD_ICON_THEME：${textOrDash(src.SD_ICON_THEME)}`);
   arr.push(`┗ SD_REGION_MODE：${textOrDash(src.SD_REGION_MODE)}`);
   return arr;
