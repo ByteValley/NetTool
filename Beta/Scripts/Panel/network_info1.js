@@ -1,10 +1,9 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R1
+ * 版本 · 2026-03-14R1
  *
  * 模块分类 · 说明
- * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
  * · 参数优先级：
  *   env 显式设置 > BoxJS > 默认值
  * · 不再依赖 _compat.$argument / compat_arguments 作为运行时参数源
@@ -437,6 +436,10 @@ function buildCFG(ctx, box) {
     antenna: "antenna.radiowaves.left.and.right",
     point: "point.3.connected.trianglepath.dotted"
   }[String(cfg.IconPreset).trim()] || "globe.asia.australia");
+
+  cfg.ENV_DIRECT = ENV.directEnv || {};
+  cfg.COMPAT_ARGUMENT_RAW = ENV.compatArgumentRaw || "";
+  cfg.COMPAT_ARGUMENT_PARSED = ENV.compatEnv || {};
 
   return cfg;
 }
@@ -1684,6 +1687,15 @@ async function buildModel(ctx) {
   const box = await readBoxSettings(ctx);
   const cfg = buildCFG(ctx, box);
 
+  // ===== DEBUG: 检查 env 注入 =====
+  try {
+    console.log("[NI][DEBUG] ctx.env =", JSON.stringify(ctx?.env || {}));
+    console.log("[NI][DEBUG] raw PROXY_POLICY =", String(ctx?.env?.PROXY_POLICY ?? ""));
+    console.log("[NI][DEBUG] cfg PROXY_POLICY =", String(cfg?.PROXY_POLICY ?? ""));
+    console.log("[NI][DEBUG] cfg source =", JSON.stringify(cfg?.SOURCE_MAP || {}));
+  } catch (_) {}
+  // =================================
+  
   G = {
     RT: ctx,
     CFG: cfg,
