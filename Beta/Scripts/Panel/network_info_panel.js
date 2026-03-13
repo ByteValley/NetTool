@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R8
+ * 版本 · 2026-03-13R9
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -16,7 +16,7 @@
  * · 保留 DOMIC_IPv4 / DOMIC_IPv6 旧别名兼容
  * · 策略 / 入口支持自动捕获（若宿主提供 recent requests 能力），否则回退手动传参
  * · 日志统一输出到宿主日志（console.log）
- * · 参数来源仅输出到宿主日志，不在 panel 渲染
+ * · 采用高密度日志埋点，便于在 Egern 日志页排查参数、生效顺序与请求链路
  * ========================================================= */
 
 const CONSTS = Object.freeze({
@@ -526,6 +526,7 @@ function logCfgSources(cfg) {
     log("info", "cfg-source", {
       Update: cfg?.SOURCE_MAP?.Update || "default",
       Timeout: cfg?.SOURCE_MAP?.Timeout || "default",
+      BUDGET: cfg?.SOURCE_MAP?.BUDGET || "default",
       MASK_IP: cfg?.SOURCE_MAP?.MASK_IP || "default",
       MASK_POS: cfg?.SOURCE_MAP?.MASK_POS || "default",
       IPv6: cfg?.SOURCE_MAP?.IPv6 || "default",
@@ -542,6 +543,7 @@ function logCfgSources(cfg) {
       SUBTITLE_MINIMAL: cfg?.SOURCE_MAP?.SUBTITLE_MINIMAL || "default",
       GAP_LINES: cfg?.SOURCE_MAP?.GAP_LINES || "default",
       SD_STYLE: cfg?.SOURCE_MAP?.SD_STYLE || "default",
+      SD_LANG: cfg?.SOURCE_MAP?.SD_LANG || "default",
       SD_REGION_MODE: cfg?.SOURCE_MAP?.SD_REGION_MODE || "default",
       SD_ICON_THEME: cfg?.SOURCE_MAP?.SD_ICON_THEME || "default",
       SD_ARROW: cfg?.SOURCE_MAP?.SD_ARROW || "default",
@@ -715,7 +717,8 @@ function hasCityLevel(loc) {
     return s.split(/\s+/).filter(Boolean).length >= 3;
   } catch (_) { return false; }
 }
-async function trySources(order, sourceMap, { needCityPrefer = false, acceptIp = null }) {
+async function trySources(order, sourceMap, { needCityPrefer = false, acceptIp = null, logTag = "trySources" }) {
+  log("info", `${logTag}:begin`, { order, needCityPrefer });
   let firstOK = null;
   for (const key of order) {
     if (budgetLeft() <= 300) break;
@@ -727,18 +730,28 @@ async function trySources(order, sourceMap, { needCityPrefer = false, acceptIp =
       const ip = String(res.ip || "").trim();
       const ok = acceptIp ? acceptIp(ip) : !!ip;
       const cityOK = ok && hasCityLevel(res.loc);
+      log("debug", `${logTag}:try`, { key, ok, cityOK, ip: maskIP(ip), loc: res.loc || "", isp: res.isp || "", status: r.status, cost: r.cost });
       if (ok) {
         res.ip = ip;
         if (!firstOK) firstOK = res;
-        if (!needCityPrefer || cityOK) return res;
+        if (!needCityPrefer || cityOK) {
+          log("info", `${logTag}:hit`, { key, ip: maskIP(ip), loc: res.loc || "", isp: res.isp || "" });
+          return res;
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      log("warn", `${logTag}:fail`, { key, error: String(e) });
+    }
   }
+  if (firstOK) log("info", `${logTag}:fallback-first`, { ip: maskIP(firstOK.ip || ""), loc: firstOK.loc || "", isp: firstOK.isp || "" });
+  else log("warn", `${logTag}:empty`);
   return firstOK || {};
 }
 async function tryIPv6Ip(order, opt = {}) {
   const timeoutMs = opt.timeoutMs != null ? opt.timeoutMs : Math.min(Math.max(CONSTS.SD_MIN_TIMEOUT, S().CFG.SD_TIMEOUT_MS), 2500);
   const maxTries = Math.max(1, Math.min(Number(opt.maxTries || order.length), order.length));
+  const logTag = opt.logTag || "tryIPv6Ip";
+  log("info", `${logTag}:begin`, { order: order.slice(0, maxTries), timeoutMs });
   for (const key of order.slice(0, maxTries)) {
     if (budgetLeft() <= 260) break;
     const url = IPV6_IP_ENDPOINTS[key];
@@ -746,9 +759,17 @@ async function tryIPv6Ip(order, opt = {}) {
     try {
       const r = await httpGetRT(url, {}, timeoutMs, false);
       const ip = String(r.body || "").trim();
-      if (isIPv6(ip)) return { ip };
-    } catch (_) {}
+      const ok = isIPv6(ip);
+      log("debug", `${logTag}:try`, { key, ok, ip: ok ? maskIP(ip) : ip, status: r.status, cost: r.cost });
+      if (ok) {
+        log("info", `${logTag}:hit`, { key, ip: maskIP(ip) });
+        return { ip };
+      }
+    } catch (e) {
+      log("warn", `${logTag}:fail`, { key, error: String(e) });
+    }
   }
+  log("warn", `${logTag}:empty`);
   return {};
 }
 async function fillDirectIspSameIp(targetIp, skipKey) {
@@ -767,17 +788,17 @@ async function fillDirectIspSameIp(targetIp, skipKey) {
   return "";
 }
 async function getDirectV4(preferKey) {
-  const res = await trySources(makeTryOrder(preferKey, ORDER.directV4), DIRECT_V4_SOURCES, { needCityPrefer: true, acceptIp: isIPv4 });
+  const res = await trySources(makeTryOrder(preferKey, ORDER.directV4), DIRECT_V4_SOURCES, { needCityPrefer: true, acceptIp: isIPv4, logTag: "direct-v4" });
   if (res && res.ip && !String(res.isp || "").trim()) {
     const filled = await fillDirectIspSameIp(res.ip, preferKey).catch(() => "");
     if (filled) res.isp = filled;
   }
   return res || {};
 }
-async function getDirectV6(preferKey) { return await tryIPv6Ip(makeTryOrder(preferKey, ORDER.directV6), { timeoutMs: 2200 }); }
-async function getLandingV4(preferKey) { return await trySources(makeTryOrder(preferKey, ORDER.landingV4), LANDING_V4_SOURCES, { acceptIp: isIPv4 }); }
+async function getDirectV6(preferKey) { return await tryIPv6Ip(makeTryOrder(preferKey, ORDER.directV6), { timeoutMs: 2200, logTag: "direct-v6" }); }
+async function getLandingV4(preferKey) { return await trySources(makeTryOrder(preferKey, ORDER.landingV4), LANDING_V4_SOURCES, { acceptIp: isIPv4, logTag: "landing-v4" }); }
 async function probeLandingV6(preferKey) {
-  const r = await tryIPv6Ip(makeTryOrder(preferKey, ORDER.landingV6), { timeoutMs: Math.min(CONSTS.V6_PROBE_TO_MS, 900), maxTries: 2 });
+  const r = await tryIPv6Ip(makeTryOrder(preferKey, ORDER.landingV6), { timeoutMs: Math.min(CONSTS.V6_PROBE_TO_MS, 900), maxTries: 2, logTag: "landing-v6-probe" });
   return { ok: !!r.ip, ip: r.ip || "" };
 }
 
@@ -977,12 +998,23 @@ function normSvcList(list) {
 function selectServices() {
   const cfg = S().CFG;
   const argList = parseServices(cfg.SERVICES_ARG_TEXT);
-  if (argList.length) return argList;
+  if (argList.length) {
+    log("info", "services-selected", { source: "arguments", list: argList });
+    return argList;
+  }
   const boxCheckedList = parseServices(cfg.SERVICES_BOX_CHECKED_RAW);
-  if (boxCheckedList.length) return boxCheckedList;
+  if (boxCheckedList.length) {
+    log("info", "services-selected", { source: "box-checked", list: boxCheckedList });
+    return boxCheckedList;
+  }
   const boxTextList = parseServices(cfg.SERVICES_BOX_TEXT);
-  if (boxTextList.length) return boxTextList;
-  return SD_TEST_KEYS.slice();
+  if (boxTextList.length) {
+    log("info", "services-selected", { source: "box-text", list: boxTextList });
+    return boxTextList;
+  }
+  const d = SD_TEST_KEYS.slice();
+  log("info", "services-selected", { source: "default", list: d });
+  return d;
 }
 
 const SD_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -1197,6 +1229,7 @@ async function runServiceChecks() {
   if (!order.length) return [];
   const map = buildServiceTests();
   const conc = S().CFG.SD_CONCURRENCY;
+  log("info", "service-check:begin", { order, conc });
   const stageCap = Math.max(800, Math.min(5200, capByBudget(5200)));
   const results = new Array(order.length);
   let cursor = 0, inflight = 0, finished = 0, doneFlag = false;
@@ -1209,7 +1242,21 @@ async function runServiceChecks() {
       const fn = map[key];
       if (!fn) { results[idx] = sd_compact(key, false, "", t("fail"), undefined, null, 0); finished++; continue; }
       inflight++;
-      Promise.resolve(fn()).then((line) => { results[idx] = line; }).catch(() => { results[idx] = sd_compact(key, false, "", t("fail"), undefined, null, 0); }).finally(() => {
+      Promise.resolve(fn()).then((line) => {
+        results[idx] = line;
+        log("info", "service-check:item", {
+          key,
+          ok: !!line?.ok,
+          state: line?.state || "",
+          region: line?.region || "",
+          tag: line?.tag || "",
+          cost: line?.cost,
+          status: line?.status
+        });
+      }).catch((e) => {
+        results[idx] = sd_compact(key, false, "", t("fail"), undefined, null, 0);
+        log("warn", "service-check:fail", { key, error: String(e) });
+      }).finally(() => {
         inflight--; finished++; if (finished >= order.length) finish(); else tryLaunch();
       });
     }
@@ -1224,7 +1271,9 @@ async function runServiceChecks() {
   }), stageCap, false);
   finish();
   for (let i = 0; i < results.length; i++) if (!results[i]) results[i] = sd_compact(order[i], false, "", t("timeout"), undefined, null, 0);
-  return results.filter(Boolean);
+  const finalResults = results.filter(Boolean);
+  log("info", "service-check:done", { count: finalResults.length });
+  return finalResults;
 }
 
 function sdRenderPanelLine(x) {
@@ -1272,12 +1321,19 @@ async function buildModel(ctx) {
   log("info", "start", { mode: "panel", policy: cfg.PROXY_POLICY || "-", policySource: cfg.SOURCE_MAP.PROXY_POLICY || "default" });
   logCfgSources(cfg);
 
-  const sdPromise = runServiceChecks().catch(() => []);
-  const local = await getDirectV4(cfg.DOMESTIC_IPv4).catch(() => ({}));
-  const local6 = (cfg.IPv6 && ctx.device?.ipv6?.address) ? await getDirectV6(cfg.DOMESTIC_IPv6).catch(() => ({})) : {};
-  const landing = await getLandingV4(cfg.LANDING_IPv4).catch(() => ({}));
-  const probe = cfg.IPv6 ? await probeLandingV6(cfg.LANDING_IPv6).catch(() => ({ ok: false, ip: "" })) : { ok: false, ip: "" };
+  const sdPromise = runServiceChecks().catch((e) => { log("warn", "service-check:crash", String(e)); return []; });
+  const local = await getDirectV4(cfg.DOMESTIC_IPv4).catch((e) => { log("warn", "direct-v4:crash", String(e)); return {}; });
+  log("info", "direct-v4:result", { ip: maskIP(local.ip || ""), loc: local.loc || "", isp: local.isp || "" });
+
+  const local6 = (cfg.IPv6 && ctx.device?.ipv6?.address) ? await getDirectV6(cfg.DOMESTIC_IPv6).catch((e) => { log("warn", "direct-v6:crash", String(e)); return {}; }) : {};
+  log("info", "direct-v6:result", { ip: maskIP(local6.ip || "") });
+
+  const landing = await getLandingV4(cfg.LANDING_IPv4).catch((e) => { log("warn", "landing-v4:crash", String(e)); return {}; });
+  log("info", "landing-v4:result", { ip: maskIP(landing.ip || ""), loc: landing.loc || "", isp: landing.isp || "", org: landing.org || "", as: landing.as || "" });
+
+  const probe = cfg.IPv6 ? await probeLandingV6(cfg.LANDING_IPv6).catch((e) => { log("warn", "landing-v6-probe:crash", String(e)); return ({ ok: false, ip: "" }); }) : { ok: false, ip: "" };
   const landing6 = probe.ok ? { ip: probe.ip } : {};
+  log("info", "landing-v6-probe:result", { ok: !!probe.ok, ip: maskIP(probe.ip || "") });
 
   let autoPolicy = "";
   let autoEntrance4 = "";
@@ -1295,16 +1351,29 @@ async function buildModel(ctx) {
         if (autoPolicy && autoEntrance4 && autoEntrance6) break;
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    log("warn", "auto-policy-entrance:crash", String(e));
+  }
+  log("info", "auto-policy-entrance:result", { policy: autoPolicy || "", entrance4: maskIP(autoEntrance4 || ""), entrance6: maskIP(autoEntrance6 || "") });
 
   const policyFinal = String(autoPolicy || cfg.PROXY_POLICY || "").trim();
   const entrance4 = isIPv4(autoEntrance4 || "") ? autoEntrance4 : (isIPv4(cfg.ENTRANCE4 || "") ? cfg.ENTRANCE4 : "");
   const entrance6ip = isIPv6(autoEntrance6 || "") ? autoEntrance6 : (isIPv6(cfg.ENTRANCE6 || "") ? cfg.ENTRANCE6 : "");
 
-  const entrance = entrance4 ? await getEntranceBundle(entrance4).catch(() => ({ ip: entrance4 })) : {};
-  const entrance6 = entrance6ip ? await getEntranceBundle(entrance6ip).catch(() => ({ ip: entrance6ip })) : {};
-  const rdnsHost = await queryPTRMaybe(landing.ip).catch(() => "");
+  log("info", "policy-entrance:final", { policy: policyFinal || "", entrance4: maskIP(entrance4 || ""), entrance6: maskIP(entrance6ip || "") });
+
+  const entrance = entrance4 ? await getEntranceBundle(entrance4).catch((e) => { log("warn", "entrance-bundle-v4:crash", String(e)); return ({ ip: entrance4 }); }) : {};
+  log("info", "entrance-bundle-v4:result", { ip: maskIP(entrance.ip || ""), loc1: entrance.loc1 || "", isp1: entrance.isp1 || "", loc2: entrance.loc2 || "", isp2: entrance.isp2 || "" });
+
+  const entrance6 = entrance6ip ? await getEntranceBundle(entrance6ip).catch((e) => { log("warn", "entrance-bundle-v6:crash", String(e)); return ({ ip: entrance6ip }); }) : {};
+  log("info", "entrance-bundle-v6:result", { ip: maskIP(entrance6.ip || ""), loc1: entrance6.loc1 || "", isp1: entrance6.isp1 || "", loc2: entrance6.loc2 || "", isp2: entrance6.isp2 || "" });
+
+  const rdnsHost = await queryPTRMaybe(landing.ip).catch((e) => { log("warn", "risk-ptr:crash", String(e)); return ""; });
+  log("info", "risk-input", { ip: maskIP(landing.ip || ""), isp: landing.isp || "", org: landing.org || "", country: landing.country || "", as: landing.as || landing.asn || "", ptr: rdnsHost || "" });
+
   const risk = landing.ip ? calculateRiskValueSafe(landing.isp, landing.org, landing.country, landing.as || landing.asn || "", rdnsHost) : null;
+  log("info", "risk-output", risk || {});
+
   const services = await sdPromise;
 
   return {
@@ -1389,6 +1458,14 @@ function pickPanelTitle(model) {
 function renderPanel(model) {
   const title = pickPanelTitle(model);
   const content = buildPanelContent(model);
+  log("info", "render-summary", {
+    title,
+    policy: model.policy || "",
+    local4: maskIP(model.local?.ip || ""),
+    landing4: maskIP(model.landing?.ip || ""),
+    services: (model.services || []).length,
+    contentLines: content.split("\n").length
+  });
   return {
     title,
     content,
@@ -1415,8 +1492,11 @@ function renderErrorPanel(err) {
 export default async function(ctx) {
   try {
     const model = await buildModel(ctx);
-    return renderPanel(model);
+    const panel = renderPanel(model);
+    log("info", "done", { title: panel.title, refreshAfter: panel.refreshAfter });
+    return panel;
   } catch (err) {
+    try { console.log(`[NI][ERROR] fatal ${String(err && err.stack ? err.stack : err)}`); } catch (_) {}
     return renderErrorPanel(err);
   }
 }
