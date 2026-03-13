@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R3
+ * 版本 · 2026-03-13R6
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -11,6 +11,7 @@
  * · 保留原脚本主要参数能力：
  *   SUBTITLE_STYLE / SUBTITLE_MINIMAL / GAP_LINES / SD_STYLE /
  *   SD_ARROW / SD_SHOW_LAT / SD_SHOW_HTTP / LOG_TO_PANEL / LOG_PUSH
+ * · 日志输出：console + storage ring；参数来源仅写日志，不在 panel 渲染
  * · 保留 SERVICES 三段优先级：
  *   arguments > BoxJS 多选 > BoxJS 文本 > 默认全开
  * · 保留 DOMIC_IPv4 / DOMIC_IPv6 旧别名兼容
@@ -61,6 +62,7 @@ const MODULE_ARG_DEFAULTS = Object.freeze({
   LOG_LEVEL: "info",
   LOG_TO_PANEL: "0",
   LOG_PUSH: "1",
+  LOG_STORE: "1",
   PROXY_POLICY: "",
   ENTRANCE4: "",
   ENTRANCE6: ""
@@ -377,6 +379,7 @@ function buildCFG(ctx, box) {
     LOG_LEVEL: String(pick("LOG_LEVEL", "info")).toLowerCase(),
     LOG_TO_PANEL: toBool(pick("LOG_TO_PANEL", false), false),
     LOG_PUSH: toBool(pick("LOG_PUSH", true), true),
+    LOG_STORE: toBool(pick("LOG_STORE", true), true),
 
     PROXY_POLICY: String(pick("PROXY_POLICY", "")).trim(),
     ENTRANCE4: String(pick("ENTRANCE4", "")).trim(),
@@ -518,6 +521,44 @@ function netTypeLine() {
   return t("unknownNet");
 }
 
+
+async function appendStorageLog(ctx, line) {
+  try {
+    const key = "NI_LOG_RING";
+    let arr = [];
+    if (ctx?.storage?.getJSON) {
+      arr = await ctx.storage.getJSON(key) || [];
+    } else if (ctx?.storage?.get) {
+      const raw = await ctx.storage.get(key);
+      arr = raw ? JSON.parse(raw) : [];
+    }
+    if (!Array.isArray(arr)) arr = [];
+    arr.push(line);
+    if (arr.length > 300) arr = arr.slice(-300);
+    if (ctx?.storage?.setJSON) {
+      await ctx.storage.setJSON(key, arr);
+    } else if (ctx?.storage?.set) {
+      await ctx.storage.set(key, JSON.stringify(arr));
+    }
+  } catch (_) {}
+}
+
+function logCfgSources(cfg) {
+  try {
+    log("info", "cfg-source", JSON.stringify({
+      MASK_IP: cfg?.SOURCE_MAP?.MASK_IP || "default",
+      MASK_POS: cfg?.SOURCE_MAP?.MASK_POS || "default",
+      PROXY_POLICY: cfg?.SOURCE_MAP?.PROXY_POLICY || "default",
+      ENTRANCE4: cfg?.SOURCE_MAP?.ENTRANCE4 || "default",
+      ENTRANCE6: cfg?.SOURCE_MAP?.ENTRANCE6 || "default",
+      SERVICES: cfg?.SERVICES_SOURCE || "default",
+      TW_FLAG_MODE: cfg?.SOURCE_MAP?.TW_FLAG_MODE || "default",
+      SD_ICON_THEME: cfg?.SOURCE_MAP?.SD_ICON_THEME || "default",
+      SD_REGION_MODE: cfg?.SOURCE_MAP?.SD_REGION_MODE || "default"
+    }));
+  } catch (_) {}
+}
+
 function log(level, ...args) {
   if (!S().CFG.LOG) return;
   const map = { debug: 10, info: 20, warn: 30, error: 40 };
@@ -526,6 +567,7 @@ function log(level, ...args) {
   try { console.log(line); } catch (_) {}
   S().DEBUG.push(line);
   if (S().DEBUG.length > CONSTS.LOG_RING_MAX) S().DEBUG.shift();
+  if (S().CFG.LOG_STORE) appendStorageLog(S().RT, line);
 }
 
 function budgetLeft() { return Math.max(0, S().DEADLINE - Date.now()); }
@@ -1233,6 +1275,7 @@ async function buildModel(ctx) {
   };
 
   log("info", "start", { mode: "panel", policy: cfg.PROXY_POLICY || "-", policySource: cfg.SOURCE_MAP.PROXY_POLICY || "default" });
+  logCfgSources(cfg);
 
   const sdPromise = runServiceChecks().catch(() => []);
   const local = await getDirectV4(cfg.DOMESTIC_IPv4).catch(() => ({}));
@@ -1295,20 +1338,6 @@ function servicesBlock(model) {
   return arr;
 }
 
-function sourceBlock(model) {
-  const src = model.cfgSource || {};
-  const arr = [];
-  arr.push("┏ 参数来源");
-  arr.push(`┣ PROXY_POLICY：${textOrDash(src.PROXY_POLICY)}`);
-  arr.push(`┣ ENTRANCE4：${textOrDash(src.ENTRANCE4)}`);
-  arr.push(`┣ ENTRANCE6：${textOrDash(src.ENTRANCE6)}`);
-  arr.push(`┣ SERVICES：${textOrDash(model.servicesSource)}`);
-  arr.push(`┣ MASK_IP：${textOrDash(src.MASK_IP)}`);
-  arr.push(`┣ TW_FLAG_MODE：${textOrDash(src.TW_FLAG_MODE)}`);
-  arr.push(`┣ SD_ICON_THEME：${textOrDash(src.SD_ICON_THEME)}`);
-  arr.push(`┗ SD_REGION_MODE：${textOrDash(src.SD_REGION_MODE)}`);
-  return arr;
-}
 
 function buildPanelContent(model) {
   const lines = [];
@@ -1348,8 +1377,6 @@ function buildPanelContent(model) {
   }
 
   lines.push(...servicesBlock(model));
-  lines.push("");
-  lines.push(...sourceBlock(model));
 
   if (S().CFG.LOG_TO_PANEL && S().CFG.LOG && model.debug?.length) {
     pushGroupTitle(lines, t("debug"));
