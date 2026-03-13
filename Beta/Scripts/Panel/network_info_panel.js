@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R7
+ * 版本 · 2026-03-13R8
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -15,9 +15,8 @@
  *   arguments > BoxJS 多选 > BoxJS 文本 > 默认全开
  * · 保留 DOMIC_IPv4 / DOMIC_IPv6 旧别名兼容
  * · 策略 / 入口支持自动捕获（若宿主提供 recent requests 能力），否则回退手动传参
- * · 日志固定输出到：
- *   console.log + storage 日志环（key = NI_LOG_FILE）
- * · 参数来源仅写入日志，不在 panel 渲染
+ * · 日志统一输出到宿主日志（console.log）
+ * · 参数来源仅输出到宿主日志，不在 panel 渲染
  * ========================================================= */
 
 const CONSTS = Object.freeze({
@@ -29,9 +28,7 @@ const CONSTS = Object.freeze({
   ENT_MAX_TTL: 3600,
   LOG_RING_MAX: 140,
   DEBUG_TAIL_LINES: 18,
-  MAX_RECENT_REQ: 150,
-  LOG_FILE_KEY: "NI_LOG_FILE",
-  LOG_FILE_MAX: 400
+  MAX_RECENT_REQ: 150
 });
 
 const MODULE_ARG_DEFAULTS = Object.freeze({
@@ -524,70 +521,38 @@ function netTypeLine() {
 }
 
 
-async function readStorageLogFile(ctx) {
-  try {
-    if (ctx?.storage?.getJSON) {
-      const arr = await ctx.storage.getJSON(CONSTS.LOG_FILE_KEY);
-      return Array.isArray(arr) ? arr : [];
-    }
-  } catch (_) {}
-  try {
-    if (ctx?.storage?.get) {
-      const raw = await ctx.storage.get(CONSTS.LOG_FILE_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    }
-  } catch (_) {}
-  return [];
-}
-
-async function writeStorageLogFile(ctx, arr) {
-  try {
-    if (ctx?.storage?.setJSON) {
-      await ctx.storage.setJSON(CONSTS.LOG_FILE_KEY, arr);
-      return true;
-    }
-  } catch (_) {}
-  try {
-    if (ctx?.storage?.set) {
-      await ctx.storage.set(CONSTS.LOG_FILE_KEY, JSON.stringify(arr));
-      return true;
-    }
-  } catch (_) {}
-  return false;
-}
-
-async function appendLogFile(ctx, line) {
-  try {
-    const arr = await readStorageLogFile(ctx);
-    arr.push(line);
-    if (arr.length > CONSTS.LOG_FILE_MAX) {
-      arr.splice(0, arr.length - CONSTS.LOG_FILE_MAX);
-    }
-    await writeStorageLogFile(ctx, arr);
-  } catch (_) {}
-}
-
 function logCfgSources(cfg) {
-  log("info", "cfg-source", {
-    Update: cfg?.SOURCE_MAP?.Update || "default",
-    Timeout: cfg?.SOURCE_MAP?.Timeout || "default",
-    MASK_IP: cfg?.SOURCE_MAP?.MASK_IP || "default",
-    MASK_POS: cfg?.SOURCE_MAP?.MASK_POS || "default",
-    IPv6: cfg?.SOURCE_MAP?.IPv6 || "default",
-    DOMESTIC_IPv4: cfg?.SOURCE_MAP?.DOMESTIC_IPv4 || "default",
-    DOMESTIC_IPv6: cfg?.SOURCE_MAP?.DOMESTIC_IPv6 || "default",
-    LANDING_IPv4: cfg?.SOURCE_MAP?.LANDING_IPv4 || "default",
-    LANDING_IPv6: cfg?.SOURCE_MAP?.LANDING_IPv6 || "default",
-    TW_FLAG_MODE: cfg?.SOURCE_MAP?.TW_FLAG_MODE || "default",
-    PROXY_POLICY: cfg?.SOURCE_MAP?.PROXY_POLICY || "default",
-    ENTRANCE4: cfg?.SOURCE_MAP?.ENTRANCE4 || "default",
-    ENTRANCE6: cfg?.SOURCE_MAP?.ENTRANCE6 || "default",
-    SERVICES: cfg?.SERVICES_SOURCE || "default",
-    SD_STYLE: cfg?.SOURCE_MAP?.SD_STYLE || "default",
-    SD_REGION_MODE: cfg?.SOURCE_MAP?.SD_REGION_MODE || "default",
-    SD_ICON_THEME: cfg?.SOURCE_MAP?.SD_ICON_THEME || "default"
-  });
+  try {
+    log("info", "cfg-source", {
+      Update: cfg?.SOURCE_MAP?.Update || "default",
+      Timeout: cfg?.SOURCE_MAP?.Timeout || "default",
+      MASK_IP: cfg?.SOURCE_MAP?.MASK_IP || "default",
+      MASK_POS: cfg?.SOURCE_MAP?.MASK_POS || "default",
+      IPv6: cfg?.SOURCE_MAP?.IPv6 || "default",
+      DOMESTIC_IPv4: cfg?.SOURCE_MAP?.DOMESTIC_IPv4 || "default",
+      DOMESTIC_IPv6: cfg?.SOURCE_MAP?.DOMESTIC_IPv6 || "default",
+      LANDING_IPv4: cfg?.SOURCE_MAP?.LANDING_IPv4 || "default",
+      LANDING_IPv6: cfg?.SOURCE_MAP?.LANDING_IPv6 || "default",
+      TW_FLAG_MODE: cfg?.SOURCE_MAP?.TW_FLAG_MODE || "default",
+      PROXY_POLICY: cfg?.SOURCE_MAP?.PROXY_POLICY || "default",
+      ENTRANCE4: cfg?.SOURCE_MAP?.ENTRANCE4 || "default",
+      ENTRANCE6: cfg?.SOURCE_MAP?.ENTRANCE6 || "default",
+      SERVICES: cfg?.SERVICES_SOURCE || "default",
+      SUBTITLE_STYLE: cfg?.SOURCE_MAP?.SUBTITLE_STYLE || "default",
+      SUBTITLE_MINIMAL: cfg?.SOURCE_MAP?.SUBTITLE_MINIMAL || "default",
+      GAP_LINES: cfg?.SOURCE_MAP?.GAP_LINES || "default",
+      SD_STYLE: cfg?.SOURCE_MAP?.SD_STYLE || "default",
+      SD_REGION_MODE: cfg?.SOURCE_MAP?.SD_REGION_MODE || "default",
+      SD_ICON_THEME: cfg?.SOURCE_MAP?.SD_ICON_THEME || "default",
+      SD_ARROW: cfg?.SOURCE_MAP?.SD_ARROW || "default",
+      SD_SHOW_LAT: cfg?.SOURCE_MAP?.SD_SHOW_LAT || "default",
+      SD_SHOW_HTTP: cfg?.SOURCE_MAP?.SD_SHOW_HTTP || "default",
+      LOG: cfg?.SOURCE_MAP?.LOG || "default",
+      LOG_LEVEL: cfg?.SOURCE_MAP?.LOG_LEVEL || "default",
+      LOG_TO_PANEL: cfg?.SOURCE_MAP?.LOG_TO_PANEL || "default",
+      LOG_PUSH: cfg?.SOURCE_MAP?.LOG_PUSH || "default"
+    });
+  } catch (_) {}
 }
 
 function log(level, ...args) {
@@ -598,7 +563,6 @@ function log(level, ...args) {
   try { console.log(line); } catch (_) {}
   S().DEBUG.push(line);
   if (S().DEBUG.length > CONSTS.LOG_RING_MAX) S().DEBUG.shift();
-  appendLogFile(S().RT, line);
 }
 
 function budgetLeft() { return Math.max(0, S().DEADLINE - Date.now()); }
