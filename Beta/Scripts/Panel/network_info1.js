@@ -170,6 +170,35 @@ function textOrDash(v) {
   const s = String(v == null ? "" : v).trim();
   return s || "-";
 }
+function parseCompatArgument(raw) {
+  const out = {};
+  const src = String(raw == null ? "" : raw).trim();
+  if (!src) return out;
+
+  for (const part of src.split("&")) {
+    if (!part) continue;
+    const idx = part.indexOf("=");
+    let k = "";
+    let v = "";
+
+    if (idx === -1) {
+      k = part.trim();
+      v = "";
+    } else {
+      k = part.slice(0, idx).trim();
+      v = part.slice(idx + 1).trim();
+    }
+
+    if (!k) continue;
+
+    try { k = decodeURIComponent(k); } catch (_) {}
+    try { v = decodeURIComponent(v); } catch (_) {}
+
+    out[k] = v;
+  }
+
+  return out;
+}
 
 const KVCompat = {
   async read(ctx, key) {
@@ -212,6 +241,14 @@ async function readBoxSettings(ctx) {
 function buildENV(ctx, box) {
   const directEnv = ctx?.env || {};
 
+  const compatArgumentRaw =
+    directEnv?._compat?.$argument ??
+    directEnv?.["$argument"] ??
+    directEnv?.["_compat.$argument"] ??
+    "";
+
+  const compatEnv = parseCompatArgument(compatArgumentRaw);
+
   function pickByKeys(container, keys) {
     for (const k of keys) {
       const v = container?.[k];
@@ -228,6 +265,7 @@ function buildENV(ctx, box) {
     const boxKeys = [key].concat(opt.boxAlias || []);
 
     const envHit = pickByKeys(directEnv, envKeys);
+    const compatHit = pickByKeys(compatEnv, envKeys);
     const boxHit = pickByKeys(box, boxKeys);
 
     const convert = (val) => {
@@ -237,13 +275,20 @@ function buildENV(ctx, box) {
     };
 
     if (envHit.hit) return { value: convert(envHit.value), source: `env:${envHit.key}`, raw: envHit.value };
+    if (compatHit.hit) return { value: convert(compatHit.value), source: `compat:${compatHit.key}`, raw: compatHit.value };
     if (boxHit.hit) return { value: convert(boxHit.value), source: `box:${boxHit.key}`, raw: boxHit.value };
     return { value: defVal, source: "default", raw: defVal };
   };
 
   const read = (key, defVal, opt = {}) => readWithMeta(key, defVal, opt).value;
 
-  return { read, readWithMeta, directEnv };
+  return {
+    read,
+    readWithMeta,
+    directEnv,
+    compatEnv,
+    compatArgumentRaw
+  };
 }
 
 const SUBTITLE_STYLES = Object.freeze({
