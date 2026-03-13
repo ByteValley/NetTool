@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R10
+ * 版本 · 2026-03-13R1
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -1819,7 +1819,6 @@ function buildPanelContent(model) {
   const lines = [];
   const policyText = model.policy ? model.policy : t("manualPolicyHint");
 
-  lines.push(`${netTypeLine()}`);
   lines.push(`${t("runAt")}：${model.runAt}`);
   lines.push(`${t("policy")}：${policyText}`);
 
@@ -1865,9 +1864,9 @@ function buildPanelContent(model) {
 }
 
 function pickPanelTitle(model) {
+  const netTitle = netTypeLine();
   const landingFlag = model.landing?.loc ? onlyFlag(model.landing.loc) : "";
-  const riskPct = model.risk ? `${model.risk.riskValue}%` : "--";
-  return `${t("title")} ${landingFlag || ""} · ${riskPct}`.trim();
+  return `${netTitle}${landingFlag ? ` ${landingFlag}` : ""}`;
 }
 
 function renderPanel(model) {
