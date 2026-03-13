@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R4
+ * 版本 · 2026-03-13R5
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -265,7 +265,8 @@ function isExplicitArgumentValue(key, rawValue, rawArgString = "") {
 }
 
 function buildENV(ctx, box) {
-  const compatArgs = parseArgs(ctx?.env?._compat?.$argument || ctx?.env?.["_compat.$argument"] || "");
+  const rawArgString = String(ctx?.env?._compat?.$argument || ctx?.env?.["_compat.$argument"] || "");
+  const compatArgs = parseArgs(rawArgString);
   const directEnv = ctx?.env || {};
 
   function pickByKeys(container, keys) {
@@ -307,7 +308,7 @@ function buildENV(ctx, box) {
 
   const read = (key, defVal, opt = {}) => readWithMeta(key, defVal, opt).value;
 
-  return { read, readWithMeta, compatArgs, directEnv };
+  return { read, readWithMeta, compatArgs, directEnv, rawArgString };
 }
 
 const SUBTITLE_STYLES = Object.freeze({
