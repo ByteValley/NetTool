@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-13R6
+ * 版本 · 2026-03-13R7
  *
  * 模块分类 · 说明
  * · 基于旧版“网络信息 + 服务检测”脚本逻辑整合为 Panel 输出
@@ -11,11 +11,13 @@
  * · 保留原脚本主要参数能力：
  *   SUBTITLE_STYLE / SUBTITLE_MINIMAL / GAP_LINES / SD_STYLE /
  *   SD_ARROW / SD_SHOW_LAT / SD_SHOW_HTTP / LOG_TO_PANEL / LOG_PUSH
- * · 日志输出：console + storage ring；参数来源仅写日志，不在 panel 渲染
  * · 保留 SERVICES 三段优先级：
  *   arguments > BoxJS 多选 > BoxJS 文本 > 默认全开
  * · 保留 DOMIC_IPv4 / DOMIC_IPv6 旧别名兼容
  * · 策略 / 入口支持自动捕获（若宿主提供 recent requests 能力），否则回退手动传参
+ * · 日志固定输出到：
+ *   console.log + storage 日志环（key = NI_LOG_FILE）
+ * · 参数来源仅写入日志，不在 panel 渲染
  * ========================================================= */
 
 const CONSTS = Object.freeze({
@@ -27,7 +29,9 @@ const CONSTS = Object.freeze({
   ENT_MAX_TTL: 3600,
   LOG_RING_MAX: 140,
   DEBUG_TAIL_LINES: 18,
-  MAX_RECENT_REQ: 150
+  MAX_RECENT_REQ: 150,
+  LOG_FILE_KEY: "NI_LOG_FILE",
+  LOG_FILE_MAX: 400
 });
 
 const MODULE_ARG_DEFAULTS = Object.freeze({
@@ -62,7 +66,6 @@ const MODULE_ARG_DEFAULTS = Object.freeze({
   LOG_LEVEL: "info",
   LOG_TO_PANEL: "0",
   LOG_PUSH: "1",
-  LOG_STORE: "1",
   PROXY_POLICY: "",
   ENTRANCE4: "",
   ENTRANCE6: ""
@@ -379,7 +382,6 @@ function buildCFG(ctx, box) {
     LOG_LEVEL: String(pick("LOG_LEVEL", "info")).toLowerCase(),
     LOG_TO_PANEL: toBool(pick("LOG_TO_PANEL", false), false),
     LOG_PUSH: toBool(pick("LOG_PUSH", true), true),
-    LOG_STORE: toBool(pick("LOG_STORE", true), true),
 
     PROXY_POLICY: String(pick("PROXY_POLICY", "")).trim(),
     ENTRANCE4: String(pick("ENTRANCE4", "")).trim(),
@@ -522,41 +524,70 @@ function netTypeLine() {
 }
 
 
-async function appendStorageLog(ctx, line) {
+async function readStorageLogFile(ctx) {
   try {
-    const key = "NI_LOG_RING";
-    let arr = [];
     if (ctx?.storage?.getJSON) {
-      arr = await ctx.storage.getJSON(key) || [];
-    } else if (ctx?.storage?.get) {
-      const raw = await ctx.storage.get(key);
-      arr = raw ? JSON.parse(raw) : [];
+      const arr = await ctx.storage.getJSON(CONSTS.LOG_FILE_KEY);
+      return Array.isArray(arr) ? arr : [];
     }
-    if (!Array.isArray(arr)) arr = [];
-    arr.push(line);
-    if (arr.length > 300) arr = arr.slice(-300);
+  } catch (_) {}
+  try {
+    if (ctx?.storage?.get) {
+      const raw = await ctx.storage.get(CONSTS.LOG_FILE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    }
+  } catch (_) {}
+  return [];
+}
+
+async function writeStorageLogFile(ctx, arr) {
+  try {
     if (ctx?.storage?.setJSON) {
-      await ctx.storage.setJSON(key, arr);
-    } else if (ctx?.storage?.set) {
-      await ctx.storage.set(key, JSON.stringify(arr));
+      await ctx.storage.setJSON(CONSTS.LOG_FILE_KEY, arr);
+      return true;
     }
+  } catch (_) {}
+  try {
+    if (ctx?.storage?.set) {
+      await ctx.storage.set(CONSTS.LOG_FILE_KEY, JSON.stringify(arr));
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+async function appendLogFile(ctx, line) {
+  try {
+    const arr = await readStorageLogFile(ctx);
+    arr.push(line);
+    if (arr.length > CONSTS.LOG_FILE_MAX) {
+      arr.splice(0, arr.length - CONSTS.LOG_FILE_MAX);
+    }
+    await writeStorageLogFile(ctx, arr);
   } catch (_) {}
 }
 
 function logCfgSources(cfg) {
-  try {
-    log("info", "cfg-source", JSON.stringify({
-      MASK_IP: cfg?.SOURCE_MAP?.MASK_IP || "default",
-      MASK_POS: cfg?.SOURCE_MAP?.MASK_POS || "default",
-      PROXY_POLICY: cfg?.SOURCE_MAP?.PROXY_POLICY || "default",
-      ENTRANCE4: cfg?.SOURCE_MAP?.ENTRANCE4 || "default",
-      ENTRANCE6: cfg?.SOURCE_MAP?.ENTRANCE6 || "default",
-      SERVICES: cfg?.SERVICES_SOURCE || "default",
-      TW_FLAG_MODE: cfg?.SOURCE_MAP?.TW_FLAG_MODE || "default",
-      SD_ICON_THEME: cfg?.SOURCE_MAP?.SD_ICON_THEME || "default",
-      SD_REGION_MODE: cfg?.SOURCE_MAP?.SD_REGION_MODE || "default"
-    }));
-  } catch (_) {}
+  log("info", "cfg-source", {
+    Update: cfg?.SOURCE_MAP?.Update || "default",
+    Timeout: cfg?.SOURCE_MAP?.Timeout || "default",
+    MASK_IP: cfg?.SOURCE_MAP?.MASK_IP || "default",
+    MASK_POS: cfg?.SOURCE_MAP?.MASK_POS || "default",
+    IPv6: cfg?.SOURCE_MAP?.IPv6 || "default",
+    DOMESTIC_IPv4: cfg?.SOURCE_MAP?.DOMESTIC_IPv4 || "default",
+    DOMESTIC_IPv6: cfg?.SOURCE_MAP?.DOMESTIC_IPv6 || "default",
+    LANDING_IPv4: cfg?.SOURCE_MAP?.LANDING_IPv4 || "default",
+    LANDING_IPv6: cfg?.SOURCE_MAP?.LANDING_IPv6 || "default",
+    TW_FLAG_MODE: cfg?.SOURCE_MAP?.TW_FLAG_MODE || "default",
+    PROXY_POLICY: cfg?.SOURCE_MAP?.PROXY_POLICY || "default",
+    ENTRANCE4: cfg?.SOURCE_MAP?.ENTRANCE4 || "default",
+    ENTRANCE6: cfg?.SOURCE_MAP?.ENTRANCE6 || "default",
+    SERVICES: cfg?.SERVICES_SOURCE || "default",
+    SD_STYLE: cfg?.SOURCE_MAP?.SD_STYLE || "default",
+    SD_REGION_MODE: cfg?.SOURCE_MAP?.SD_REGION_MODE || "default",
+    SD_ICON_THEME: cfg?.SOURCE_MAP?.SD_ICON_THEME || "default"
+  });
 }
 
 function log(level, ...args) {
@@ -567,7 +598,7 @@ function log(level, ...args) {
   try { console.log(line); } catch (_) {}
   S().DEBUG.push(line);
   if (S().DEBUG.length > CONSTS.LOG_RING_MAX) S().DEBUG.shift();
-  if (S().CFG.LOG_STORE) appendStorageLog(S().RT, line);
+  appendLogFile(S().RT, line);
 }
 
 function budgetLeft() { return Math.max(0, S().DEADLINE - Date.now()); }
@@ -1337,7 +1368,6 @@ function servicesBlock(model) {
   for (const x of svs) arr.push(sdRenderPanelLine(x));
   return arr;
 }
-
 
 function buildPanelContent(model) {
   const lines = [];
