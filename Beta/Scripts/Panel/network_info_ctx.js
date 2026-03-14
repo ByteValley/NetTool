@@ -1648,19 +1648,45 @@ function sdRenderPanelLine(x) {
   const useArrow = !!S().CFG.SD_ARROW;
   const showLat = !!S().CFG.SD_SHOW_LAT;
   const showHttp = !!S().CFG.SD_SHOW_HTTP;
-  const tag = x.tag || "";
+  const tag = String(x.tag || "").trim();
   const cost = x.cost;
   const status = x.status || 0;
 
   if (isText) {
-    const stateText = meta.st === "full" ? t("unlocked") : meta.st === "partial" ? t("partialUnlocked") : t("notReachable");
-    const head = useArrow ? `${x.name}: ${stateText} ➟ ${regionText}` : `${x.name}: ${stateText} ｜ ${regionText}`;
-    const tail = [tag, (showLat && cost != null) ? `${cost}ms` : "", (showHttp && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ ");
+    let stateText = "";
+
+    if (tag) {
+      stateText = tag;
+    } else if (meta.st === "full") {
+      stateText = t("unlocked");
+    } else if (meta.st === "partial") {
+      stateText = t("partialUnlocked");
+    } else {
+      stateText = t("notReachable");
+    }
+
+    const head = useArrow
+      ? `${x.name}: ${stateText} ➟ ${regionText}`
+      : `${x.name}: ${stateText} ｜ ${regionText}`;
+
+    const tail = [
+      showLat && cost != null ? `${cost}ms` : "",
+      showHttp && status > 0 ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");
+
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  const head = useArrow ? `${meta.icon} ${x.name} ➟ ${regionText}` : `${meta.icon} ${x.name} ｜ ${regionText}`;
-  const tail = [tag, (showLat && cost != null) ? `${cost}ms` : "", (showHttp && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ ");
+  const head = useArrow
+    ? `${meta.icon} ${x.name} ➟ ${regionText}`
+    : `${meta.icon} ${x.name} ｜ ${regionText}`;
+
+  const tail = [
+    tag,
+    showLat && cost != null ? `${cost}ms` : "",
+    showHttp && status > 0 ? `HTTP ${status}` : ""
+  ].filter(Boolean).join(" ｜ ");
+
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
