@@ -2001,13 +2001,13 @@ function buildCardHeader(title, colors, icon, iconColor) {
     type: "stack",
     direction: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 2,
     children: [
       {
         type: "image",
         src: icon,
-        width: 14,
-        height: 14,
+        width: 12,
+        height: 12,
         color: iconColor || colors.accent
       },
       {
