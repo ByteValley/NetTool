@@ -2001,13 +2001,13 @@ function buildCardHeader(title, colors, icon, iconColor) {
     type: "stack",
     direction: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     children: [
       {
         type: "image",
         src: icon,
-        width: 14,
-        height: 14,
+        width: 12,
+        height: 12,
         color: iconColor || colors.accent
       },
       {
@@ -2022,8 +2022,8 @@ function buildCardHeader(title, colors, icon, iconColor) {
       {
         type: "image",
         src: "sf-symbol:clock",
-        width: 8,
-        height: 8,
+        width: 7,
+        height: 7,
         color: colors.textSoft
       },
       {
@@ -2042,18 +2042,19 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
   return {
     type: "stack",
     direction: "column",
-    gap: 8,
-    padding: [8, 10, 8, 10],
+    gap: 3,
+    padding: [6, 10, 6, 10],
     backgroundColor: colors.cardBg,
     borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
       buildCardHeader(title, colors, icon, iconColor),
+
       {
         type: "stack",
         direction: "column",
-        gap: 4,
+        gap: 1,
         children: validRows.length
           ? validRows.map((line) => ({
               type: "text",
