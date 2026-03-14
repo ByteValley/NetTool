@@ -1,3 +1,5 @@
+还是一样，就摘要卡片显示顺眼点
+
 /* =========================================================
  * 模块分类 · 网络信息面板 / Widget
  * 作者 · ByteValley
@@ -2001,13 +2003,13 @@ function buildCardHeader(title, colors, icon, iconColor) {
     type: "stack",
     direction: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
     children: [
       {
         type: "image",
         src: icon,
-        width: 12,
-        height: 12,
+        width: 14,
+        height: 14,
         color: iconColor || colors.accent
       },
       {
@@ -2022,8 +2024,8 @@ function buildCardHeader(title, colors, icon, iconColor) {
       {
         type: "image",
         src: "sf-symbol:clock",
-        width: 7,
-        height: 7,
+        width: 8,
+        height: 8,
         color: colors.textSoft
       },
       {
@@ -2042,19 +2044,18 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
   return {
     type: "stack",
     direction: "column",
-    gap: 3,
-    padding: [6, 10, 6, 10],
+    gap: 8,
+    padding: [8, 10, 8, 10],
     backgroundColor: colors.cardBg,
     borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
       buildCardHeader(title, colors, icon, iconColor),
-
       {
         type: "stack",
         direction: "column",
-        gap: 1,
+        gap: 4,
         children: validRows.length
           ? validRows.map((line) => ({
               type: "text",
