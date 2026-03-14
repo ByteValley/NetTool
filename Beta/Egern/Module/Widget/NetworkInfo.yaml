@@ -177,13 +177,7 @@ env_schema:
   PROXY_POLICY:
     name: 代理策略名称
     description: 显示的策略名
-    default_value: "我爱吃大鸡巴"
-
-  WIDGET_PAGE:
-    name: 小组件页面
-    description: local/entrance/landing/risk/services
-    options: ["local","entrance","landing","risk","services"]
-    default_value: "landing"
+    default_value: "我愛吃大雞巴"
 
 compat_arguments:
   Update: ''
@@ -282,39 +276,28 @@ scriptings:
       update_interval: 21600
       timeout: 14
 
-  - schedule:
-      name: 网络信息·播报
-      cron: 0 * * * * *
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Panel/network_info1.js
-      timeout: 20
-
 widgets:
   - name: 网络信息·本地
     script_name: 网络信息·组件
     env:
       WIDGET_PAGE: "local"
-      PROXY_POLICY: "{{{PROXY_POLICY}}}"
 
   - name: 网络信息·入口
     script_name: 网络信息·组件
     env:
       WIDGET_PAGE: "entrance"
-      PROXY_POLICY: "{{{PROXY_POLICY}}}"
 
   - name: 网络信息·落地
     script_name: 网络信息·组件
     env:
       WIDGET_PAGE: "landing"
-      PROXY_POLICY: "{{{PROXY_POLICY}}}"
 
   - name: 网络信息·风险
     script_name: 网络信息·组件
     env:
       WIDGET_PAGE: "risk"
-      PROXY_POLICY: "{{{PROXY_POLICY}}}"
 
   - name: 网络信息·服务
     script_name: 网络信息·组件
     env:
       WIDGET_PAGE: "services"
-      PROXY_POLICY: "{{{PROXY_POLICY}}}"
