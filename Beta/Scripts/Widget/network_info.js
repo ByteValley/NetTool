@@ -65,7 +65,7 @@ const DEFAULTS = Object.freeze({
   PROXY_POLICY: "",
   ENTRANCE4: "",
   ENTRANCE6: "",
-  WIDGET_PAGE: "landing"
+  WIDGET_PAGE: "summary"
 });
 
 const SD_STR = {
@@ -1986,11 +1986,14 @@ function buildLocalCard(model, colors) {
     t("local"),
     [
       `IPv4 ${widgetText(maskIP(model.local?.ip || ""))}`,
-      `${t("location")} ${widgetText(localLoc)}`
+      model.local6?.ip ? `IPv6 ${widgetText(maskIP(model.local6.ip))}` : "",
+      `${t("location")} ${widgetText(localLoc)}`,
+      model.local?.isp ? `${t("isp")} ${fmtISP(model.local.isp, model.local.loc)}` : ""
     ],
     colors,
     "sf-symbol:house",
-    colors.accent
+    colors.accent,
+    { minHeight: 112, maxRows: 4 }
   );
 }
 
@@ -2001,26 +2004,26 @@ function buildEntranceCard(model, colors) {
   if (!hasAny) {
     return buildInfoCard(
       t("entrance"),
-      [t("noData"), ""],
+      [t("noData")],
       colors,
       "sf-symbol:arrow.down.forward.circle",
-      colors.textSoft
+      colors.textSoft,
+      { minHeight: 112, maxRows: 3 }
     );
   }
 
   return buildInfoCard(
     t("entrance"),
     [
-      model.entrance?.ip
-        ? `IPv4 ${maskIP(model.entrance.ip)}`
-        : model.entrance6?.ip
-        ? `IPv6 ${maskIP(model.entrance6.ip)}`
-        : "-",
-      entShow?.loc1 ? `${t("location")} ${flagFirst(entShow.loc1)}` : "-"
+      model.entrance?.ip ? `IPv4 ${maskIP(model.entrance.ip)}` : "",
+      model.entrance6?.ip ? `IPv6 ${maskIP(model.entrance6.ip)}` : "",
+      entShow?.loc1 ? `${t("location")} ${flagFirst(entShow.loc1)}` : "",
+      entShow?.isp1 ? `${t("isp")} ${fmtISP(entShow.isp1, entShow.loc1)}` : ""
     ],
     colors,
     "sf-symbol:arrow.down.forward.circle",
-    colors.accent
+    colors.accent,
+    { minHeight: 112, maxRows: 4 }
   );
 }
 
@@ -2029,11 +2032,14 @@ function buildLandingCard(model, colors) {
     t("landing"),
     [
       `IPv4 ${widgetText(maskIP(model.landing?.ip || ""))}`,
-      model.landing?.loc ? `${t("location")} ${flagFirst(model.landing.loc)}` : "-"
+      model.landing6?.ip ? `IPv6 ${maskIP(model.landing6.ip)}` : "",
+      model.landing?.loc ? `${t("location")} ${flagFirst(model.landing.loc)}` : "",
+      model.landing?.isp ? `${t("isp")} ${fmtISP(model.landing.isp, model.landing.loc)}` : ""
     ],
     colors,
     "sf-symbol:airplane.circle",
-    colors.accent
+    colors.accent,
+    { minHeight: 112, maxRows: 4 }
   );
 }
 
@@ -2042,10 +2048,11 @@ function buildRiskCard(model, colors) {
   if (!risk) {
     return buildInfoCard(
       t("risk"),
-      [t("noData"), ""],
+      [t("noData")],
       colors,
       "sf-symbol:shield.lefthalf.filled",
-      colors.textSoft
+      colors.textSoft,
+      { minHeight: 112, maxRows: 3 }
     );
   }
 
@@ -2053,11 +2060,14 @@ function buildRiskCard(model, colors) {
     t("risk"),
     [
       `${risk.lineType}`,
+      `${risk.nativeHint}`,
+      `${risk.tunnelHint}`,
       `风险值 ${risk.riskValue}%`
     ],
     colors,
     "sf-symbol:shield.lefthalf.filled",
-    widgetRiskTone(model, colors)
+    widgetRiskTone(model, colors),
+    { minHeight: 112, maxRows: 4 }
   );
 }
 
@@ -2065,24 +2075,28 @@ function buildServiceCard(model, colors) {
   const svs = Array.isArray(model.services) ? model.services : [];
   const summary = widgetServiceSummary(model);
 
-  const line1 = `完整 ${summary.ok} · 部分 ${summary.partial} · 失败 ${summary.bad}`;
-  const line2 = svs[0] ? compactServiceLine(svs[0]) : t("noData");
-  const line3 = svs[1] ? compactServiceLine(svs[1]) : "";
+  const rows = [
+    `完整 ${summary.ok} · 部分 ${summary.partial} · 失败 ${summary.bad}`
+  ];
+
+  for (const item of svs.slice(0, 3)) {
+    rows.push(compactServiceLine(item));
+  }
 
   return buildInfoCard(
     t("services"),
-    [line1, line2, line3],
+    rows,
     colors,
     "sf-symbol:sparkles.tv",
     summary.bad > 0 ? colors.warn : colors.ok,
-    { minHeight: 92, maxRows: 3 }
+    { minHeight: 118, maxRows: 4 }
   );
 }
 
 function pickWidgetPage() {
   const p = String(S().CFG.WIDGET_PAGE || "").trim().toLowerCase();
-  if (["local", "entrance", "landing", "risk", "services"].includes(p)) return p;
-  return "landing";
+  if (["summary", "local", "entrance", "landing", "risk", "services"].includes(p)) return p;
+  return "summary";
 }
 
 function buildSummaryCard(model, colors) {
@@ -2090,14 +2104,15 @@ function buildSummaryCard(model, colors) {
   const localFlag = model.local?.loc ? onlyFlag(model.local.loc) : "-";
   const landingFlag = model.landing?.loc ? onlyFlag(model.landing.loc) : "-";
   const riskText = model.risk ? `${model.risk.riskValue}%` : "-";
+  const policyText = model.policy ? model.policy : "未传入";
 
   return {
     type: "stack",
     direction: "column",
-    gap: 5,
-    padding: [10, 10, 10, 10],
+    gap: 8,
+    padding: [12, 12, 12, 12],
     backgroundColor: colors.cardBg,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2109,99 +2124,14 @@ function buildSummaryCard(model, colors) {
         children: [
           {
             type: "image",
-            src: "sf-symbol:chart.bar.xaxis",
-            width: 11,
-            height: 11,
-            color: colors.accent
-          },
-          {
-            type: "text",
-            text: "摘要",
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textSub
-          }
-        ]
-      },
-      {
-        type: "text",
-        text: `本地 ${localFlag} · 落地 ${landingFlag}`,
-        font: { size: "caption2" },
-        textColor: colors.textMain,
-        maxLines: 1,
-        minScale: 0.72
-      },
-      {
-        type: "text",
-        text: `风险 ${riskText} · 服务 ${summary.ok}/${summary.total || 0}`,
-        font: { size: "caption2" },
-        textColor: colors.textMain,
-        maxLines: 1,
-        minScale: 0.72
-      }
-    ]
-  };
-}
-
-function buildDetailCardByPage(model, colors) {
-  const page = pickWidgetPage();
-
-  if (page === "local") return buildLocalCard(model, colors);
-  if (page === "entrance") return buildEntranceCard(model, colors);
-  if (page === "landing") return buildLandingCard(model, colors);
-  if (page === "risk") return buildRiskCard(model, colors);
-  return buildServiceCard(model, colors);
-}
-
-function buildDetailTitle() {
-  const page = pickWidgetPage();
-  const map = {
-    local: t("local"),
-    entrance: t("entrance"),
-    landing: t("landing"),
-    risk: t("risk"),
-    services: t("services")
-  };
-  return map[page] || t("landing");
-}
-
-function renderWidget(model) {
-  const colors = widgetColors();
-  const refreshTime = new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString();
-  const title = widgetNetTitle(model);
-  const policyText = model.policy ? model.policy : "未传入";
-  const detailTitle = buildDetailTitle();
-
-  log("info", "render-widget-summary", {
-    title,
-    page: pickWidgetPage(),
-    policy: model.policy || "",
-    local4: maskIP(model.local?.ip || ""),
-    landing4: maskIP(model.landing?.ip || "")
-  });
-
-  return {
-    type: "widget",
-    padding: [12, 12, 12, 12],
-    gap: 8,
-    backgroundGradient: colors.bgGradient,
-    refreshAfter: refreshTime,
-    children: [
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
             src: `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`,
-            width: 14,
-            height: 14,
+            width: 15,
+            height: 15,
             color: colors.accent
           },
           {
             type: "text",
-            text: title,
+            text: widgetNetTitle(model),
             font: { size: "caption1", weight: "semibold" },
             textColor: colors.textMain,
             maxLines: 1,
@@ -2230,10 +2160,8 @@ function renderWidget(model) {
         alignItems: "center",
         gap: 6,
         padding: [8, 10, 8, 10],
-        backgroundColor: colors.cardBg,
-        borderRadius: 12,
-        borderWidth: 0.5,
-        borderColor: colors.cardBorder,
+        backgroundColor: { light: "#F8FAFC", dark: "#1C1E22" },
+        borderRadius: 11,
         children: [
           {
             type: "image",
@@ -2248,33 +2176,129 @@ function renderWidget(model) {
             font: { size: "caption2", weight: "medium" },
             textColor: colors.textMain,
             maxLines: 1,
-            minScale: 0.7,
+            minScale: 0.72,
             flex: 1
           }
         ]
       },
 
-      buildSummaryCard(model, colors),
+      {
+        type: "stack",
+        direction: "column",
+        gap: 5,
+        children: [
+          {
+            type: "text",
+            text: `本地 ${localFlag} · 落地 ${landingFlag}`,
+            font: { size: "caption2" },
+            textColor: colors.textMain,
+            maxLines: 1,
+            minScale: 0.72
+          },
+          {
+            type: "text",
+            text: `风险 ${riskText} · 服务 ${summary.ok}/${summary.total || 0}`,
+            font: { size: "caption2" },
+            textColor: colors.textMain,
+            maxLines: 1,
+            minScale: 0.72
+          }
+        ]
+      }
+    ]
+  };
+}
 
+function buildDetailCardByPage(model, colors) {
+  const page = pickWidgetPage();
+
+  if (page === "summary") return buildSummaryCard(model, colors);
+  if (page === "local") return buildLocalCard(model, colors);
+  if (page === "entrance") return buildEntranceCard(model, colors);
+  if (page === "landing") return buildLandingCard(model, colors);
+  if (page === "risk") return buildRiskCard(model, colors);
+  return buildServiceCard(model, colors);
+}
+
+function buildDetailTitle() {
+  const page = pickWidgetPage();
+  const map = {
+    local: t("local"),
+    entrance: t("entrance"),
+    landing: t("landing"),
+    risk: t("risk"),
+    services: t("services")
+  };
+  return map[page] || "详情";
+}
+
+function renderWidget(model) {
+  const colors = widgetColors();
+  const refreshTime = new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString();
+  const page = pickWidgetPage();
+  const detailTitle = buildDetailTitle();
+
+  log("info", "render-widget-summary", {
+    page,
+    policy: model.policy || "",
+    local4: maskIP(model.local?.ip || ""),
+    landing4: maskIP(model.landing?.ip || "")
+  });
+
+  if (page === "summary") {
+    return {
+      type: "widget",
+      padding: [12, 12, 12, 12],
+      gap: 8,
+      backgroundGradient: colors.bgGradient,
+      refreshAfter: refreshTime,
+      children: [
+        buildSummaryCard(model, colors)
+      ]
+    };
+  }
+
+  return {
+    type: "widget",
+    padding: [12, 12, 12, 12],
+    gap: 8,
+    backgroundGradient: colors.bgGradient,
+    refreshAfter: refreshTime,
+    children: [
       {
         type: "stack",
         direction: "row",
         alignItems: "center",
         gap: 6,
-        padding: [2, 2, 0, 2],
         children: [
           {
             type: "image",
-            src: "sf-symbol:rectangle.stack",
+            src: `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`,
+            width: 14,
+            height: 14,
+            color: colors.accent
+          },
+          {
+            type: "text",
+            text: detailTitle,
+            font: { size: "caption1", weight: "semibold" },
+            textColor: colors.textMain,
+            maxLines: 1,
+            minScale: 0.72,
+            flex: 1
+          },
+          {
+            type: "image",
+            src: "sf-symbol:clock",
             width: 10,
             height: 10,
             color: colors.textSoft
           },
           {
             type: "text",
-            text: `当前页面 · ${detailTitle}`,
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textSub
+            text: widgetTimeText(),
+            font: { size: "caption2" },
+            textColor: colors.textSoft
           }
         ]
       },
