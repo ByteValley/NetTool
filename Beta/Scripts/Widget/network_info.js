@@ -1923,53 +1923,42 @@ function compactServiceLine(x) {
   return `${x.icon || "•"} ${x.name}${x.region ? ` ${x.region}` : ""}`;
 }
 
-function buildInfoCard(title, rows, colors, icon = "sf-symbol:circle.fill", iconColor = null, opt = {}) {
-  const cardMinHeight = opt.minHeight || 82;
-  const bodyRows = rows.filter(Boolean).slice(0, opt.maxRows || 2);
+function buildInfoCard(title, rows, colors, icon, iconColor) {
+  const validRows = rows.filter(Boolean);
 
   return {
     type: "stack",
-    direction: "column",
-    gap: 6,
-    padding: [10, 10, 10, 10],
+    direction: "row",
+    gap: 10,
+    padding: [12, 12, 12, 12],
     backgroundColor: colors.cardBg,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
-    minHeight: cardMinHeight,
+
     children: [
       {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
-            src: icon,
-            width: 11,
-            height: 11,
-            color: iconColor || colors.accent
-          },
-          {
-            type: "text",
-            text: title,
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textSub,
-            maxLines: 1,
-            minScale: 0.8,
-            flex: 1
-          }
-        ]
+        type: "image",
+        src: icon,
+        width: 18,
+        height: 18,
+        color: iconColor || colors.accent
       },
-      ...bodyRows.map((row) => ({
-        type: "text",
-        text: row,
-        font: { size: "caption2" },
-        textColor: colors.textMain,
-        maxLines: 1,
-        minScale: 0.65
-      }))
+
+      {
+        type: "stack",
+        direction: "column",
+        gap: 3,
+        flex: 1,
+        children: validRows.map(t => ({
+          type: "text",
+          text: t,
+          font: { size: "caption2" },
+          textColor: colors.textMain,
+          maxLines: 1,
+          minScale: 0.72
+        }))
+      }
     ]
   };
 }
@@ -2131,22 +2120,24 @@ function buildSummaryCard(model, colors) {
             text: widgetNetTitle(model),
             font: { size: "caption1", weight: "semibold" },
             textColor: colors.textMain,
-            maxLines: 1,
-            minScale: 0.72,
             flex: 1
-          },
-          {
-            type: "image",
-            src: "sf-symbol:clock",
-            width: 10,
-            height: 10,
-            color: colors.textSoft
           },
           {
             type: "text",
             text: widgetTimeText(),
             font: { size: "caption2" },
             textColor: colors.textSoft
+          },
+
+          {
+            type: "image",
+            src: "sf-symbol:arrow.clockwise",
+            width: 12,
+            height: 12,
+            color: colors.textSoft,
+            action: {
+              type: "refresh"
+            }
           }
         ]
       },
@@ -2246,7 +2237,7 @@ function renderWidget(model) {
     return {
       type: "widget",
       padding: [12, 12, 12, 12],
-      gap: 8,
+      gap: 10,
       backgroundGradient: colors.bgGradient,
       refreshAfter: refreshTime,
       children: [
@@ -2258,7 +2249,7 @@ function renderWidget(model) {
   return {
     type: "widget",
     padding: [12, 12, 12, 12],
-    gap: 8,
+    gap: 10,
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
     children: [
