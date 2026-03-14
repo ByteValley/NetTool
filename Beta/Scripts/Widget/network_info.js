@@ -1952,7 +1952,7 @@ function widgetColors() {
     textMain: { light: "#111827", dark: "#F3F4F6" },
     textSub: { light: "#6B7280", dark: "#A1A1AA" },
     textSoft: { light: "#9CA3AF", dark: "#71717A" },
-    accent: { light: S().CFG.IconColor || "#1E90FF", dark: S().CFG.IconColor || "#4DA3FF" },
+    accent: { light: S().CFG.IconColor || "#1E90FF", dark: "#4DA3FF" },
     ok: { light: "#10B981", dark: "#34D399" },
     warn: { light: "#F59E0B", dark: "#FBBF24" },
     bad: { light: "#EF4444", dark: "#F87171" }
@@ -1996,6 +1996,46 @@ function compactServiceLine(x) {
   return `${x.icon || "•"} ${x.name}${x.region ? ` ${x.region}` : ""}`;
 }
 
+function buildCardHeader(title, colors, icon, iconColor) {
+  return {
+    type: "stack",
+    direction: "row",
+    alignItems: "center",
+    gap: 6,
+    children: [
+      {
+        type: "image",
+        src: icon,
+        width: 14,
+        height: 14,
+        color: iconColor || colors.accent
+      },
+      {
+        type: "text",
+        text: title,
+        font: { size: "caption2", weight: "semibold" },
+        textColor: colors.textMain,
+        flex: 1,
+        maxLines: 1,
+        minScale: 0.8
+      },
+      {
+        type: "image",
+        src: "sf-symbol:clock",
+        width: 8,
+        height: 8,
+        color: colors.textSoft
+      },
+      {
+        type: "text",
+        text: widgetTimeText(),
+        font: { size: "caption2" },
+        textColor: colors.textSoft
+      }
+    ]
+  };
+}
+
 function buildInfoCard(title, rows, colors, icon, iconColor) {
   const validRows = rows.filter(Boolean);
 
@@ -2003,62 +2043,38 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
     type: "stack",
     direction: "column",
     gap: 8,
-    padding: [10, 10, 10, 10],
+    padding: [8, 10, 8, 10],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
-            src: icon,
-            width: 14,
-            height: 14,
-            color: iconColor || colors.accent
-          },
-          {
-            type: "text",
-            text: title,
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textMain,
-            flex: 1,
-            maxLines: 1,
-            minScale: 0.8
-          },
-          {
-            type: "image",
-            src: "sf-symbol:clock",
-            width: 8,
-            height: 8,
-            color: colors.textSoft
-          },
-          {
-            type: "text",
-            text: widgetTimeText(),
-            font: { size: "caption2" },
-            textColor: colors.textSoft
-          }
-        ]
-      },
+      buildCardHeader(title, colors, icon, iconColor),
       {
         type: "stack",
         direction: "column",
         gap: 4,
-        children: validRows.map((line) => ({
-          type: "text",
-          text: line,
-          font: { size: "caption2" },
-          textColor: colors.textMain,
-          maxLines: 1,
-          minScale: 0.7,
-          textAlign: "left"
-        }))
+        children: validRows.length
+          ? validRows.map((line) => ({
+              type: "text",
+              text: line,
+              font: { size: "caption2" },
+              textColor: colors.textMain,
+              maxLines: 1,
+              minScale: 0.72,
+              textAlign: "left"
+            }))
+          : [
+              {
+                type: "text",
+                text: t("noData"),
+                font: { size: "caption2" },
+                textColor: colors.textSoft,
+                maxLines: 1,
+                minScale: 0.72,
+                textAlign: "left"
+              }
+            ]
       }
     ]
   };
@@ -2084,7 +2100,9 @@ function buildLocalCard(model, colors) {
 }
 
 function buildEntranceCard(model, colors) {
-  const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1)) ? model.entrance : model.entrance6;
+  const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1))
+    ? model.entrance
+    : model.entrance6;
   const hasAny = model.entrance?.ip || model.entrance6?.ip || entShow?.loc1 || entShow?.isp1;
 
   if (!hasAny) {
@@ -2116,7 +2134,7 @@ function buildLandingCard(model, colors) {
     t("landing"),
     [
       `IPv4 ${widgetText(maskIP(model.landing?.ip || ""))}`,
-      model.landing6?.ip ? `IPv6 ${maskIP(model.landing6.ip)}` : "",
+      model.landing6?.ip ? `IPv6 ${widgetText(maskIP(model.landing6.ip)}` : "",
       model.landing?.loc ? `${t("location")} ${flagFirst(model.landing.loc)}` : "",
       model.landing?.isp ? `${t("isp")} ${fmtISP(model.landing.isp, model.landing.loc)}` : ""
     ],
@@ -2173,72 +2191,31 @@ function buildServiceCard(model, colors) {
   );
 }
 
-function pickWidgetPage() {
-  const p = String(S().CFG.WIDGET_PAGE || "").trim().toLowerCase();
-  if (["summary", "local", "entrance", "landing", "risk", "services"].includes(p)) return p;
-  return "summary";
-}
-
 function buildSummaryCard(model, colors) {
   const summary = widgetServiceSummary(model);
   const localFlag = model.local?.loc ? onlyFlag(model.local.loc) : "-";
   const landingFlag = model.landing?.loc ? onlyFlag(model.landing.loc) : "-";
   const riskText = model.risk ? `${model.risk.riskValue}%` : "-";
-  const policyText = model.policy ? model.policy : "未传入";
+  const policyText = model.policy ? model.policy : t("manualPolicyHint");
 
   return {
     type: "stack",
     direction: "column",
     gap: 8,
-    padding: [10, 10, 10, 10],
+    padding: [8, 10, 8, 10],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
+      buildCardHeader(widgetNetTitle(model), colors, `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`, colors.accent),
+
       {
         type: "stack",
         direction: "row",
         alignItems: "center",
         gap: 6,
-        children: [
-          {
-            type: "image",
-            src: `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`,
-            width: 14,
-            height: 14,
-            color: colors.accent
-          },
-          {
-            type: "text",
-            text: widgetNetTitle(model),
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textMain,
-            flex: 1,
-            maxLines: 1,
-            minScale: 0.78
-          },
-          {
-            type: "image",
-            src: "sf-symbol:clock",
-            width: 8,
-            height: 8,
-            color: colors.textSoft
-          },
-          {
-            type: "text",
-            text: widgetTimeText(),
-            font: { size: "caption2" },
-            textColor: colors.textSoft
-          }
-        ]
-      },
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        padding: [7, 9, 7, 9],
+        padding: [6, 8, 6, 8],
         backgroundColor: { light: "#F8FAFC", dark: "#1C1E22" },
         borderRadius: 10,
         children: [
@@ -2260,6 +2237,7 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
+
       {
         type: "text",
         text: `本地 ${localFlag} · 落地 ${landingFlag}`,
@@ -2278,6 +2256,12 @@ function buildSummaryCard(model, colors) {
       }
     ]
   };
+}
+
+function pickWidgetPage() {
+  const p = String(S().CFG.WIDGET_PAGE || "").trim().toLowerCase();
+  if (["summary", "local", "entrance", "landing", "risk", "services"].includes(p)) return p;
+  return "summary";
 }
 
 function buildDetailCardByPage(model, colors) {
@@ -2307,7 +2291,7 @@ function renderWidget(model) {
 
   return {
     type: "widget",
-    padding: [6, 6, 6, 6],
+    padding: [2, 2, 2, 2],
     gap: 0,
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
@@ -2340,10 +2324,10 @@ function renderErrorWidget(err) {
       {
         type: "stack",
         direction: "column",
-        gap: 8,
+        gap: 6,
         padding: [10, 10, 10, 10],
         backgroundColor: { light: "#FFFFFF", dark: "#23252A" },
-        borderRadius: 14,
+        borderRadius: 16,
         borderWidth: 0.5,
         borderColor: { light: "#E8EAEE", dark: "#343741" },
         children: [
@@ -2363,7 +2347,7 @@ function renderErrorWidget(err) {
               {
                 type: "text",
                 text: "网络信息组件异常",
-                font: { size: "caption1", weight: "semibold" },
+                font: { size: "caption2", weight: "semibold" },
                 textColor: { light: "#111827", dark: "#F3F4F6" }
               }
             ]
