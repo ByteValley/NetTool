@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息面板 / Widget
  * 作者 · ByteValley
- * 版本 · 2026-03-14R2
+ * 版本 · 2026-03-14R3
  *
  * 模块分类 · 说明
  * · 参数优先级：
@@ -2002,10 +2002,10 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
   return {
     type: "stack",
     direction: "column",
-    gap: 10,
-    padding: [12, 12, 12, 12],
+    gap: 8,
+    padding: [10, 10, 10, 10],
     backgroundColor: colors.cardBg,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2013,29 +2013,29 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
         type: "stack",
         direction: "row",
         alignItems: "center",
-        gap: 8,
+        gap: 6,
         children: [
           {
             type: "image",
             src: icon,
-            width: 16,
-            height: 16,
+            width: 14,
+            height: 14,
             color: iconColor || colors.accent
           },
           {
             type: "text",
             text: title,
-            font: { size: "caption1", weight: "semibold" },
+            font: { size: "caption2", weight: "semibold" },
             textColor: colors.textMain,
             flex: 1,
             maxLines: 1,
-            minScale: 0.82
+            minScale: 0.8
           },
           {
             type: "image",
             src: "sf-symbol:clock",
-            width: 9,
-            height: 9,
+            width: 8,
+            height: 8,
             color: colors.textSoft
           },
           {
@@ -2046,18 +2046,17 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
           }
         ]
       },
-
       {
         type: "stack",
         direction: "column",
-        gap: 5,
+        gap: 4,
         children: validRows.map((line) => ({
           type: "text",
           text: line,
           font: { size: "caption2" },
           textColor: colors.textMain,
           maxLines: 1,
-          minScale: 0.72,
+          minScale: 0.7,
           textAlign: "left"
         }))
       }
@@ -2191,9 +2190,9 @@ function buildSummaryCard(model, colors) {
     type: "stack",
     direction: "column",
     gap: 8,
-    padding: [12, 12, 12, 12],
+    padding: [10, 10, 10, 10],
     backgroundColor: colors.cardBg,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2206,24 +2205,24 @@ function buildSummaryCard(model, colors) {
           {
             type: "image",
             src: `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`,
-            width: 15,
-            height: 15,
+            width: 14,
+            height: 14,
             color: colors.accent
           },
           {
             type: "text",
             text: widgetNetTitle(model),
-            font: { size: "caption1", weight: "semibold" },
+            font: { size: "caption2", weight: "semibold" },
             textColor: colors.textMain,
             flex: 1,
             maxLines: 1,
-            minScale: 0.76
+            minScale: 0.78
           },
           {
             type: "image",
             src: "sf-symbol:clock",
-            width: 9,
-            height: 9,
+            width: 8,
+            height: 8,
             color: colors.textSoft
           },
           {
@@ -2234,21 +2233,20 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
-
       {
         type: "stack",
         direction: "row",
         alignItems: "center",
         gap: 6,
-        padding: [8, 10, 8, 10],
+        padding: [7, 9, 7, 9],
         backgroundColor: { light: "#F8FAFC", dark: "#1C1E22" },
-        borderRadius: 12,
+        borderRadius: 10,
         children: [
           {
             type: "image",
             src: "sf-symbol:point.3.connected.trianglepath.dotted",
-            width: 11,
-            height: 11,
+            width: 10,
+            height: 10,
             color: colors.accent
           },
           {
@@ -2262,7 +2260,6 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
-
       {
         type: "text",
         text: `本地 ${localFlag} · 落地 ${landingFlag}`,
@@ -2310,14 +2307,76 @@ function renderWidget(model) {
 
   return {
     type: "widget",
-    padding: [10, 10, 10, 10],
+    padding: [6, 6, 6, 6],
     gap: 0,
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
     children: [
-      page === "summary"
-        ? buildSummaryCard(model, colors)
-        : buildDetailCardByPage(model, colors)
+      buildDetailCardByPage(model, colors)
+    ]
+  };
+}
+
+function renderErrorWidget(err) {
+  const msg = String(err && err.stack ? err.stack : err);
+  try { console.log(msg); } catch (_) {}
+
+  return {
+    type: "widget",
+    padding: [6, 6, 6, 6],
+    gap: 0,
+    backgroundGradient: {
+      type: "linear",
+      colors: [
+        { light: "#FFF7F7", dark: "#2A1414" },
+        { light: "#FFFFFF", dark: "#1A1A1A" }
+      ],
+      stops: [0, 1],
+      startPoint: { x: 0, y: 0 },
+      endPoint: { x: 1, y: 1 }
+    },
+    refreshAfter: new Date(Date.now() + 60000).toISOString(),
+    children: [
+      {
+        type: "stack",
+        direction: "column",
+        gap: 8,
+        padding: [10, 10, 10, 10],
+        backgroundColor: { light: "#FFFFFF", dark: "#23252A" },
+        borderRadius: 14,
+        borderWidth: 0.5,
+        borderColor: { light: "#E8EAEE", dark: "#343741" },
+        children: [
+          {
+            type: "stack",
+            direction: "row",
+            alignItems: "center",
+            gap: 6,
+            children: [
+              {
+                type: "image",
+                src: "sf-symbol:exclamationmark.triangle.fill",
+                width: 14,
+                height: 14,
+                color: { light: "#EF4444", dark: "#F87171" }
+              },
+              {
+                type: "text",
+                text: "网络信息组件异常",
+                font: { size: "caption1", weight: "semibold" },
+                textColor: { light: "#111827", dark: "#F3F4F6" }
+              }
+            ]
+          },
+          {
+            type: "text",
+            text: msg.slice(0, 260),
+            font: { size: "caption2" },
+            textColor: { light: "#6B7280", dark: "#A1A1AA" },
+            maxLines: 8
+          }
+        ]
+      }
     ]
   };
 }
@@ -2325,8 +2384,6 @@ function renderWidget(model) {
 export default async function(ctx) {
   try {
     const model = await buildModel(ctx);
-
-    // 优先按 widget 输出；若宿主不接受 widget，则改回 renderPanel(model)
     const widget = renderWidget(model);
     log("info", "done", { refreshAfter: widget.refreshAfter });
     return widget;
