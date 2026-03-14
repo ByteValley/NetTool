@@ -1,7 +1,7 @@
 /* =========================================================
- * 模块分类 · 网络信息面板
+ * 模块分类 · 网络信息面板 / Widget
  * 作者 · ByteValley
- * 版本 · 2026-03-14R1
+ * 版本 · 2026-03-14R2
  *
  * 模块分类 · 说明
  * · 参数优先级：
@@ -15,7 +15,7 @@
  * · 保留 DOMIC_IPv4 / DOMIC_IPv6 旧别名兼容（env alias）
  * · 策略 / 入口支持自动捕获（若宿主提供 recent requests 能力），否则回退手动传参
  * · 日志统一输出到宿主日志（console.log）
- * · 采用高密度日志埋点，便于在 Egern 日志页排查参数、生效顺序与请求链路
+ * · Widget 采用单页卡片模式，通过 WIDGET_PAGE 切换摘要/本地/入口/落地/风险/服务检测
  * ========================================================= */
 
 const CONSTS = Object.freeze({
@@ -166,10 +166,6 @@ function nowStr() {
   const d = new Date();
   return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
-function textOrDash(v) {
-  const s = String(v == null ? "" : v).trim();
-  return s || "-";
-}
 function parseCompatArgument(raw) {
   const out = {};
   const src = String(raw == null ? "" : raw).trim();
@@ -280,10 +276,7 @@ function buildENV(ctx, box) {
     return { value: defVal, source: "default", raw: defVal };
   };
 
-  const read = (key, defVal, opt = {}) => readWithMeta(key, defVal, opt).value;
-
   return {
-    read,
     readWithMeta,
     directEnv,
     compatEnv,
@@ -376,7 +369,6 @@ function buildCFG(ctx, box) {
     PROXY_POLICY: String(pick("PROXY_POLICY", "")).trim(),
     ENTRANCE4: String(pick("ENTRANCE4", "")).trim(),
     ENTRANCE6: String(pick("ENTRANCE6", "")).trim(),
-    
     WIDGET_PAGE: String(pick("WIDGET_PAGE", DEFAULTS.WIDGET_PAGE)).trim().toLowerCase()
   };
 
@@ -577,7 +569,8 @@ function logCfgSources(cfg) {
       LOG: cfg?.SOURCE_MAP?.LOG || "default",
       LOG_LEVEL: cfg?.SOURCE_MAP?.LOG_LEVEL || "default",
       LOG_TO_PANEL: cfg?.SOURCE_MAP?.LOG_TO_PANEL || "default",
-      LOG_PUSH: cfg?.SOURCE_MAP?.LOG_PUSH || "default"
+      LOG_PUSH: cfg?.SOURCE_MAP?.LOG_PUSH || "default",
+      WIDGET_PAGE: cfg?.SOURCE_MAP?.WIDGET_PAGE || "default"
     });
   } catch (_) {}
 }
@@ -614,6 +607,7 @@ async function withTimeout(promise, ms, onTimeoutValue) {
     if (tmr) clearTimeout(tmr);
   }
 }
+
 async function httpGetRT(url, headers = {}, timeoutMs = null, followRedirect = false) {
   const start = Date.now();
   const resp = await S().RT.http.get(url, {
@@ -1687,15 +1681,13 @@ async function buildModel(ctx) {
   const box = await readBoxSettings(ctx);
   const cfg = buildCFG(ctx, box);
 
-  // ===== DEBUG: 检查 env 注入 =====
   try {
     console.log("[NI][DEBUG] ctx.env =", JSON.stringify(ctx?.env || {}));
     console.log("[NI][DEBUG] raw PROXY_POLICY =", String(ctx?.env?.PROXY_POLICY ?? ""));
     console.log("[NI][DEBUG] cfg PROXY_POLICY =", String(cfg?.PROXY_POLICY ?? ""));
     console.log("[NI][DEBUG] cfg source =", JSON.stringify(cfg?.SOURCE_MAP || {}));
   } catch (_) {}
-  // =================================
-  
+
   G = {
     RT: ctx,
     CFG: cfg,
@@ -1705,7 +1697,7 @@ async function buildModel(ctx) {
   };
 
   log("info", "start", {
-    mode: "panel",
+    mode: "panel-widget",
     policy: cfg.PROXY_POLICY || "-",
     policySource: cfg.SOURCE_MAP.PROXY_POLICY || "default"
   });
@@ -1860,6 +1852,89 @@ async function buildModel(ctx) {
   };
 }
 
+function buildPanelContent(model) {
+  const lines = [];
+  const policyText = model.policy ? model.policy : t("manualPolicyHint");
+
+  lines.push(`${t("runAt")}：${model.runAt}`);
+  lines.push(`${t("policy")}：${policyText}`);
+
+  pushGroupTitle(lines, t("local"));
+  if (model.local?.ip) lines.push(`IPv4: ${maskIP(model.local.ip)}`);
+  if (model.local6?.ip) lines.push(`IPv6: ${maskIP(model.local6.ip)}`);
+  lines.push(secLine(t("location"), model.local?.loc ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc)) : "-"));
+  if (model.local?.isp) lines.push(secLine(t("isp"), fmtISP(model.local.isp, model.local.loc)));
+
+  if (model.entrance?.ip || model.entrance6?.ip || model.entrance?.loc1 || model.entrance6?.loc1) {
+    pushGroupTitle(lines, t("entrance"));
+    if (model.entrance?.ip) lines.push(`IPv4: ${maskIP(model.entrance.ip)}`);
+    if (model.entrance6?.ip) lines.push(`IPv6: ${maskIP(model.entrance6.ip)}`);
+
+    const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1)) ? model.entrance : model.entrance6;
+    if (entShow?.loc1) lines.push(`${t("location")}¹：${flagFirst(entShow.loc1)}`);
+    if (entShow?.isp1) lines.push(`${t("isp")}¹：${fmtISP(entShow.isp1, entShow.loc1)}`);
+    if (entShow?.loc2) lines.push(`${t("location")}²：${flagFirst(entShow.loc2)}`);
+    if (entShow?.isp2) lines.push(`${t("isp")}²：${entShow.isp2}`);
+  }
+
+  pushGroupTitle(lines, t("landing"));
+  if (model.landing?.ip) lines.push(`IPv4: ${maskIP(model.landing.ip)}`);
+  if (model.landing6?.ip) lines.push(`IPv6: ${maskIP(model.landing6.ip)}`);
+  if (model.landing?.loc) lines.push(secLine(t("location"), flagFirst(model.landing.loc)));
+  if (model.landing?.isp) lines.push(secLine(t("isp"), fmtISP(model.landing.isp, model.landing.loc)));
+
+  if (model.risk) {
+    pushGroupTitle(lines, t("risk"));
+    lines.push(`网络类型：${model.risk.lineType} · ${model.risk.nativeHint}`);
+    lines.push(`代理特征：${model.risk.tunnelHint}`);
+    lines.push(`证据：${(model.risk.reasons || []).slice(0, 4).join("；") || "-"}`);
+    lines.push(`风险值：${model.risk.riskValue}%`);
+  }
+
+  pushGroupTitle(lines, t("services"));
+  if (!model.services?.length) {
+    lines.push(t("noData"));
+  } else {
+    for (const x of model.services) lines.push(sdRenderPanelLine(x));
+  }
+
+  if (S().CFG.LOG_TO_PANEL && S().CFG.LOG && model.debug?.length) {
+    pushGroupTitle(lines, t("debug"));
+    lines.push(...model.debug);
+  }
+
+  return lines.join("\n");
+}
+
+function pickPanelTitle(model) {
+  const netTitle = netTypeLine();
+  const landingFlag = model.landing?.loc ? onlyFlag(model.landing.loc) : "";
+  return `${netTitle}${landingFlag ? ` ${landingFlag}` : ""}`;
+}
+
+function renderPanel(model) {
+  const title = pickPanelTitle(model);
+  const content = buildPanelContent(model);
+
+  log("info", "render-summary", {
+    title,
+    policy: model.policy || "",
+    local4: maskIP(model.local?.ip || ""),
+    landing4: maskIP(model.landing?.ip || ""),
+    services: (model.services || []).length,
+    contentLines: content.split("\n").length
+  });
+
+  return {
+    title,
+    content,
+    icon: S().CFG.ICON_NAME,
+    "icon-color": S().CFG.IconColor,
+    iconColor: S().CFG.IconColor,
+    refreshAfter: Math.max(60, Number(S().CFG.Update) || 10)
+  };
+}
+
 function widgetColors() {
   return {
     bgGradient: {
@@ -1881,8 +1956,7 @@ function widgetColors() {
     accent: { light: S().CFG.IconColor || "#1E90FF", dark: S().CFG.IconColor || "#4DA3FF" },
     ok: { light: "#10B981", dark: "#34D399" },
     warn: { light: "#F59E0B", dark: "#FBBF24" },
-    bad: { light: "#EF4444", dark: "#F87171" },
-    line: { light: "#E5E7EB", dark: "#3F3F46" }
+    bad: { light: "#EF4444", dark: "#F87171" }
   };
 }
 
@@ -1928,31 +2002,58 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
 
   return {
     type: "stack",
-    direction: "row",
+    direction: "column",
     gap: 10,
     padding: [12, 12, 12, 12],
     backgroundColor: colors.cardBg,
     borderRadius: 14,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
-
     children: [
       {
-        type: "image",
-        src: icon,
-        width: 18,
-        height: 18,
-        color: iconColor || colors.accent
+        type: "stack",
+        direction: "row",
+        alignItems: "center",
+        gap: 8,
+        children: [
+          {
+            type: "image",
+            src: icon,
+            width: 18,
+            height: 18,
+            color: iconColor || colors.accent
+          },
+          {
+            type: "text",
+            text: title,
+            font: { size: "caption1", weight: "semibold" },
+            textColor: colors.textMain,
+            flex: 1,
+            maxLines: 1,
+            minScale: 0.78
+          },
+          {
+            type: "image",
+            src: "sf-symbol:clock",
+            width: 10,
+            height: 10,
+            color: colors.textSoft
+          },
+          {
+            type: "text",
+            text: widgetTimeText(),
+            font: { size: "caption2" },
+            textColor: colors.textSoft
+          }
+        ]
       },
-
       {
         type: "stack",
         direction: "column",
-        gap: 3,
-        flex: 1,
-        children: validRows.map(t => ({
+        gap: 4,
+        children: validRows.map((line) => ({
           type: "text",
-          text: t,
+          text: line,
           font: { size: "caption2" },
           textColor: colors.textMain,
           maxLines: 1,
@@ -1978,8 +2079,7 @@ function buildLocalCard(model, colors) {
     ],
     colors,
     "sf-symbol:house",
-    colors.accent,
-    { minHeight: 112, maxRows: 4 }
+    colors.accent
   );
 }
 
@@ -1993,8 +2093,7 @@ function buildEntranceCard(model, colors) {
       [t("noData")],
       colors,
       "sf-symbol:arrow.down.forward.circle",
-      colors.textSoft,
-      { minHeight: 112, maxRows: 3 }
+      colors.textSoft
     );
   }
 
@@ -2008,8 +2107,7 @@ function buildEntranceCard(model, colors) {
     ],
     colors,
     "sf-symbol:arrow.down.forward.circle",
-    colors.accent,
-    { minHeight: 112, maxRows: 4 }
+    colors.accent
   );
 }
 
@@ -2024,8 +2122,7 @@ function buildLandingCard(model, colors) {
     ],
     colors,
     "sf-symbol:airplane.circle",
-    colors.accent,
-    { minHeight: 112, maxRows: 4 }
+    colors.accent
   );
 }
 
@@ -2037,8 +2134,7 @@ function buildRiskCard(model, colors) {
       [t("noData")],
       colors,
       "sf-symbol:shield.lefthalf.filled",
-      colors.textSoft,
-      { minHeight: 112, maxRows: 3 }
+      colors.textSoft
     );
   }
 
@@ -2052,8 +2148,7 @@ function buildRiskCard(model, colors) {
     ],
     colors,
     "sf-symbol:shield.lefthalf.filled",
-    widgetRiskTone(model, colors),
-    { minHeight: 112, maxRows: 4 }
+    widgetRiskTone(model, colors)
   );
 }
 
@@ -2074,8 +2169,7 @@ function buildServiceCard(model, colors) {
     rows,
     colors,
     "sf-symbol:sparkles.tv",
-    summary.bad > 0 ? colors.warn : colors.ok,
-    { minHeight: 118, maxRows: 4 }
+    summary.bad > 0 ? colors.warn : colors.ok
   );
 }
 
@@ -2120,28 +2214,25 @@ function buildSummaryCard(model, colors) {
             text: widgetNetTitle(model),
             font: { size: "caption1", weight: "semibold" },
             textColor: colors.textMain,
-            flex: 1
+            flex: 1,
+            maxLines: 1,
+            minScale: 0.74
+          },
+          {
+            type: "image",
+            src: "sf-symbol:clock",
+            width: 10,
+            height: 10,
+            color: colors.textSoft
           },
           {
             type: "text",
             text: widgetTimeText(),
             font: { size: "caption2" },
             textColor: colors.textSoft
-          },
-
-          {
-            type: "image",
-            src: "sf-symbol:arrow.clockwise",
-            width: 12,
-            height: 12,
-            color: colors.textSoft,
-            action: {
-              type: "refresh"
-            }
           }
         ]
       },
-
       {
         type: "stack",
         direction: "row",
@@ -2169,7 +2260,6 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
-
       {
         type: "stack",
         direction: "column",
@@ -2205,26 +2295,15 @@ function buildDetailCardByPage(model, colors) {
   if (page === "entrance") return buildEntranceCard(model, colors);
   if (page === "landing") return buildLandingCard(model, colors);
   if (page === "risk") return buildRiskCard(model, colors);
-  return buildServiceCard(model, colors);
-}
+  if (page === "services") return buildServiceCard(model, colors);
 
-function buildDetailTitle() {
-  const page = pickWidgetPage();
-  const map = {
-    local: t("local"),
-    entrance: t("entrance"),
-    landing: t("landing"),
-    risk: t("risk"),
-    services: t("services")
-  };
-  return map[page] || "详情";
+  return buildSummaryCard(model, colors);
 }
 
 function renderWidget(model) {
   const colors = widgetColors();
   const refreshTime = new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString();
   const page = pickWidgetPage();
-  const detailTitle = buildDetailTitle();
 
   log("info", "render-widget-summary", {
     page,
@@ -2233,19 +2312,6 @@ function renderWidget(model) {
     landing4: maskIP(model.landing?.ip || "")
   });
 
-  if (page === "summary") {
-    return {
-      type: "widget",
-      padding: [12, 12, 12, 12],
-      gap: 10,
-      backgroundGradient: colors.bgGradient,
-      refreshAfter: refreshTime,
-      children: [
-        buildSummaryCard(model, colors)
-      ]
-    };
-  }
-
   return {
     type: "widget",
     padding: [12, 12, 12, 12],
@@ -2253,45 +2319,9 @@ function renderWidget(model) {
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
     children: [
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
-            src: `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`,
-            width: 14,
-            height: 14,
-            color: colors.accent
-          },
-          {
-            type: "text",
-            text: detailTitle,
-            font: { size: "caption1", weight: "semibold" },
-            textColor: colors.textMain,
-            maxLines: 1,
-            minScale: 0.72,
-            flex: 1
-          },
-          {
-            type: "image",
-            src: "sf-symbol:clock",
-            width: 10,
-            height: 10,
-            color: colors.textSoft
-          },
-          {
-            type: "text",
-            text: widgetTimeText(),
-            font: { size: "caption2" },
-            textColor: colors.textSoft
-          }
-        ]
-      },
-
-      buildDetailCardByPage(model, colors)
+      page === "summary"
+        ? buildSummaryCard(model, colors)
+        : buildDetailCardByPage(model, colors)
     ]
   };
 }
@@ -2351,6 +2381,8 @@ function renderErrorWidget(err) {
 export default async function(ctx) {
   try {
     const model = await buildModel(ctx);
+
+    // 优先按 widget 输出；若宿主不接受 widget，则改回 renderPanel(model)
     const widget = renderWidget(model);
     log("info", "done", { refreshAfter: widget.refreshAfter });
     return widget;
