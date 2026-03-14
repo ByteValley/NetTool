@@ -617,8 +617,7 @@ async function httpGetRT(url, headers = {}, timeoutMs = null, followRedirect = f
   const resp = await S().RT.http.get(url, {
     headers,
     timeout: timeoutMs == null ? capByBudget(3500) : Math.min(Number(timeoutMs) || 3500, capByBudget(3500)),
-    redirect: followRedirect ? "follow" : "manual",
-    policy: S().CFG.PROXY_POLICY || undefined
+    redirect: followRedirect ? "follow" : "manual"
   });
   const body = await resp.text();
   return { status: resp.status || 0, headers: resp.headers || {}, body, cost: Date.now() - start };
@@ -630,8 +629,7 @@ async function httpPostRT(url, headers = {}, body = "", timeoutMs = null) {
     headers,
     body,
     timeout: timeoutMs == null ? capByBudget(3500) : Math.min(Number(timeoutMs) || 3500, capByBudget(3500)),
-    redirect: "follow",
-    policy: S().CFG.PROXY_POLICY || undefined
+    redirect: "follow"
   });
   const text = await resp.text();
   return { status: resp.status || 0, headers: resp.headers || {}, body: text, cost: Date.now() - start };
