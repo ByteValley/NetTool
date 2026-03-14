@@ -1,0 +1,320 @@
+name: 网络信息
+description: 直连/入口/落地信息 + 服务检测；图标接管；中国 ISP 规范化；城市级优先；IPv6 无出口自动放弃外网 v6；预算 clamp；支持 BoxJS/arguments 覆盖
+env_schema:
+
+  # 基本设置
+  Update:
+    name: 刷新间隔
+    description: 小组件刷新间隔(秒)
+    default_value: "10"
+
+  Timeout:
+    name: 超时时间
+    description: 脚本总超时(秒)
+    default_value: "30"
+
+  BUDGET:
+    name: 执行预算
+    description: 执行预算(秒)，0=自动
+    default_value: "10"
+
+  # 隐私显示
+  MASK_IP:
+    name: IP 脱敏
+    description: 是否隐藏部分 IP
+    options: ["0","1"]
+    default_value: "0"
+
+  MASK_POS:
+    name: 位置脱敏
+    description: auto=跟随IP / 1=仅旗帜 / 0=完整
+    options: ["auto","0","1"]
+    default_value: "auto"
+
+  IPv6:
+    name: IPv6 探测
+    description: 是否启用 IPv6
+    options: ["0","1"]
+    default_value: "1"
+
+  TW_FLAG_MODE:
+    name: 台湾旗模式
+    description: 0=🇨🇳 / 1=🇹🇼 / 2=🇼🇸
+    options: ["0","1","2"]
+    default_value: "0"
+
+  # 数据源
+  DOMESTIC_IPv4:
+    name: 直连 IPv4 数据源
+    description: ipip/cip/163/126/bilibili/pingan
+    options: ["ipip","cip","163","126","bilibili","pingan"]
+    default_value: "ipip"
+
+  DOMESTIC_IPv6:
+    name: 直连 IPv6 数据源
+    description: ddnspod/neu6/ipsb/ident/ipify
+    options: ["ddnspod","neu6","ipsb","ident","ipify"]
+    default_value: "ddnspod"
+
+  LANDING_IPv4:
+    name: 落地 IPv4 数据源
+    description: ipapi/ipwhois/ipsb
+    options: ["ipapi","ipwhois","ipsb"]
+    default_value: "ipapi"
+
+  LANDING_IPv6:
+    name: 落地 IPv6 数据源
+    description: ipsb/ident/ipify
+    options: ["ipsb","ident","ipify"]
+    default_value: "ipsb"
+
+  # 图标
+  IconPreset:
+    name: 图标预设
+    description: 预设图标样式
+    options: ["wifi","globe","dots","antenna","point"]
+    default_value: "wifi"
+
+  Icon:
+    name: 自定义图标
+    description: 覆盖 IconPreset
+
+  IconColor:
+    name: 图标颜色
+    description: HEX 或系统色
+
+  # 子标题样式
+  SUBTITLE_STYLE:
+    name: 子标题样式
+    options: ["line","cnBracket","cnQuote","square","curly","angle","pipe","bullet","plain"]
+    default_value: "line"
+
+  SUBTITLE_MINIMAL:
+    name: 极简子标题
+    options: ["0","1"]
+    default_value: "0"
+
+  GAP_LINES:
+    name: 组间空行
+    description: 0~2
+    options: ["0","1","2"]
+    default_value: "1"
+
+  # 服务检测
+  SD_STYLE:
+    name: 服务检测样式
+    options: ["icon","text"]
+    default_value: "icon"
+
+  SD_LANG:
+    name: 服务检测语言
+    options: ["zh-Hans","zh-Hant"]
+    default_value: "zh-Hans"
+
+  SD_TIMEOUT:
+    name: 服务检测超时
+    description: 单项超时(秒)
+    default_value: "0"
+
+  SD_CONCURRENCY:
+    name: 并发检测数
+    description: 1~8
+    options: ["1","2","3","4","5","6","7","8"]
+    default_value: "4"
+
+  SD_REGION_MODE:
+    name: 区域显示
+    options: ["full","abbr","flag"]
+    default_value: "flag"
+
+  SD_ICON_THEME:
+    name: 状态图标
+    options: ["check","lock","circle"]
+    default_value: "check"
+
+  SD_ARROW:
+    name: 连接符
+    description: 1=➟ / 0=｜
+    options: ["0","1"]
+    default_value: "1"
+
+  SD_SHOW_LAT:
+    name: 显示延迟
+    options: ["0","1"]
+    default_value: "1"
+
+  SD_SHOW_HTTP:
+    name: 显示 HTTP 状态
+    options: ["0","1"]
+    default_value: "0"
+
+  SERVICES:
+    name: 指定检测服务
+    description: JSON数组或逗号分隔
+
+  # 日志
+  LOG:
+    name: 启用日志
+    options: ["0","1"]
+    default_value: "0"
+
+  LOG_LEVEL:
+    name: 日志等级
+    options: ["debug","info","warn","error"]
+    default_value: "info"
+
+  LOG_TO_PANEL:
+    name: 面板调试日志
+    options: ["0","1"]
+    default_value: "0"
+
+  LOG_PUSH:
+    name: 异常通知
+    options: ["0","1"]
+    default_value: "0"
+
+  # UI展示
+  PROXY_POLICY:
+    name: 代理策略名称
+    description: 显示的策略名
+    default_value: "我爱吃大鸡巴"
+
+  WIDGET_PAGE:
+    name: 小组件页面
+    description: local/entrance/landing/risk/services
+    options: ["local","entrance","landing","risk","services"]
+    default_value: "landing"
+
+compat_arguments:
+  Update: ''
+  Timeout: ''
+  BUDGET: ''
+  MASK_IP: ''
+  MASK_POS: ''
+  IPv6: ''
+  DOMESTIC_IPv4: ''
+  DOMESTIC_IPv6: ''
+  LANDING_IPv4: ''
+  LANDING_IPv6: ''
+  TW_FLAG_MODE: ''
+  IconPreset: ''
+  Icon: ''
+  IconColor: ''
+  SUBTITLE_STYLE: ''
+  SUBTITLE_MINIMAL: ''
+  GAP_LINES: ''
+  SD_STYLE: ''
+  SD_LANG: ''
+  SD_TIMEOUT: ''
+  SD_CONCURRENCY: ''
+  SD_REGION_MODE: ''
+  SD_ICON_THEME: ''
+  SD_ARROW: ''
+  SD_SHOW_LAT: ''
+  SD_SHOW_HTTP: ''
+  SERVICES: ''
+  LOG: ''
+  LOG_LEVEL: ''
+  LOG_TO_PANEL: ''
+  LOG_PUSH: ''
+  PROXY_POLICY: ''
+  WIDGET_PAGE: ''
+
+compat_arguments_desc: |-
+  参数（优先级：arguments“显式改动” > BoxJS > 默认）
+
+  — 基本设置 —
+  • Update: 刷新间隔(秒)
+  • Timeout: 脚本总超时(秒)
+  • BUDGET: 执行预算(秒)，0=自动
+
+  — 隐私显示 —
+  • MASK_IP: IP 脱敏(1/0)
+  • MASK_POS: 位置脱敏(auto=跟随 MASK_IP / 1=仅旗帜 / 0=完整)
+  • IPv6: 启用 IPv6(1/0)
+  • TW_FLAG_MODE: 台湾旗模式(0=🇨🇳/1=🇹🇼/2=🇼🇸)
+
+  — 数据源选择 —
+  • DOMESTIC_IPv4: 直连 v4 源（ipip/cip/163/126/bilibili/pingan）
+  • DOMESTIC_IPv6: 直连 v6 源（ddnspod/neu6/ipsb/ident/ipify）
+  • LANDING_IPv4: 落地 v4 源（ipapi/ipwhois/ipsb）
+  • LANDING_IPv6: 落地 v6 源（ipsb/ident/ipify）
+
+  — 图标接管 —
+  • IconPreset: wifi|globe|dots|antenna|point
+  • Icon: 覆盖图标名（优先于 IconPreset）
+  • IconColor: 图标颜色
+
+  — 子标题样式 —
+  • SUBTITLE_STYLE: line/cnBracket/cnQuote/square/curly/angle/pipe/bullet/plain
+  • SUBTITLE_MINIMAL: 极简子标题(1/0)
+  • GAP_LINES: 组间空行(0~2)
+
+  — 服务检测 —
+  • SD_STYLE: icon|text
+  • SD_LANG: zh-Hans|zh-Hant
+  • SD_TIMEOUT: 单项超时(秒)
+  • SD_CONCURRENCY: 并发数(1~8)
+  • SD_REGION_MODE: full|abbr|flag
+  • SD_ICON_THEME: check|lock|circle
+  • SD_ARROW: 连接符(1=➟ / 0=｜)
+  • SD_SHOW_LAT: 显示耗时(1/0)
+  • SD_SHOW_HTTP: 显示 HTTP 状态码(1/0)
+  • SERVICES: JSON数组或逗号/空白分隔
+  • WIDGET_PAGE: local/entrance/landing/risk/services
+
+  — 日志 —
+  • LOG: 1/0
+  • LOG_LEVEL: debug|info|warn|error
+  • LOG_TO_PANEL: 面板尾部附加调试日志(1/0)
+  • LOG_PUSH: 异常通知(1/0)
+
+author: ByteValley
+homepage: https://github.com/ByteValley/NetTool
+dns: {}
+
+scriptings:
+  - generic:
+      name: 网络信息·组件
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/network_info.js
+      env:
+        _compat.$argument: Update={{{Update}}}&Timeout={{{Timeout}}}&BUDGET={{{BUDGET}}}&MASK_IP={{{MASK_IP}}}&MASK_POS={{{MASK_POS}}}&IPv6={{{IPv6}}}&DOMESTIC_IPv4={{{DOMESTIC_IPv4}}}&DOMESTIC_IPv6={{{DOMESTIC_IPv6}}}&LANDING_IPv4={{{LANDING_IPv4}}}&LANDING_IPv6={{{LANDING_IPv6}}}&TW_FLAG_MODE={{{TW_FLAG_MODE}}}&IconPreset={{{IconPreset}}}&Icon={{{Icon}}}&IconColor={{{IconColor}}}&SUBTITLE_STYLE={{{SUBTITLE_STYLE}}}&SUBTITLE_MINIMAL={{{SUBTITLE_MINIMAL}}}&GAP_LINES={{{GAP_LINES}}}&SD_STYLE={{{SD_STYLE}}}&SD_LANG={{{SD_LANG}}}&SD_TIMEOUT={{{SD_TIMEOUT}}}&SD_CONCURRENCY={{{SD_CONCURRENCY}}}&SD_REGION_MODE={{{SD_REGION_MODE}}}&SD_ICON_THEME={{{SD_ICON_THEME}}}&SD_ARROW={{{SD_ARROW}}}&SD_SHOW_LAT={{{SD_SHOW_LAT}}}&SD_SHOW_HTTP={{{SD_SHOW_HTTP}}}&SERVICES={{{SERVICES}}}&LOG={{{LOG}}}&LOG_LEVEL={{{LOG_LEVEL}}}&LOG_TO_PANEL={{{LOG_TO_PANEL}}}&LOG_PUSH={{{LOG_PUSH}}}&PROXY_POLICY={{{PROXY_POLICY}}}&WIDGET_PAGE={{{WIDGET_PAGE}}}
+      update_interval: 21600
+      timeout: 14
+
+  - schedule:
+      name: 网络信息·播报
+      cron: 0 * * * * *
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Panel/network_info1.js
+      timeout: 20
+
+widgets:
+  - name: 网络信息·本地
+    script_name: 网络信息·组件
+    env:
+      WIDGET_PAGE: "local"
+      PROXY_POLICY: "{{{PROXY_POLICY}}}"
+
+  - name: 网络信息·入口
+    script_name: 网络信息·组件
+    env:
+      WIDGET_PAGE: "entrance"
+      PROXY_POLICY: "{{{PROXY_POLICY}}}"
+
+  - name: 网络信息·落地
+    script_name: 网络信息·组件
+    env:
+      WIDGET_PAGE: "landing"
+      PROXY_POLICY: "{{{PROXY_POLICY}}}"
+
+  - name: 网络信息·风险
+    script_name: 网络信息·组件
+    env:
+      WIDGET_PAGE: "risk"
+      PROXY_POLICY: "{{{PROXY_POLICY}}}"
+
+  - name: 网络信息·服务
+    script_name: 网络信息·组件
+    env:
+      WIDGET_PAGE: "services"
+      PROXY_POLICY: "{{{PROXY_POLICY}}}"
