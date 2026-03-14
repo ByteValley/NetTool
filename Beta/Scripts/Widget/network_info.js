@@ -1952,7 +1952,7 @@ function widgetColors() {
     textMain: { light: "#111827", dark: "#F3F4F6" },
     textSub: { light: "#6B7280", dark: "#A1A1AA" },
     textSoft: { light: "#9CA3AF", dark: "#71717A" },
-    accent: { light: S().CFG.IconColor || "#1E90FF", dark: S().CFG.IconColor || "#4DA3FF" },
+    accent: { light: S().CFG.IconColor || "#1E90FF", dark: "#4DA3FF" },
     ok: { light: "#10B981", dark: "#34D399" },
     warn: { light: "#F59E0B", dark: "#FBBF24" },
     bad: { light: "#EF4444", dark: "#F87171" }
@@ -2002,10 +2002,10 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
   return {
     type: "stack",
     direction: "column",
-    gap: 8,
-    padding: [10, 10, 10, 10],
+    gap: 6,
+    padding: [8, 10, 8, 10],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2029,7 +2029,7 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
             textColor: colors.textMain,
             flex: 1,
             maxLines: 1,
-            minScale: 0.8
+            minScale: 0.82
           },
           {
             type: "image",
@@ -2046,17 +2046,18 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
           }
         ]
       },
+
       {
         type: "stack",
         direction: "column",
-        gap: 4,
+        gap: 3,
         children: validRows.map((line) => ({
           type: "text",
           text: line,
           font: { size: "caption2" },
           textColor: colors.textMain,
           maxLines: 1,
-          minScale: 0.7,
+          minScale: 0.74,
           textAlign: "left"
         }))
       }
@@ -2189,10 +2190,10 @@ function buildSummaryCard(model, colors) {
   return {
     type: "stack",
     direction: "column",
-    gap: 8,
-    padding: [10, 10, 10, 10],
+    gap: 6,
+    padding: [8, 10, 8, 10],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2216,7 +2217,7 @@ function buildSummaryCard(model, colors) {
             textColor: colors.textMain,
             flex: 1,
             maxLines: 1,
-            minScale: 0.78
+            minScale: 0.76
           },
           {
             type: "image",
@@ -2233,12 +2234,13 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
+
       {
         type: "stack",
         direction: "row",
         alignItems: "center",
         gap: 6,
-        padding: [7, 9, 7, 9],
+        padding: [6, 8, 6, 8],
         backgroundColor: { light: "#F8FAFC", dark: "#1C1E22" },
         borderRadius: 10,
         children: [
@@ -2260,6 +2262,7 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
+
       {
         type: "text",
         text: `本地 ${localFlag} · 落地 ${landingFlag}`,
@@ -2307,7 +2310,7 @@ function renderWidget(model) {
 
   return {
     type: "widget",
-    padding: [6, 6, 6, 6],
+    padding: [4, 4, 4, 4],
     gap: 0,
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
