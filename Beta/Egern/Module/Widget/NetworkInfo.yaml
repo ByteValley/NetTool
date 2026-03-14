@@ -276,6 +276,13 @@ scriptings:
       update_interval: 21600
       timeout: 14
 
+
+panels:
+- name: 网络信息 𝕏
+  script_name: 网络信息·组件
+  update_interval: 600
+
+
 widgets:
   - name: 网络信息·摘要
     script_name: 网络信息·组件
@@ -306,9 +313,3 @@ widgets:
     script_name: 网络信息·组件
     env:
       WIDGET_PAGE: "services"
-
-
-panels:
-- name: 网络信息 𝕏
-  script_name: 网络信息·组件
-  update_interval: 600
