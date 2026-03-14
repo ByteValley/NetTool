@@ -1941,15 +1941,14 @@ function widgetColors() {
       type: "linear",
       colors: [
         { light: "#F7F8FA", dark: "#111214" },
-        { light: "#FFFFFF", dark: "#1B1C1F" },
-        { light: "#F4F6F8", dark: "#16171A" }
+        { light: "#FFFFFF", dark: "#1B1C1F" }
       ],
-      stops: [0, 0.55, 1],
+      stops: [0, 1],
       startPoint: { x: 0, y: 0 },
       endPoint: { x: 1, y: 1 }
     },
     cardBg: { light: "#FFFFFF", dark: "#23252A" },
-    cardBorder: { light: "#E6E8EC", dark: "#343741" },
+    cardBorder: { light: "#E8EAEE", dark: "#343741" },
     textMain: { light: "#111827", dark: "#F3F4F6" },
     textSub: { light: "#6B7280", dark: "#A1A1AA" },
     textSoft: { light: "#9CA3AF", dark: "#71717A" },
@@ -2006,7 +2005,7 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
     gap: 10,
     padding: [12, 12, 12, 12],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2019,8 +2018,8 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
           {
             type: "image",
             src: icon,
-            width: 18,
-            height: 18,
+            width: 16,
+            height: 16,
             color: iconColor || colors.accent
           },
           {
@@ -2030,13 +2029,13 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
             textColor: colors.textMain,
             flex: 1,
             maxLines: 1,
-            minScale: 0.78
+            minScale: 0.82
           },
           {
             type: "image",
             src: "sf-symbol:clock",
-            width: 10,
-            height: 10,
+            width: 9,
+            height: 9,
             color: colors.textSoft
           },
           {
@@ -2047,17 +2046,19 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
           }
         ]
       },
+
       {
         type: "stack",
         direction: "column",
-        gap: 4,
+        gap: 5,
         children: validRows.map((line) => ({
           type: "text",
           text: line,
           font: { size: "caption2" },
           textColor: colors.textMain,
           maxLines: 1,
-          minScale: 0.72
+          minScale: 0.72,
+          textAlign: "left"
         }))
       }
     ]
@@ -2107,7 +2108,7 @@ function buildEntranceCard(model, colors) {
     ],
     colors,
     "sf-symbol:arrow.down.forward.circle",
-    colors.accent
+    colors.textSoft
   );
 }
 
@@ -2192,7 +2193,7 @@ function buildSummaryCard(model, colors) {
     gap: 8,
     padding: [12, 12, 12, 12],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
     children: [
@@ -2216,13 +2217,13 @@ function buildSummaryCard(model, colors) {
             textColor: colors.textMain,
             flex: 1,
             maxLines: 1,
-            minScale: 0.74
+            minScale: 0.76
           },
           {
             type: "image",
             src: "sf-symbol:clock",
-            width: 10,
-            height: 10,
+            width: 9,
+            height: 9,
             color: colors.textSoft
           },
           {
@@ -2233,6 +2234,7 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
+
       {
         type: "stack",
         direction: "row",
@@ -2240,7 +2242,7 @@ function buildSummaryCard(model, colors) {
         gap: 6,
         padding: [8, 10, 8, 10],
         backgroundColor: { light: "#F8FAFC", dark: "#1C1E22" },
-        borderRadius: 11,
+        borderRadius: 12,
         children: [
           {
             type: "image",
@@ -2260,28 +2262,22 @@ function buildSummaryCard(model, colors) {
           }
         ]
       },
+
       {
-        type: "stack",
-        direction: "column",
-        gap: 5,
-        children: [
-          {
-            type: "text",
-            text: `本地 ${localFlag} · 落地 ${landingFlag}`,
-            font: { size: "caption2" },
-            textColor: colors.textMain,
-            maxLines: 1,
-            minScale: 0.72
-          },
-          {
-            type: "text",
-            text: `风险 ${riskText} · 服务 ${summary.ok}/${summary.total || 0}`,
-            font: { size: "caption2" },
-            textColor: colors.textMain,
-            maxLines: 1,
-            minScale: 0.72
-          }
-        ]
+        type: "text",
+        text: `本地 ${localFlag} · 落地 ${landingFlag}`,
+        font: { size: "caption2" },
+        textColor: colors.textMain,
+        maxLines: 1,
+        minScale: 0.72
+      },
+      {
+        type: "text",
+        text: `风险 ${riskText} · 服务 ${summary.ok}/${summary.total || 0}`,
+        font: { size: "caption2" },
+        textColor: colors.textMain,
+        maxLines: 1,
+        minScale: 0.72
       }
     ]
   };
@@ -2314,66 +2310,14 @@ function renderWidget(model) {
 
   return {
     type: "widget",
-    padding: [12, 12, 12, 12],
-    gap: 10,
+    padding: [10, 10, 10, 10],
+    gap: 0,
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
     children: [
       page === "summary"
         ? buildSummaryCard(model, colors)
         : buildDetailCardByPage(model, colors)
-    ]
-  };
-}
-
-function renderErrorWidget(err) {
-  const msg = String(err && err.stack ? err.stack : err);
-  try { console.log(msg); } catch (_) {}
-
-  return {
-    type: "widget",
-    padding: 14,
-    gap: 8,
-    backgroundGradient: {
-      type: "linear",
-      colors: [
-        { light: "#FFF7F7", dark: "#2A1414" },
-        { light: "#FFFFFF", dark: "#1A1A1A" }
-      ],
-      stops: [0, 1],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 }
-    },
-    refreshAfter: new Date(Date.now() + 60000).toISOString(),
-    children: [
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
-            src: "sf-symbol:exclamationmark.triangle.fill",
-            width: 14,
-            height: 14,
-            color: { light: "#EF4444", dark: "#F87171" }
-          },
-          {
-            type: "text",
-            text: "网络信息组件异常",
-            font: { size: "caption1", weight: "semibold" },
-            textColor: { light: "#111827", dark: "#F3F4F6" }
-          }
-        ]
-      },
-      {
-        type: "text",
-        text: msg.slice(0, 260),
-        font: { size: "caption2" },
-        textColor: { light: "#6B7280", dark: "#A1A1AA" },
-        maxLines: 8
-      }
     ]
   };
 }
