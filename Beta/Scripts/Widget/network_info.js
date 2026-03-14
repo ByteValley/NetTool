@@ -47,7 +47,7 @@ const DEFAULTS = Object.freeze({
   IconColor: "#1E90FF",
   SUBTITLE_STYLE: "line",
   SUBTITLE_MINIMAL: "0",
-  GAP_LINES: "1",
+  GAP_LINES: "0",
   SD_STYLE: "icon",
   SD_LANG: "zh-Hans",
   SD_TIMEOUT: "3",
@@ -2002,8 +2002,8 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
   return {
     type: "stack",
     direction: "column",
-    gap: 8,
-    padding: [10, 10, 10, 10],
+    gap: 2,
+    padding: [4, 4, 4, 4],
     backgroundColor: colors.cardBg,
     borderRadius: 14,
     borderWidth: 0.5,
@@ -2013,7 +2013,7 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
         type: "stack",
         direction: "row",
         alignItems: "center",
-        gap: 6,
+        gap: 2,
         children: [
           {
             type: "image",
@@ -2049,7 +2049,7 @@ function buildInfoCard(title, rows, colors, icon, iconColor) {
       {
         type: "stack",
         direction: "column",
-        gap: 4,
+        gap: 2,
         children: validRows.map((line) => ({
           type: "text",
           text: line,
