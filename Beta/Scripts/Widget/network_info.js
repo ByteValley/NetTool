@@ -2134,7 +2134,7 @@ function buildLandingCard(model, colors) {
     t("landing"),
     [
       `IPv4 ${widgetText(maskIP(model.landing?.ip || ""))}`,
-      model.landing6?.ip ? `IPv6 ${widgetText(maskIP(model.landing6.ip)}` : "",
+      model.landing6?.ip ? `IPv6 ${widgetText(maskIP(model.landing6.ip))}` : "",
       model.landing?.loc ? `${t("location")} ${flagFirst(model.landing.loc)}` : "",
       model.landing?.isp ? `${t("isp")} ${fmtISP(model.landing.isp, model.landing.loc)}` : ""
     ],
