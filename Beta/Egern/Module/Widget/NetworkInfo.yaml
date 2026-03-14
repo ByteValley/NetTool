@@ -310,5 +310,5 @@ widgets:
 
 panels:
 - name: 网络信息 𝕏
-  script_name: 网络信息·面板
+  script_name: 网络信息·组件
   update_interval: 600
