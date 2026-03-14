@@ -1666,8 +1666,8 @@ function sdRenderPanelLine(x) {
     }
 
     const head = useArrow
-      ? `${x.name}: ${stateText} ➟ ${regionText}`
-      : `${x.name}: ${stateText} ｜ ${regionText}`;
+      ? `${x.name}:${stateText} ➟ ${regionText}`
+      : `${x.name}:${stateText}， 区域：${regionText}`;
 
     const tail = [
       showLat && cost != null ? `${cost}ms` : "",
