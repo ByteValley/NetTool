@@ -409,7 +409,7 @@ function replaceAliasSafely(text, alias, replacement) {
     .join("[\\s_\\-+]+");
 
   const reg = new RegExp(
-    `(^|[\\s|\$begin:math:display$\\$end:math:display$【】()（）_\\-+])${pattern}(?=($|[\\s|\$begin:math:display$\\$end:math:display$【】()（）_\\-+]))`,
+    `(^|[\\s|【】()（）_\\-+])${pattern}(?=($|[\\s|【】()（）_\\-+]))`,
     "ig"
   );
 
