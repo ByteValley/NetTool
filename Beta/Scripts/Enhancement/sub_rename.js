@@ -827,8 +827,6 @@ function escapeRegExp(s) {
  * Base64 / UTF-8 兼容实现
  * ========================================================= */
 
-const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
 function utf8ToBytes(str) {
   const bytes = [];
   for (let i = 0; i < str.length; i++) {
@@ -885,6 +883,7 @@ function bytesToUtf8(bytes) {
 }
 
 function base64EncodeBytes(bytes) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let out = "";
   for (let i = 0; i < bytes.length; i += 3) {
     const b0 = bytes[i];
@@ -892,15 +891,16 @@ function base64EncodeBytes(bytes) {
     const b2 = i + 2 < bytes.length ? bytes[i + 2] : NaN;
 
     const n = (b0 << 16) | ((b1 || 0) << 8) | (b2 || 0);
-    out += B64_CHARS[(n >> 18) & 63];
-    out += B64_CHARS[(n >> 12) & 63];
-    out += Number.isNaN(b1) ? "=" : B64_CHARS[(n >> 6) & 63];
-    out += Number.isNaN(b2) ? "=" : B64_CHARS[n & 63];
+    out += chars[(n >> 18) & 63];
+    out += chars[(n >> 12) & 63];
+    out += Number.isNaN(b1) ? "=" : chars[(n >> 6) & 63];
+    out += Number.isNaN(b2) ? "=" : chars[n & 63];
   }
   return out;
 }
 
 function base64DecodeToBytes(str) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let clean = String(str).replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
 
   const mod = clean.length % 4;
@@ -919,10 +919,10 @@ function base64DecodeToBytes(str) {
     const c2 = clean[i + 2];
     const c3 = clean[i + 3];
 
-    const n0 = B64_CHARS.indexOf(c0);
-    const n1 = B64_CHARS.indexOf(c1);
-    const n2 = c2 === "=" ? 0 : B64_CHARS.indexOf(c2);
-    const n3 = c3 === "=" ? 0 : B64_CHARS.indexOf(c3);
+    const n0 = chars.indexOf(c0);
+    const n1 = chars.indexOf(c1);
+    const n2 = c2 === "=" ? 0 : chars.indexOf(c2);
+    const n3 = c3 === "=" ? 0 : chars.indexOf(c3);
 
     if (n0 < 0 || n1 < 0 || (c2 !== "=" && n2 < 0) || (c3 !== "=" && n3 < 0)) {
       throw new Error("invalid base64 chars");
