@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 通用订阅改名 / Surge 原生版
  * 作者 · ByteValley
- * 版本 · 2026-03-15R1
+ * 版本 · 2026-03-15R2
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
@@ -17,57 +17,6 @@
  * · 不重组复杂节点结构
  * · 尽量保留原有旗帜、倍率、标签、机场前缀
  * ========================================================= */
-
-(function () {
-  "use strict";
-
-  const env = parseArgument(typeof $argument !== "undefined" ? $argument : "");
-  const prefix = String(env.PREFIX || "");
-  const twFlagMode = String(env.TWFLAG || "0");
-
-  try {
-    const status = Number((typeof $response !== "undefined" && $response.status) || 200);
-    if ([204, 301, 302, 303, 307, 308, 304].includes(status)) {
-      console.log(`[SubRename] 状态码 ${status}，跳过处理`);
-      return passthroughResponse();
-    }
-
-    const rawBody = readResponseBodyText();
-    let content = String(rawBody || "").trim();
-
-    if (!content) {
-      console.log("[SubRename] 当前响应无可处理正文，跳过");
-      return passthroughResponse();
-    }
-
-    let isBase64Wrapped = false;
-
-    const decodedMaybe = tryDecodeWrappedSubscriptionText(content);
-    if (decodedMaybe) {
-      console.log(
-        `[SubRename] decoded preview=${decodedMaybe.slice(0, 80).replace(/\n/g, "\\n")}`
-      );
-      isBase64Wrapped = true;
-      content = decodedMaybe.trim();
-    }
-
-    const isClash = looksLikeClashYaml(content);
-    const outText = isClash
-      ? rewriteClashYamlProxyNames(content, prefix, twFlagMode)
-      : rewriteSubscriptionLines(content, prefix, twFlagMode);
-
-    const finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText;
-
-    console.log(
-      `[SubRename] 处理完成，base64=${isBase64Wrapped}, clash=${isClash}, len=${content.length}, preview=${content.slice(0, 80).replace(/\n/g, "\\n")}`
-    );
-
-    return buildModifiedResponse(finalBody);
-  } catch (e) {
-    console.log(`[SubRename] 改写失败: ${String(e)}`);
-    return passthroughResponse();
-  }
-})();
 
 /* =========================================================
  * 参数解析
@@ -936,3 +885,58 @@ function base64DecodeToBytes(str) {
 
   return bytes;
 }
+
+/* =========================================================
+ * 入口执行
+ * ========================================================= */
+
+(function () {
+  "use strict";
+
+  const env = parseArgument(typeof $argument !== "undefined" ? $argument : "");
+  const prefix = String(env.PREFIX || "");
+  const twFlagMode = String(env.TWFLAG || "0");
+
+  try {
+    const status = Number((typeof $response !== "undefined" && $response.status) || 200);
+    if ([204, 301, 302, 303, 307, 308, 304].includes(status)) {
+      console.log(`[SubRename] 状态码 ${status}，跳过处理`);
+      return passthroughResponse();
+    }
+
+    const rawBody = readResponseBodyText();
+    let content = String(rawBody || "").trim();
+
+    if (!content) {
+      console.log("[SubRename] 当前响应无可处理正文，跳过");
+      return passthroughResponse();
+    }
+
+    let isBase64Wrapped = false;
+
+    const decodedMaybe = tryDecodeWrappedSubscriptionText(content);
+    if (decodedMaybe) {
+      console.log(
+        `[SubRename] decoded preview=${decodedMaybe.slice(0, 80).replace(/\n/g, "\\n")}`
+      );
+      isBase64Wrapped = true;
+      content = decodedMaybe.trim();
+    }
+
+    const isClash = looksLikeClashYaml(content);
+    const outText = isClash
+      ? rewriteClashYamlProxyNames(content, prefix, twFlagMode)
+      : rewriteSubscriptionLines(content, prefix, twFlagMode);
+
+    const finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText;
+
+    console.log(
+      `[SubRename] 处理完成，base64=${isBase64Wrapped}, clash=${isClash}, len=${content.length}, preview=${content.slice(0, 80).replace(/\n/g, "\\n")}`
+    );
+
+    return buildModifiedResponse(finalBody);
+  } catch (e) {
+    console.log(`[SubRename] 改写失败: ${String(e)}`);
+    return passthroughResponse();
+  }
+})();
