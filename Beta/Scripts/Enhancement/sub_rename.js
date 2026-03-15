@@ -5,7 +5,7 @@
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
- * · 用途：直接改写订阅响应内容，不依赖 Cloudflare Worker
+ * · 用途：直接改写订阅响应内容
  * · 参数来源：argument
  *   PREFIX = 自定义前缀，如 "【ByteEden】 "
  *   TWFLAG = 台湾旗帜修正开关，1=启用，0=关闭
