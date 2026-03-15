@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 通用订阅改名 / Surge 原生版
  * 作者 · ByteValley
- * 版本 · 2026-03-15R1
+ * 版本 · 2026-03-15R4
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
@@ -42,12 +42,16 @@
 
     let isBase64Wrapped = false;
 
-    if (looksLikeBase64(content)) {
-      const decoded = tryDecodeBase64ToText(content);
-      if (decoded && looksLikeUsefulDecodedText(decoded)) {
-        isBase64Wrapped = true;
-        content = decoded.trim();
-      }
+    const decodedMaybe = tryDecodeBase64ToText(content);
+    if (decodedMaybe) {
+      console.log(
+        `[SubRename] decoded preview=${decodedMaybe.slice(0, 80).replace(/\n/g, "\\n")}`
+      );
+    }
+
+    if (decodedMaybe && looksLikeUsefulDecodedText(decodedMaybe)) {
+      isBase64Wrapped = true;
+      content = decodedMaybe.trim();
     }
 
     const isClash = looksLikeClashYaml(content);
@@ -700,18 +704,10 @@ function tryDecodeBase64ToText(b64) {
   try {
     const bytes = base64DecodeToBytes(String(b64 || "").replace(/\s+/g, ""));
     return bytesToUtf8(bytes);
-  } catch {
+  } catch (e) {
+    console.log(`[SubRename] base64 decode failed: ${String(e)}`);
     return null;
   }
-}
-
-function looksLikeBase64(s) {
-  const t = String(s || "")
-    .replace(/\s+/g, "")
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-
-  return t.length >= 16 && t.length % 4 !== 1 && /^[A-Za-z0-9+/=]+$/.test(t);
 }
 
 function looksLikeClashYaml(s) {
