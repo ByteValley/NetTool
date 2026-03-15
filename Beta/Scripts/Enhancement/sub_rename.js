@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 通用订阅改名 / Surge 原生版
  * 作者 · ByteValley
- * 版本 · 2026-03-15R4
+ * 版本 · 2026-03-15R1
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
@@ -42,14 +42,11 @@
 
     let isBase64Wrapped = false;
 
-    const decodedMaybe = tryDecodeBase64ToText(content);
+    const decodedMaybe = tryDecodeWrappedSubscriptionText(content);
     if (decodedMaybe) {
       console.log(
         `[SubRename] decoded preview=${decodedMaybe.slice(0, 80).replace(/\n/g, "\\n")}`
       );
-    }
-
-    if (decodedMaybe && looksLikeUsefulDecodedText(decodedMaybe)) {
       isBase64Wrapped = true;
       content = decodedMaybe.trim();
     }
@@ -589,7 +586,7 @@ function rewriteSubscriptionLines(text, prefix, twFlagMode) {
     if (/^vmess:\/\//i.test(trimLine)) {
       try {
         const raw = trimLine.slice(8);
-        const decoded = tryDecodeBase64ToText(raw);
+        const decoded = tryDecodeWrappedSubscriptionText(raw) || tryDecodeBase64LooseToText(raw);
         if (!decoded) return line;
 
         const obj = JSON.parse(decoded);
@@ -700,22 +697,126 @@ function encodeTextToBase64(text) {
   return base64EncodeBytes(bytes);
 }
 
-function tryDecodeBase64ToText(b64) {
+function tryDecodeWrappedSubscriptionText(input) {
+  const raw = normalizeBase64Input(input);
+  if (!raw) return null;
+
+  const maybeWrapped = startsLikeWrappedSubscription(raw) || looksLikeBase64(raw);
+  if (!maybeWrapped) return null;
+
+  const candidates = buildBase64Candidates(raw);
+
+  for (const candidate of candidates) {
+    const text = decodeBase64CandidateToText(candidate);
+    if (text && looksLikeDecodedSubscriptionText(text)) {
+      return text;
+    }
+  }
+
+  return null;
+}
+
+function tryDecodeBase64LooseToText(input) {
+  const raw = normalizeBase64Input(input);
+  if (!raw) return null;
+
+  const candidates = buildBase64Candidates(raw);
+  for (const candidate of candidates) {
+    const text = decodeBase64CandidateToText(candidate);
+    if (text) return text;
+  }
+
+  return null;
+}
+
+function normalizeBase64Input(input) {
+  return String(input || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/[\r\n\t ]+/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .trim();
+}
+
+function buildBase64Candidates(raw) {
+  const list = [raw];
+  const mod = raw.length % 4;
+
+  if (mod === 2) list.push(raw + "==");
+  else if (mod === 3) list.push(raw + "=");
+  else if (mod === 0) list.push(raw);
+
+  return [...new Set(list)];
+}
+
+function startsLikeWrappedSubscription(raw) {
+  return /^(c3M6Ly8|c3NyOi8v|dm1lc3M6Ly8|dmxlc3M6Ly8|dHJvamFuOi8v|aHlzdGVyaWE6Ly8|aHkyOi8v|dHVpYzovLw|cHJveGllczo)/i.test(raw);
+}
+
+function looksLikeDecodedSubscriptionText(text) {
+  return (
+    /(vmess|vless|trojan|ss|ssr|hy2|hysteria|tuic):\/\//i.test(text) ||
+    looksLikeClashYaml(text)
+  );
+}
+
+function decodeBase64CandidateToText(candidate) {
+  const byNative = decodeBase64ByNativeAtob(candidate);
+  if (byNative && looksLikeDecodedSubscriptionText(byNative)) {
+    return byNative;
+  }
+
+  const byCustom = decodeBase64ByCustom(candidate);
+  if (byCustom && looksLikeDecodedSubscriptionText(byCustom)) {
+    return byCustom;
+  }
+
+  return null;
+}
+
+function decodeBase64ByNativeAtob(candidate) {
   try {
-    const bytes = base64DecodeToBytes(String(b64 || "").replace(/\s+/g, ""));
-    return bytesToUtf8(bytes);
-  } catch (e) {
-    console.log(`[SubRename] base64 decode failed: ${String(e)}`);
+    if (typeof atob !== "function") return null;
+    const bin = atob(candidate);
+
+    const utf8Text = latin1BinaryToUtf8(bin);
+    if (utf8Text) return utf8Text;
+
+    if (looksLikeDecodedSubscriptionText(bin)) return bin;
+    return null;
+  } catch {
     return null;
   }
 }
 
-function looksLikeClashYaml(s) {
-  return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s);
+function latin1BinaryToUtf8(bin) {
+  try {
+    let escaped = "";
+    for (let i = 0; i < bin.length; i++) {
+      escaped += "%" + ("00" + bin.charCodeAt(i).toString(16)).slice(-2);
+    }
+    return decodeURIComponent(escaped);
+  } catch {
+    return null;
+  }
 }
 
-function looksLikeUsefulDecodedText(s) {
-  return /(vmess|vless|trojan|ss|ssr|hy2|hysteria|tuic):\/\//i.test(s) || looksLikeClashYaml(s);
+function decodeBase64ByCustom(candidate) {
+  try {
+    const bytes = base64DecodeToBytes(candidate);
+    return bytesToUtf8(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeBase64(s) {
+  const t = normalizeBase64Input(s);
+  return t.length >= 16 && t.length % 4 !== 1 && /^[A-Za-z0-9+/=]+$/.test(t);
+}
+
+function looksLikeClashYaml(s) {
+  return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s);
 }
 
 function escapeRegExp(s) {
