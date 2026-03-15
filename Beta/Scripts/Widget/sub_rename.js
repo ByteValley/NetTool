@@ -1,12 +1,12 @@
 /* =========================================================
- * 模块分类 · 通用订阅改名 / Surge 版
+ * 模块分类 · 通用订阅改名 / Surge 原生版
  * 作者 · ByteValley
- * 版本 · 2026-03-15R2
+ * 版本 · 2026-03-15R1
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
  * · 用途：直接改写订阅响应内容
- * · 参数来源：模块 argument
+ * · 参数来源：argument
  *   PREFIX = 自定义前缀，如 "【ByteEden】 "
  *   TWFLAG = 台湾旗帜修正开关，1=启用，0=关闭
  *
@@ -17,53 +17,6 @@
  * · 不重组复杂节点结构
  * · 尽量保留原有旗帜、倍率、标签、机场前缀
  * ========================================================= */
-
-(function () {
-  "use strict";
-
-  const env = parseArgument(typeof $argument !== "undefined" ? $argument : "");
-  const prefix = String(env.PREFIX || "");
-  const twFlagMode = String(env.TWFLAG || "0");
-
-  let rawBody = "";
-  try {
-    rawBody = readResponseBodyText();
-  } catch (e) {
-    console.log(`[SubRename] 读取响应体失败: ${String(e)}`);
-    return passthroughResponse();
-  }
-
-  let content = String(rawBody || "").trim();
-  if (!content) {
-    console.log("[SubRename] 响应体为空，跳过处理");
-    return passthroughResponse();
-  }
-
-  let isBase64Wrapped = false;
-
-  try {
-    if (looksLikeBase64(content)) {
-      const decoded = tryDecodeBase64ToText(content);
-      if (decoded && looksLikeUsefulDecodedText(decoded)) {
-        isBase64Wrapped = true;
-        content = decoded.trim();
-      }
-    }
-
-    const isClash = looksLikeClashYaml(content);
-    const outText = isClash
-      ? rewriteClashYamlProxyNames(content, prefix, twFlagMode)
-      : rewriteSubscriptionLines(content, prefix, twFlagMode);
-
-    const finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText;
-    console.log(`[SubRename] 处理完成，base64=${isBase64Wrapped}, clash=${isClash}`);
-
-    return buildModifiedResponse(finalBody);
-  } catch (e) {
-    console.log(`[SubRename] 改写失败: ${String(e)}`);
-    return passthroughResponse();
-  }
-})();
 
 /* =========================================================
  * 参数解析
@@ -582,7 +535,7 @@ function rewriteSubscriptionLines(text, prefix, twFlagMode) {
     if (/^vmess:\/\//i.test(trimLine)) {
       try {
         const raw = trimLine.slice(8);
-        const decoded = tryDecodeBase64ToText(raw);
+        const decoded = tryDecodeWrappedSubscriptionText(raw) || tryDecodeBase64LooseToText(raw);
         if (!decoded) return line;
 
         const obj = JSON.parse(decoded);
@@ -640,10 +593,17 @@ function rewriteClashYamlProxyNames(text, prefix, twFlagMode) {
  * ========================================================= */
 
 function readResponseBodyText() {
-  if (typeof $response !== "undefined" && typeof $response.body === "string") {
+  if (typeof $response === "undefined" || !$response) return "";
+
+  if (typeof $response.body === "string") {
     return $response.body;
   }
-  throw new Error("当前响应对象不支持读取文本 body");
+
+  if ($response.body == null) {
+    return "";
+  }
+
+  return String($response.body || "");
 }
 
 function buildModifiedResponse(bodyText) {
@@ -654,6 +614,7 @@ function buildModifiedResponse(bodyText) {
   headers["cache-control"] = "no-store";
 
   const status = Number((typeof $response !== "undefined" && $response.status) || 200);
+
   $done({
     status,
     headers,
@@ -672,9 +633,11 @@ function passthroughResponse() {
 function cloneHeaders(headers) {
   const out = {};
   if (!headers) return out;
+
   for (const key of Object.keys(headers)) {
-    out[String(key)] = String(headers[key]);
+    out[String(key).toLowerCase()] = String(headers[key]);
   }
+
   return out;
 }
 
@@ -683,9 +646,113 @@ function encodeTextToBase64(text) {
   return base64EncodeBytes(bytes);
 }
 
-function tryDecodeBase64ToText(b64) {
+function tryDecodeWrappedSubscriptionText(input) {
+  const raw = normalizeBase64Input(input);
+  if (!raw) return null;
+
+  const maybeWrapped = startsLikeWrappedSubscription(raw) || looksLikeBase64(raw);
+  if (!maybeWrapped) return null;
+
+  const candidates = buildBase64Candidates(raw);
+
+  for (const candidate of candidates) {
+    const text = decodeBase64CandidateToText(candidate);
+    if (text && looksLikeDecodedSubscriptionText(text)) {
+      return text;
+    }
+  }
+
+  return null;
+}
+
+function tryDecodeBase64LooseToText(input) {
+  const raw = normalizeBase64Input(input);
+  if (!raw) return null;
+
+  const candidates = buildBase64Candidates(raw);
+  for (const candidate of candidates) {
+    const text = decodeBase64CandidateToText(candidate);
+    if (text) return text;
+  }
+
+  return null;
+}
+
+function normalizeBase64Input(input) {
+  return String(input || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/[\r\n\t ]+/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .trim();
+}
+
+function buildBase64Candidates(raw) {
+  const list = [raw];
+  const mod = raw.length % 4;
+
+  if (mod === 2) list.push(raw + "==");
+  else if (mod === 3) list.push(raw + "=");
+  else if (mod === 0) list.push(raw);
+
+  return [...new Set(list)];
+}
+
+function startsLikeWrappedSubscription(raw) {
+  return /^(c3M6Ly8|c3NyOi8v|dm1lc3M6Ly8|dmxlc3M6Ly8|dHJvamFuOi8v|aHlzdGVyaWE6Ly8|aHkyOi8v|dHVpYzovLw|cHJveGllczo)/i.test(raw);
+}
+
+function looksLikeDecodedSubscriptionText(text) {
+  return (
+    /(vmess|vless|trojan|ss|ssr|hy2|hysteria|tuic):\/\//i.test(text) ||
+    looksLikeClashYaml(text)
+  );
+}
+
+function decodeBase64CandidateToText(candidate) {
+  const byNative = decodeBase64ByNativeAtob(candidate);
+  if (byNative && looksLikeDecodedSubscriptionText(byNative)) {
+    return byNative;
+  }
+
+  const byCustom = decodeBase64ByCustom(candidate);
+  if (byCustom && looksLikeDecodedSubscriptionText(byCustom)) {
+    return byCustom;
+  }
+
+  return null;
+}
+
+function decodeBase64ByNativeAtob(candidate) {
   try {
-    const bytes = base64DecodeToBytes(String(b64 || "").replace(/\s+/g, ""));
+    if (typeof atob !== "function") return null;
+    const bin = atob(candidate);
+
+    const utf8Text = latin1BinaryToUtf8(bin);
+    if (utf8Text) return utf8Text;
+
+    if (looksLikeDecodedSubscriptionText(bin)) return bin;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function latin1BinaryToUtf8(bin) {
+  try {
+    let escaped = "";
+    for (let i = 0; i < bin.length; i++) {
+      escaped += "%" + ("00" + bin.charCodeAt(i).toString(16)).slice(-2);
+    }
+    return decodeURIComponent(escaped);
+  } catch {
+    return null;
+  }
+}
+
+function decodeBase64ByCustom(candidate) {
+  try {
+    const bytes = base64DecodeToBytes(candidate);
     return bytesToUtf8(bytes);
   } catch {
     return null;
@@ -693,16 +760,12 @@ function tryDecodeBase64ToText(b64) {
 }
 
 function looksLikeBase64(s) {
-  const t = String(s || "").replace(/\s+/g, "");
-  return t.length >= 16 && t.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(t);
+  const t = normalizeBase64Input(s);
+  return t.length >= 16 && t.length % 4 !== 1 && /^[A-Za-z0-9+/=]+$/.test(t);
 }
 
 function looksLikeClashYaml(s) {
   return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s);
-}
-
-function looksLikeUsefulDecodedText(s) {
-  return /(vmess|vless|trojan|ss|ssr|hy2|tuic):\/\//i.test(s) || looksLikeClashYaml(s);
 }
 
 function escapeRegExp(s) {
@@ -712,8 +775,6 @@ function escapeRegExp(s) {
 /* =========================================================
  * Base64 / UTF-8 兼容实现
  * ========================================================= */
-
-const B64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 function utf8ToBytes(str) {
   const bytes = [];
@@ -771,6 +832,7 @@ function bytesToUtf8(bytes) {
 }
 
 function base64EncodeBytes(bytes) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let out = "";
   for (let i = 0; i < bytes.length; i += 3) {
     const b0 = bytes[i];
@@ -778,18 +840,25 @@ function base64EncodeBytes(bytes) {
     const b2 = i + 2 < bytes.length ? bytes[i + 2] : NaN;
 
     const n = (b0 << 16) | ((b1 || 0) << 8) | (b2 || 0);
-    out += B64_CHARS[(n >> 18) & 63];
-    out += B64_CHARS[(n >> 12) & 63];
-    out += Number.isNaN(b1) ? "=" : B64_CHARS[(n >> 6) & 63];
-    out += Number.isNaN(b2) ? "=" : B64_CHARS[n & 63];
+    out += chars[(n >> 18) & 63];
+    out += chars[(n >> 12) & 63];
+    out += Number.isNaN(b1) ? "=" : chars[(n >> 6) & 63];
+    out += Number.isNaN(b2) ? "=" : chars[n & 63];
   }
   return out;
 }
 
 function base64DecodeToBytes(str) {
-  const clean = String(str).replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
-  if (!/^[A-Za-z0-9+/=]+$/.test(clean) || clean.length % 4 === 1) {
-    throw new Error("invalid base64");
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let clean = String(str).replace(/[\r\n\s]/g, "").replace(/-/g, "+").replace(/_/g, "/");
+
+  const mod = clean.length % 4;
+  if (mod === 2) clean += "==";
+  else if (mod === 3) clean += "=";
+  else if (mod === 1) throw new Error("invalid base64");
+
+  if (!/^[A-Za-z0-9+/=]+$/.test(clean)) {
+    throw new Error("invalid base64 chars");
   }
 
   const bytes = [];
@@ -799,10 +868,10 @@ function base64DecodeToBytes(str) {
     const c2 = clean[i + 2];
     const c3 = clean[i + 3];
 
-    const n0 = B64_CHARS.indexOf(c0);
-    const n1 = B64_CHARS.indexOf(c1);
-    const n2 = c2 === "=" ? 0 : B64_CHARS.indexOf(c2);
-    const n3 = c3 === "=" ? 0 : B64_CHARS.indexOf(c3);
+    const n0 = chars.indexOf(c0);
+    const n1 = chars.indexOf(c1);
+    const n2 = c2 === "=" ? 0 : chars.indexOf(c2);
+    const n3 = c3 === "=" ? 0 : chars.indexOf(c3);
 
     if (n0 < 0 || n1 < 0 || (c2 !== "=" && n2 < 0) || (c3 !== "=" && n3 < 0)) {
       throw new Error("invalid base64 chars");
@@ -816,3 +885,58 @@ function base64DecodeToBytes(str) {
 
   return bytes;
 }
+
+/* =========================================================
+ * 入口执行
+ * ========================================================= */
+
+(function () {
+  "use strict";
+
+  const env = parseArgument(typeof $argument !== "undefined" ? $argument : "");
+  const prefix = String(env.PREFIX || "");
+  const twFlagMode = String(env.TWFLAG || "0");
+
+  try {
+    const status = Number((typeof $response !== "undefined" && $response.status) || 200);
+    if ([204, 301, 302, 303, 307, 308, 304].includes(status)) {
+      console.log(`[SubRename] 状态码 ${status}，跳过处理`);
+      return passthroughResponse();
+    }
+
+    const rawBody = readResponseBodyText();
+    let content = String(rawBody || "").trim();
+
+    if (!content) {
+      console.log("[SubRename] 当前响应无可处理正文，跳过");
+      return passthroughResponse();
+    }
+
+    let isBase64Wrapped = false;
+
+    const decodedMaybe = tryDecodeWrappedSubscriptionText(content);
+    if (decodedMaybe) {
+      console.log(
+        `[SubRename] decoded preview=${decodedMaybe.slice(0, 80).replace(/\n/g, "\\n")}`
+      );
+      isBase64Wrapped = true;
+      content = decodedMaybe.trim();
+    }
+
+    const isClash = looksLikeClashYaml(content);
+    const outText = isClash
+      ? rewriteClashYamlProxyNames(content, prefix, twFlagMode)
+      : rewriteSubscriptionLines(content, prefix, twFlagMode);
+
+    const finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText;
+
+    console.log(
+      `[SubRename] 处理完成，base64=${isBase64Wrapped}, clash=${isClash}, len=${content.length}, preview=${content.slice(0, 80).replace(/\n/g, "\\n")}`
+    );
+
+    return buildModifiedResponse(finalBody);
+  } catch (e) {
+    console.log(`[SubRename] 改写失败: ${String(e)}`);
+    return passthroughResponse();
+  }
+})();
