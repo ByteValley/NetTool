@@ -2186,47 +2186,35 @@ function buildSummaryCard(model, colors) {
       type: "stack",
       direction: "row",
       alignItems: "center",
-      gap: 6,
+      gap: 5,
       children: [
         {
           type: "image",
           src: `sf-symbol:${sfIcon}`,
-          width: 15,
-          height: 15,
+          width: 14,
+          height: 14,
           color: iconColor || colors.textSub
         },
         {
           type: "text",
           text: label,
-          font: { size: "footnote" },
+          font: { size: "caption1" },
           textColor: colors.textSub,
-          minScale: 0.8
+          minScale: 0.85
         },
         { type: "spacer" },
         {
           type: "text",
           text: String(value),
-          font: { size: "footnote", weight: "medium" },
+          font: { size: "caption1", weight: "medium" },
           textColor: valueColor || colors.textMain,
           maxLines: 1,
-          minScale: 0.7,
+          minScale: 0.65,
           textAlign: "right"
         }
       ]
     };
   }
-
-  const divider = {
-    type: "stack",
-    direction: "row",
-    padding: [2, 0, 2, 0],
-    children: [{
-      type: "stack",
-      flex: 1,
-      height: 0.4,
-      backgroundColor: colors.cardBorder
-    }]
-  };
 
   // 本地
   const localLoc = model.local?.loc
@@ -2246,7 +2234,7 @@ function buildSummaryCard(model, colors) {
     ? maskIP(model.landing.ip) + (isDatacenter ? "（机房）" : "")
     : null;
 
-  // 风险一行：右侧 "高风险 (76) · 非家宽 · 偏强"
+  // 风险一行
   const riskColor = widgetRiskTone(model, colors);
   const riskVal = model.risk
     ? `高风险 (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
@@ -2266,66 +2254,54 @@ function buildSummaryCard(model, colors) {
   });
   const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
 
-  // 顶部标题行
+  // 顶部标题行：图标小一点，标题 flex 撑满，时间固定在右
   const headerRow = {
     type: "stack",
     direction: "row",
     alignItems: "center",
-    gap: 6,
-    padding: [0, 0, 2, 0],
+    gap: 5,
+    padding: [0, 0, 3, 0],
     children: [
       {
         type: "image",
         src: `sf-symbol:${S().CFG.ICON_NAME || "wifi"}`,
-        width: 18,
-        height: 18,
+        width: 15,
+        height: 15,
         color: colors.textMain
       },
       {
         type: "text",
         text: netTypeLine(),
-        font: { size: "subheadline", weight: "bold" },
+        font: { size: "footnote", weight: "bold" },
         textColor: colors.textMain,
         flex: 1,
         maxLines: 1,
-        minScale: 0.78
+        minScale: 0.75
       },
       {
         type: "text",
         text: widgetTimeText(),
-        font: { size: "subheadline", weight: "semibold" },
+        font: { size: "footnote", weight: "semibold" },
         textColor: colors.accent
       }
     ]
   };
 
   const rows = [headerRow];
-
-  // 本地
   if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", "本地 IP", maskIP(model.local.ip)));
   if (model.local6?.ip) rows.push(kvRow("house", "#4A9EFF", "本地 IPv6", maskIP(model.local6.ip)));
   if (localPosVal) rows.push(kvRow("map.fill", "#4A9EFF", "本地位置", localPosVal));
-
-  rows.push(divider);
-
-  // 落地
   if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IP", landingIPDisplay));
   if (model.landing6?.ip) rows.push(kvRow("globe", "#9B59B6", "落地 IPv6", maskIP(model.landing6.ip)));
   if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", "落地位置", landingPosVal));
-
-  rows.push(divider);
-
-  // 风险（一行）
   if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", "风险评级", riskVal, riskColor));
-
-  // 流媒体
   rows.push(kvRow("play.rectangle.fill", "#27AE60", "流媒体", sdLine));
 
   return {
     type: "stack",
     direction: "column",
-    gap: 5,
-    padding: [12, 14, 12, 14],
+    gap: 3,
+    padding: [10, 12, 10, 12],
     backgroundColor: colors.cardBg,
     borderRadius: 16,
     borderWidth: 0.5,
