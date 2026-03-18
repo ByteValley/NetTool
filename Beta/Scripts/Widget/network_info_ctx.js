@@ -2228,7 +2228,7 @@ function buildSummaryCard(model, colors) {
   const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
   const landingPosVal = [landingLoc, landingIsp].filter(Boolean).join(" ") || null;
 
-  // 落地IP（机房标记）
+  // 落地IP
   const isDatacenter = model.risk && model.risk.riskValue >= 60;
   const landingIPDisplay = model.landing?.ip
     ? maskIP(model.landing.ip) + (isDatacenter ? "（机房）" : "")
@@ -2240,21 +2240,31 @@ function buildSummaryCard(model, colors) {
     ? `高风险 (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
     : null;
 
-  // 流媒体
-  const SD_SHORT = {
-    youtube: "YT", netflix: "NF", disney: "D+",
-    chatgpt_app: "GPT", chatgpt_web: "GPT-W",
-    hulu_us: "Hulu", hulu_jp: "HuluJP", hbo: "MAX"
+  // 流媒体：中文名/英文全称
+  const SD_NAME = {
+    youtube:     "油管",
+    netflix:     "奈飞",
+    disney:      "Disney+",
+    chatgpt_app: "ChatGPT",
+    chatgpt_web: "ChatGPT Web",
+    hulu_us:     "Hulu US",
+    hulu_jp:     "Hulu JP",
+    hbo:         "Max"
   };
   const sdParts = svs.map(x => {
-    const short = SD_SHORT[x.key] || x.name;
+    const name = SD_NAME[x.key] || x.name;
     const flag = (x.state === "full" || x.state === "partial") && x.cc
       ? sd_flagFromCC(x.cc) : "🚫";
-    return `${short}:${flag}`;
+    return `${name}:${flag}`;
   });
   const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
 
-  // 顶部标题行：图标小一点，标题 flex 撑满，时间固定在右
+  // 标题图标：Wi-Fi 还是蜂窝
+  const n = S().RT.device || {};
+  const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
+  const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
+
+  // 顶部标题行
   const headerRow = {
     type: "stack",
     direction: "row",
@@ -2264,7 +2274,7 @@ function buildSummaryCard(model, colors) {
     children: [
       {
         type: "image",
-        src: `sf-symbol:${S().CFG.ICON_NAME || "wifi"}`,
+        src: `sf-symbol:${headerIcon}`,
         width: 15,
         height: 15,
         color: colors.textMain
@@ -2288,14 +2298,15 @@ function buildSummaryCard(model, colors) {
   };
 
   const rows = [headerRow];
-  if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", "本地 IP", maskIP(model.local.ip)));
+  // IPv4 标签补全
+  if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", "本地 IPv4", maskIP(model.local.ip)));
   if (model.local6?.ip) rows.push(kvRow("house", "#4A9EFF", "本地 IPv6", maskIP(model.local6.ip)));
   if (localPosVal) rows.push(kvRow("map.fill", "#4A9EFF", "本地位置", localPosVal));
-  if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IP", landingIPDisplay));
+  if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IPv4", landingIPDisplay));
   if (model.landing6?.ip) rows.push(kvRow("globe", "#9B59B6", "落地 IPv6", maskIP(model.landing6.ip)));
   if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", "落地位置", landingPosVal));
   if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", "风险评级", riskVal, riskColor));
-  rows.push(kvRow("play.rectangle.fill", "#27AE60", "流媒体", sdLine));
+  rows.push(kvRow("play.rectangle.fill", "#27AE60", "服务检测", sdLine));
 
   return {
     type: "stack",
