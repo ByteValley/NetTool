@@ -2255,19 +2255,19 @@ function buildSummaryCard(model, colors) {
   // 落地IP
   const isDatacenter = model.risk && model.risk.riskValue >= 60;
   const landingIPDisplay = model.landing?.ip
-    ? maskIP(model.landing.ip) + (isDatacenter ? "（机房）" : "")
+    ? maskIP(model.landing.ip) + (isDatacenter ? t("datacenter") : "")
     : null;
 
   // 风险一行
   const riskColor = widgetRiskTone(model, colors);
   const riskVal = model.risk
-    ? `高风险 (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
+    ? `${t("highRisk")} (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
     : null;
 
   // 流媒体：中文名/英文全称
   const SD_NAME = {
-    youtube:     "油管",
-    netflix:     "奈飞",
+    youtube:     t("youtube"),
+    netflix:     t("netflix"),
     disney:      "Disney+",
     chatgpt_app: "ChatGPT",
     chatgpt_web: "ChatGPT Web",
@@ -2322,16 +2322,15 @@ function buildSummaryCard(model, colors) {
   };
 
   const rows = [headerRow];
-  // IPv4 标签补全
-  if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", "本地 IPv4", maskIP(model.local.ip)));
-  if (model.local6?.ip) rows.push(kvRow("house", "#4A9EFF", "本地 IPv6", maskIP(model.local6.ip)));
-  if (localPosVal) rows.push(kvRow("map.fill", "#4A9EFF", "本地位置", localPosVal));
-  if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IPv4", landingIPDisplay));
-  if (model.landing6?.ip) rows.push(kvRow("globe", "#9B59B6", "落地 IPv6", maskIP(model.landing6.ip)));
-  if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", "落地位置", landingPosVal));
-  if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", "风险评级", riskVal, riskColor));
-  rows.push(kvRow("play.rectangle.fill", "#27AE60", "服务检测", sdLine));
-
+  if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", t("localIPv4"), maskIP(model.local.ip)));
+  if (model.local6?.ip) rows.push(kvRow("house", "#4A9EFF", t("localIPv6"), maskIP(model.local6.ip)));
+  if (localPosVal) rows.push(kvRow("map.fill", "#4A9EFF", t("localPos"), localPosVal));
+  if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", t("landingIPv4"), landingIPDisplay));
+  if (model.landing6?.ip) rows.push(kvRow("globe", "#9B59B6", t("landingIPv6"), maskIP(model.landing6.ip)));
+  if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", t("landingPos"), landingPosVal));
+  if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", t("riskLevel"), riskVal, riskColor));
+  rows.push(kvRow("play.rectangle.fill", "#27AE60", t("serviceCheck"), sdLine));
+  
   return {
     type: "stack",
     direction: "column",
