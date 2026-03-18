@@ -2180,116 +2180,216 @@ function pickWidgetPage() {
 }
 
 function buildSummaryCard(model, colors) {
+  const svs = Array.isArray(model.services) ? model.services : [];
   const summary = widgetServiceSummary(model);
-  const localFlag = model.local?.loc ? onlyFlag(model.local.loc) : "-";
-  const landingFlag = model.landing?.loc ? onlyFlag(model.landing.loc) : "-";
-  const riskText = model.risk ? `${model.risk.riskValue}%` : "-";
-  const policyText = model.policy ? model.policy : "未传入";
+
+  // ── 辅助：构建 IP 行（IPv4 + IPv6 同列展示）
+  function ipRows(ip4, ip6) {
+    const rows = [];
+    if (ip4) rows.push({ label: "IPv4", val: maskIP(ip4) });
+    if (ip6) rows.push({ label: "IPv6", val: maskIP(ip6) });
+    return rows;
+  }
+
+  // ── 辅助：单行 label + value
+  function kvRow(label, val, valColor) {
+    if (!val) return null;
+    return {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 4,
+      children: [
+        {
+          type: "text",
+          text: label,
+          font: { size: "caption2" },
+          textColor: colors.textSoft,
+          minScale: 0.75
+        },
+        {
+          type: "text",
+          text: String(val),
+          font: { size: "caption2", weight: "medium" },
+          textColor: valColor || colors.textMain,
+          flex: 1,
+          maxLines: 1,
+          minScale: 0.72
+        }
+      ]
+    };
+  }
+
+  // ── 辅助：分隔线
+  function divider() {
+    return {
+      type: "stack",
+      direction: "row",
+      padding: [1, 0, 1, 0],
+      children: [{
+        type: "stack",
+        flex: 1,
+        height: 0.4,
+        backgroundColor: colors.cardBorder
+      }]
+    };
+  }
+
+  // ── 辅助：分组标题行（小图标 + 文字）
+  function sectionHeader(sfIcon, title, iconColor) {
+    return {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 4,
+      padding: [2, 0, 0, 0],
+      children: [
+        {
+          type: "image",
+          src: `sf-symbol:${sfIcon}`,
+          width: 10,
+          height: 10,
+          color: iconColor || colors.accent
+        },
+        {
+          type: "text",
+          text: title,
+          font: { size: "caption2", weight: "semibold" },
+          textColor: colors.textSub,
+          maxLines: 1
+        }
+      ]
+    };
+  }
+
+  // ── 本地数据
+  const localLoc = model.local?.loc
+    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
+    : "";
+  const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
+
+  // ── 落地数据
+  const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
+  const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
+
+  // ── 风险色调
+  const riskColor = widgetRiskTone(model, colors);
+  const riskText = model.risk
+    ? `${model.risk.lineType} · ${model.risk.nativeHint} · ${model.risk.riskValue}`
+    : "-";
+  const riskLabel = model.risk ? `高风险 (${model.risk.riskValue})` : "-";
+
+  // ── 流媒体紧凑行：GPT:🇺🇸 · NF:🚫 · ...
+  const SD_SHORT = { youtube: "YT", netflix: "NF", disney: "D+", chatgpt_app: "GPT", chatgpt_web: "GPT-W", hulu_us: "Hulu", hulu_jp: "HuluJP", hbo: "MAX" };
+  const sdParts = svs.map(x => {
+    const short = SD_SHORT[x.key] || x.name;
+    if (x.state === "full" || x.state === "partial") {
+      const flag = x.cc ? sd_flagFromCC(x.cc) : "";
+      return `${short}:${flag || "✓"}`;
+    } else {
+      return `${short}:🚫`;
+    }
+  });
+  const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
+
+  // ── 顶部标题行
+  const headerRow = {
+    type: "stack",
+    direction: "row",
+    alignItems: "center",
+    gap: 6,
+    children: [
+      {
+        type: "image",
+        src: `sf-symbol:${S().CFG.ICON_NAME || "wifi"}`,
+        width: 14,
+        height: 14,
+        color: colors.accent
+      },
+      {
+        type: "text",
+        text: netTypeLine(),
+        font: { size: "caption2", weight: "bold" },
+        textColor: colors.textMain,
+        flex: 1,
+        maxLines: 1,
+        minScale: 0.78
+      },
+      {
+        type: "text",
+        text: widgetTimeText(),
+        font: { size: "caption2" },
+        textColor: colors.accent
+      }
+    ]
+  };
+
+  // ── 构建子元素列表
+  const children = [headerRow, divider()];
+
+  // 本地 section
+  children.push(sectionHeader("house.fill", t("local"), colors.accent));
+  for (const r of ipRows(model.local?.ip, model.local6?.ip)) {
+    const row = kvRow(r.label, r.val);
+    if (row) children.push(row);
+  }
+  if (localIsp) children.push(kvRow(t("isp"), localIsp));
+  if (localLoc) children.push(kvRow(t("location"), localLoc));
+
+  children.push(divider());
+
+  // 落地 section
+  children.push(sectionHeader("airplane.circle.fill", t("landing"), colors.accent));
+  for (const r of ipRows(model.landing?.ip, model.landing6?.ip)) {
+    const row = kvRow(r.label, r.val);
+    if (row) children.push(row);
+  }
+  if (landingIsp) children.push(kvRow(t("isp"), landingIsp));
+  if (landingLoc) children.push(kvRow(t("location"), landingLoc));
+
+  children.push(divider());
+
+  // 风险评级
+  if (model.risk) {
+    children.push(kvRow("风险评级", riskLabel, riskColor));
+    children.push(divider());
+  }
+
+  // 流媒体
+  children.push(sectionHeader("play.rectangle.fill", t("services"), summary.bad > 0 ? colors.warn : colors.ok));
+  children.push({
+    type: "text",
+    text: sdLine,
+    font: { size: "caption2" },
+    textColor: colors.textMain,
+    maxLines: 2,
+    minScale: 0.68
+  });
 
   return {
     type: "stack",
     direction: "column",
-    gap: 8,
-    padding: [10, 10, 10, 10],
+    gap: 5,
+    padding: [10, 12, 10, 12],
     backgroundColor: colors.cardBg,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
-    children: [
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
-            src: `sf-symbol:${S().CFG.ICON_NAME || "globe.asia.australia"}`,
-            width: 14,
-            height: 14,
-            color: colors.accent
-          },
-          {
-            type: "text",
-            text: widgetNetTitle(model),
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textMain,
-            flex: 1,
-            maxLines: 1,
-            minScale: 0.78
-          },
-          {
-            type: "image",
-            src: "sf-symbol:clock",
-            width: 8,
-            height: 8,
-            color: colors.textSoft
-          },
-          {
-            type: "text",
-            text: widgetTimeText(),
-            font: { size: "caption2" },
-            textColor: colors.textSoft
-          }
-        ]
-      },
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        padding: [7, 9, 7, 9],
-        backgroundColor: { light: "#F8FAFC", dark: "#1C1E22" },
-        borderRadius: 10,
-        children: [
-          {
-            type: "image",
-            src: "sf-symbol:point.3.connected.trianglepath.dotted",
-            width: 10,
-            height: 10,
-            color: colors.accent
-          },
-          {
-            type: "text",
-            text: `${t("policy")} ${policyText}`,
-            font: { size: "caption2", weight: "medium" },
-            textColor: colors.textMain,
-            maxLines: 1,
-            minScale: 0.72,
-            flex: 1
-          }
-        ]
-      },
-      {
-        type: "text",
-        text: `本地 ${localFlag} · 落地 ${landingFlag}`,
-        font: { size: "caption2" },
-        textColor: colors.textMain,
-        maxLines: 1,
-        minScale: 0.72
-      },
-      {
-        type: "text",
-        text: `风险 ${riskText} · 服务 ${summary.ok}/${summary.total || 0}`,
-        font: { size: "caption2" },
-        textColor: colors.textMain,
-        maxLines: 1,
-        minScale: 0.72
-      }
-    ]
+    children
   };
 }
 
 function buildDetailCardByPage(model, colors) {
   const page = pickWidgetPage();
 
-  if (page === "summary") return buildSummaryCard(model, colors);
+  // 所有 page 都走整合卡片，保留旧页面切换作为兼容
   if (page === "local") return buildLocalCard(model, colors);
   if (page === "entrance") return buildEntranceCard(model, colors);
   if (page === "landing") return buildLandingCard(model, colors);
   if (page === "risk") return buildRiskCard(model, colors);
   if (page === "services") return buildServiceCard(model, colors);
 
+  // summary（默认）→ 整合卡片
   return buildSummaryCard(model, colors);
 }
 
@@ -2316,6 +2416,7 @@ function renderWidget(model) {
     ]
   };
 }
+
 
 function renderErrorWidget(err) {
   const msg = String(err && err.stack ? err.stack : err);
