@@ -2179,28 +2179,26 @@ function pickWidgetPage() {
 
 function buildSummaryCard(model, colors) {
   const svs = Array.isArray(model.services) ? model.services : [];
-  const summary = widgetServiceSummary(model);
 
-  // ── 辅助：左图标+标签 右对齐值 的一行
   function kvRow(sfIcon, iconColor, label, value, valueColor) {
     if (!value) return null;
     return {
       type: "stack",
       direction: "row",
       alignItems: "center",
-      gap: 8,
+      gap: 6,
       children: [
         {
           type: "image",
           src: `sf-symbol:${sfIcon}`,
-          width: 16,
-          height: 16,
+          width: 15,
+          height: 15,
           color: iconColor || colors.textSub
         },
         {
           type: "text",
           text: label,
-          font: { size: "body" },
+          font: { size: "footnote" },
           textColor: colors.textSub,
           minScale: 0.8
         },
@@ -2208,93 +2206,20 @@ function buildSummaryCard(model, colors) {
         {
           type: "text",
           text: String(value),
-          font: { size: "body", weight: "medium" },
+          font: { size: "footnote", weight: "medium" },
           textColor: valueColor || colors.textMain,
           maxLines: 1,
-          minScale: 0.72,
+          minScale: 0.7,
           textAlign: "right"
         }
       ]
     };
   }
 
-  // ── 流媒体紧凑行
-  const SD_SHORT = {
-    youtube: "YT", netflix: "NF", disney: "D+",
-    chatgpt_app: "GPT", chatgpt_web: "GPT-W",
-    hulu_us: "Hulu", hulu_jp: "HuluJP", hbo: "MAX"
-  };
-  const sdParts = svs.map(x => {
-    const short = SD_SHORT[x.key] || x.name;
-    const flag = (x.state === "full" || x.state === "partial") && x.cc
-      ? sd_flagFromCC(x.cc)
-      : "🚫";
-    return `${short}:${flag}`;
-  });
-  const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
-
-  // ── 本地数据
-  const localLoc = model.local?.loc
-    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
-    : "";
-  const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
-  // 本地位置：合并 位置+运营商 到右侧，参考图样式 "🇨🇳 浙江 中国电信"
-  const localPosVal = [localLoc, localIsp].filter(Boolean).join(" ") || "-";
-
-  // ── 落地数据
-  const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
-  const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
-  const landingPosVal = [landingLoc, landingIsp].filter(Boolean).join(" ") || "-";
-
-  // ── 风险色
-  const riskColor = widgetRiskTone(model, colors);
-  const riskLabel = model.risk
-    ? `高风险 (${model.risk.riskValue})`
-    : "-";
-
-  // ── 风险详情：网络类型 + 代理特征
-  const riskDetailLine = model.risk
-    ? `${model.risk.lineType} · ${model.risk.nativeHint} · ${model.risk.tunnelHint}`
-    : null;
-
-  // ── 顶部标题行
-  const headerRow = {
-    type: "stack",
-    direction: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: [0, 0, 4, 0],
-    children: [
-      {
-        type: "image",
-        src: `sf-symbol:${S().CFG.ICON_NAME || "wifi"}`,
-        width: 20,
-        height: 20,
-        color: colors.textMain
-      },
-      {
-        type: "text",
-        text: netTypeLine(),
-        font: { size: "headline", weight: "bold" },
-        textColor: colors.textMain,
-        flex: 1,
-        maxLines: 1,
-        minScale: 0.78
-      },
-      {
-        type: "text",
-        text: widgetTimeText(),
-        font: { size: "headline", weight: "semibold" },
-        textColor: colors.accent
-      }
-    ]
-  };
-
-  // ── 分隔线
   const divider = {
     type: "stack",
     direction: "row",
-    padding: [4, 0, 4, 0],
+    padding: [2, 0, 2, 0],
     children: [{
       type: "stack",
       flex: 1,
@@ -2303,81 +2228,129 @@ function buildSummaryCard(model, colors) {
     }]
   };
 
-  // ── 构建行列表
-  const rows = [];
+  // 本地
+  const localLoc = model.local?.loc
+    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
+    : "";
+  const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
+  const localPosVal = [localLoc, localIsp].filter(Boolean).join(" ") || null;
 
-  // 本地 IP
-  if (model.local?.ip) {
-    rows.push(kvRow("house.fill", "#4A9EFF", "本地 IP", maskIP(model.local.ip)));
-  }
-  // 本地 IPv6（若有，换小图标区分）
-  if (model.local6?.ip) {
-    rows.push(kvRow("house", "#4A9EFF", "本地 IPv6", maskIP(model.local6.ip)));
-  }
-  // 本地位置
-  if (localPosVal && localPosVal !== "-") {
-    rows.push(kvRow("map.fill", "#4A9EFF", "本地位置", localPosVal));
-  }
+  // 落地
+  const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
+  const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
+  const landingPosVal = [landingLoc, landingIsp].filter(Boolean).join(" ") || null;
 
-  rows.push(divider);
-
-  // 落地 IP
+  // 落地IP（机房标记）
+  const isDatacenter = model.risk && model.risk.riskValue >= 60;
   const landingIPDisplay = model.landing?.ip
-    ? maskIP(model.landing.ip) + (model.risk && model.risk.riskValue >= 60 ? "（机房）" : "")
+    ? maskIP(model.landing.ip) + (isDatacenter ? "（机房）" : "")
     : null;
-  if (landingIPDisplay) {
-    rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IP", landingIPDisplay));
-  }
-  if (model.landing6?.ip) {
-    rows.push(kvRow("globe", "#9B59B6", "落地 IPv6", maskIP(model.landing6.ip)));
-  }
-  // 落地位置
-  if (landingPosVal && landingPosVal !== "-") {
-    rows.push(kvRow("mappin.and.ellipse", "#9B59B6", "落地位置", landingPosVal));
-  }
 
-  rows.push(divider);
-
-  // 风险评级（主行）
-  rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", "风险评级", riskLabel, riskColor));
-
-  // 风险详情行（网络类型 · 原生 · 代理特征）
-  if (riskDetailLine) {
-    rows.push({
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 8,
-      children: [
-        { type: "image", src: "sf-symbol:info.circle", width: 16, height: 16, color: colors.textSoft },
-        {
-          type: "text",
-          text: riskDetailLine,
-          font: { size: "caption1" },
-          textColor: colors.textSub,
-          flex: 1,
-          maxLines: 1,
-          minScale: 0.7
-        }
-      ]
-    });
-  }
+  // 风险一行：右侧 "高风险 (76) · 非家宽 · 偏强"
+  const riskColor = widgetRiskTone(model, colors);
+  const riskVal = model.risk
+    ? `高风险 (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
+    : null;
 
   // 流媒体
-  rows.push(kvRow("play.rectangle.fill", "#27AE60", "流媒体", sdLine, colors.textMain));
+  const SD_SHORT = {
+    youtube: "YT", netflix: "NF", disney: "D+",
+    chatgpt_app: "GPT", chatgpt_web: "GPT-W",
+    hulu_us: "Hulu", hulu_jp: "HuluJP", hbo: "MAX"
+  };
+  const sdParts = svs.map(x => {
+    const short = SD_SHORT[x.key] || x.name;
+    const flag = (x.state === "full" || x.state === "partial") && x.cc
+      ? sd_flagFromCC(x.cc) : "🚫";
+    return `${short}:${flag}`;
+  });
+  const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
+
+  // 顶部标题行
+  const headerRow = {
+    type: "stack",
+    direction: "row",
+    alignItems: "center",
+    gap: 6,
+    padding: [0, 0, 2, 0],
+    children: [
+      {
+        type: "image",
+        src: `sf-symbol:${S().CFG.ICON_NAME || "wifi"}`,
+        width: 18,
+        height: 18,
+        color: colors.textMain
+      },
+      {
+        type: "text",
+        text: netTypeLine(),
+        font: { size: "subheadline", weight: "bold" },
+        textColor: colors.textMain,
+        flex: 1,
+        maxLines: 1,
+        minScale: 0.78
+      },
+      {
+        type: "text",
+        text: widgetTimeText(),
+        font: { size: "subheadline", weight: "semibold" },
+        textColor: colors.accent
+      }
+    ]
+  };
+
+  const rows = [headerRow];
+
+  // 本地
+  if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", "本地 IP", maskIP(model.local.ip)));
+  if (model.local6?.ip) rows.push(kvRow("house", "#4A9EFF", "本地 IPv6", maskIP(model.local6.ip)));
+  if (localPosVal) rows.push(kvRow("map.fill", "#4A9EFF", "本地位置", localPosVal));
+
+  rows.push(divider);
+
+  // 落地
+  if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IP", landingIPDisplay));
+  if (model.landing6?.ip) rows.push(kvRow("globe", "#9B59B6", "落地 IPv6", maskIP(model.landing6.ip)));
+  if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", "落地位置", landingPosVal));
+
+  rows.push(divider);
+
+  // 风险（一行）
+  if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", "风险评级", riskVal, riskColor));
+
+  // 流媒体
+  rows.push(kvRow("play.rectangle.fill", "#27AE60", "流媒体", sdLine));
 
   return {
     type: "stack",
     direction: "column",
-    gap: 6,
-    padding: [14, 16, 14, 16],
+    gap: 5,
+    padding: [12, 14, 12, 14],
     backgroundColor: colors.cardBg,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
+    children: rows.filter(Boolean)
+  };
+}
+
+function renderWidget(model) {
+  const colors = widgetColors();
+  const refreshTime = new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString();
+
+  log("info", "render-widget", {
+    policy: model.policy || "",
+    local4: maskIP(model.local?.ip || ""),
+    landing4: maskIP(model.landing?.ip || "")
+  });
+
+  return {
+    type: "widget",
+    padding: [0, 0, 0, 0],
+    backgroundGradient: colors.bgGradient,
+    refreshAfter: refreshTime,
     children: [
-      headerRow,
-      ...rows
+      buildSummaryCard(model, colors)
     ]
   };
 }
@@ -2405,7 +2378,6 @@ function renderWidget(model) {
     ]
   };
 }
-
 
 function renderErrorWidget(err) {
   const msg = String(err && err.stack ? err.stack : err);
