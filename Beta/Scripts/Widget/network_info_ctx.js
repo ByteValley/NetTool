@@ -69,6 +69,18 @@ const DEFAULTS = Object.freeze({
 
 const SD_STR = {
   "zh-Hans": {
+    localIPv4: "本地 IPv4",
+    localIPv6: "本地 IPv6",
+    localPos: "本地位置",
+    landingIPv4: "落地 IPv4",
+    landingIPv6: "落地 IPv6",
+    landingPos: "落地位置",
+    riskLevel: "风险评级",
+    serviceCheck: "服务检测",
+    highRisk: "高风险",
+    datacenter: "（机房）",
+    youtube: "油管",
+    netflix: "奈飞",
     title: "网络信息 𝕏",
     runAt: "执行时间",
     policy: "代理策略",
@@ -101,6 +113,18 @@ const SD_STR = {
     debug: "调试"
   },
   "zh-Hant": {
+    localIPv4: "本地 IPv4",
+    localIPv6: "本地 IPv6",
+    localPos: "本地位置",
+    landingIPv4: "落地 IPv4",
+    landingIPv6: "落地 IPv6",
+    landingPos: "落地位置",
+    riskLevel: "風險評級",
+    serviceCheck: "服務檢測",
+    highRisk: "高風險",
+    datacenter: "（機房）",
+    youtube: "油管",
+    netflix: "奈飛",
     title: "網路資訊 𝕏",
     runAt: "執行時間",
     policy: "代理策略",
