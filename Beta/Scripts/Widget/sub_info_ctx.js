@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块：订阅信息面板（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2026-03-18R2
+ * 版本：2026-03-18R3
  * ========================================================= */
 
 const TAG = "SubscribeInfo";
@@ -198,7 +198,9 @@ function buildArgStore(ctx) {
     if (!p) return;
     const idx = p.indexOf("=");
     if (idx === -1) return;
-    args[p.substring(0, idx)] = (() => { try { return decodeURIComponent(p.substring(idx + 1)); } catch (_) { return p.substring(idx + 1); } })();
+    args[p.substring(0, idx)] = (() => {
+      try { return decodeURIComponent(p.substring(idx + 1)); } catch (_) { return p.substring(idx + 1); }
+    })();
   });
   return { envStore, args };
 }
@@ -261,7 +263,9 @@ function makeHttpRequest(ctx) {
   function httpWithRetry(method, options, attempt) {
     return new Promise((resolve, reject) => {
       let finished = false;
-      const timer = setTimeout(() => { if (finished) return; finished = true; reject(new Error("timeout")); }, REQ_TIMEOUT_MS + 200);
+      const timer = setTimeout(() => {
+        if (finished) return; finished = true; reject(new Error("timeout"));
+      }, REQ_TIMEOUT_MS + 200);
       httpInvoke(method, options, (err, resp) => {
         if (finished) return; finished = true; clearTimeout(timer);
         if (err || !resp) {
@@ -317,9 +321,16 @@ async function fetchInfo(requestSubInfo, url, resetDayRaw, title, index) {
       expireMs = new Date("2099-12-31T00:00:00Z").getTime();
     }
     const resetSpec = parseResetSpec(cleanArg(resetDayRaw));
-    const resetDate = resetSpec ? (resetSpec.type === "monthly"
-      ? (() => { const now = new Date(); let d = new Date(now.getFullYear(), now.getMonth(), resetSpec.day); if (d <= now) d = new Date(now.getFullYear(), now.getMonth() + 1, resetSpec.day); return d; })()
-      : nextResetDateFromSpec(resetSpec)) : null;
+    const resetDate = resetSpec
+      ? (resetSpec.type === "monthly"
+        ? (() => {
+            const now = new Date();
+            let d = new Date(now.getFullYear(), now.getMonth(), resetSpec.day);
+            if (d <= now) d = new Date(now.getFullYear(), now.getMonth() + 1, resetSpec.day);
+            return d;
+          })()
+        : nextResetDateFromSpec(resetSpec))
+      : null;
     log("fetchInfo done slot", index, `used=${bytesToSize(used)} total=${bytesToSize(total)}`);
     return { ok: true, title, used, remain, total, usedPct, expireMs, resetDate, resetDayRaw };
   } catch (e) {
@@ -348,207 +359,205 @@ async function runPool(tasks, limit) {
 }
 
 // =====================================================================
-// Widget 渲染
+// Widget 渲染（仿电信仪表盘样式）
 // =====================================================================
 
 function gaugeColor(usedPct) {
-  if (usedPct >= 0.9) return { light: "#EF4444", dark: "#F87171" };
-  if (usedPct >= 0.7) return { light: "#F59E0B", dark: "#FBBF24" };
-  return { light: "#10B981", dark: "#34D399" };
+  if (usedPct >= 0.9) return "#EF4444";
+  if (usedPct >= 0.7) return "#F59E0B";
+  return "#10B981";
 }
 
-// 单个机场行（紧凑，整合进一张卡片）
-function buildSubRow(info) {
-  const textMain = { light: "#111827", dark: "#F3F4F6" };
-  const textSub  = { light: "#6B7280", dark: "#A1A1AA" };
-  const textSoft = { light: "#9CA3AF", dark: "#71717A" };
+// SVG 半圆仪表盘
+function buildGaugeSVG(usedPct, size) {
+  const remainPct = Math.max(0, 1 - usedPct);
+  const remainStr = `${(remainPct * 100).toFixed(1)}`;
+  const cx = size / 2, cy = size / 2;
+  const r = size * 0.38;
+  const strokeW = size * 0.09;
+  const startAngle = 210;
+  const totalAngle = 240;
+  const fillAngle = totalAngle * remainPct;
+  const gc = gaugeColor(usedPct);
+
+  function polarToXY(deg, radius) {
+    const rad = (deg - 90) * Math.PI / 180;
+    return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+  }
+  function arcPath(startDeg, angleDeg, radius) {
+    if (angleDeg <= 0) return "";
+    const endDeg = startDeg + Math.min(angleDeg, 359.99);
+    const s = polarToXY(startDeg, radius);
+    const e = polarToXY(endDeg, radius);
+    const large = angleDeg > 180 ? 1 : 0;
+    return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+  }
+
+  const dotEnd = polarToXY(startAngle + fillAngle, r);
+  const dotR = strokeW * 0.5;
+  const fontSize = size * 0.19;
+  const unitSize = size * 0.11;
+
+  const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+  <path d="${arcPath(startAngle, totalAngle, r)}" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="${strokeW}" stroke-linecap="round"/>
+  ${fillAngle > 0.5 ? `<path d="${arcPath(startAngle, fillAngle, r)}" fill="none" stroke="${gc}" stroke-width="${strokeW}" stroke-linecap="round"/>` : ""}
+  ${fillAngle > 0.5 ? `<circle cx="${dotEnd.x.toFixed(2)}" cy="${dotEnd.y.toFixed(2)}" r="${dotR}" fill="white"/>` : ""}
+  <text x="${cx}" y="${(cy + fontSize * 0.35).toFixed(2)}" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="white" font-family="-apple-system,sans-serif">${remainStr}</text>
+  <text x="${cx}" y="${(cy + fontSize * 0.35 + unitSize * 1.2).toFixed(2)}" text-anchor="middle" font-size="${unitSize}" fill="rgba(255,255,255,0.7)" font-family="-apple-system,sans-serif">%</text>
+</svg>`;
+
+  return svg;
+}
+
+// 单个机场列
+function buildSubColumn(info, gaugeSize) {
+  const textWhite     = { light: "#FFFFFF", dark: "#FFFFFF" };
+  const textWhiteSub  = { light: "rgba(255,255,255,0.75)", dark: "rgba(255,255,255,0.75)" };
+  const textWhiteSoft = { light: "rgba(255,255,255,0.5)", dark: "rgba(255,255,255,0.5)" };
 
   if (!info.ok) {
     return {
       type: "stack",
-      direction: "row",
+      direction: "column",
       alignItems: "center",
-      gap: 6,
-      padding: [4, 0, 4, 0],
+      gap: 4,
+      flex: 1,
       children: [
         {
           type: "image",
-          src: "sf-symbol:exclamationmark.circle",
-          width: 12, height: 12,
-          color: { light: "#EF4444", dark: "#F87171" }
+          src: "sf-symbol:exclamationmark.circle.fill",
+          width: gaugeSize * 0.4, height: gaugeSize * 0.4,
+          color: textWhiteSoft
         },
         {
           type: "text",
-          text: `${info.title}  ${info.error || "获取失败"}`,
+          text: "获取失败",
           font: { size: "caption2" },
-          textColor: textSub
+          textColor: textWhiteSoft,
+          textAlign: "center"
+        },
+        {
+          type: "text",
+          text: info.title,
+          font: { size: "caption2" },
+          textColor: textWhiteSub,
+          maxLines: 1, minScale: 0.8,
+          textAlign: "center"
         }
       ]
     };
   }
 
   const usedPct = info.usedPct || 0;
-  const remainPct = Math.max(0, 1 - usedPct);
-  const gc = gaugeColor(usedPct);
-  const usedPctStr = `${(usedPct * 100).toFixed(1)}%`;
-  const remainPctStr = `${(remainPct * 100).toFixed(1)}%`;
   const expireStr = info.expireMs ? formatDate(info.expireMs) : "未知";
+  const resetDays = info.resetDate ? daysUntilDate(info.resetDate) : null;
 
-  // 重置信息
-  let resetStr = "";
-  if (info.resetDate) {
-    const days = daysUntilDate(info.resetDate);
-    resetStr = `${days}天`;
-  }
+  const svgStr = buildGaugeSVG(usedPct, gaugeSize);
+  const svgB64 = (() => {
+    try {
+      return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgStr)))}`;
+    } catch (_) {
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
+    }
+  })();
 
   return {
     type: "stack",
     direction: "column",
-    gap: 3,
-    padding: [5, 0, 5, 0],
+    alignItems: "center",
+    gap: 2,
+    flex: 1,
     children: [
-      // 机场名 + 到期 + 重置
+      // 半圆仪表盘
+      {
+        type: "image",
+        src: svgB64,
+        width: gaugeSize,
+        height: gaugeSize
+      },
+      // 剩余流量大字
+      {
+        type: "text",
+        text: bytesToSize(info.remain),
+        font: { size: "footnote", weight: "bold" },
+        textColor: textWhite,
+        maxLines: 1, minScale: 0.7,
+        textAlign: "center"
+      },
+      // 机场名称
+      {
+        type: "text",
+        text: info.title,
+        font: { size: "caption2", weight: "semibold" },
+        textColor: textWhiteSub,
+        maxLines: 1, minScale: 0.75,
+        textAlign: "center"
+      },
+      // 到期日期
       {
         type: "stack",
         direction: "row",
         alignItems: "center",
-        gap: 4,
+        gap: 2,
         children: [
-          {
-            type: "text",
-            text: info.title,
-            font: { size: "caption1", weight: "semibold" },
-            textColor: textMain,
-            flex: 1,
-            maxLines: 1,
-            minScale: 0.8
-          },
           {
             type: "image",
             src: "sf-symbol:calendar",
-            width: 10, height: 10,
-            color: textSoft
+            width: 9, height: 9,
+            color: textWhiteSoft
           },
           {
             type: "text",
             text: expireStr,
             font: { size: "caption2" },
-            textColor: textSoft
-          },
-          ...(resetStr ? [
-            {
-              type: "image",
-              src: "sf-symbol:arrow.clockwise",
-              width: 10, height: 10,
-              color: textSoft
-            },
-            {
-              type: "text",
-              text: resetStr,
-              font: { size: "caption2" },
-              textColor: textSoft
-            }
-          ] : [])
-        ]
-      },
-      // 进度条
-      {
-        type: "stack",
-        direction: "row",
-        height: 5,
-        borderRadius: 2.5,
-        backgroundColor: { light: "#F3F4F6", dark: "#2D2F35" },
-        children: [
-          {
-            type: "stack",
-            flex: Math.max(usedPct, 0.001),
-            height: 5,
-            borderRadius: 2.5,
-            backgroundColor: gc
-          },
-          {
-            type: "stack",
-            flex: Math.max(remainPct, 0.001),
-            height: 5
+            textColor: textWhiteSoft,
+            textAlign: "center"
           }
         ]
       },
-      // 流量数据：已用% | 已用量 · 剩余% | 剩余量 · 总量
-      {
+      // 重置倒计时（有才显示）
+      ...(resetDays !== null ? [{
         type: "stack",
         direction: "row",
         alignItems: "center",
-        gap: 3,
+        gap: 2,
         children: [
           {
-            type: "text",
-            text: `已用 ${usedPctStr}`,
-            font: { size: "caption2" },
-            textColor: gc
+            type: "image",
+            src: "sf-symbol:arrow.clockwise",
+            width: 9, height: 9,
+            color: textWhiteSoft
           },
           {
             type: "text",
-            text: bytesToSize(info.used),
+            text: `${resetDays} 天后重置`,
             font: { size: "caption2" },
-            textColor: textSub
-          },
-          { type: "spacer" },
-          {
-            type: "text",
-            text: `剩余 ${remainPctStr}`,
-            font: { size: "caption2" },
-            textColor: textSub
-          },
-          {
-            type: "text",
-            text: bytesToSize(info.remain),
-            font: { size: "caption2" },
-            textColor: textSub
-          },
-          {
-            type: "text",
-            text: `/ ${bytesToSize(info.total)}`,
-            font: { size: "caption2" },
-            textColor: textSoft
+            textColor: textWhiteSoft,
+            textAlign: "center"
           }
         ]
-      }
+      }] : [])
     ]
   };
 }
 
-// 分隔线
-function rowDivider() {
-  return {
-    type: "stack",
-    direction: "row",
-    padding: [1, 0, 1, 0],
-    children: [{
-      type: "stack",
-      flex: 1,
-      height: 0.4,
-      backgroundColor: { light: "#E8EAEE", dark: "#343741" }
-    }]
-  };
-}
-
 function buildWidget(infos, cfg) {
-  const refreshTime = new Date(Date.now() + Math.max(60, (cfg.Update || 10)) * 1000).toISOString();
+  const refreshTime = new Date(Date.now() + Math.max(60, cfg.Update || 600) * 1000).toISOString();
+
   const bgGradient = {
     type: "linear",
     colors: [
-      { light: "#F7F8FA", dark: "#111214" },
-      { light: "#FFFFFF", dark: "#1B1C1F" }
+      { light: "#1A2A3A", dark: "#111820" },
+      { light: "#2A3A4A", dark: "#1A2530" }
     ],
     stops: [0, 1],
     startPoint: { x: 0, y: 0 },
     endPoint: { x: 1, y: 1 }
   };
-  const cardBg     = { light: "#FFFFFF", dark: "#23252A" };
-  const cardBorder = { light: "#E8EAEE", dark: "#343741" };
-  const textMain   = { light: "#111827", dark: "#F3F4F6" };
-  const textSoft   = { light: "#9CA3AF", dark: "#71717A" };
-  const accentColor = { light: cfg.defaultIconColor || "#00E28F", dark: cfg.defaultIconColor || "#00E28F" };
+
+  const textWhite    = { light: "#FFFFFF", dark: "#FFFFFF" };
+  const textWhiteSub = { light: "rgba(255,255,255,0.6)", dark: "rgba(255,255,255,0.6)" };
+  const accentColor  = { light: cfg.defaultIconColor || "#00E28F", dark: cfg.defaultIconColor || "#00E28F" };
 
   if (!infos.length) {
     return {
@@ -557,60 +566,63 @@ function buildWidget(infos, cfg) {
       backgroundGradient: bgGradient,
       refreshAfter: refreshTime,
       children: [{
-        type: "stack",
-        direction: "column",
-        gap: 4,
-        padding: [12, 14, 12, 14],
-        backgroundColor: cardBg,
-        borderRadius: 16,
-        borderWidth: 0.5,
-        borderColor: cardBorder,
-        children: [{
-          type: "text",
-          text: "未配置订阅参数",
-          font: { size: "footnote" },
-          textColor: textSoft
-        }]
+        type: "text",
+        text: "未配置订阅参数",
+        font: { size: "footnote" },
+        textColor: textWhiteSub,
+        padding: [14, 14, 14, 14]
       }]
     };
   }
 
-  // 标题行
+  // 仪表盘尺寸按机场数量自适应
+  const count = infos.length;
+  const gaugeSize = count <= 2 ? 88 : count <= 3 ? 80 : count <= 5 ? 68 : 56;
+
+  // 顶部标题行
   const headerRow = {
     type: "stack",
     direction: "row",
     alignItems: "center",
-    gap: 5,
-    padding: [0, 0, 3, 0],
+    gap: 6,
+    padding: [0, 0, 8, 0],
     children: [
       {
         type: "image",
         src: `sf-symbol:${cfg.defaultIcon || "antenna.radiowaves.left.and.right.circle.fill"}`,
-        width: 14, height: 14,
+        width: 15, height: 15,
         color: accentColor
       },
       {
         type: "text",
         text: "订阅信息",
-        font: { size: "footnote", weight: "bold" },
-        textColor: textMain,
+        font: { size: "footnote", weight: "semibold" },
+        textColor: textWhite,
         flex: 1
+      },
+      {
+        type: "image",
+        src: "sf-symbol:arrow.clockwise",
+        width: 10, height: 10,
+        color: textWhiteSub
       },
       {
         type: "text",
         text: widgetTimeText(),
         font: { size: "caption2" },
-        textColor: accentColor
+        textColor: textWhiteSub
       }
     ]
   };
 
-  // 所有机场行，中间插分隔线
-  const subRows = [];
-  infos.forEach((info, idx) => {
-    subRows.push(buildSubRow(info));
-    if (idx < infos.length - 1) subRows.push(rowDivider());
-  });
+  // 所有机场横排
+  const columnsRow = {
+    type: "stack",
+    direction: "row",
+    alignItems: "flex-start",
+    gap: 4,
+    children: infos.map(info => buildSubColumn(info, gaugeSize))
+  };
 
   return {
     type: "widget",
@@ -621,25 +633,20 @@ function buildWidget(infos, cfg) {
       type: "stack",
       direction: "column",
       gap: 0,
-      padding: [10, 12, 10, 12],
-      backgroundColor: cardBg,
-      borderRadius: 16,
-      borderWidth: 0.5,
-      borderColor: cardBorder,
-      children: [headerRow, ...subRows]
+      padding: [12, 14, 12, 14],
+      children: [headerRow, columnsRow]
     }]
   };
 }
 
 // =====================================================================
-// 面板文字输出（原有格式，保留）
+// 面板文字输出（Surge / Loon / QX 原有格式）
 // =====================================================================
 
 function buildPanelContent(infos) {
   if (!infos.length) return "未配置订阅参数";
   const blocks = infos.map(info => {
     if (!info.ok) return `机场：${info.title}\n订阅请求失败：${info.error}`;
-    const used = info.used, total = info.total, remain = info.remain;
     const expireStr = info.expireMs ? formatDate(info.expireMs) : "未知";
     const now = new Date();
     const timeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
@@ -648,9 +655,9 @@ function buildPanelContent(infos) {
       ? `${resetLinePart} | 到期：${expireStr}`
       : `到期：${expireStr}`;
     return [
-      `${info.title} | ${bytesToSize(total)} | ${timeStr}`,
-      `已用：${toPercent(used, total)} ➟ ${bytesToSize(used)}`,
-      `剩余：${toReversePercent(used, total)} ➟ ${bytesToSize(remain)}`,
+      `${info.title} | ${bytesToSize(info.total)} | ${timeStr}`,
+      `已用：${toPercent(info.used, info.total)} ➟ ${bytesToSize(info.used)}`,
+      `剩余：${toReversePercent(info.used, info.total)} ➟ ${bytesToSize(info.remain)}`,
       tailLine
     ].join("\n");
   });
@@ -668,12 +675,11 @@ async function main(ctx) {
   const pickStr = makePickStr(envStore, args, BOX);
   const requestSubInfo = makeHttpRequest(ctx);
 
-  const defaultIcon  = pickStr("defaultIcon", "DefaultIcon",
+  const defaultIcon = pickStr("defaultIcon", "DefaultIcon",
     "antenna.radiowaves.left.and.right.circle.fill",
     "antenna.radiowaves.left.and.right.circle.fill");
   const defaultIconColor = pickStr("defaultIconColor", "DefaultIconColor", "#00E28F", "#00E28F");
   const updateSec = Math.max(60, parseInt(pickStr("update", "Update", "600", "600"), 10));
-
   const cfg = { defaultIcon, defaultIconColor, Update: updateSec };
 
   const tasks = [];
@@ -684,21 +690,17 @@ async function main(ctx) {
     const title = rawTitle || `机场${i}`;
     const reset = pickStr(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
     if (!url || !isHttpUrl(url)) continue;
-    const _reset = reset;
-    tasks.push(() => fetchInfo(requestSubInfo, url, _reset, title, i));
+    tasks.push(() => fetchInfo(requestSubInfo, url, reset, title, i));
   }
 
   const results = await runPool(tasks, CONCURRENCY_LIMIT);
   const infos = results.filter(Boolean);
-
   log("final slots:", infos.length);
 
-  // Egern：返回 Widget
   if (ctx) {
     return buildWidget(infos, cfg);
   }
 
-  // 其他环境：返回面板文字
   return {
     title: "订阅信息",
     content: buildPanelContent(infos),
@@ -718,20 +720,36 @@ export default async function(ctx) {
       padding: [0, 0, 0, 0],
       backgroundGradient: {
         type: "linear",
-        colors: [{ light: "#FFF7F7", dark: "#2A1414" }, { light: "#FFFFFF", dark: "#1A1A1A" }],
+        colors: [
+          { light: "#1A2A3A", dark: "#111820" },
+          { light: "#2A3A4A", dark: "#1A2530" }
+        ],
         stops: [0, 1], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 }
       },
       refreshAfter: new Date(Date.now() + 60000).toISOString(),
       children: [{
         type: "stack", direction: "column", gap: 6,
         padding: [12, 14, 12, 14],
-        backgroundColor: { light: "#FFFFFF", dark: "#23252A" },
-        borderRadius: 14, borderWidth: 0.5,
-        borderColor: { light: "#E8EAEE", dark: "#343741" },
         children: [
-          { type: "image", src: "sf-symbol:exclamationmark.triangle.fill", width: 16, height: 16, color: { light: "#EF4444", dark: "#F87171" } },
-          { type: "text", text: "订阅信息组件异常", font: { size: "caption1", weight: "semibold" }, textColor: { light: "#111827", dark: "#F3F4F6" } },
-          { type: "text", text: String(err?.stack || err).slice(0, 200), font: { size: "caption2" }, textColor: { light: "#6B7280", dark: "#A1A1AA" }, maxLines: 6 }
+          {
+            type: "image",
+            src: "sf-symbol:exclamationmark.triangle.fill",
+            width: 16, height: 16,
+            color: { light: "#EF4444", dark: "#F87171" }
+          },
+          {
+            type: "text",
+            text: "订阅信息组件异常",
+            font: { size: "caption1", weight: "semibold" },
+            textColor: { light: "#FFFFFF", dark: "#FFFFFF" }
+          },
+          {
+            type: "text",
+            text: String(err?.stack || err).slice(0, 200),
+            font: { size: "caption2" },
+            textColor: { light: "rgba(255,255,255,0.6)", dark: "rgba(255,255,255,0.6)" },
+            maxLines: 6
+          }
         ]
       }]
     };
@@ -742,6 +760,11 @@ export default async function(ctx) {
 if (typeof $done !== "undefined") {
   main(null).then(r => $done(r)).catch(err => {
     log("fatal:", String(err));
-    $done({ title: "订阅信息", content: `脚本异常：${String(err)}`, icon: "exclamationmark.triangle", iconColor: "#EF4444" });
+    $done({
+      title: "订阅信息",
+      content: `脚本异常：${String(err)}`,
+      icon: "exclamationmark.triangle",
+      iconColor: "#EF4444"
+    });
   });
 }
