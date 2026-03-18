@@ -64,8 +64,7 @@ const DEFAULTS = Object.freeze({
   LOG_PUSH: "1",
   PROXY_POLICY: "",
   ENTRANCE4: "",
-  ENTRANCE6: "",
-  WIDGET_PAGE: "summary"
+  ENTRANCE6: ""
 });
 
 const SD_STR = {
@@ -368,8 +367,7 @@ function buildCFG(ctx, box) {
 
     PROXY_POLICY: String(pick("PROXY_POLICY", "")).trim(),
     ENTRANCE4: String(pick("ENTRANCE4", "")).trim(),
-    ENTRANCE6: String(pick("ENTRANCE6", "")).trim(),
-    WIDGET_PAGE: String(pick("WIDGET_PAGE", DEFAULTS.WIDGET_PAGE)).trim().toLowerCase()
+    ENTRANCE6: String(pick("ENTRANCE6", "")).trim()
   };
 
   const servicesEnvMeta = (() => {
