@@ -2336,10 +2336,9 @@ function buildSummaryCard(model, colors) {
     direction: "column",
     gap: 3,
     padding: [10, 12, 10, 12],
-    backgroundColor: colors.cardBg,
+    backgroundColor: { light: "#F7F8FA", dark: "#202F44" },
     borderRadius: 16,
-    borderWidth: 0.5,
-    borderColor: colors.cardBorder,
+    borderWidth: 0,
     children: rows.filter(Boolean)
   };
 }
