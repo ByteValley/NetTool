@@ -2403,7 +2403,7 @@ function renderWidget(model) {
     backgroundGradient: colors.bgGradient,
     refreshAfter: refreshTime,
     children: [
-      buildDetailCardByPage(model, colors)
+       buildSummaryCard(model, colors)
     ]
   };
 }
