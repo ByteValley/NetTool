@@ -2355,30 +2355,6 @@ function renderWidget(model) {
   };
 }
 
-function renderWidget(model) {
-  const colors = widgetColors();
-  const refreshTime = new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString();
-  const page = pickWidgetPage();
-
-  log("info", "render-widget-summary", {
-    page,
-    policy: model.policy || "",
-    local4: maskIP(model.local?.ip || ""),
-    landing4: maskIP(model.landing?.ip || "")
-  });
-
-  return {
-    type: "widget",
-    padding: [6, 6, 6, 6],
-    gap: 0,
-    backgroundGradient: colors.bgGradient,
-    refreshAfter: refreshTime,
-    children: [
-       buildSummaryCard(model, colors)
-    ]
-  };
-}
-
 function renderErrorWidget(err) {
   const msg = String(err && err.stack ? err.stack : err);
   try { console.log(msg); } catch (_) {}
