@@ -2183,133 +2183,101 @@ function buildSummaryCard(model, colors) {
   const svs = Array.isArray(model.services) ? model.services : [];
   const summary = widgetServiceSummary(model);
 
-  // ── 辅助：构建 IP 行（IPv4 + IPv6 同列展示）
-  function ipRows(ip4, ip6) {
-    const rows = [];
-    if (ip4) rows.push({ label: "IPv4", val: maskIP(ip4) });
-    if (ip6) rows.push({ label: "IPv6", val: maskIP(ip6) });
-    return rows;
-  }
-
-  // ── 辅助：单行 label + value
-  function kvRow(label, val, valColor) {
-    if (!val) return null;
+  // ── 辅助：左图标+标签 右对齐值 的一行
+  function kvRow(sfIcon, iconColor, label, value, valueColor) {
+    if (!value) return null;
     return {
       type: "stack",
       direction: "row",
       alignItems: "center",
-      gap: 4,
-      children: [
-        {
-          type: "text",
-          text: label,
-          font: { size: "caption2" },
-          textColor: colors.textSoft,
-          minScale: 0.75
-        },
-        {
-          type: "text",
-          text: String(val),
-          font: { size: "caption2", weight: "medium" },
-          textColor: valColor || colors.textMain,
-          flex: 1,
-          maxLines: 1,
-          minScale: 0.72
-        }
-      ]
-    };
-  }
-
-  // ── 辅助：分隔线
-  function divider() {
-    return {
-      type: "stack",
-      direction: "row",
-      padding: [1, 0, 1, 0],
-      children: [{
-        type: "stack",
-        flex: 1,
-        height: 0.4,
-        backgroundColor: colors.cardBorder
-      }]
-    };
-  }
-
-  // ── 辅助：分组标题行（小图标 + 文字）
-  function sectionHeader(sfIcon, title, iconColor) {
-    return {
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 4,
-      padding: [2, 0, 0, 0],
+      gap: 8,
       children: [
         {
           type: "image",
           src: `sf-symbol:${sfIcon}`,
-          width: 10,
-          height: 10,
-          color: iconColor || colors.accent
+          width: 16,
+          height: 16,
+          color: iconColor || colors.textSub
         },
         {
           type: "text",
-          text: title,
-          font: { size: "caption2", weight: "semibold" },
+          text: label,
+          font: { size: "body" },
           textColor: colors.textSub,
-          maxLines: 1
+          minScale: 0.8
+        },
+        { type: "spacer" },
+        {
+          type: "text",
+          text: String(value),
+          font: { size: "body", weight: "medium" },
+          textColor: valueColor || colors.textMain,
+          maxLines: 1,
+          minScale: 0.72,
+          textAlign: "right"
         }
       ]
     };
   }
+
+  // ── 流媒体紧凑行
+  const SD_SHORT = {
+    youtube: "YT", netflix: "NF", disney: "D+",
+    chatgpt_app: "GPT", chatgpt_web: "GPT-W",
+    hulu_us: "Hulu", hulu_jp: "HuluJP", hbo: "MAX"
+  };
+  const sdParts = svs.map(x => {
+    const short = SD_SHORT[x.key] || x.name;
+    const flag = (x.state === "full" || x.state === "partial") && x.cc
+      ? sd_flagFromCC(x.cc)
+      : "🚫";
+    return `${short}:${flag}`;
+  });
+  const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
 
   // ── 本地数据
   const localLoc = model.local?.loc
     ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
     : "";
   const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
+  // 本地位置：合并 位置+运营商 到右侧，参考图样式 "🇨🇳 浙江 中国电信"
+  const localPosVal = [localLoc, localIsp].filter(Boolean).join(" ") || "-";
 
   // ── 落地数据
   const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
   const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
+  const landingPosVal = [landingLoc, landingIsp].filter(Boolean).join(" ") || "-";
 
-  // ── 风险色调
+  // ── 风险色
   const riskColor = widgetRiskTone(model, colors);
-  const riskText = model.risk
-    ? `${model.risk.lineType} · ${model.risk.nativeHint} · ${model.risk.riskValue}`
+  const riskLabel = model.risk
+    ? `高风险 (${model.risk.riskValue})`
     : "-";
-  const riskLabel = model.risk ? `高风险 (${model.risk.riskValue})` : "-";
 
-  // ── 流媒体紧凑行：GPT:🇺🇸 · NF:🚫 · ...
-  const SD_SHORT = { youtube: "YT", netflix: "NF", disney: "D+", chatgpt_app: "GPT", chatgpt_web: "GPT-W", hulu_us: "Hulu", hulu_jp: "HuluJP", hbo: "MAX" };
-  const sdParts = svs.map(x => {
-    const short = SD_SHORT[x.key] || x.name;
-    if (x.state === "full" || x.state === "partial") {
-      const flag = x.cc ? sd_flagFromCC(x.cc) : "";
-      return `${short}:${flag || "✓"}`;
-    } else {
-      return `${short}:🚫`;
-    }
-  });
-  const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
+  // ── 风险详情：网络类型 + 代理特征
+  const riskDetailLine = model.risk
+    ? `${model.risk.lineType} · ${model.risk.nativeHint} · ${model.risk.tunnelHint}`
+    : null;
 
   // ── 顶部标题行
   const headerRow = {
     type: "stack",
     direction: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    padding: [0, 0, 4, 0],
     children: [
       {
         type: "image",
         src: `sf-symbol:${S().CFG.ICON_NAME || "wifi"}`,
-        width: 14,
-        height: 14,
-        color: colors.accent
+        width: 20,
+        height: 20,
+        color: colors.textMain
       },
       {
         type: "text",
         text: netTypeLine(),
-        font: { size: "caption2", weight: "bold" },
+        font: { size: "headline", weight: "bold" },
         textColor: colors.textMain,
         flex: 1,
         maxLines: 1,
@@ -2318,79 +2286,102 @@ function buildSummaryCard(model, colors) {
       {
         type: "text",
         text: widgetTimeText(),
-        font: { size: "caption2" },
+        font: { size: "headline", weight: "semibold" },
         textColor: colors.accent
       }
     ]
   };
 
-  // ── 构建子元素列表
-  const children = [headerRow, divider()];
+  // ── 分隔线
+  const divider = {
+    type: "stack",
+    direction: "row",
+    padding: [4, 0, 4, 0],
+    children: [{
+      type: "stack",
+      flex: 1,
+      height: 0.4,
+      backgroundColor: colors.cardBorder
+    }]
+  };
 
-  // 本地 section
-  children.push(sectionHeader("house.fill", t("local"), colors.accent));
-  for (const r of ipRows(model.local?.ip, model.local6?.ip)) {
-    const row = kvRow(r.label, r.val);
-    if (row) children.push(row);
+  // ── 构建行列表
+  const rows = [];
+
+  // 本地 IP
+  if (model.local?.ip) {
+    rows.push(kvRow("house.fill", "#4A9EFF", "本地 IP", maskIP(model.local.ip)));
   }
-  if (localIsp) children.push(kvRow(t("isp"), localIsp));
-  if (localLoc) children.push(kvRow(t("location"), localLoc));
-
-  children.push(divider());
-
-  // 落地 section
-  children.push(sectionHeader("airplane.circle.fill", t("landing"), colors.accent));
-  for (const r of ipRows(model.landing?.ip, model.landing6?.ip)) {
-    const row = kvRow(r.label, r.val);
-    if (row) children.push(row);
+  // 本地 IPv6（若有，换小图标区分）
+  if (model.local6?.ip) {
+    rows.push(kvRow("house", "#4A9EFF", "本地 IPv6", maskIP(model.local6.ip)));
   }
-  if (landingIsp) children.push(kvRow(t("isp"), landingIsp));
-  if (landingLoc) children.push(kvRow(t("location"), landingLoc));
+  // 本地位置
+  if (localPosVal && localPosVal !== "-") {
+    rows.push(kvRow("map.fill", "#4A9EFF", "本地位置", localPosVal));
+  }
 
-  children.push(divider());
+  rows.push(divider);
 
-  // 风险评级
-  if (model.risk) {
-    children.push(kvRow("风险评级", riskLabel, riskColor));
-    children.push(divider());
+  // 落地 IP
+  const landingIPDisplay = model.landing?.ip
+    ? maskIP(model.landing.ip) + (model.risk && model.risk.riskValue >= 60 ? "（机房）" : "")
+    : null;
+  if (landingIPDisplay) {
+    rows.push(kvRow("globe.asia.australia", "#9B59B6", "落地 IP", landingIPDisplay));
+  }
+  if (model.landing6?.ip) {
+    rows.push(kvRow("globe", "#9B59B6", "落地 IPv6", maskIP(model.landing6.ip)));
+  }
+  // 落地位置
+  if (landingPosVal && landingPosVal !== "-") {
+    rows.push(kvRow("mappin.and.ellipse", "#9B59B6", "落地位置", landingPosVal));
+  }
+
+  rows.push(divider);
+
+  // 风险评级（主行）
+  rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", "风险评级", riskLabel, riskColor));
+
+  // 风险详情行（网络类型 · 原生 · 代理特征）
+  if (riskDetailLine) {
+    rows.push({
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 8,
+      children: [
+        { type: "image", src: "sf-symbol:info.circle", width: 16, height: 16, color: colors.textSoft },
+        {
+          type: "text",
+          text: riskDetailLine,
+          font: { size: "caption1" },
+          textColor: colors.textSub,
+          flex: 1,
+          maxLines: 1,
+          minScale: 0.7
+        }
+      ]
+    });
   }
 
   // 流媒体
-  children.push(sectionHeader("play.rectangle.fill", t("services"), summary.bad > 0 ? colors.warn : colors.ok));
-  children.push({
-    type: "text",
-    text: sdLine,
-    font: { size: "caption2" },
-    textColor: colors.textMain,
-    maxLines: 2,
-    minScale: 0.68
-  });
+  rows.push(kvRow("play.rectangle.fill", "#27AE60", "流媒体", sdLine, colors.textMain));
 
   return {
     type: "stack",
     direction: "column",
-    gap: 5,
-    padding: [10, 12, 10, 12],
+    gap: 6,
+    padding: [14, 16, 14, 16],
     backgroundColor: colors.cardBg,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 0.5,
     borderColor: colors.cardBorder,
-    children
+    children: [
+      headerRow,
+      ...rows
+    ]
   };
-}
-
-function buildDetailCardByPage(model, colors) {
-  const page = pickWidgetPage();
-
-  // 所有 page 都走整合卡片，保留旧页面切换作为兼容
-  if (page === "local") return buildLocalCard(model, colors);
-  if (page === "entrance") return buildEntranceCard(model, colors);
-  if (page === "landing") return buildLandingCard(model, colors);
-  if (page === "risk") return buildRiskCard(model, colors);
-  if (page === "services") return buildServiceCard(model, colors);
-
-  // summary（默认）→ 整合卡片
-  return buildSummaryCard(model, colors);
 }
 
 function renderWidget(model) {
