@@ -2266,8 +2266,8 @@ function buildSummaryCard(model, colors) {
 
   // 流媒体：中文名/英文全称
   const SD_NAME = {
-    youtube:     t("youtube"),
-    netflix:     t("netflix"),
+    youtube:     "YouTube",
+    netflix:     "Netflix",
     disney:      "Disney+",
     chatgpt_app: "ChatGPT",
     chatgpt_web: "ChatGPT Web",
