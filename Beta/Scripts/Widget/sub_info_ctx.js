@@ -578,10 +578,3 @@ export default async function(ctx) {
     };
   }
 }
-
-if (typeof $done !== "undefined") {
-  main(null).then(function(r) { $done(r); }).catch(function(err) {
-    log("fatal:", String(err));
-    $done({ title: "订阅信息", content: "脚本异常：" + String(err), icon: "exclamationmark.triangle", iconColor: "#EF4444" });
-  });
-}
