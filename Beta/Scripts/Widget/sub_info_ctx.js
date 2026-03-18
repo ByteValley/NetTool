@@ -358,7 +358,7 @@ function buildGaugeBlock(usedPct, gaugeSize) {
   const remainPct = Math.max(0, 1 - usedPct);
   const remainStr = (remainPct * 100).toFixed(1);
   const gc = gaugeColor(usedPct);
-  const trackColor = { light: "rgba(255,255,255,0.15)", dark: "rgba(255,255,255,0.15)" };
+  const trackColor = { light: "#FFFFFF26", dark: "#FFFFFF26" };
   const barH = Math.max(4, Math.round(gaugeSize * 0.09));
   const barR = barH / 2;
   const numSize = gaugeSize >= 72 ? "title3" : gaugeSize >= 60 ? "headline" : "subheadline";
@@ -375,7 +375,7 @@ function buildGaugeBlock(usedPct, gaugeSize) {
         gap: 1,
         children: [
           { type: "text", text: remainStr, font: { size: numSize, weight: "bold" }, textColor: { light: "#FFFFFF", dark: "#FFFFFF" } },
-          { type: "text", text: "%", font: { size: "caption1" }, textColor: { light: "rgba(255,255,255,0.7)", dark: "rgba(255,255,255,0.7)" }, padding: [0, 0, 2, 0] }
+          { type: "text", text: "%", font: { size: "caption1" }, textColor: { light: "#FFFFFFB3", dark: "#FFFFFFB3" }, padding: [0, 0, 2, 0] }
         ]
       },
       {
@@ -395,8 +395,8 @@ function buildGaugeBlock(usedPct, gaugeSize) {
 
 function buildSubColumn(info, gaugeSize) {
   const textWhite     = { light: "#FFFFFF", dark: "#FFFFFF" };
-  const textWhiteSub  = { light: "rgba(255,255,255,0.75)", dark: "rgba(255,255,255,0.75)" };
-  const textWhiteSoft = { light: "rgba(255,255,255,0.5)", dark: "rgba(255,255,255,0.5)" };
+  const textWhiteSub  = { light: "#FFFFFFBF", dark: "#FFFFFFBF" };
+  const textWhiteSoft = { light: "#FFFFFF80", dark: "#FFFFFF80" };
 
   if (!info.ok) {
     return {
@@ -446,7 +446,7 @@ function buildWidget(infos, cfg, widgetFamily) {
     stops: [0, 1], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 }
   };
   const textWhite    = { light: "#FFFFFF", dark: "#FFFFFF" };
-  const textWhiteSub = { light: "rgba(255,255,255,0.6)", dark: "rgba(255,255,255,0.6)" };
+  const textWhiteSub = { light: "#FFFFFF99", dark: "#FFFFFF99" };
   const accentColor  = { light: cfg.defaultIconColor || "#00E28F", dark: cfg.defaultIconColor || "#00E28F" };
 
   if (!infos.length) {
@@ -572,7 +572,7 @@ export default async function(ctx) {
         children: [
           { type: "image", src: "sf-symbol:exclamationmark.triangle.fill", width: 16, height: 16, color: { light: "#EF4444", dark: "#F87171" } },
           { type: "text", text: "订阅信息组件异常", font: { size: "caption1", weight: "semibold" }, textColor: { light: "#FFFFFF", dark: "#FFFFFF" } },
-          { type: "text", text: String(err && err.stack ? err.stack : err).slice(0, 200), font: { size: "caption2" }, textColor: { light: "rgba(255,255,255,0.6)", dark: "rgba(255,255,255,0.6)" }, maxLines: 6 }
+          { type: "text", text: String(err && err.stack ? err.stack : err).slice(0, 200), font: { size: "caption2" }, textColor: { light: "#FFFFFF99", dark: "#FFFFFF99" }, maxLines: 6 }
         ]
       }]
     };
