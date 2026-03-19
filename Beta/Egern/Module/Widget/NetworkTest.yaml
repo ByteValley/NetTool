@@ -6,7 +6,7 @@ dns: {}
 
 scriptings:
   - generic:
-      name: 网络测速·组件
+      name: 网络测速
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/network_test.js
       update_interval: 21600
       timeout: 14
@@ -14,4 +14,4 @@ scriptings:
 
 widgets:
   - name: 网络测速
-    script_name: 网络测速·组件
+    script_name: 网络测速
