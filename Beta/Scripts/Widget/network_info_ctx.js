@@ -2336,6 +2336,7 @@ function buildSummaryCard(model, colors) {
     direction: "column",
     gap: 3,
     padding: [10, 12, 10, 12],
+    justifyContent: "start",
     backgroundColor: { light: "#F7F8FA", dark: "#202F44" },
     borderRadius: 16,
     borderWidth: 0,
@@ -2559,6 +2560,7 @@ function buildLargeCard(model, colors) {
     direction: "column",
     gap: 3,
     padding: [10, 12, 10, 12],
+    justifyContent: "start",
     backgroundColor: { light: "#F7F8FA", dark: "#202F44" },
     borderRadius: 16,
     children: rows.filter(Boolean)
