@@ -9,7 +9,7 @@ scriptings:
       name: 网络测速
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/network_test.js
       update_interval: 21600
-      timeout: 14
+      timeout: 30
 
 
 widgets:
