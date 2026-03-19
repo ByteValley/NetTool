@@ -95,6 +95,7 @@ export default async function (ctx) {
     type: "widget",
     padding: [16, 16, 16, 16],
     backgroundColor: "transparent",
+    refreshAfter: new Date(0).toISOString(),
     children: [
       // 第一层：标题与药丸描述
       {
