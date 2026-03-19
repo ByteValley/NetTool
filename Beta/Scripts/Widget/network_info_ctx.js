@@ -2343,9 +2343,234 @@ function buildSummaryCard(model, colors) {
   };
 }
 
+// ===================== large card =====================
+function buildLargeCard(model, colors) {
+  const n = S().RT.device || {};
+  const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
+  const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
+
+  function divider() {
+    return {
+      type: "stack",
+      direction: "row",
+      padding: [3, 0, 3, 0],
+      children: [{
+        type: "text",
+        text: "─────────────────────",
+        font: { size: "caption2" },
+        textColor: colors.cardBorder,
+        maxLines: 1,
+        minScale: 0.5
+      }]
+    };
+  }
+
+  function groupTitle(sfIcon, iconColor, label) {
+    return {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 5,
+      padding: [2, 0, 1, 0],
+      children: [
+        {
+          type: "image",
+          src: `sf-symbol:${sfIcon}`,
+          width: 13,
+          height: 13,
+          color: iconColor || colors.accent
+        },
+        {
+          type: "text",
+          text: label,
+          font: { size: "caption1", weight: "semibold" },
+          textColor: colors.textMain
+        }
+      ]
+    };
+  }
+
+  function kvRow(label, value, valueColor) {
+    if (!value) return null;
+    return {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 5,
+      children: [
+        {
+          type: "text",
+          text: label,
+          font: { size: "caption2" },
+          textColor: colors.textSub,
+          minScale: 0.85
+        },
+        { type: "spacer" },
+        {
+          type: "text",
+          text: String(value),
+          font: { size: "caption2", weight: "medium" },
+          textColor: valueColor || colors.textMain,
+          maxLines: 1,
+          minScale: 0.65,
+          textAlign: "right"
+        }
+      ]
+    };
+  }
+
+  function svcRow(x) {
+    if (!x) return null;
+    const meta = serviceStateMeta(x.ok, x.tag, x.state);
+    const regionText = x.region && x.region !== "—" ? `  区域：${x.region}` : "";
+    const tagText = x.tag ? `  ${x.tag}` : "";
+    const stateText = x.state === "full" ? t("unlocked")
+      : x.state === "partial" ? t("partialUnlocked")
+      : t("notReachable");
+    return {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 5,
+      children: [
+        {
+          type: "text",
+          text: meta.icon,
+          font: { size: "caption2" },
+          textColor: colors.textMain
+        },
+        {
+          type: "text",
+          text: x.name,
+          font: { size: "caption2", weight: "medium" },
+          textColor: colors.textMain,
+          minScale: 0.85
+        },
+        { type: "spacer" },
+        {
+          type: "text",
+          text: `${stateText}${tagText}${regionText}`,
+          font: { size: "caption2" },
+          textColor: x.ok ? colors.ok : colors.bad,
+          maxLines: 1,
+          minScale: 0.65,
+          textAlign: "right"
+        }
+      ]
+    };
+  }
+
+  // 本地
+  const localLoc = model.local?.loc
+    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
+    : "";
+  const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
+
+  // 落地
+  const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
+  const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
+
+  // 入口
+  const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1))
+    ? model.entrance : model.entrance6;
+  const hasEntrance = model.entrance?.ip || model.entrance6?.ip || entShow?.loc1;
+
+  // 风险
+  const risk = model.risk;
+  const riskColor = widgetRiskTone(model, colors);
+
+  // 服务
+  const svs = Array.isArray(model.services) ? model.services : [];
+
+  const rows = [
+    // 标题行
+    {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 5,
+      padding: [0, 0, 4, 0],
+      children: [
+        {
+          type: "image",
+          src: `sf-symbol:${headerIcon}`,
+          width: 15,
+          height: 15,
+          color: colors.textMain
+        },
+        {
+          type: "text",
+          text: netTypeLine(),
+          font: { size: "footnote", weight: "bold" },
+          textColor: colors.textMain,
+          flex: 1,
+          maxLines: 1,
+          minScale: 0.75
+        },
+        {
+          type: "text",
+          text: widgetTimeText(),
+          font: { size: "footnote", weight: "semibold" },
+          textColor: colors.accent
+        }
+      ]
+    },
+
+    // 本地
+    divider(),
+    groupTitle("house.fill", "#4A9EFF", t("local")),
+    model.local?.ip ? kvRow(t("localIPv4"), maskIP(model.local.ip)) : null,
+    model.local6?.ip ? kvRow(t("localIPv6"), maskIP(model.local6.ip)) : null,
+    localLoc ? kvRow(t("location"), localLoc) : null,
+    localIsp ? kvRow(t("isp"), localIsp) : null,
+
+    // 入口（有数据才显示）
+    hasEntrance ? divider() : null,
+    hasEntrance ? groupTitle("arrow.down.forward.circle", colors.textSub, t("entrance")) : null,
+    model.entrance?.ip ? kvRow(t("localIPv4"), maskIP(model.entrance.ip)) : null,
+    model.entrance6?.ip ? kvRow(t("localIPv6"), maskIP(model.entrance6.ip)) : null,
+    entShow?.loc1 ? kvRow(t("location"), flagFirst(entShow.loc1)) : null,
+    entShow?.isp1 ? kvRow(t("isp"), fmtISP(entShow.isp1, entShow.loc1)) : null,
+
+    // 落地
+    divider(),
+    groupTitle("airplane.circle", "#9B59B6", t("landing")),
+    model.landing?.ip ? kvRow(t("landingIPv4"), maskIP(model.landing.ip)) : null,
+    model.landing6?.ip ? kvRow(t("landingIPv6"), maskIP(model.landing6.ip)) : null,
+    landingLoc ? kvRow(t("location"), landingLoc) : null,
+    landingIsp ? kvRow(t("isp"), landingIsp) : null,
+
+    // 风险
+    risk ? divider() : null,
+    risk ? groupTitle("shield.lefthalf.filled", riskColor, t("risk")) : null,
+    risk ? kvRow(t("isp"), `${risk.lineType} · ${risk.nativeHint}`) : null,
+    risk ? kvRow("代理特征", risk.tunnelHint) : null,
+    risk ? kvRow("证据", (risk.reasons || []).slice(0, 2).join("；") || "-") : null,
+    risk ? kvRow("风险值", `${risk.riskValue}%`, riskColor) : null,
+
+    // 服务检测
+    svs.length ? divider() : null,
+    svs.length ? groupTitle("sparkles.tv", colors.ok, t("services")) : null,
+    ...svs.map(svcRow)
+  ];
+
+  return {
+    type: "stack",
+    direction: "column",
+    gap: 3,
+    padding: [10, 12, 10, 12],
+    backgroundColor: { light: "#F7F8FA", dark: "#202F44" },
+    borderRadius: 16,
+    children: rows.filter(Boolean)
+  };
+}
+
+// ===================== renderWidget（替换原有的）=====================
 function renderWidget(model) {
   const colors = widgetColors();
-  const refreshTime = new Date(Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000).toISOString();
+  const refreshTime = new Date(
+    Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000
+  ).toISOString();
 
   log("info", "render-widget", {
     policy: model.policy || "",
@@ -2353,15 +2578,24 @@ function renderWidget(model) {
     landing4: maskIP(model.landing?.ip || "")
   });
 
-  return {
-    type: "widget",
-    padding: [0, 0, 0, 0],
-    backgroundGradient: colors.bgGradient,
-    refreshAfter: refreshTime,
-    children: [
-      buildSummaryCard(model, colors)
-    ]
-  };
+  return [
+    {
+      type: "widget",
+      family: "medium",
+      padding: [0, 0, 0, 0],
+      backgroundGradient: colors.bgGradient,
+      refreshAfter: refreshTime,
+      children: [buildSummaryCard(model, colors)]
+    },
+    {
+      type: "widget",
+      family: "large",
+      padding: [0, 0, 0, 0],
+      backgroundGradient: colors.bgGradient,
+      refreshAfter: refreshTime,
+      children: [buildLargeCard(model, colors)]
+    }
+  ];
 }
 
 function renderErrorWidget(err) {
