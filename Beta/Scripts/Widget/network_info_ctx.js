@@ -2315,6 +2315,14 @@ function buildSummaryCard(model, colors) {
         maxLines: 1,
         minScale: 0.75
       },
+      ...(model.policy ? [{
+        type: "text",
+        text: model.policy,
+        font: { size: "caption2" },
+        textColor: colors.textSub,
+        maxLines: 1,
+        minScale: 0.7
+      }] : []),
       {
         type: "text",
         text: widgetTimeText(),
@@ -2489,6 +2497,14 @@ function buildLargeCard(model, colors) {
           maxLines: 1,
           minScale: 0.75
         },
+        ...(model.policy ? [{
+          type: "text",
+          text: model.policy,
+          font: { size: "caption2" },
+          textColor: colors.textSub,
+          maxLines: 1,
+          minScale: 0.7
+        }] : []),
         {
           type: "text",
           text: widgetTimeText(),
