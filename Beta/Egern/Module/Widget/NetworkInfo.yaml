@@ -176,7 +176,7 @@ env_schema:
   # UI展示
   PROXY_POLICY:
     name: 代理策略名称
-    description: 显示的策略名
+    description: 显示的策略名，仅用于自嗨
     default_value: ""
 
 compat_arguments:
