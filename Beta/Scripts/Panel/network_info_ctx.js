@@ -1,7 +1,7 @@
 /* =========================================================
- * 模块分类 · 网络信息组件
+ * 模块分类 · 网络信息面板
  * 作者 · ByteValley
- * 版本 · 2026-03-18R1
+ * 版本 · 2026-03-14R1
  *
  * 模块分类 · 说明
  * · 参数优先级：
@@ -15,7 +15,7 @@
  * · 保留 DOMIC_IPv4 / DOMIC_IPv6 旧别名兼容（env alias）
  * · 策略 / 入口支持自动捕获（若宿主提供 recent requests 能力），否则回退手动传参
  * · 日志统一输出到宿主日志（console.log）
- * · Widget 采用单页卡片模式，通过 WIDGET_PAGE 切换摘要/本地/入口/落地/风险/服务检测
+ * · 采用高密度日志埋点，便于在 Egern 日志页排查参数、生效顺序与请求链路
  * ========================================================= */
 
 const CONSTS = Object.freeze({
@@ -69,18 +69,6 @@ const DEFAULTS = Object.freeze({
 
 const SD_STR = {
   "zh-Hans": {
-    localIPv4: "本地 IPv4",
-    localIPv6: "本地 IPv6",
-    localPos: "本地位置",
-    landingIPv4: "落地 IPv4",
-    landingIPv6: "落地 IPv6",
-    landingPos: "落地位置",
-    riskLevel: "风险评级",
-    serviceCheck: "服务检测",
-    highRisk: "高风险",
-    datacenter: "（机房）",
-    youtube: "油管",
-    netflix: "奈飞",
     title: "网络信息 𝕏",
     runAt: "执行时间",
     policy: "代理策略",
@@ -113,18 +101,6 @@ const SD_STR = {
     debug: "调试"
   },
   "zh-Hant": {
-    localIPv4: "本地 IPv4",
-    localIPv6: "本地 IPv6",
-    localPos: "本地位置",
-    landingIPv4: "落地 IPv4",
-    landingIPv6: "落地 IPv6",
-    landingPos: "落地位置",
-    riskLevel: "風險評級",
-    serviceCheck: "服務檢測",
-    highRisk: "高風險",
-    datacenter: "（機房）",
-    youtube: "油管",
-    netflix: "奈飛",
     title: "網路資訊 𝕏",
     runAt: "執行時間",
     policy: "代理策略",
@@ -188,6 +164,10 @@ function pad2(n) { return String(n).padStart(2, "0"); }
 function nowStr() {
   const d = new Date();
   return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+function textOrDash(v) {
+  const s = String(v == null ? "" : v).trim();
+  return s || "-";
 }
 function parseCompatArgument(raw) {
   const out = {};
@@ -299,7 +279,10 @@ function buildENV(ctx, box) {
     return { value: defVal, source: "default", raw: defVal };
   };
 
+  const read = (key, defVal, opt = {}) => readWithMeta(key, defVal, opt).value;
+
   return {
+    read,
     readWithMeta,
     directEnv,
     compatEnv,
@@ -591,8 +574,7 @@ function logCfgSources(cfg) {
       LOG: cfg?.SOURCE_MAP?.LOG || "default",
       LOG_LEVEL: cfg?.SOURCE_MAP?.LOG_LEVEL || "default",
       LOG_TO_PANEL: cfg?.SOURCE_MAP?.LOG_TO_PANEL || "default",
-      LOG_PUSH: cfg?.SOURCE_MAP?.LOG_PUSH || "default",
-      WIDGET_PAGE: cfg?.SOURCE_MAP?.WIDGET_PAGE || "default"
+      LOG_PUSH: cfg?.SOURCE_MAP?.LOG_PUSH || "default"
     });
   } catch (_) {}
 }
@@ -1666,19 +1648,45 @@ function sdRenderPanelLine(x) {
   const useArrow = !!S().CFG.SD_ARROW;
   const showLat = !!S().CFG.SD_SHOW_LAT;
   const showHttp = !!S().CFG.SD_SHOW_HTTP;
-  const tag = x.tag || "";
+  const tag = String(x.tag || "").trim();
   const cost = x.cost;
   const status = x.status || 0;
 
   if (isText) {
-    const stateText = meta.st === "full" ? t("unlocked") : meta.st === "partial" ? t("partialUnlocked") : t("notReachable");
-    const head = useArrow ? `${x.name}: ${stateText} ➟ ${regionText}` : `${x.name}: ${stateText} ｜ ${regionText}`;
-    const tail = [tag, (showLat && cost != null) ? `${cost}ms` : "", (showHttp && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ ");
+    let stateText = "";
+
+    if (tag) {
+      stateText = tag;
+    } else if (meta.st === "full") {
+      stateText = t("unlocked");
+    } else if (meta.st === "partial") {
+      stateText = t("partialUnlocked");
+    } else {
+      stateText = t("notReachable");
+    }
+
+    const head = useArrow
+      ? `${x.name}:${stateText} ➟ ${regionText}`
+      : `${x.name}:${stateText}， 区域：${regionText}`;
+
+    const tail = [
+      showLat && cost != null ? `${cost}ms` : "",
+      showHttp && status > 0 ? `HTTP ${status}` : ""
+    ].filter(Boolean).join(" ｜ ");
+
     return tail ? `${head} ｜ ${tail}` : head;
   }
 
-  const head = useArrow ? `${meta.icon} ${x.name} ➟ ${regionText}` : `${meta.icon} ${x.name} ｜ ${regionText}`;
-  const tail = [tag, (showLat && cost != null) ? `${cost}ms` : "", (showHttp && status > 0) ? `HTTP ${status}` : ""].filter(Boolean).join(" ｜ ");
+  const head = useArrow
+    ? `${meta.icon} ${x.name} ➟ ${regionText}`
+    : `${meta.icon} ${x.name} ｜ ${regionText}`;
+
+  const tail = [
+    tag,
+    showLat && cost != null ? `${cost}ms` : "",
+    showHttp && status > 0 ? `HTTP ${status}` : ""
+  ].filter(Boolean).join(" ｜ ");
+
   return tail ? `${head} ｜ ${tail}` : head;
 }
 
@@ -1703,13 +1711,15 @@ async function buildModel(ctx) {
   const box = await readBoxSettings(ctx);
   const cfg = buildCFG(ctx, box);
 
+  // ===== DEBUG: 检查 env 注入 =====
   try {
     console.log("[NI][DEBUG] ctx.env =", JSON.stringify(ctx?.env || {}));
     console.log("[NI][DEBUG] raw PROXY_POLICY =", String(ctx?.env?.PROXY_POLICY ?? ""));
     console.log("[NI][DEBUG] cfg PROXY_POLICY =", String(cfg?.PROXY_POLICY ?? ""));
     console.log("[NI][DEBUG] cfg source =", JSON.stringify(cfg?.SOURCE_MAP || {}));
   } catch (_) {}
-
+  // =================================
+  
   G = {
     RT: ctx,
     CFG: cfg,
@@ -1719,7 +1729,7 @@ async function buildModel(ctx) {
   };
 
   log("info", "start", {
-    mode: "panel-widget",
+    mode: "panel",
     policy: cfg.PROXY_POLICY || "-",
     policySource: cfg.SOURCE_MAP.PROXY_POLICY || "default"
   });
@@ -1874,6 +1884,18 @@ async function buildModel(ctx) {
   };
 }
 
+function servicesBlock(model) {
+  const arr = [];
+  pushGroupTitle(arr, t("services"));
+  const svs = model.services || [];
+  if (!svs.length) {
+    arr.push(t("noData"));
+    return arr;
+  }
+  for (const x of svs) arr.push(sdRenderPanelLine(x));
+  return arr;
+}
+
 function buildPanelContent(model) {
   const lines = [];
   const policyText = model.policy ? model.policy : t("manualPolicyHint");
@@ -1881,14 +1903,14 @@ function buildPanelContent(model) {
   lines.push(`${t("runAt")}：${model.runAt}`);
   lines.push(`${t("policy")}：${policyText}`);
 
-  pushGroupTitle(lines, t("local"));
+  pushGroupTitle(lines, "本地");
   if (model.local?.ip) lines.push(`IPv4: ${maskIP(model.local.ip)}`);
   if (model.local6?.ip) lines.push(`IPv6: ${maskIP(model.local6.ip)}`);
   lines.push(secLine(t("location"), model.local?.loc ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc)) : "-"));
   if (model.local?.isp) lines.push(secLine(t("isp"), fmtISP(model.local.isp, model.local.loc)));
 
   if (model.entrance?.ip || model.entrance6?.ip || model.entrance?.loc1 || model.entrance6?.loc1) {
-    pushGroupTitle(lines, t("entrance"));
+    pushGroupTitle(lines, "入口");
     if (model.entrance?.ip) lines.push(`IPv4: ${maskIP(model.entrance.ip)}`);
     if (model.entrance6?.ip) lines.push(`IPv6: ${maskIP(model.entrance6.ip)}`);
 
@@ -1899,26 +1921,20 @@ function buildPanelContent(model) {
     if (entShow?.isp2) lines.push(`${t("isp")}²：${entShow.isp2}`);
   }
 
-  pushGroupTitle(lines, t("landing"));
+  pushGroupTitle(lines, "落地");
   if (model.landing?.ip) lines.push(`IPv4: ${maskIP(model.landing.ip)}`);
   if (model.landing6?.ip) lines.push(`IPv6: ${maskIP(model.landing6.ip)}`);
   if (model.landing?.loc) lines.push(secLine(t("location"), flagFirst(model.landing.loc)));
   if (model.landing?.isp) lines.push(secLine(t("isp"), fmtISP(model.landing.isp, model.landing.loc)));
 
   if (model.risk) {
-    pushGroupTitle(lines, t("risk"));
     lines.push(`网络类型：${model.risk.lineType} · ${model.risk.nativeHint}`);
     lines.push(`代理特征：${model.risk.tunnelHint}`);
     lines.push(`证据：${(model.risk.reasons || []).slice(0, 4).join("；") || "-"}`);
     lines.push(`风险值：${model.risk.riskValue}%`);
   }
 
-  pushGroupTitle(lines, t("services"));
-  if (!model.services?.length) {
-    lines.push(t("noData"));
-  } else {
-    for (const x of model.services) lines.push(sdRenderPanelLine(x));
-  }
+  lines.push(...servicesBlock(model));
 
   if (S().CFG.LOG_TO_PANEL && S().CFG.LOG && model.debug?.length) {
     pushGroupTitle(lines, t("debug"));
@@ -1957,737 +1973,28 @@ function renderPanel(model) {
   };
 }
 
-function widgetColors() {
-  return {
-    bgGradient: {
-      type: "linear",
-      colors: [
-        { light: "#F7F8FA", dark: "#111214" },
-        { light: "#FFFFFF", dark: "#1B1C1F" }
-      ],
-      stops: [0, 1],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 }
-    },
-    cardBg: { light: "#FFFFFF", dark: "#23252A" },
-    cardBorder: { light: "#E8EAEE", dark: "#343741" },
-    textMain: { light: "#111827", dark: "#F3F4F6" },
-    textSub: { light: "#6B7280", dark: "#A1A1AA" },
-    textSoft: { light: "#9CA3AF", dark: "#71717A" },
-    accent: { light: S().CFG.IconColor || "#1E90FF", dark: S().CFG.IconColor || "#4DA3FF" },
-    ok: { light: "#10B981", dark: "#34D399" },
-    warn: { light: "#F59E0B", dark: "#FBBF24" },
-    bad: { light: "#EF4444", dark: "#F87171" }
-  };
-}
-
-function widgetText(v, fallback = "-") {
-  const s = String(v == null ? "" : v).trim();
-  return s || fallback;
-}
-
-function widgetNetTitle(model) {
-  const net = netTypeLine();
-  const landingFlag = model.landing?.loc ? onlyFlag(model.landing.loc) : "";
-  return `${net}${landingFlag ? ` ${landingFlag}` : ""}`;
-}
-
-function widgetTimeText() {
-  const d = new Date();
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
-function widgetRiskTone(model, colors) {
-  const risk = model.risk;
-  if (!risk) return colors.textSoft;
-  if (risk.riskValue >= 70) return colors.bad;
-  if (risk.riskValue >= 40) return colors.warn;
-  return colors.ok;
-}
-
-function widgetServiceSummary(model) {
-  const arr = Array.isArray(model.services) ? model.services : [];
-  const ok = arr.filter(x => x?.state === "full").length;
-  const partial = arr.filter(x => x?.state === "partial").length;
-  const bad = arr.filter(x => !x?.ok || x?.state === "blocked").length;
-  return { ok, partial, bad, total: arr.length };
-}
-
-function compactServiceLine(x) {
-  if (!x) return "";
-  return `${x.icon || "•"} ${x.name}${x.region ? ` ${x.region}` : ""}`;
-}
-
-function buildInfoCard(title, rows, colors, icon, iconColor) {
-  const validRows = rows.filter(Boolean);
-
-  return {
-    type: "stack",
-    direction: "column",
-    gap: 8,
-    padding: [10, 10, 10, 10],
-    backgroundColor: colors.cardBg,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    borderColor: colors.cardBorder,
-    children: [
-      {
-        type: "stack",
-        direction: "row",
-        alignItems: "center",
-        gap: 6,
-        children: [
-          {
-            type: "image",
-            src: icon,
-            width: 14,
-            height: 14,
-            color: iconColor || colors.accent
-          },
-          {
-            type: "text",
-            text: title,
-            font: { size: "caption2", weight: "semibold" },
-            textColor: colors.textMain,
-            flex: 1,
-            maxLines: 1,
-            minScale: 0.8
-          },
-          {
-            type: "image",
-            src: "sf-symbol:clock",
-            width: 8,
-            height: 8,
-            color: colors.textSoft
-          },
-          {
-            type: "text",
-            text: widgetTimeText(),
-            font: { size: "caption2" },
-            textColor: colors.textSoft
-          }
-        ]
-      },
-      {
-        type: "stack",
-        direction: "column",
-        gap: 4,
-        children: validRows.map((line) => ({
-          type: "text",
-          text: line,
-          font: { size: "caption2" },
-          textColor: colors.textMain,
-          maxLines: 1,
-          minScale: 0.7,
-          textAlign: "left"
-        }))
-      }
-    ]
-  };
-}
-
-function buildLocalCard(model, colors) {
-  const localLoc = model.local?.loc
-    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
-    : "-";
-
-  return buildInfoCard(
-    t("local"),
-    [
-      `IPv4 ${widgetText(maskIP(model.local?.ip || ""))}`,
-      model.local6?.ip ? `IPv6 ${widgetText(maskIP(model.local6.ip))}` : "",
-      `${t("location")} ${widgetText(localLoc)}`,
-      model.local?.isp ? `${t("isp")} ${fmtISP(model.local.isp, model.local.loc)}` : ""
-    ],
-    colors,
-    "sf-symbol:house",
-    colors.accent
-  );
-}
-
-function buildEntranceCard(model, colors) {
-  const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1)) ? model.entrance : model.entrance6;
-  const hasAny = model.entrance?.ip || model.entrance6?.ip || entShow?.loc1 || entShow?.isp1;
-
-  if (!hasAny) {
-    return buildInfoCard(
-      t("entrance"),
-      [t("noData")],
-      colors,
-      "sf-symbol:arrow.down.forward.circle",
-      colors.textSoft
-    );
-  }
-
-  return buildInfoCard(
-    t("entrance"),
-    [
-      model.entrance?.ip ? `IPv4 ${maskIP(model.entrance.ip)}` : "",
-      model.entrance6?.ip ? `IPv6 ${maskIP(model.entrance6.ip)}` : "",
-      entShow?.loc1 ? `${t("location")} ${flagFirst(entShow.loc1)}` : "",
-      entShow?.isp1 ? `${t("isp")} ${fmtISP(entShow.isp1, entShow.loc1)}` : ""
-    ],
-    colors,
-    "sf-symbol:arrow.down.forward.circle",
-    colors.textSoft
-  );
-}
-
-function buildLandingCard(model, colors) {
-  return buildInfoCard(
-    t("landing"),
-    [
-      `IPv4 ${widgetText(maskIP(model.landing?.ip || ""))}`,
-      model.landing6?.ip ? `IPv6 ${maskIP(model.landing6.ip)}` : "",
-      model.landing?.loc ? `${t("location")} ${flagFirst(model.landing.loc)}` : "",
-      model.landing?.isp ? `${t("isp")} ${fmtISP(model.landing.isp, model.landing.loc)}` : ""
-    ],
-    colors,
-    "sf-symbol:airplane.circle",
-    colors.accent
-  );
-}
-
-function buildRiskCard(model, colors) {
-  const risk = model.risk;
-  if (!risk) {
-    return buildInfoCard(
-      t("risk"),
-      [t("noData")],
-      colors,
-      "sf-symbol:shield.lefthalf.filled",
-      colors.textSoft
-    );
-  }
-
-  return buildInfoCard(
-    t("risk"),
-    [
-      `${risk.lineType}`,
-      `${risk.nativeHint}`,
-      `${risk.tunnelHint}`,
-      `风险值 ${risk.riskValue}%`
-    ],
-    colors,
-    "sf-symbol:shield.lefthalf.filled",
-    widgetRiskTone(model, colors)
-  );
-}
-
-function buildServiceCard(model, colors) {
-  const svs = Array.isArray(model.services) ? model.services : [];
-  const summary = widgetServiceSummary(model);
-
-  const rows = [
-    `完整 ${summary.ok} · 部分 ${summary.partial} · 失败 ${summary.bad}`
-  ];
-
-  for (const item of svs.slice(0, 3)) {
-    rows.push(compactServiceLine(item));
-  }
-
-  return buildInfoCard(
-    t("services"),
-    rows,
-    colors,
-    "sf-symbol:sparkles.tv",
-    summary.bad > 0 ? colors.warn : colors.ok
-  );
-}
-
-function pickWidgetPage() {
-  const p = String(S().CFG.WIDGET_PAGE || "").trim().toLowerCase();
-  if (["summary", "local", "entrance", "landing", "risk", "services"].includes(p)) return p;
-  return "summary";
-}
-
-function buildSummaryCard(model, colors) {
-  const svs = Array.isArray(model.services) ? model.services : [];
-
-  function kvRow(sfIcon, iconColor, label, value, valueColor) {
-    if (!value) return null;
-    return {
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 5,
-      children: [
-        {
-          type: "image",
-          src: `sf-symbol:${sfIcon}`,
-          width: 14,
-          height: 14,
-          color: iconColor || colors.textSub
-        },
-        {
-          type: "text",
-          text: label,
-          font: { size: "caption1" },
-          textColor: colors.textSub,
-          minScale: 0.85
-        },
-        { type: "spacer" },
-        {
-          type: "text",
-          text: String(value),
-          font: { size: "caption1", weight: "medium" },
-          textColor: valueColor || colors.textMain,
-          maxLines: 1,
-          minScale: 0.65,
-          textAlign: "right"
-        }
-      ]
-    };
-  }
-
-  // 本地
-  const localLoc = model.local?.loc
-    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
-    : "";
-  const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
-  const localPosVal = [localLoc, localIsp].filter(Boolean).join(" ") || null;
-
-  // 落地
-  const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
-  const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
-  const landingPosVal = [landingLoc, landingIsp].filter(Boolean).join(" ") || null;
-
-  // 落地IP
-  const isDatacenter = model.risk && model.risk.riskValue >= 60;
-  const landingIPDisplay = model.landing?.ip
-    ? maskIP(model.landing.ip) + (isDatacenter ? t("datacenter") : "")
-    : null;
-
-  // 风险一行
-  const riskColor = widgetRiskTone(model, colors);
-  const riskVal = model.risk
-    ? `${t("highRisk")} (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
-    : null;
-
-  // 流媒体：中文名/英文全称
-  const SD_NAME = {
-    youtube:     "YouTube",
-    netflix:     "Netflix",
-    disney:      "Disney+",
-    chatgpt_app: "ChatGPT",
-    chatgpt_web: "ChatGPT Web",
-    hulu_us:     "Hulu US",
-    hulu_jp:     "Hulu JP",
-    hbo:         "Max"
-  };
-  const sdParts = svs.map(x => {
-    const name = SD_NAME[x.key] || x.name;
-    const flag = (x.state === "full" || x.state === "partial") && x.cc
-      ? sd_flagFromCC(x.cc) : "🚫";
-    return `${name}:${flag}`;
-  });
-  const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
-
-  // 标题图标：Wi-Fi 还是蜂窝
-  const n = S().RT.device || {};
-  const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
-  const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
-
-  // 顶部标题行
-  const headerRow = {
-    type: "stack",
-    direction: "row",
-    alignItems: "center",
-    gap: 5,
-    padding: [0, 0, 3, 0],
-    children: [
-      {
-        type: "image",
-        src: `sf-symbol:${headerIcon}`,
-        width: 15,
-        height: 15,
-        color: colors.textMain
-      },
-      {
-        type: "text",
-        text: netTypeLine(),
-        font: { size: "footnote", weight: "bold" },
-        textColor: colors.textMain,
-        flex: 1,
-        maxLines: 1,
-        minScale: 0.75
-      },
-      {
-        type: "text",
-        text: widgetTimeText(),
-        font: { size: "footnote", weight: "semibold" },
-        textColor: colors.accent
-      }
-    ]
-  };
-
-  const rows = [headerRow];
-  if (model.local?.ip) rows.push(kvRow("house.fill", "#4A9EFF", t("localIPv4"), maskIP(model.local.ip)));
-  if (model.local6?.ip) rows.push(kvRow("house", "#4A9EFF", t("localIPv6"), maskIP(model.local6.ip)));
-  if (localPosVal) rows.push(kvRow("map.fill", "#4A9EFF", t("localPos"), localPosVal));
-  if (landingIPDisplay) rows.push(kvRow("globe.asia.australia", "#9B59B6", t("landingIPv4"), landingIPDisplay));
-  if (model.landing6?.ip) rows.push(kvRow("globe", "#9B59B6", t("landingIPv6"), maskIP(model.landing6.ip)));
-  if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", t("landingPos"), landingPosVal));
-  if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", t("riskLevel"), riskVal, riskColor));
-  rows.push(kvRow("play.rectangle.fill", "#27AE60", t("serviceCheck"), sdLine));
-  
-  return {
-    type: "stack",
-    direction: "column",
-    gap: 3,
-    padding: [10, 12, 10, 12],
-    justifyContent: "start",
-    borderRadius: 16,
-    borderWidth: 0,
-    children: rows.filter(Boolean)
-  };
-}
-
-// ===================== large card =====================
-function buildLargeCard(model, colors) {
-  const n = S().RT.device || {};
-  const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
-  const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
-
-  function divider() {
-    return {
-      type: "stack",
-      direction: "row",
-      padding: [3, 0, 3, 0],
-      children: [{
-        type: "text",
-        text: "─────────────────────",
-        font: { size: "caption2" },
-        textColor: colors.cardBorder,
-        maxLines: 1,
-        minScale: 0.5
-      }]
-    };
-  }
-
-  function groupTitle(sfIcon, iconColor, label) {
-    return {
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 5,
-      padding: [2, 0, 1, 0],
-      children: [
-        {
-          type: "image",
-          src: `sf-symbol:${sfIcon}`,
-          width: 13,
-          height: 13,
-          color: iconColor || colors.accent
-        },
-        {
-          type: "text",
-          text: label,
-          font: { size: "caption1", weight: "semibold" },
-          textColor: colors.textMain
-        }
-      ]
-    };
-  }
-
-  function kvRow(label, value, valueColor) {
-    if (!value) return null;
-    return {
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 5,
-      children: [
-        {
-          type: "text",
-          text: label,
-          font: { size: "caption2" },
-          textColor: colors.textSub,
-          minScale: 0.85
-        },
-        { type: "spacer" },
-        {
-          type: "text",
-          text: String(value),
-          font: { size: "caption2", weight: "medium" },
-          textColor: valueColor || colors.textMain,
-          maxLines: 1,
-          minScale: 0.65,
-          textAlign: "right"
-        }
-      ]
-    };
-  }
-
-  function svcRow(x) {
-    if (!x) return null;
-    const meta = serviceStateMeta(x.ok, x.tag, x.state);
-    const regionText = x.region && x.region !== "—" ? `  区域：${x.region}` : "";
-    const tagText = x.tag ? `  ${x.tag}` : "";
-    const stateText = x.state === "full" ? t("unlocked")
-      : x.state === "partial" ? t("partialUnlocked")
-      : t("notReachable");
-    return {
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 5,
-      children: [
-        {
-          type: "text",
-          text: meta.icon,
-          font: { size: "caption2" },
-          textColor: colors.textMain
-        },
-        {
-          type: "text",
-          text: x.name,
-          font: { size: "caption2", weight: "medium" },
-          textColor: colors.textMain,
-          minScale: 0.85
-        },
-        { type: "spacer" },
-        {
-          type: "text",
-          text: `${stateText}${tagText}${regionText}`,
-          font: { size: "caption2" },
-          textColor: x.ok ? colors.ok : colors.bad,
-          maxLines: 1,
-          minScale: 0.65,
-          textAlign: "right"
-        }
-      ]
-    };
-  }
-
-  // 本地
-  const localLoc = model.local?.loc
-    ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
-    : "";
-  const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
-
-  // 落地
-  const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
-  const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
-
-  // 入口
-  const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1))
-    ? model.entrance : model.entrance6;
-  const hasEntrance = model.entrance?.ip || model.entrance6?.ip || entShow?.loc1;
-
-  // 风险
-  const risk = model.risk;
-  const riskColor = widgetRiskTone(model, colors);
-
-  // 服务
-  const svs = Array.isArray(model.services) ? model.services : [];
-
-  const rows = [
-    // 标题行
-    {
-      type: "stack",
-      direction: "row",
-      alignItems: "center",
-      gap: 5,
-      padding: [0, 0, 4, 0],
-      children: [
-        {
-          type: "image",
-          src: `sf-symbol:${headerIcon}`,
-          width: 15,
-          height: 15,
-          color: colors.textMain
-        },
-        {
-          type: "text",
-          text: netTypeLine(),
-          font: { size: "footnote", weight: "bold" },
-          textColor: colors.textMain,
-          flex: 1,
-          maxLines: 1,
-          minScale: 0.75
-        },
-        {
-          type: "text",
-          text: widgetTimeText(),
-          font: { size: "footnote", weight: "semibold" },
-          textColor: colors.accent
-        }
-      ]
-    },
-
-    // 本地
-    divider(),
-    groupTitle("house.fill", "#4A9EFF", t("local")),
-    model.local?.ip ? kvRow(t("localIPv4"), maskIP(model.local.ip)) : null,
-    model.local6?.ip ? kvRow(t("localIPv6"), maskIP(model.local6.ip)) : null,
-    localLoc ? kvRow(t("location"), localLoc) : null,
-    localIsp ? kvRow(t("isp"), localIsp) : null,
-
-    // 入口（有数据才显示）
-    hasEntrance ? divider() : null,
-    hasEntrance ? groupTitle("arrow.down.forward.circle", colors.textSub, t("entrance")) : null,
-    model.entrance?.ip ? kvRow(t("localIPv4"), maskIP(model.entrance.ip)) : null,
-    model.entrance6?.ip ? kvRow(t("localIPv6"), maskIP(model.entrance6.ip)) : null,
-    entShow?.loc1 ? kvRow(t("location"), flagFirst(entShow.loc1)) : null,
-    entShow?.isp1 ? kvRow(t("isp"), fmtISP(entShow.isp1, entShow.loc1)) : null,
-
-    // 落地
-    divider(),
-    groupTitle("airplane.circle", "#9B59B6", t("landing")),
-    model.landing?.ip ? kvRow(t("landingIPv4"), maskIP(model.landing.ip)) : null,
-    model.landing6?.ip ? kvRow(t("landingIPv6"), maskIP(model.landing6.ip)) : null,
-    landingLoc ? kvRow(t("location"), landingLoc) : null,
-    landingIsp ? kvRow(t("isp"), landingIsp) : null,
-
-    // 风险
-    risk ? divider() : null,
-    risk ? groupTitle("shield.lefthalf.filled", riskColor, t("risk")) : null,
-    risk ? kvRow(t("isp"), `${risk.lineType} · ${risk.nativeHint}`) : null,
-    risk ? kvRow("代理特征", risk.tunnelHint) : null,
-    risk ? kvRow("证据", (risk.reasons || []).slice(0, 2).join("；") || "-") : null,
-    risk ? kvRow("风险值", `${risk.riskValue}%`, riskColor) : null,
-
-    // 服务检测
-    svs.length ? divider() : null,
-    svs.length ? groupTitle("sparkles.tv", colors.ok, t("services")) : null,
-    ...svs.map(svcRow)
-  ];
-
-  return {
-    type: "stack",
-    direction: "column",
-    gap: 3,
-    padding: [10, 12, 10, 12],
-    justifyContent: "start",
-    borderRadius: 16,
-    children: rows.filter(Boolean)
-  };
-}
-
-// ===================== renderWidget（替换原有的）=====================
-function renderWidget(model) {
-  const colors = widgetColors();
-  const refreshTime = new Date(
-    Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000
-  ).toISOString();
-
-  log("info", "render-widget", {
-    policy: model.policy || "",
-    local4: maskIP(model.local?.ip || ""),
-    landing4: maskIP(model.landing?.ip || "")
-  });
-
-  return [
-    {
-      type: "widget",
-      family: "medium",
-      padding: [0, 0, 0, 0],
-      backgroundGradient: colors.bgGradient,
-      refreshAfter: refreshTime,
-      children: [buildSummaryCard(model, colors)]
-    },
-    {
-      type: "widget",
-      family: "large",
-      padding: [0, 0, 0, 0],
-      backgroundGradient: colors.bgGradient,
-      refreshAfter: refreshTime,
-      children: [buildLargeCard(model, colors)]
-    }
-  ];
-}
-
-function renderErrorWidget(err) {
+function renderErrorPanel(err) {
   const msg = String(err && err.stack ? err.stack : err);
   try { console.log(msg); } catch (_) {}
 
   return {
-    type: "widget",
-    padding: [6, 6, 6, 6],
-    gap: 0,
-    backgroundGradient: {
-      type: "linear",
-      colors: [
-        { light: "#FFF7F7", dark: "#2A1414" },
-        { light: "#FFFFFF", dark: "#1A1A1A" }
-      ],
-      stops: [0, 1],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 }
-    },
-    refreshAfter: new Date(Date.now() + 60000).toISOString(),
-    children: [
-      {
-        type: "stack",
-        direction: "column",
-        gap: 8,
-        padding: [10, 10, 10, 10],
-        backgroundColor: { light: "#FFFFFF", dark: "#23252A" },
-        borderRadius: 14,
-        borderWidth: 0.5,
-        borderColor: { light: "#E8EAEE", dark: "#343741" },
-        children: [
-          {
-            type: "stack",
-            direction: "row",
-            alignItems: "center",
-            gap: 6,
-            children: [
-              {
-                type: "image",
-                src: "sf-symbol:exclamationmark.triangle.fill",
-                width: 14,
-                height: 14,
-                color: { light: "#EF4444", dark: "#F87171" }
-              },
-              {
-                type: "text",
-                text: "网络信息组件异常",
-                font: { size: "caption1", weight: "semibold" },
-                textColor: { light: "#111827", dark: "#F3F4F6" }
-              }
-            ]
-          },
-          {
-            type: "text",
-            text: msg.slice(0, 260),
-            font: { size: "caption2" },
-            textColor: { light: "#6B7280", dark: "#A1A1AA" },
-            maxLines: 8
-          }
-        ]
-      }
-    ]
+    title: "网络信息 𝕏",
+    content: ["Panel 运行失败", "", msg.slice(0, 1200)].join("\n"),
+    icon: "exclamationmark.triangle.fill",
+    "icon-color": "#F87171",
+    iconColor: "#F87171",
+    refreshAfter: 60
   };
 }
 
 export default async function(ctx) {
   try {
     const model = await buildModel(ctx);
-    const colors = widgetColors();
-    const refreshTime = new Date(
-      Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000
-    ).toISOString();
-
-    const family = String(ctx.widgetFamily || "").toLowerCase();
-    const isLarge = family === "systemlarge" || family === "large";
-
-    log("info", "widget-family", { family, isLarge });
-
-    const widget = {
-      type: "widget",
-      family: isLarge ? "large" : "medium",
-      padding: [0, 0, 0, 0],
-      backgroundColor: "transparent",
-      refreshAfter: refreshTime,
-      children: [isLarge ? buildLargeCard(model, colors) : buildSummaryCard(model, colors)]
-    };
-
-    log("info", "done", { family: widget.family, refreshAfter: widget.refreshAfter });
-    return widget;
+    const panel = renderPanel(model);
+    log("info", "done", { title: panel.title, refreshAfter: panel.refreshAfter });
+    return panel;
   } catch (err) {
     try { console.log(`[NI][ERROR] fatal ${String(err && err.stack ? err.stack : err)}`); } catch (_) {}
-    return renderErrorWidget(err);
+    return renderErrorPanel(err);
   }
 }
