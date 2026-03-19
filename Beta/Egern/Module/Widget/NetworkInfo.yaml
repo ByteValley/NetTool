@@ -177,7 +177,7 @@ env_schema:
   PROXY_POLICY:
     name: 代理策略名称
     description: 显示的策略名
-    default_value: "我愛吃大雞巴"
+    default_value: ""
 
 compat_arguments:
   Update: ''
