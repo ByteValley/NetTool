@@ -92,16 +92,10 @@ export default async function (ctx) {
     ],
   });
 
-  return {
+    return {
     type: "widget",
     padding: [16, 16, 16, 16],
-    backgroundGradient: {
-      type: "linear",
-      colors: gradientColors,
-      stops: [0, 1],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 },
-    },
+    backgroundColor: "transparent",   // ← 改这里
     children: [
       // 第一层：标题与药丸描述
       {
