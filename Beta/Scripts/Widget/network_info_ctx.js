@@ -2337,7 +2337,6 @@ function buildSummaryCard(model, colors) {
     gap: 3,
     padding: [10, 12, 10, 12],
     justifyContent: "start",
-    backgroundColor: { light: "#F7F8FA", dark: "#202F44" },
     borderRadius: 16,
     borderWidth: 0,
     children: rows.filter(Boolean)
@@ -2561,7 +2560,6 @@ function buildLargeCard(model, colors) {
     gap: 3,
     padding: [10, 12, 10, 12],
     justifyContent: "start",
-    backgroundColor: { light: "#F7F8FA", dark: "#202F44" },
     borderRadius: 16,
     children: rows.filter(Boolean)
   };
@@ -2681,7 +2679,7 @@ export default async function(ctx) {
       type: "widget",
       family: isLarge ? "large" : "medium",
       padding: [0, 0, 0, 0],
-      backgroundGradient: colors.bgGradient,
+      backgroundColor: "transparent",
       refreshAfter: refreshTime,
       children: [isLarge ? buildLargeCard(model, colors) : buildSummaryCard(model, colors)]
     };
