@@ -1,0 +1,17 @@
+name: 网络测速
+description: 落地信息 + 网络测速
+author: ByteValley
+homepage: https://github.com/ByteValley/NetTool
+dns: {}
+
+scriptings:
+  - generic:
+      name: 网络测速·组件
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/network_test.js
+      update_interval: 21600
+      timeout: 14
+
+
+widgets:
+  - name: 网络测速
+    script_name: 网络测速·组件
