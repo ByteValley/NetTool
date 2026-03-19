@@ -2672,17 +2672,10 @@ export default async function(ctx) {
       Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000
     ).toISOString();
 
-    // Egern 不传 family，用 displaySize 宽高区分
-    // large 高度明显大于宽度，medium 宽度大于高度
-    const size = ctx.displaySize || ctx.size || {};
-    const w = Number(size.width || size.w || 0);
-    const h = Number(size.height || size.h || 0);
-    const isLarge = h > w;  // large 是竖向的，medium/small 是横向的
+    const family = String(ctx.widgetFamily || "").toLowerCase();
+    const isLarge = family === "systemlarge" || family === "large";
 
-    log("info", "widget-family", {
-      w, h, isLarge,
-      displaySize: JSON.stringify(size)
-    });
+    log("info", "widget-family", { family, isLarge });
 
     const widget = {
       type: "widget",
