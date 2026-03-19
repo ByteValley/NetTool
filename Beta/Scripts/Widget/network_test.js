@@ -13,8 +13,6 @@ export default async function (ctx) {
   let timeLabel = "--";
   let nodeIp = "获取中...";
   let nodeLocation = "";
-  
-  let gradientColors = ["#374151", "#111827"]; 
   let pillText = "READY | 等待";
 
   try {
@@ -73,13 +71,23 @@ export default async function (ctx) {
     pillText = "TIMEOUT | 超时";
   }
 
+  // 自适应颜色
+  const C = {
+    textMain:   { light: "#1E3A5F", dark: "#7DD3FC" },
+    textSub:    { light: "#1E3A5F80", dark: "#7DD3FC80" },
+    textAccent: { light: "#2563EB", dark: "#38BDF8" },
+    textIP:     { light: "#2563EBCC", dark: "#7DD3FCCC" },
+    pillBg:     { light: "#1E90FF20", dark: "#FFFFFF15" },
+    ipBg:       { light: "#1E90FF15", dark: "#FFFFFF10" },
+  };
+
   const statItem = (value, label) => ({
     type: "stack",
     direction: "column",
     gap: 2,
     children: [
-      { type: "text", text: value, font: { size: 10, weight: "bold" }, textColor: "#1E3A5F" },
-      { type: "text", text: label, font: { size: 9, weight: "medium" }, textColor: "#1E3A5F80" },
+      { type: "text", text: value, font: { size: 10, weight: "bold" }, textColor: C.textMain },
+      { type: "text", text: label, font: { size: 9, weight: "medium" }, textColor: C.textSub },
     ],
   });
 
@@ -94,16 +102,16 @@ export default async function (ctx) {
         direction: "row",
         alignItems: "center",
         children: [
-          { type: "text", text: "Speedtest Pro", font: { size: 14, weight: "heavy" }, textColor: "#1E3A5F" },
+          { type: "text", text: "Speedtest Pro", font: { size: 14, weight: "heavy" }, textColor: C.textMain },
           { type: "spacer" },
           {
             type: "stack",
             direction: "row",
             padding: [4, 12, 4, 12],
-            background: "#1E90FF20",
+            background: C.pillBg,
             cornerRadius: 12,
             children: [
-              { type: "text", text: pillText, font: { size: 10, weight: "heavy" }, textColor: "#1E3A5F" },
+              { type: "text", text: pillText, font: { size: 10, weight: "heavy" }, textColor: C.textMain },
             ],
           },
         ],
@@ -119,10 +127,10 @@ export default async function (ctx) {
             type: "stack",
             direction: "row",
             padding: [2, 8, 2, 8],
-            background: "#1E90FF15",
+            background: C.ipBg,
             cornerRadius: 8,
             children: [
-              { type: "text", text: `${nodeIp}${nodeLocation}`, font: { size: 8, weight: "bold" }, textColor: "#2563EBCC" },
+              { type: "text", text: `${nodeIp}${nodeLocation}`, font: { size: 8, weight: "bold" }, textColor: C.textIP },
             ],
           },
         ],
@@ -137,15 +145,15 @@ export default async function (ctx) {
         alignItems: "end",
         gap: 4,
         children: [
-          { type: "text", text: `${speedMBs}`, font: { size: 48, weight: "thin" }, textColor: "#1E3A5F" },
+          { type: "text", text: `${speedMBs}`, font: { size: 48, weight: "thin" }, textColor: C.textMain },
           {
             type: "stack",
             direction: "column",
             alignItems: "start",
             padding: [0, 0, 11, 0],
             children: [
-              { type: "text", text: "MB/s", font: { size: 13, weight: "bold" }, textColor: "#1E3A5F" },
-              { type: "text", text: `${speedMbps} Mbps`, font: { size: 10, weight: "medium" }, textColor: "#2563EB" },
+              { type: "text", text: "MB/s", font: { size: 13, weight: "bold" }, textColor: C.textMain },
+              { type: "text", text: `${speedMbps} Mbps`, font: { size: 10, weight: "medium" }, textColor: C.textAccent },
             ],
           },
         ],
