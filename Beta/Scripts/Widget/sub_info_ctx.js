@@ -1,97 +1,67 @@
 /* =========================================================
- * Module: Subscribe Info Panel
- * Author: ByteValley
- * Version: 2026-03-18R4
+ * 模块：订阅信息 Widget
+ * 作者：ByteValley
+ * 版本：2026-03-19R1
+ *
+ * 参数优先级：ctx.env > $argument > BoxJS
+ * Widget：medium（1排5个）/ large（2排各5个）
+ * 背景透明，仪表盘显示剩余流量百分比
  * ========================================================= */
 
 const TAG = "SubscribeInfo";
-function log() {
-  if (typeof console === "undefined" || !console.log) return;
-  const parts = [];
-  for (let i = 0; i < arguments.length; i++) {
-    const v = arguments[i];
-    if (v === null || v === undefined) parts.push("");
-    else if (typeof v === "string") parts.push(v);
-    else { try { parts.push(JSON.stringify(v)); } catch (_) { parts.push(String(v)); } }
-  }
-  console.log("[" + TAG + "] " + parts.join(" "));
-}
 
+// ===== 工具函数 =====
 function pad2(n) { return String(n).padStart(2, "0"); }
 
 function bytesToSize(bytes) {
   if (!bytes || bytes <= 0) return "0 B";
   const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return (bytes / Math.pow(k, i)).toFixed(2) + " " + sizes[i];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
 }
 
 function toPercent(used, total) {
   if (!total) return "0%";
-  return ((used / total) * 100).toFixed(2) + "%";
+  return `${((used / total) * 100).toFixed(1)}%`;
 }
 
-function toReversePercent(used, total) {
-  if (!total) return "0%";
-  return (((total - used) / total) * 100).toFixed(2) + "%";
+function remainPercent(used, total) {
+  if (!total) return 0;
+  return Math.max(0, Math.min(100, ((total - used) / total) * 100));
 }
 
 function formatDate(ts) {
   const d = new Date(ts);
-  return d.getFullYear() + "." + pad2(d.getMonth() + 1) + "." + pad2(d.getDate());
+  return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`;
 }
 
-function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function nowStr() {
+  const d = new Date();
+  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 function daysUntilDate(targetDate) {
-  const diff = Math.ceil((startOfDay(targetDate) - startOfDay(new Date())) / 86400000);
+  const today = startOfDay(new Date());
+  const t = startOfDay(targetDate);
+  const diff = Math.ceil((t - today) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 0;
 }
 
-function getResetDaysLeft(resetDayNum) {
-  if (!resetDayNum) return null;
-  const now = new Date();
-  let d = new Date(now.getFullYear(), now.getMonth(), resetDayNum);
-  if (d.getDate() < now.getDate()) d = new Date(now.getFullYear(), now.getMonth() + 1, resetDayNum);
-  return Math.max(0, Math.ceil((d - now) / 86400000));
-}
-
-function isHttpUrl(s) { return /^https?:\/\//i.test(String(s || "")); }
-
-const PLACEHOLDER_STRINGS = ["订阅链接", "机场名称", "重置日期"];
-function isPlaceholderString(s) {
-  const t = String(s || "").trim();
-  if (!t) return false;
-  if (/^\{\{\{[^}]+\}\}\}$/.test(t)) return true;
-  if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
-  return ["null", "undefined"].includes(t.toLowerCase());
-}
-
-function cleanArg(val) {
-  if (val == null) return null;
-  const s = String(val).trim();
-  return (!s || isPlaceholderString(s)) ? null : s;
-}
-
-function normalizeUrl(src, label) {
-  const s = cleanArg(src);
-  if (!s) { log("normalizeUrl", label, "=> skip"); return null; }
-  if (isHttpUrl(s)) return s;
-  try {
-    const d = decodeURIComponent(s);
-    if (isHttpUrl(d)) return d;
-  } catch (_) {}
-  return null;
-}
-
-function widgetTimeText() {
-  const d = new Date();
-  return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
-}
-
-function runAtLine() {
-  const d = new Date();
-  return "执行时间：" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+function getResetDaysLeft(day) {
+  if (!day) return null;
+  const today = new Date();
+  const nowDay = today.getDate();
+  const nowMonth = today.getMonth();
+  const nowYear = today.getFullYear();
+  let resetDate;
+  if (nowDay < day) resetDate = new Date(nowYear, nowMonth, day);
+  else resetDate = new Date(nowYear, nowMonth + 1, day);
+  const diff = Math.ceil((resetDate - today) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
 }
 
 function parseResetSpec(s) {
@@ -99,24 +69,26 @@ function parseResetSpec(s) {
   if (!t) return null;
   if (/^\d{1,2}$/.test(t)) {
     const day = parseInt(t, 10);
-    return (day >= 1 && day <= 31) ? { type: "monthly", day: day } : null;
+    if (day >= 1 && day <= 31) return { type: "monthly", day };
+    return null;
   }
   let m = t.match(/^(\d{4})[.\-\/年](\d{1,2})[.\-\/月](\d{1,2})/);
   if (m) {
-    const mo = parseInt(m[2], 10), d = parseInt(m[3], 10);
-    return (mo >= 1 && mo <= 12 && d >= 1 && d <= 31)
-      ? { type: "absolute", year: parseInt(m[1], 10), month: mo, day: d } : null;
+    const year = parseInt(m[1], 10), month = parseInt(m[2], 10), day = parseInt(m[3], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { type: "absolute", year, month, day };
+    return null;
   }
   m = t.match(/^(\d{1,2})[.\-\/月](\d{1,2})(?:日)?$/);
   if (m) {
-    const mo = parseInt(m[1], 10), d = parseInt(m[2], 10);
-    return (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) ? { type: "yearly", month: mo, day: d } : null;
+    const month = parseInt(m[1], 10), day = parseInt(m[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { type: "yearly", month, day };
   }
   return null;
 }
 
 function nextResetDateFromSpec(spec) {
-  const now = new Date(), today = startOfDay(now);
+  const now = new Date();
+  const today = startOfDay(now);
   if (spec.type === "yearly") {
     let d = new Date(now.getFullYear(), spec.month - 1, spec.day);
     if (startOfDay(d) <= today) d = new Date(now.getFullYear() + 1, spec.month - 1, spec.day);
@@ -125,455 +97,418 @@ function nextResetDateFromSpec(spec) {
   if (spec.type === "absolute") {
     let d = new Date(spec.year, spec.month - 1, spec.day);
     if (startOfDay(d) <= today) {
-      d = new Date(now.getFullYear(), spec.month - 1, spec.day);
-      if (startOfDay(d) <= today) d = new Date(now.getFullYear() + 1, spec.month - 1, spec.day);
+      let y = now.getFullYear();
+      d = new Date(y, spec.month - 1, spec.day);
+      if (startOfDay(d) <= today) d = new Date(y + 1, spec.month - 1, spec.day);
     }
     return d;
   }
   return null;
 }
 
-function buildResetLine(resetDayRaw) {
-  const resetClean = cleanArg(resetDayRaw);
-  if (!resetClean) return "";
-  const spec = parseResetSpec(resetClean);
-  if (spec && spec.type === "monthly") return "重置：" + (getResetDaysLeft(spec.day) || 0) + "天";
-  if (spec && (spec.type === "yearly" || spec.type === "absolute")) {
-    const nd = nextResetDateFromSpec(spec);
-    return nd ? "重置：" + daysUntilDate(nd) + "天（" + formatDate(nd.getTime()) + "）" : "重置：" + resetClean;
+function getResetText(resetRaw) {
+  if (!resetRaw) return null;
+  const spec = parseResetSpec(resetRaw);
+  if (!spec) return `重置：${resetRaw}`;
+  if (spec.type === "monthly") {
+    const left = getResetDaysLeft(spec.day);
+    return `重置 ${left ?? 0}天`;
   }
-  return "重置：" + resetClean;
+  if (spec.type === "yearly" || spec.type === "absolute") {
+    const nextDate = nextResetDateFromSpec(spec);
+    if (nextDate) return `重置 ${daysUntilDate(nextDate)}天`;
+    return `重置：${resetRaw}`;
+  }
+  return `重置：${resetRaw}`;
 }
 
-function makeKVStore(ctx) {
-  if (ctx && ctx.storage) {
-    return {
-      read: async function(k) {
-        try {
-          if (ctx.storage.getJSON) { const v = await ctx.storage.getJSON(k); if (v != null) return v; }
-          if (ctx.storage.get) return await ctx.storage.get(k);
-        } catch (_) {}
-        return null;
-      }
-    };
-  }
-  const syncStore = (function() {
-    if (typeof $prefs !== "undefined" && $prefs.valueForKey) return { read: function(k) { return $prefs.valueForKey(k); } };
-    if (typeof $persistentStore !== "undefined" && $persistentStore.read) return { read: function(k) { return $persistentStore.read(k); } };
-    try { if (typeof localStorage !== "undefined") return { read: function(k) { return localStorage.getItem(k); } }; } catch (_) {}
-    return { read: function() { return null; } };
-  })();
-  return { read: async function(k) { return syncStore.read(k); } };
+// ===== 颜色：剩余越多越绿，越少越红 =====
+// remainPct: 0~100
+function gaugeColor(remainPct) {
+  const r = Math.round(255 * (1 - remainPct / 100));
+  const g = Math.round(200 * (remainPct / 100));
+  const b = 60;
+  const toHex = v => pad2(Math.max(0, Math.min(255, v)).toString(16));
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-async function readBoxSettings(ctx) {
-  const kv = makeKVStore(ctx);
+// ===== 参数读取 =====
+const PLACEHOLDER_STRINGS = ["订阅链接", "机场名称", "重置日期"];
+
+function isPlaceholder(s) {
+  const t = String(s || "").trim();
+  if (!t) return true;
+  if (/^{{{[^}]+}}}$/.test(t)) return true;
+  if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
+  const low = t.toLowerCase();
+  return low === "null" || low === "undefined";
+}
+
+function cleanArg(val) {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s || isPlaceholder(s)) return null;
+  return s;
+}
+
+function isHttpUrl(s) {
+  return /^https?:\/\//i.test(String(s || ""));
+}
+
+function normalizeUrl(src) {
+  const s = cleanArg(src);
+  if (!s) return null;
+  if (isHttpUrl(s)) return s;
   try {
-    let panel = await kv.read("Panel");
-    if (panel) {
-      if (typeof panel === "string") { try { panel = JSON.parse(panel); } catch (_) {} }
-      if (panel && panel.SubscribeInfo && panel.SubscribeInfo.Settings) return panel.SubscribeInfo.Settings;
-    }
+    const decoded = decodeURIComponent(s);
+    if (isHttpUrl(decoded)) return decoded;
   } catch (_) {}
-  const candidates = ["Panel.SubscribeInfo.Settings", "@Panel.SubscribeInfo.Settings"];
-  for (let ci = 0; ci < candidates.length; ci++) {
-    const key = candidates[ci];
+  return null;
+}
+
+// ===== 构建参数读取器（ctx.env > $argument > BoxJS）=====
+function buildParamReader(ctx, boxSettings) {
+  // 解析 $argument 字符串（Egern 通过 ctx.env 透传或者 arguments 字段）
+  const argStr = ctx?.env?._compat?.$argument || ctx?.env?.["$argument"] || "";
+  const argMap = {};
+  String(argStr).split("&").forEach(p => {
+    const idx = p.indexOf("=");
+    if (idx === -1) return;
+    const k = p.substring(0, idx).trim();
+    const v = p.substring(idx + 1).trim();
+    if (k) {
+      try { argMap[k] = decodeURIComponent(v); } catch (_) { argMap[k] = v; }
+    }
+  });
+
+  return function pick(lowerKey, upperKey, defVal, defArgRaw) {
+    // 1. ctx.env 直接字段（最高优先）
+    const envVal = ctx?.env?.[upperKey] ?? ctx?.env?.[lowerKey];
+    const envClean = cleanArg(envVal);
+    if (envClean != null) return envClean;
+
+    // 2. $argument（检查是否被改过）
+    const argRaw = argMap[lowerKey] ?? argMap[upperKey] ?? null;
+    const argClean = cleanArg(argRaw);
+    const argChanged = argRaw != null && String(argRaw).trim() !== String(defArgRaw || "").trim();
+    if (argChanged && argClean != null) return argClean;
+
+    // 3. BoxJS
+    const boxVal = boxSettings?.[upperKey] ?? boxSettings?.[lowerKey];
+    const boxClean = cleanArg(boxVal);
+    if (boxClean != null) return boxClean;
+
+    // 4. argument 未改但有值
+    if (argClean != null) return argClean;
+
+    // 5. 默认值
+    return defVal ?? null;
+  };
+}
+
+// ===== BoxJS 读取 =====
+async function readBoxSettings(ctx) {
+  try {
+    const panel = await ctx.storage?.getJSON?.("Panel");
+    if (panel?.SubscribeInfo?.Settings) return panel.SubscribeInfo.Settings;
+    if (panel?.Settings) return panel.Settings;
+  } catch (_) {}
+  // 兼容旧 key
+  for (const key of ["Panel.SubscribeInfo.Settings", "@Panel.SubscribeInfo.Settings"]) {
     try {
-      let val = await kv.read(key);
-      if (!val) continue;
-      if (typeof val === "string") { try { val = JSON.parse(val); } catch (_) { continue; } }
-      if (val && val.Settings) return val.Settings;
+      const val = await ctx.storage?.getJSON?.(key);
+      if (val?.Settings) return val.Settings;
       if (val && typeof val === "object") return val;
     } catch (_) {}
   }
   return {};
 }
 
-function buildArgStore(ctx) {
-  const envStore = (ctx && ctx.env) ? ctx.env : {};
-  const args = {};
-  const rawArgument = (typeof $argument !== "undefined" ? $argument : "") + "";
-  rawArgument.split("&").forEach(function(p) {
-    if (!p) return;
-    const idx = p.indexOf("=");
-    if (idx === -1) return;
-    const key = p.substring(0, idx);
-    const val = p.substring(idx + 1);
-    try { args[key] = decodeURIComponent(val); } catch (_) { args[key] = val; }
-  });
-  return { envStore: envStore, args: args };
-}
-
-function makePickStr(envStore, args, BOX) {
-  function readBoxMulti(keys) {
-    if (!BOX || typeof BOX !== "object") return undefined;
-    for (let ki = 0; ki < keys.length; ki++) {
-      const k = keys[ki];
-      if (!k || !Object.prototype.hasOwnProperty.call(BOX, k)) continue;
-      const v = BOX[k];
-      if (v !== "" && v != null) return v;
+// ===== 订阅信息拉取 =====
+async function fetchSubInfo(ctx, url) {
+  const headers = { "User-Agent": "Clash/1.18.0" };
+  let resp = null;
+  // HEAD 优先
+  try {
+    resp = await ctx.http.head(url, { headers, timeout: 8000, redirect: "follow" });
+    if (resp.status < 200 || resp.status >= 400) resp = null;
+  } catch (_) { resp = null; }
+  // 回退 GET
+  if (!resp) {
+    try {
+      resp = await ctx.http.get(url, { headers, timeout: 8000, redirect: "follow" });
+    } catch (e) {
+      return { error: String(e) };
     }
-    return undefined;
   }
-  return function pickStr(lowerKey, upperKey, defVal) {
-    const envVal = cleanArg(envStore[lowerKey] != null ? envStore[lowerKey] : (envStore[upperKey] != null ? envStore[upperKey] : null));
-    if (envVal != null) return envVal;
-    const argRaw = Object.prototype.hasOwnProperty.call(args, lowerKey)
-      ? args[lowerKey]
-      : (Object.prototype.hasOwnProperty.call(args, upperKey) ? args[upperKey] : null);
-    const argClean = cleanArg(argRaw);
-    if (argClean != null) return argClean;
-    const boxClean = cleanArg(readBoxMulti([upperKey, lowerKey]));
-    if (boxClean != null) return boxClean;
-    return defVal;
-  };
-}
+  if (!resp || resp.status < 200 || resp.status >= 400) {
+    return { error: `HTTP ${resp?.status || "error"}` };
+  }
 
-const CONCURRENCY_LIMIT = 3;
-const REQ_TIMEOUT_MS = 5000;
-const MAX_RETRY = 1;
-
-function makeHttpRequest(ctx) {
-  if (ctx && ctx.http) {
-    return async function requestSubInfo(url) {
-      const opt = { timeout: REQ_TIMEOUT_MS, redirect: "follow" };
-      try {
-        const r = await ctx.http.head(url, opt);
-        if (r.status >= 200 && r.status < 400) return r;
-      } catch (_) {}
-      return await ctx.http.get(url, opt);
-    };
-  }
-  function httpInvoke(method, options, cb) {
-    const m = String(method || "GET").toUpperCase();
-    const opt = Object.assign({}, options);
-    if (!opt.timeout) opt.timeout = REQ_TIMEOUT_MS;
-    const lower = m.toLowerCase();
-    const fn = (typeof $httpClient !== "undefined") && $httpClient[lower] ? $httpClient[lower] : null;
-    if (fn) { fn(opt, cb); return; }
-    opt.method = m;
-    $httpClient.get(opt, cb);
-  }
-  function httpWithRetry(method, options, attempt) {
-    return new Promise(function(resolve, reject) {
-      let finished = false;
-      const timer = setTimeout(function() {
-        if (finished) return; finished = true; reject(new Error("timeout"));
-      }, REQ_TIMEOUT_MS + 200);
-      httpInvoke(method, options, function(err, resp) {
-        if (finished) return; finished = true; clearTimeout(timer);
-        if (err || !resp) {
-          if (attempt < MAX_RETRY) return httpWithRetry(method, options, attempt + 1).then(resolve, reject);
-          return reject(err || new Error("request error"));
-        }
-        resolve(resp);
-      });
+  const headerKey = Object.keys(resp.headers || {}).find(k => k.toLowerCase() === "subscription-userinfo");
+  const data = {};
+  if (headerKey) {
+    String(resp.headers[headerKey]).split(";").forEach(p => {
+      const kv = p.trim().split("=");
+      if (kv.length === 2) {
+        const num = parseInt(kv[1], 10);
+        if (!isNaN(num)) data[kv[0].trim()] = num;
+      }
     });
   }
-  return async function requestSubInfo(url) {
-    const opt = { url: url, headers: { "User-Agent": "Clash/1.18.0" } };
-    try {
-      const r = await httpWithRetry("HEAD", opt, 1);
-      if (r.status >= 200 && r.status < 400) return r;
-    } catch (_) {}
-    return await httpWithRetry("GET", opt, 1);
-  };
-}
 
-async function fetchInfo(requestSubInfo, url, resetDayRaw, title, index) {
-  log("fetchInfo start slot", index);
-  try {
-    const resp = await requestSubInfo(url);
-    if (!(resp.status >= 200 && resp.status < 400)) {
-      return { ok: false, title: title, error: "状态码：" + resp.status };
-    }
-    const headers = resp.headers || {};
-    const headerKey = Object.keys(headers).find(function(k) { return k.toLowerCase() === "subscription-userinfo"; });
-    const data = {};
-    if (headerKey && headers[headerKey]) {
-      headers[headerKey].split(";").forEach(function(p) {
-        const idx = p.indexOf("=");
-        if (idx === -1) return;
-        const k = p.slice(0, idx).trim();
-        const v = parseInt(p.slice(idx + 1).trim(), 10);
-        if (k && !isNaN(v)) data[k] = v;
-      });
-    }
-    const upload = data.upload || 0, download = data.download || 0;
-    const total = data.total || 0, used = upload + download;
-    const remain = Math.max(total - used, 0);
-    const usedPct = total > 0 ? (used / total) : 0;
-    let expireMs = null;
-    if (data.expire) {
-      let exp = Number(data.expire);
-      if (exp < 10000000000) exp *= 1000;
-      expireMs = exp;
-    } else {
-      expireMs = new Date("2099-12-31T00:00:00Z").getTime();
-    }
-    const resetSpec = parseResetSpec(cleanArg(resetDayRaw));
-    let resetDate = null;
-    if (resetSpec) {
-      if (resetSpec.type === "monthly") {
-        const now = new Date();
-        let d = new Date(now.getFullYear(), now.getMonth(), resetSpec.day);
-        if (d <= now) d = new Date(now.getFullYear(), now.getMonth() + 1, resetSpec.day);
-        resetDate = d;
-      } else {
-        resetDate = nextResetDateFromSpec(resetSpec);
-      }
-    }
-    log("fetchInfo done slot", index);
-    return { ok: true, title: title, used: used, remain: remain, total: total, usedPct: usedPct, expireMs: expireMs, resetDate: resetDate, resetDayRaw: resetDayRaw };
-  } catch (e) {
-    const reason = String(e).includes("timeout") ? "请求超时" : "请求错误";
-    return { ok: false, title: title, error: reason };
+  const upload = data.upload || 0;
+  const download = data.download || 0;
+  const total = data.total || 0;
+  const used = upload + download;
+  let expireMs = new Date("2099-12-31").getTime();
+  if (data.expire) {
+    let exp = Number(data.expire);
+    if (exp < 10000000000) exp *= 1000;
+    expireMs = exp;
   }
+
+  return { upload, download, total, used, expireMs };
 }
 
-async function runPool(tasks, limit) {
-  const results = new Array(tasks.length);
-  let nextIndex = 0;
-  async function worker() {
-    while (true) {
-      const cur = nextIndex++;
-      if (cur >= tasks.length) break;
-      try { results[cur] = await tasks[cur](); } catch (e) { results[cur] = null; }
-    }
+// ===== 仪表盘 Widget 组件 =====
+function buildGauge(info, title, resetRaw, isSmall) {
+  const fontSize = isSmall ? "caption2" : "caption1";
+  const arcSize = isSmall ? 44 : 56;
+
+  if (info.error) {
+    return {
+      type: "stack",
+      direction: "column",
+      alignItems: "center",
+      gap: 2,
+      flex: 1,
+      children: [
+        {
+          type: "arc",
+          value: 0,
+          total: 100,
+          width: arcSize,
+          height: arcSize / 2 + 4,
+          lineWidth: isSmall ? 5 : 6,
+          color: "#555555",
+          backgroundColor: "#333333"
+        },
+        { type: "text", text: title, font: { size: fontSize, weight: "semibold" }, textColor: "#FFFFFF", maxLines: 1, minScale: 0.7, textAlign: "center" },
+        { type: "text", text: "获取失败", font: { size: "caption2" }, textColor: "#FF6B6B", textAlign: "center" }
+      ]
+    };
   }
-  const n = Math.max(1, Math.min(limit || 3, tasks.length));
-  const workers = [];
-  for (let wi = 0; wi < n; wi++) workers.push(worker());
-  await Promise.all(workers);
-  return results;
-}
 
-function gaugeColor(usedPct) {
-  if (usedPct >= 0.9) return { light: "#EF4444", dark: "#F87171" };
-  if (usedPct >= 0.7) return { light: "#F59E0B", dark: "#FBBF24" };
-  return { light: "#10B981", dark: "#34D399" };
-}
+  const { used, total, expireMs } = info;
+  const remainPct = remainPercent(used, total);
+  const color = gaugeColor(remainPct);
+  const expireStr = formatDate(expireMs);
+  const resetText = getResetText(resetRaw);
+  const usedStr = bytesToSize(used);
+  const remainStr = bytesToSize(Math.max(0, total - used));
+  const totalStr = bytesToSize(total);
+  const pctLabel = `${remainPct.toFixed(1)}%`;
 
-function buildGaugeBlock(usedPct, gaugeSize) {
-  const remainPct = Math.max(0, 1 - usedPct);
-  const remainStr = (remainPct * 100).toFixed(1);
-  const gc = gaugeColor(usedPct);
-  const trackColor = { light: "#FFFFFF26", dark: "#FFFFFF26" };
-  const barH = Math.max(4, Math.round(gaugeSize * 0.09));
-  const barR = barH / 2;
-  const numSize = gaugeSize >= 72 ? "title3" : gaugeSize >= 60 ? "headline" : "subheadline";
+  const detailLines = isSmall
+    ? [`${remainStr}/${totalStr}`, expireStr]
+    : [`已用 ${usedStr}`, `剩余 ${remainStr}`, `共 ${totalStr}`, expireStr, resetText].filter(Boolean);
+
   return {
     type: "stack",
     direction: "column",
     alignItems: "center",
-    gap: 4,
+    gap: isSmall ? 2 : 3,
+    flex: 1,
     children: [
       {
         type: "stack",
-        direction: "row",
-        alignItems: "flex-end",
-        gap: 1,
+        direction: "column",
+        alignItems: "center",
         children: [
-          { type: "text", text: remainStr, font: { size: numSize, weight: "bold" }, textColor: { light: "#FFFFFF", dark: "#FFFFFF" } },
-          { type: "text", text: "%", font: { size: "caption1" }, textColor: { light: "#FFFFFFB3", dark: "#FFFFFFB3" }, padding: [0, 0, 2, 0] }
+          {
+            type: "arc",
+            value: remainPct,
+            total: 100,
+            width: arcSize,
+            height: arcSize / 2 + 4,
+            lineWidth: isSmall ? 5 : 6,
+            color: color,
+            backgroundColor: "#333333"
+          },
+          {
+            type: "text",
+            text: pctLabel,
+            font: { size: isSmall ? "caption2" : "caption1", weight: "bold" },
+            textColor: color,
+            textAlign: "center"
+          }
         ]
       },
       {
-        type: "stack",
-        direction: "row",
-        height: barH,
-        borderRadius: barR,
-        backgroundColor: trackColor,
-        children: [
-          { type: "stack", flex: Math.max(usedPct, 0.001), height: barH },
-          { type: "stack", flex: Math.max(remainPct, 0.001), height: barH, borderRadius: barR, backgroundColor: gc }
-        ]
-      }
+        type: "text",
+        text: title,
+        font: { size: fontSize, weight: "semibold" },
+        textColor: "#FFFFFF",
+        maxLines: 1,
+        minScale: 0.65,
+        textAlign: "center"
+      },
+      ...detailLines.map(line => ({
+        type: "text",
+        text: line,
+        font: { size: "caption2" },
+        textColor: "rgba(255,255,255,0.7)",
+        maxLines: 1,
+        minScale: 0.6,
+        textAlign: "center"
+      }))
     ]
   };
 }
 
-function buildSubColumn(info, gaugeSize) {
-  const textWhite     = { light: "#FFFFFF", dark: "#FFFFFF" };
-  const textWhiteSub  = { light: "#FFFFFFBF", dark: "#FFFFFFBF" };
-  const textWhiteSoft = { light: "#FFFFFF80", dark: "#FFFFFF80" };
-
-  if (!info.ok) {
-    return {
-      type: "stack", direction: "column", alignItems: "center", gap: 3, flex: 1, padding: [4, 2, 4, 2],
-      children: [
-        { type: "image", src: "sf-symbol:exclamationmark.circle.fill", width: 24, height: 24, color: textWhiteSoft },
-        { type: "text", text: info.title, font: { size: "caption2", weight: "semibold" }, textColor: textWhiteSub, maxLines: 1, minScale: 0.8, textAlign: "center" },
-        { type: "text", text: info.error || "获取失败", font: { size: "caption2" }, textColor: textWhiteSoft, maxLines: 1, textAlign: "center" }
-      ]
-    };
-  }
-
-  const usedPct   = info.usedPct || 0;
-  const expireStr = info.expireMs ? formatDate(info.expireMs) : "未知";
-  const resetDays = info.resetDate ? daysUntilDate(info.resetDate) : null;
-
-  const children = [
-    buildGaugeBlock(usedPct, gaugeSize),
-    { type: "text", text: bytesToSize(info.remain), font: { size: "caption1", weight: "bold" }, textColor: textWhite, maxLines: 1, minScale: 0.7, textAlign: "center" },
-    { type: "text", text: info.title, font: { size: "caption2", weight: "semibold" }, textColor: textWhiteSub, maxLines: 1, minScale: 0.75, textAlign: "center" },
-    {
-      type: "stack", direction: "row", alignItems: "center", gap: 2,
-      children: [
-        { type: "image", src: "sf-symbol:calendar", width: 9, height: 9, color: textWhiteSoft },
-        { type: "text", text: expireStr, font: { size: "caption2" }, textColor: textWhiteSoft, textAlign: "center" }
-      ]
-    }
-  ];
-  if (resetDays !== null) {
-    children.push({
-      type: "stack", direction: "row", alignItems: "center", gap: 2,
-      children: [
-        { type: "image", src: "sf-symbol:arrow.clockwise", width: 9, height: 9, color: textWhiteSoft },
-        { type: "text", text: resetDays + " 天后重置", font: { size: "caption2" }, textColor: textWhiteSoft, textAlign: "center" }
-      ]
-    });
-  }
-  return { type: "stack", direction: "column", alignItems: "center", gap: 3, flex: 1, padding: [4, 2, 4, 2], children: children };
-}
-
-function buildWidget(infos, cfg, widgetFamily) {
-  const refreshTime = new Date(Date.now() + Math.max(60, cfg.Update || 600) * 1000).toISOString();
-  const isLarge = widgetFamily === "large";
-  const bgGradient = {
-    type: "linear",
-    colors: [{ light: "#1A2A3A", dark: "#111820" }, { light: "#2A3A4A", dark: "#1A2530" }],
-    stops: [0, 1], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 }
-  };
-  const textWhite    = { light: "#FFFFFF", dark: "#FFFFFF" };
-  const textWhiteSub = { light: "#FFFFFF99", dark: "#FFFFFF99" };
-  const accentColor  = { light: cfg.defaultIconColor || "#00E28F", dark: cfg.defaultIconColor || "#00E28F" };
-
-  if (!infos.length) {
-    return {
-      type: "widget", padding: [0, 0, 0, 0], backgroundGradient: bgGradient, refreshAfter: refreshTime,
-      children: [{ type: "text", text: "未配置订阅参数", font: { size: "footnote" }, textColor: textWhiteSub, padding: [14, 14, 14, 14] }]
-    };
-  }
-
-  const maxCount = isLarge ? 10 : 5;
-  const displayInfos = infos.slice(0, maxCount);
-  const count = displayInfos.length;
-  const gaugeSize = isLarge ? (count > 5 ? 58 : 68) : (count <= 2 ? 80 : count <= 3 ? 72 : count <= 4 ? 64 : 56);
-
-  const headerRow = {
-    type: "stack", direction: "row", alignItems: "center", gap: 6, padding: [0, 0, 8, 0],
-    children: [
-      { type: "image", src: "sf-symbol:" + (cfg.defaultIcon || "antenna.radiowaves.left.and.right.circle.fill"), width: 14, height: 14, color: accentColor },
-      { type: "text", text: "订阅信息", font: { size: "footnote", weight: "semibold" }, textColor: textWhite, flex: 1 },
-      { type: "image", src: "sf-symbol:arrow.clockwise", width: 10, height: 10, color: textWhiteSub },
-      { type: "text", text: widgetTimeText(), font: { size: "caption2" }, textColor: textWhiteSub }
-    ]
-  };
-
-  let contentRows;
-  if (isLarge && count > 5) {
-    const perRow = Math.ceil(count / 2);
-    const row1 = displayInfos.slice(0, perRow);
-    const row2 = displayInfos.slice(perRow);
-    while (row2.length < perRow) row2.push(null);
-    contentRows = [
-      { type: "stack", direction: "row", alignItems: "flex-start", gap: 4, children: row1.map(function(info) { return buildSubColumn(info, gaugeSize); }) },
-      { type: "stack", direction: "row", alignItems: "flex-start", gap: 4, padding: [10, 0, 0, 0], children: row2.map(function(info) { return info ? buildSubColumn(info, gaugeSize) : { type: "stack", flex: 1 }; }) }
-    ];
-  } else {
-    contentRows = [{ type: "stack", direction: "row", alignItems: "flex-start", gap: 4, children: displayInfos.map(function(info) { return buildSubColumn(info, gaugeSize); }) }];
-  }
-
-  const cardChildren = [headerRow].concat(contentRows);
+function buildRow(slots, isSmall) {
   return {
-    type: "widget", padding: [0, 0, 0, 0], backgroundGradient: bgGradient, refreshAfter: refreshTime,
-    children: [{ type: "stack", direction: "column", gap: 0, padding: isLarge ? [14, 16, 14, 16] : [12, 14, 12, 14], children: cardChildren }]
+    type: "stack",
+    direction: "row",
+    alignItems: "start",
+    gap: isSmall ? 4 : 6,
+    children: slots.map(s => buildGauge(s.info, s.title, s.resetRaw, isSmall))
   };
 }
 
-function buildPanelContent(infos) {
-  if (!infos.length) return "未配置订阅参数";
-  const blocks = infos.map(function(info) {
-    if (!info.ok) return "机场：" + info.title + "\n订阅请求失败：" + info.error;
-    const expireStr = info.expireMs ? formatDate(info.expireMs) : "未知";
-    const now = new Date();
-    const timeStr = pad2(now.getHours()) + ":" + pad2(now.getMinutes());
-    const resetLinePart = buildResetLine(info.resetDayRaw);
-    const tailLine = resetLinePart ? resetLinePart + " | 到期：" + expireStr : "到期：" + expireStr;
-    return [
-      info.title + " | " + bytesToSize(info.total) + " | " + timeStr,
-      "已用：" + toPercent(info.used, info.total) + " -> " + bytesToSize(info.used),
-      "剩余：" + toReversePercent(info.used, info.total) + " -> " + bytesToSize(info.remain),
-      tailLine
-    ].join("\n");
-  });
-  return runAtLine() + "\n\n" + blocks.join("\n\n");
-}
-
-async function main(ctx) {
-  log("script start, egern:", !!ctx);
-  const BOX = await readBoxSettings(ctx);
-  const argStore = buildArgStore(ctx);
-  const pickStr = makePickStr(argStore.envStore, argStore.args, BOX);
-  const requestSubInfo = makeHttpRequest(ctx);
-
-  const defaultIcon = pickStr("defaultIcon", "DefaultIcon", "antenna.radiowaves.left.and.right.circle.fill");
-  const defaultIconColor = pickStr("defaultIconColor", "DefaultIconColor", "#00E28F");
-  const updateSec = Math.max(60, parseInt(pickStr("update", "Update", "600"), 10));
-  const cfg = { defaultIcon: defaultIcon, defaultIconColor: defaultIconColor, Update: updateSec };
-
-  const tasks = [];
-  for (let i = 1; i <= 10; i++) {
-    const rawUrl   = pickStr("url" + i,      "URL" + i,      null);
-    const url      = normalizeUrl(rawUrl, "url" + i);
-    const rawTitle = pickStr("title" + i,    "Title" + i,    null);
-    const title    = rawTitle || ("机场" + i);
-    const reset    = pickStr("resetDay" + i, "ResetDay" + i, null);
-    if (!url || !isHttpUrl(url)) continue;
-    (function(u, r, ti, idx) {
-      tasks.push(function() { return fetchInfo(requestSubInfo, u, r, ti, idx); });
-    })(url, reset, title, i);
-  }
-
-  const results = await runPool(tasks, CONCURRENCY_LIMIT);
-  const infos = results.filter(Boolean);
-  log("final slots:", infos.length);
-
-  if (ctx) {
-    const widgetFamily = ctx.widgetFamily ? ctx.widgetFamily : "medium";
-    log("widgetFamily:", widgetFamily);
-    return buildWidget(infos, cfg, widgetFamily);
-  }
-
-  return {
-    title: "订阅信息",
-    content: buildPanelContent(infos),
-    icon: defaultIcon,
-    iconColor: defaultIconColor
-  };
-}
-
+// ===== 主入口 =====
 export default async function(ctx) {
   try {
-    return await main(ctx);
-  } catch (err) {
-    log("fatal:", String(err && err.stack ? err.stack : err));
+    const boxSettings = await readBoxSettings(ctx);
+    const pick = buildParamReader(ctx, boxSettings);
+
+    const family = String(ctx.widgetFamily || "").toLowerCase();
+    const isLarge = family === "systemlarge" || family === "large";
+    const slotsPerRow = 5;
+    const totalSlots = isLarge ? 10 : slotsPerRow;
+
+    // 读取所有订阅配置
+    const configs = [];
+    for (let i = 1; i <= totalSlots; i++) {
+      const rawUrl = pick(`url${i}`, `URL${i}`, null, "订阅链接");
+      const url = normalizeUrl(rawUrl);
+      const title = pick(`title${i}`, `Title${i}`, `机场${i}`, "机场名称") || `机场${i}`;
+      const resetRaw = pick(`resetDay${i}`, `ResetDay${i}`, null, "重置日期");
+      configs.push({ url, title, resetRaw });
+    }
+
+    // 并发拉取（最多并发3）
+    const CONCURRENCY = 3;
+    const results = new Array(configs.length).fill(null);
+    let cursor = 0;
+
+    async function worker() {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= configs.length) break;
+        const { url } = configs[idx];
+        if (!url) { results[idx] = { error: "未配置" }; continue; }
+        try { results[idx] = await fetchSubInfo(ctx, url); }
+        catch (e) { results[idx] = { error: String(e) }; }
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, configs.length) }, worker));
+
+    // 构建 slot 列表
+    const slots = configs.map((c, i) => ({
+      info: results[i] || { error: "无数据" },
+      title: c.title,
+      resetRaw: c.resetRaw,
+      hasUrl: !!c.url
+    })).filter(s => s.hasUrl);
+
+    // 补齐到 slotsPerRow 的整数倍
+    while (slots.length < slotsPerRow) slots.push({ info: { error: "未配置" }, title: `机场${slots.length + 1}`, resetRaw: null, hasUrl: false });
+
+    const isSmall = !isLarge;
+
+    // 标题行
+    const headerRow = {
+      type: "stack",
+      direction: "row",
+      alignItems: "center",
+      gap: 5,
+      padding: [0, 0, isSmall ? 4 : 6, 0],
+      children: [
+        {
+          type: "text",
+          text: "订阅信息",
+          font: { size: "footnote", weight: "bold" },
+          textColor: "#FFFFFF",
+          flex: 1
+        },
+        {
+          type: "text",
+          text: nowStr(),
+          font: { size: "caption2" },
+          textColor: "rgba(255,255,255,0.5)"
+        }
+      ]
+    };
+
+    let content;
+    if (isLarge) {
+      const row1 = slots.slice(0, slotsPerRow);
+      const row2 = slots.slice(slotsPerRow, slotsPerRow * 2);
+      while (row2.length < slotsPerRow) row2.push({ info: { error: "未配置" }, title: `—`, resetRaw: null, hasUrl: false });
+      content = {
+        type: "stack",
+        direction: "column",
+        gap: 8,
+        padding: [10, 12, 10, 12],
+        justifyContent: "start",
+        children: [
+          headerRow,
+          buildRow(row1, false),
+          buildRow(row2, false)
+        ]
+      };
+    } else {
+      content = {
+        type: "stack",
+        direction: "column",
+        gap: 4,
+        padding: [8, 10, 8, 10],
+        justifyContent: "start",
+        children: [
+          headerRow,
+          buildRow(slots.slice(0, slotsPerRow), true)
+        ]
+      };
+    }
+
+    const refreshTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
     return {
-      type: "widget", padding: [0, 0, 0, 0],
-      backgroundGradient: {
-        type: "linear",
-        colors: [{ light: "#1A2A3A", dark: "#111820" }, { light: "#2A3A4A", dark: "#1A2530" }],
-        stops: [0, 1], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 }
-      },
+      type: "widget",
+      family: isLarge ? "large" : "medium",
+      padding: [0, 0, 0, 0],
+      backgroundColor: "transparent",
+      refreshAfter: refreshTime,
+      children: [content]
+    };
+
+  } catch (err) {
+    const msg = String(err?.stack || err);
+    console.log(`[SubscribeInfo][ERROR] ${msg}`);
+    return {
+      type: "widget",
+      padding: [6, 6, 6, 6],
+      backgroundColor: "transparent",
       refreshAfter: new Date(Date.now() + 60000).toISOString(),
       children: [{
-        type: "stack", direction: "column", gap: 6, padding: [12, 14, 12, 14],
-        children: [
-          { type: "image", src: "sf-symbol:exclamationmark.triangle.fill", width: 16, height: 16, color: { light: "#EF4444", dark: "#F87171" } },
-          { type: "text", text: "订阅信息组件异常", font: { size: "caption1", weight: "semibold" }, textColor: { light: "#FFFFFF", dark: "#FFFFFF" } },
-          { type: "text", text: String(err && err.stack ? err.stack : err).slice(0, 200), font: { size: "caption2" }, textColor: { light: "#FFFFFF99", dark: "#FFFFFF99" }, maxLines: 6 }
-        ]
+        type: "text",
+        text: `订阅信息组件异常\n${msg.slice(0, 200)}`,
+        font: { size: "caption2" },
+        textColor: "#FF6B6B",
+        maxLines: 6
       }]
     };
   }
