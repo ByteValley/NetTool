@@ -2260,8 +2260,14 @@ function buildSummaryCard(model, colors) {
 
   // 风险一行
   const riskColor = widgetRiskTone(model, colors);
+  function riskLevelLabel(riskValue) {
+    if (riskValue >= 70) return t("highRisk");
+    if (riskValue >= 40) return t("mediumRisk");
+    return t("lowRisk");
+  }
+
   const riskVal = model.risk
-    ? `${t("highRisk")} (${model.risk.riskValue}) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
+    ? `${riskLevelLabel(model.risk.riskValue)} (${model.risk.riskValue}%) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
     : null;
 
   // 流媒体：中文名/英文全称
