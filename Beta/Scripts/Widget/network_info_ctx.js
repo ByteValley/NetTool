@@ -2349,22 +2349,6 @@ function buildLargeCard(model, colors) {
   const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
   const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
 
-  function divider() {
-    return {
-      type: "stack",
-      direction: "row",
-      padding: [3, 0, 3, 0],
-      children: [{
-        type: "text",
-        text: "─────────────────────",
-        font: { size: "caption2" },
-        textColor: colors.cardBorder,
-        maxLines: 1,
-        minScale: 0.5
-      }]
-    };
-  }
-
   function groupTitle(sfIcon, iconColor, label) {
     return {
       type: "stack",
@@ -2421,24 +2405,19 @@ function buildLargeCard(model, colors) {
 
   function svcRow(x) {
     if (!x) return null;
-    const meta = serviceStateMeta(x.ok, x.tag, x.state);
-    const regionText = x.region && x.region !== "—" ? `  区域：${x.region}` : "";
-    const tagText = x.tag ? `  ${x.tag}` : "";
-    const stateText = x.state === "full" ? t("unlocked")
-      : x.state === "partial" ? t("partialUnlocked")
-      : t("notReachable");
+    const regionCC = x.cc ? x.cc.toUpperCase() : "";
+    const stateText = x.state === "full"
+      ? (x.tag || t("unlocked"))
+      : x.state === "partial"
+        ? (x.tag || t("partialUnlocked"))
+        : t("notReachable");
+    const valText = regionCC ? `${stateText}  ${regionCC}` : stateText;
     return {
       type: "stack",
       direction: "row",
       alignItems: "center",
       gap: 5,
       children: [
-        {
-          type: "text",
-          text: meta.icon,
-          font: { size: "caption2" },
-          textColor: colors.textMain
-        },
         {
           type: "text",
           text: x.name,
@@ -2449,7 +2428,7 @@ function buildLargeCard(model, colors) {
         { type: "spacer" },
         {
           type: "text",
-          text: `${stateText}${tagText}${regionText}`,
+          text: valText,
           font: { size: "caption2" },
           textColor: x.ok ? colors.ok : colors.bad,
           maxLines: 1,
@@ -2517,40 +2496,35 @@ function buildLargeCard(model, colors) {
     },
 
     // 本地
-    divider(),
-    groupTitle("house.fill", "#4A9EFF", t("local")),
+    groupTitle(t("local")),
     model.local?.ip ? kvRow(t("localIPv4"), maskIP(model.local.ip)) : null,
     model.local6?.ip ? kvRow(t("localIPv6"), maskIP(model.local6.ip)) : null,
     localLoc ? kvRow(t("location"), localLoc) : null,
     localIsp ? kvRow(t("isp"), localIsp) : null,
 
     // 入口（有数据才显示）
-    hasEntrance ? divider() : null,
-    hasEntrance ? groupTitle("arrow.down.forward.circle", colors.textSub, t("entrance")) : null,
-    model.entrance?.ip ? kvRow(t("localIPv4"), maskIP(model.entrance.ip)) : null,
-    model.entrance6?.ip ? kvRow(t("localIPv6"), maskIP(model.entrance6.ip)) : null,
-    entShow?.loc1 ? kvRow(t("location"), flagFirst(entShow.loc1)) : null,
-    entShow?.isp1 ? kvRow(t("isp"), fmtISP(entShow.isp1, entShow.loc1)) : null,
+    hasEntrance ? groupTitle(t("entrance")) : null,
+    hasEntrance && model.entrance?.ip ? kvRow(t("localIPv4"), maskIP(model.entrance.ip)) : null,
+    hasEntrance && model.entrance6?.ip ? kvRow(t("localIPv6"), maskIP(model.entrance6.ip)) : null,
+    hasEntrance && entShow?.loc1 ? kvRow(t("location"), flagFirst(entShow.loc1)) : null,
+    hasEntrance && entShow?.isp1 ? kvRow(t("isp"), fmtISP(entShow.isp1, entShow.loc1)) : null,
 
     // 落地
-    divider(),
-    groupTitle("airplane.circle", "#9B59B6", t("landing")),
+    groupTitle(t("landing")),
     model.landing?.ip ? kvRow(t("landingIPv4"), maskIP(model.landing.ip)) : null,
     model.landing6?.ip ? kvRow(t("landingIPv6"), maskIP(model.landing6.ip)) : null,
     landingLoc ? kvRow(t("location"), landingLoc) : null,
     landingIsp ? kvRow(t("isp"), landingIsp) : null,
 
     // 风险
-    risk ? divider() : null,
-    risk ? groupTitle("shield.lefthalf.filled", riskColor, t("risk")) : null,
-    risk ? kvRow(t("isp"), `${risk.lineType} · ${risk.nativeHint}`) : null,
+    risk ? groupTitle(t("risk")) : null,
+    risk ? kvRow("网络类型", `${risk.lineType} · ${risk.nativeHint}`) : null,
     risk ? kvRow("代理特征", risk.tunnelHint) : null,
     risk ? kvRow("证据", (risk.reasons || []).slice(0, 2).join("；") || "-") : null,
     risk ? kvRow("风险值", `${risk.riskValue}%`, riskColor) : null,
 
     // 服务检测
-    svs.length ? divider() : null,
-    svs.length ? groupTitle("sparkles.tv", colors.ok, t("services")) : null,
+    svs.length ? groupTitle(t("services")) : null,
     ...svs.map(svcRow)
   ];
 
