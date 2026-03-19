@@ -2664,29 +2664,34 @@ function renderErrorWidget(err) {
 
 export default async function(ctx) {
   try {
-    // 先探测 ctx 结构，看 family 字段叫什么
-    console.log("[NI][DEBUG] ctx.widgetFamily =", ctx.widgetFamily);
-    console.log("[NI][DEBUG] ctx.family =", ctx.family);
-    console.log("[NI][DEBUG] ctx.size =", JSON.stringify(ctx.size));
-    console.log("[NI][DEBUG] ctx keys =", JSON.stringify(Object.keys(ctx)));
-
     const model = await buildModel(ctx);
     const colors = widgetColors();
     const refreshTime = new Date(
       Date.now() + Math.max(60, Number(S().CFG.Update) || 10) * 1000
     ).toISOString();
 
-    // 临时先固定返回 medium，等确认 family 字段名后再加判断
+    // Egern 不传 family，用 displaySize 宽高区分
+    // large 高度明显大于宽度，medium 宽度大于高度
+    const size = ctx.displaySize || ctx.size || {};
+    const w = Number(size.width || size.w || 0);
+    const h = Number(size.height || size.h || 0);
+    const isLarge = h > w;  // large 是竖向的，medium/small 是横向的
+
+    log("info", "widget-family", {
+      w, h, isLarge,
+      displaySize: JSON.stringify(size)
+    });
+
     const widget = {
       type: "widget",
-      family: "medium",
+      family: isLarge ? "large" : "medium",
       padding: [0, 0, 0, 0],
       backgroundGradient: colors.bgGradient,
       refreshAfter: refreshTime,
-      children: [buildSummaryCard(model, colors)]
+      children: [isLarge ? buildLargeCard(model, colors) : buildSummaryCard(model, colors)]
     };
 
-    log("info", "done", { refreshAfter: widget.refreshAfter });
+    log("info", "done", { family: widget.family, refreshAfter: widget.refreshAfter });
     return widget;
   } catch (err) {
     try { console.log(`[NI][ERROR] fatal ${String(err && err.stack ? err.stack : err)}`); } catch (_) {}
