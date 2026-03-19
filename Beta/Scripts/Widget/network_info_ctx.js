@@ -538,16 +538,9 @@ function radioToGen(r) {
   const alias = { NR5G: "NR", NRSA: "NR", NRNSA: "NRNSA", LTEA: "LTE", "LTE+": "LTE", LTEPLUS: "LTE" };
   const k = alias[x] || x;
   const MAP = {
-    GPRS: "2.5G",
-    EDGE: "2.75G",
-    CDMA1X: "2.5G",
-    WCDMA: "3G",
-    HSDPA: "3.5G",
-    HSUPA: "3.75G",
-    EHRPD: "3.9G",
-    LTE: "4G",
-    NRNSA: "5G",
-    NR: "5G"
+    GPRS: "2.5G", EDGE: "2.75G", CDMA1X: "2.5G",
+    WCDMA: "3G", HSDPA: "3.5G", HSUPA: "3.75G", EHRPD: "3.9G",
+    LTE: "4G", NRNSA: "5G NSA", NR: "5G NR"
   };
   return MAP[k] || "";
 }
