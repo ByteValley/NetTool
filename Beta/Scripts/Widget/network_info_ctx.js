@@ -2659,13 +2659,16 @@ export default async function(ctx) {
     const family = String(ctx.widgetFamily || "").toLowerCase();
     const isLarge = family === "systemlarge" || family === "large";
 
-    log("info", "widget-family", { family, isLarge });
+    // TRANSPARENT=1 启用透明背景，默认主题色
+    const useTransparent = String(S().CFG.ENV_DIRECT?.TRANSPARENT ?? "0") === "1";
+
+    log("info", "widget-family", { family, isLarge, transparent: useTransparent });
 
     const widget = {
       type: "widget",
       family: isLarge ? "large" : "medium",
       padding: [0, 0, 0, 0],
-      backgroundColor: "transparent",
+      backgroundColor: useTransparent ? "transparent" : colors.bg,
       refreshAfter: refreshTime,
       children: [isLarge ? buildLargeCard(model, colors) : buildSummaryCard(model, colors)]
     };
