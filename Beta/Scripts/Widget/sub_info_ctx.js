@@ -262,9 +262,7 @@ function buildResetText(resetDayRaw) {
 // =====================================================================
 
 const UA_LIST = [
-  { "User-Agent": "Quantumult%20X/1.5.2" },
-  { "User-Agent": "clash-verge-rev/2.3.1", Accept: "application/x-yaml,text/plain,*/*" },
-  { "User-Agent": "mihomo/1.19.3",          Accept: "application/x-yaml,text/plain,*/*" },
+  { "User-Agent": "Clash/1.18.0" },
 ];
 
 function buildVariants(url) {
@@ -293,44 +291,39 @@ function parseUserInfo(header) {
 async function fetchInfo(ctx, slot) {
   log("fetchInfo start", "name:", slot.name, "url:", slot.url, "resetDay:", slot.resetDay);
 
-  const urls = buildVariants(slot.url);
-
   for (const method of ["head", "get"]) {
-    for (const url of urls) {
-      for (const headers of UA_LIST) {
-        try {
-          const resp = await ctx.http[method](url, { headers, timeout: 9000 });
-          const raw  = resp.headers.get("subscription-userinfo") || "";
-          const info = parseUserInfo(raw);
+    try {
+      const resp = await ctx.http[method](slot.url, {
+        headers: { "User-Agent": "Clash/1.18.0" },
+        timeout: 9000
+      });
+      const raw  = resp.headers.get("subscription-userinfo") || "";
+      const info = parseUserInfo(raw);
 
-          if (info) {
-            const upload     = info.upload   || 0;
-            const download   = info.download || 0;
-            const totalBytes = info.total    || 0;
-            const used       = upload + download;
-            const percent    = totalBytes > 0 ? (used / totalBytes) * 100 : 0;
+      if (info) {
+        const upload     = info.upload   || 0;
+        const download   = info.download || 0;
+        const totalBytes = info.total    || 0;
+        const used       = upload + download;
+        const percent    = totalBytes > 0 ? (used / totalBytes) * 100 : 0;
 
-            // 到期时间（秒→毫秒）
-            let expire = null;
-            if (info.expire) {
-              let exp = Number(info.expire);
-              if (exp < 10000000000) exp *= 1000;
-              expire = exp;
-            }
-
-            const resetText = buildResetText(slot.resetDay);
-
-            log("fetchInfo done", "name:", slot.name, "used:", used, "total:", totalBytes, "percent:", percent.toFixed(1) + "%");
-            return { name: slot.name, error: null, used, totalBytes, percent, expire, resetText };
-          }
-        } catch (e) {
-          log("fetchInfo attempt fail", "method:", method, "url:", url, "err:", String(e));
+        let expire = null;
+        if (info.expire) {
+          let exp = Number(info.expire);
+          if (exp < 10000000000) exp *= 1000;
+          expire = exp;
         }
+
+        const resetText = buildResetText(slot.resetDay);
+        log("fetchInfo done", "name:", slot.name, "percent:", percent.toFixed(1) + "%");
+        return { name: slot.name, error: null, used, totalBytes, percent, expire, resetText };
       }
+    } catch (e) {
+      log("fetchInfo attempt fail", "method:", method, "err:", String(e));
     }
   }
 
-  log("fetchInfo final error", "name:", slot.name, "all attempts failed");
+  log("fetchInfo final error", "name:", slot.name);
   return { name: slot.name, error: true };
 }
 
