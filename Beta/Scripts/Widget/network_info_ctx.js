@@ -2410,12 +2410,14 @@ function buildLargeCard(model, colors) {
   function svcRow(x) {
     if (!x) return null;
     const regionCC = x.cc ? x.cc.toUpperCase() : "";
+    // 有地区时显示旗帜，无地区时不显示
+    const regionFlag = regionCC ? sd_flagFromCC(regionCC) || regionCC : "";
     const stateText = x.state === "full"
       ? (x.tag || t("unlocked"))
       : x.state === "partial"
         ? (x.tag || t("partialUnlocked"))
         : t("notReachable");
-    const valText = regionCC ? `${stateText}  ${regionCC}` : stateText;
+    const valText = regionFlag ? `${stateText}  ${regionFlag}` : stateText;
     return {
       type: "stack",
       direction: "row",
