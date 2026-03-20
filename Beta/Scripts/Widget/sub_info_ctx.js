@@ -261,24 +261,6 @@ function buildResetText(resetDayRaw) {
 // 模块分类 · 网络请求策略
 // =====================================================================
 
-const UA_LIST = [
-  { "User-Agent": "Clash/1.18.0" },
-];
-
-function buildVariants(url) {
-  const seen = new Set(), out = [];
-  const add = u => { if (u && !seen.has(u)) { seen.add(u); out.push(u); } };
-  add(url);
-  add(withParam(url, "flag",   "clash"));
-  add(withParam(url, "flag",   "meta"));
-  add(withParam(url, "target", "clash"));
-  return out;
-}
-
-function withParam(url, key, value) {
-  return `${url}${url.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(value)}`;
-}
-
 function parseUserInfo(header) {
   if (!header) return null;
   const pairs = header.match(/\w+=[\d.eE+-]+/g) || [];
