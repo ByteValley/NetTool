@@ -127,6 +127,13 @@ env_schema:
     name: 缓存时长（小时）
     description: 缓存有效期，单位小时，建议不低于1小时
     default_value: "12"
+      
+  CACHE_RESET:
+    name: 重置缓存
+    description: 1=本次强制清空缓存并重新拉取，完成后改回0
+    options: ["0", "1"]
+    default_value: "0"
+
 
 compat_arguments:
   NAME1: ''
@@ -161,6 +168,7 @@ compat_arguments:
   RESET10: ''
   CACHE: ''
   CACHE_TTL: ''
+  CACHE_RESET: ''
 
 compat_arguments_desc: |-
   参数（优先级：env > arguments > BoxJS > 默认）
@@ -177,6 +185,7 @@ compat_arguments_desc: |-
   — 缓存设置 —
   • CACHE:     缓存开关(1=开/0=关)，默认开启，防止频繁拉取触发风控
   • CACHE_TTL: 缓存时长(小时)，默认12小时
+  • CACHE_RESET: 重置缓存(1=本次强制清空并重新拉取，用后改回0)
 
 author: ByteValley
 homepage: https://github.com/ByteValley/NetTool
