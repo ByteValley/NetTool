@@ -1,8 +1,5 @@
 name: 订阅信息
 description: 机场订阅流量看板，展示总量/已用/剩余及到期日期，支持最多 10 个订阅；中卡4个/大卡10个；渐变进度条；12小时缓存防风控
-author: ByteValley
-homepage: https://github.com/ByteValley/NetTool
-dns: {}
 
 env_schema:
 
@@ -181,10 +178,16 @@ compat_arguments_desc: |-
   • CACHE:     缓存开关(1=开/0=关)，默认开启，防止频繁拉取触发风控
   • CACHE_TTL: 缓存时长(小时)，默认12小时
 
+author: ByteValley
+homepage: https://github.com/ByteValley/NetTool
+dns: {}
+
 scriptings:
   - generic:
       name: 订阅信息·组件
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/sub_info_ctx.js
+      env:
+        _compat.$argument: title1={{{NAME1}}}&url1={{{URL1}}}&resetDay1={{{RESET1}}}&title2={{{NAME2}}}&url2={{{URL2}}}&resetDay2={{{RESET2}}}&title3={{{NAME3}}}&url3={{{URL3}}}&resetDay3={{{RESET3}}}&title4={{{NAME4}}}&url4={{{URL4}}}&resetDay4={{{RESET4}}}&title5={{{NAME5}}}&url5={{{URL5}}}&resetDay5={{{RESET5}}}&title6={{{NAME6}}}&url6={{{URL6}}}&resetDay6={{{RESET6}}}&title7={{{NAME7}}}&url7={{{URL7}}}&resetDay7={{{RESET7}}}&title8={{{NAME8}}}&url8={{{URL8}}}&resetDay8={{{RESET8}}}&title9={{{NAME9}}}&url9={{{URL9}}}&resetDay9={{{RESET9}}}&title10={{{NAME10}}}&url10={{{URL10}}}&resetDay10={{{RESET10}}}&CACHE={{{CACHE}}}&CACHE_TTL={{{CACHE_TTL}}}
       update_interval: 21600
       timeout: 30
 
