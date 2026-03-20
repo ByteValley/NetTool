@@ -437,7 +437,7 @@ export default async function (ctx) {
 
   // ─── 样式常量 ───────────────────────────────────────────────
 
-  #const BG_COLOR      = "transparent";
+  // const BG_COLOR      = "transparent";
 
   const BG_COLOR      = { light: "#FFFFFF",   dark: "#1B2836" };  // background
   const CARD_BG       = { light: "#F2F2F7",   dark: "#202F44" };  // secondaryGroupedBackground
