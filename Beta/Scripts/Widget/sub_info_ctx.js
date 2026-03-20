@@ -438,13 +438,13 @@ export default async function (ctx) {
   // ─── 样式常量 ───────────────────────────────────────────────
 
   const BG_COLOR      = "transparent";
-  const CARD_BG       = { light: "#FFFFFF18", dark: "#FFFFFF08" };
-  const CARD_BG_ERR   = { light: "#FF453A18", dark: "#FF453A10" };
-  const TEXT_PRIMARY  = { light: "#202F44",   dark: "#FFFFFFDD" };
-  const TEXT_SECOND   = { light: "#4A6080",   dark: "#FFFFFFAA" };
-  const TEXT_SOFT     = { light: "#7A90A8",   dark: "#FFFFFF55" };
-  const BORDER_NORMAL = { light: "#202F4420", dark: "#FFFFFF10" };
-  const BORDER_ERR    = { light: "#FF453A30", dark: "#FF453A28" };
+  const CARD_BG       = { light: "#FFFFFF25", dark: "#FFFFFF12" };
+  const CARD_BG_ERR   = { light: "#FF453A25", dark: "#FF453A18" };
+  const TEXT_PRIMARY  = { light: "#202F44",   dark: "#FFFFFF" };
+  const TEXT_SECOND   = { light: "#4A6080",   dark: "#FFFFFFCC" };
+  const TEXT_SOFT     = { light: "#7A90A8",   dark: "#FFFFFF88" };
+  const BORDER_NORMAL = { light: "#202F4430", dark: "#FFFFFF20" };
+  const BORDER_ERR    = { light: "#FF453A40", dark: "#FF453A35" };
 
   function usageColor(pct) {
     if (pct >= 80) return "#FF453A";
