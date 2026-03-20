@@ -1,93 +1,353 @@
 /* =========================================================
- * 模块：订阅信息 Widget（多机场流量展示）
+ * 模块：订阅信息 Widget（多机场流量 / 到期展示）
  * 作者：ByteValley
  * 版本：2026-03-20R1
- * 环境：Egern Widget
- * 参数优先级：env > arguments > boxjs
- * 中卡：4个机场，2×2布局
- * 大卡：8个机场，2×4布局
- * 缓存：6小时自动刷新订阅
+ *
+ * 概述 · 功能边界
+ * · 支持最多 10 组订阅链接，2×N 网格展示
+ * · 中卡显示 4 个机场（2×2），大卡显示 8 个机场（2×4）
+ * · 自动解析 subscription-userinfo 头（upload / download / total / expire）
+ * · 支持每个订阅配置单独重置规则（按日 / 年月日 / 自定义文本）
+ * · 缓存 12 小时，避免频繁拉订阅触发机场风控
+ * · 渐变进度条：蓝→绿（<60%）/ 绿→黄（60~80%）/ 黄→红（>80%）
+ * · 颜色提醒：用量 ≥80% 红 / ≥60% 黄 / 其余绿
+ *
+ * 运行环境 · 依赖接口
+ * · 兼容：Egern Widget
+ * · 依赖：ctx.http / ctx.storage / ctx.env
+ *
+ * 参数源 · BoxJS 结构
+ * · BoxJS 存储根推荐结构：key = "Panel"
+ *   {
+ *     "NetworkInfo":  { "Settings": {...}, "Caches": ... },
+ *     "SubscribeInfo":{ "Settings": {...}, "Caches": ... }
+ *   }
+ * · 本脚本优先读取 Panel.SubscribeInfo.Settings
+ * · 兼容：
+ *   - 直接 key = "Panel.SubscribeInfo.Settings"
+ *   - 直接 key = "@Panel.SubscribeInfo.Settings"
+ *
+ * 参数 · 命名 & 取值优先级
+ * · 所有参数均支持「小写 + 大写」两种键名：
+ *   - url1 / URL1, url2 / URL2, ... url10 / URL10
+ *   - name1 / NAME1 / title1 / Title1（机场名）
+ *   - reset1 / RESET1 / resetDay1 / ResetDay1（重置日）
+ *
+ * · 单值参数优先级（最终逻辑）
+ *   1）env 显式设置
+ *   2）模块 arguments
+ *   3）BoxJS（SubscribeInfo.Settings.*）
+ *   4）脚本默认值
+ *
+ * URL 特性
+ * · 支持原始 http(s) 链接
+ * · 支持 encodeURIComponent 后的整串值（会自动解码一次）
+ * · 以下视为占位符，等价"未配置"：订阅链接 / 机场名称 / 重置日期
+ *
+ * 网络请求策略
+ * · head → get 双轮尝试
+ * · 三个 UA 轮询（Quantumult X / clash-verge-rev / mihomo）
+ * · 每个 URL 自动追加 flag=clash / flag=meta / target=clash 变体
+ * · 单请求超时 9s
  * ========================================================= */
 
-export default async function (ctx) {
+/**
+ * ===============================
+ * 重置时间（resetDay）使用说明
+ * ===============================
+ *
+ * ① 每月重置（按日）
+ *    RESET1=22
+ *
+ * ② 每年重置（按月-日）
+ *    RESET1=1-22
+ *    RESET1=01/22
+ *    RESET1=1月22日
+ *
+ * ③ 指定日期（绝对日期）
+ *    RESET1=2027-01-22
+ *    RESET1=2027年1月22日
+ *    若已过去，将自动滚动为下一年同月同日（无需每年改年份）
+ *
+ * 说明：
+ * - 若填写非上述格式，将按文本原样显示
+ * - 所有计算基于本地时间
+ */
 
-  // ─────────────────────────────────────────────
-  // 工具函数
-  // ─────────────────────────────────────────────
+// =====================================================================
+// 模块分类 · 日志工具
+// =====================================================================
 
-  function bytesToSize(bytes) {
-    const n = Number(bytes || 0);
-    if (!n || n <= 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.min(Math.floor(Math.log(n) / Math.log(k)), sizes.length - 1);
-    return `${(n / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+const TAG = "SubscribeInfo";
+
+function log() {
+  if (typeof console === "undefined" || !console.log) return;
+  const parts = [];
+  for (let i = 0; i < arguments.length; i++) {
+    const v = arguments[i];
+    if (v === null || v === undefined) parts.push("");
+    else if (typeof v === "string") parts.push(v);
+    else { try { parts.push(JSON.stringify(v)); } catch (_) { parts.push(String(v)); } }
   }
+  console.log("[" + TAG + "] " + parts.join(" "));
+}
 
-  function usedPercent(used, total) {
-    const u = Number(used || 0), t = Number(total || 0);
-    if (!t) return 0;
-    return Math.min((u / t) * 100, 100);
+// =====================================================================
+// 模块分类 · 工具函数
+// =====================================================================
+
+function bytesToSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 2)} ${sizes[i]}`;
+}
+
+function formatDate(ts) {
+  const d = new Date(ts > 1e12 ? ts : ts * 1000);
+  if (isNaN(d.getTime())) return "未知";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function daysUntilDate(targetDate) {
+  const today = startOfDay(new Date());
+  const t = startOfDay(targetDate);
+  const diff = Math.ceil((t - today) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+}
+
+function getResetDaysLeft(resetDayNum) {
+  if (!resetDayNum) return null;
+  const now = new Date();
+  let resetDate = new Date(now.getFullYear(), now.getMonth(), resetDayNum);
+  if (startOfDay(resetDate) <= startOfDay(now)) {
+    resetDate = new Date(now.getFullYear(), now.getMonth() + 1, resetDayNum);
   }
+  return daysUntilDate(resetDate);
+}
 
-  function formatDate(ts) {
-    if (!ts) return "未知";
-    const d = new Date(Number(ts));
-    if (isNaN(d.getTime())) return "未知";
-    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;
+function isHttpUrl(s) {
+  return /^https?:\/\//i.test(String(s || "").trim());
+}
+
+function inferName(url) {
+  const m = String(url || "").match(/^https?:\/\/([^\/?#]+)/i);
+  return m ? m[1] : "未命名订阅";
+}
+
+// =====================================================================
+// 模块分类 · 占位符 / 清洗
+// =====================================================================
+
+const PLACEHOLDER_STRINGS = ["订阅链接", "机场名称", "重置日期"];
+
+function isPlaceholderString(s) {
+  const t = String(s || "").trim();
+  if (!t) return false;
+  if (/^\{\{\{[^}]+\}\}\}$/.test(t)) return true;
+  if (PLACEHOLDER_STRINGS.indexOf(t) !== -1) return true;
+  const low = t.toLowerCase();
+  return low === "null" || low === "undefined";
+}
+
+function cleanArg(val) {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s || isPlaceholderString(s)) return null;
+  return s;
+}
+
+function normalizeUrl(src, label) {
+  const s = cleanArg(src);
+  if (!s) { log("normalizeUrl", label, "=> empty/placeholder, skip"); return null; }
+  if (isHttpUrl(s)) { log("normalizeUrl", label, "use raw http(s):", s); return s; }
+  try {
+    const decoded = decodeURIComponent(s);
+    if (isHttpUrl(decoded)) { log("normalizeUrl", label, "decoded to http(s):", decoded); return decoded; }
+    log("normalizeUrl", label, "decoded but still not http(s):", decoded);
+  } catch (e) {
+    log("normalizeUrl", label, "decodeURIComponent error:", String(e), "raw:", s);
   }
+  log("normalizeUrl", label, "invalid http(s):", s);
+  return null;
+}
 
-  function daysLeft(ts) {
-    if (!ts) return null;
-    const now = new Date();
-    const exp = new Date(Number(ts));
-    const diff = Math.ceil((exp - now) / 86400000);
-    return diff > 0 ? diff : 0;
-  }
+// =====================================================================
+// 模块分类 · resetDay 解析
+// =====================================================================
 
-  function parseUserInfo(raw) {
-    const data = {};
-    String(raw || "").split(";").forEach(p => {
-      const idx = p.indexOf("=");
-      if (idx === -1) return;
-      const k = p.slice(0, idx).trim();
-      const v = parseInt(p.slice(idx + 1).trim(), 10);
-      if (k && !isNaN(v)) data[k] = v;
-    });
-    return data;
-  }
+/**
+ * 解析 resetDay：
+ * - "22"            => { type: "monthly", day: 22 }
+ * - "1-22"/"01/22"  => { type: "yearly", month: 1, day: 22 }
+ * - "1月22日"        => { type: "yearly", month: 1, day: 22 }
+ * - "2027-01-22"    => { type: "absolute", year: 2027, month: 1, day: 22 }
+ * - "2027年1月22日"  => { type: "absolute", year: 2027, month: 1, day: 22 }
+ */
+function parseResetSpec(s) {
+  const t = String(s || "").trim();
+  if (!t) return null;
 
-  function findHeader(headers, name) {
-    if (!headers) return null;
-    const lc = name.toLowerCase();
-    for (const k of Object.keys(headers)) {
-      if (k.toLowerCase() === lc) return headers[k];
-    }
+  if (/^\d{1,2}$/.test(t)) {
+    const day = parseInt(t, 10);
+    if (day >= 1 && day <= 31) return { type: "monthly", day };
     return null;
   }
 
-  function isHttpUrl(s) {
-    return /^https?:\/\//i.test(String(s || "").trim());
+  let m = t.match(/^(\d{4})[.\-\/年](\d{1,2})[.\-\/月](\d{1,2})/);
+  if (m) {
+    const year = parseInt(m[1], 10), month = parseInt(m[2], 10), day = parseInt(m[3], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { type: "absolute", year, month, day };
+    return null;
   }
 
-  function cleanVal(v) {
-    if (v == null) return null;
-    const s = String(v).trim();
-    if (!s || ["订阅链接","机场名称","重置日期","null","undefined"].includes(s)) return null;
-    if (/^\{\{\{[^}]+\}\}\}$/.test(s)) return null;
-    return s;
+  m = t.match(/^(\d{1,2})[.\-\/月](\d{1,2})(?:日)?$/);
+  if (m) {
+    const month = parseInt(m[1], 10), day = parseInt(m[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return { type: "yearly", month, day };
   }
 
-  // ─────────────────────────────────────────────
-  // 参数读取：env > arguments > boxjs
-  // ─────────────────────────────────────────────
+  return null;
+}
 
-  function getParam(key, defVal = null) {
+function nextResetDateFromSpec(spec) {
+  const now = new Date();
+  const today = startOfDay(now);
+
+  if (spec.type === "yearly") {
+    let d = new Date(now.getFullYear(), spec.month - 1, spec.day);
+    if (startOfDay(d) <= today) d = new Date(now.getFullYear() + 1, spec.month - 1, spec.day);
+    return d;
+  }
+
+  if (spec.type === "absolute") {
+    let d = new Date(spec.year, spec.month - 1, spec.day);
+    if (startOfDay(d) <= today) {
+      d = new Date(now.getFullYear(), spec.month - 1, spec.day);
+      if (startOfDay(d) <= today) d = new Date(now.getFullYear() + 1, spec.month - 1, spec.day);
+    }
+    return d;
+  }
+
+  return null;
+}
+
+function buildResetText(resetDayRaw) {
+  const resetClean = cleanArg(resetDayRaw);
+  if (!resetClean) return null;
+
+  const spec = parseResetSpec(resetClean);
+
+  if (spec && spec.type === "monthly") {
+    const left = getResetDaysLeft(spec.day);
+    return `${left ?? 0}天重置`;
+  }
+
+  if (spec && (spec.type === "yearly" || spec.type === "absolute")) {
+    const nextDate = nextResetDateFromSpec(spec);
+    if (nextDate) return `${daysUntilDate(nextDate)}天重置`;
+    return `重置：${resetClean}`;
+  }
+
+  // 兜底：原样显示
+  return resetClean;
+}
+
+// =====================================================================
+// 模块分类 · 网络请求策略
+// =====================================================================
+
+const UA_LIST = [
+  { "User-Agent": "Quantumult%20X/1.5.2" },
+  { "User-Agent": "clash-verge-rev/2.3.1", Accept: "application/x-yaml,text/plain,*/*" },
+  { "User-Agent": "mihomo/1.19.3",          Accept: "application/x-yaml,text/plain,*/*" },
+];
+
+function buildVariants(url) {
+  const seen = new Set(), out = [];
+  const add = u => { if (u && !seen.has(u)) { seen.add(u); out.push(u); } };
+  add(url);
+  add(withParam(url, "flag",   "clash"));
+  add(withParam(url, "flag",   "meta"));
+  add(withParam(url, "target", "clash"));
+  return out;
+}
+
+function withParam(url, key, value) {
+  return `${url}${url.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(value)}`;
+}
+
+function parseUserInfo(header) {
+  if (!header) return null;
+  const pairs = header.match(/\w+=[\d.eE+-]+/g) || [];
+  if (!pairs.length) return null;
+  return Object.fromEntries(
+    pairs.map(p => { const [k, v] = p.split("="); return [k, Number(v)]; })
+  );
+}
+
+async function fetchInfo(ctx, slot) {
+  log("fetchInfo start", "name:", slot.name, "url:", slot.url, "resetDay:", slot.resetDay);
+
+  const urls = buildVariants(slot.url);
+
+  for (const method of ["head", "get"]) {
+    for (const url of urls) {
+      for (const headers of UA_LIST) {
+        try {
+          const resp = await ctx.http[method](url, { headers, timeout: 9000 });
+          const raw  = resp.headers.get("subscription-userinfo") || "";
+          const info = parseUserInfo(raw);
+
+          if (info) {
+            const upload     = info.upload   || 0;
+            const download   = info.download || 0;
+            const totalBytes = info.total    || 0;
+            const used       = upload + download;
+            const percent    = totalBytes > 0 ? (used / totalBytes) * 100 : 0;
+
+            // 到期时间（秒→毫秒）
+            let expire = null;
+            if (info.expire) {
+              let exp = Number(info.expire);
+              if (exp < 10000000000) exp *= 1000;
+              expire = exp;
+            }
+
+            const resetText = buildResetText(slot.resetDay);
+
+            log("fetchInfo done", "name:", slot.name, "used:", used, "total:", totalBytes, "percent:", percent.toFixed(1) + "%");
+            return { name: slot.name, error: null, used, totalBytes, percent, expire, resetText };
+          }
+        } catch (e) {
+          log("fetchInfo attempt fail", "method:", method, "url:", url, "err:", String(e));
+        }
+      }
+    }
+  }
+
+  log("fetchInfo final error", "name:", slot.name, "all attempts failed");
+  return { name: slot.name, error: true };
+}
+
+// =====================================================================
+// 模块分类 · 主入口
+// =====================================================================
+
+export default async function (ctx) {
+
+  // ─── 参数读取：env > arguments > boxjs ─────────────────────
+
+  function getParam(key) {
     // 1. env
-    const envVal = cleanVal(ctx.env?.[key] ?? ctx.env?.[key.toLowerCase()] ?? ctx.env?.[key.toUpperCase()]);
+    const envVal = cleanArg(ctx.env?.[key] ?? ctx.env?.[key.toUpperCase()] ?? ctx.env?.[key.toLowerCase()]);
     if (envVal) return envVal;
 
-    // 2. arguments (ctx.arguments 或 ctx.env._compat.$argument)
+    // 2. arguments
     const argRaw = ctx.arguments ?? ctx.env?._compat?.["$argument"] ?? "";
     const argMap = {};
     String(argRaw).split("&").forEach(p => {
@@ -95,381 +355,312 @@ export default async function (ctx) {
       if (idx === -1) return;
       try { argMap[decodeURIComponent(p.slice(0, idx))] = decodeURIComponent(p.slice(idx + 1)); } catch (_) {}
     });
-    const argVal = cleanVal(argMap[key] ?? argMap[key.toLowerCase()] ?? argMap[key.toUpperCase()]);
+    const argVal = cleanArg(argMap[key] ?? argMap[key.toUpperCase()] ?? argMap[key.toLowerCase()]);
     if (argVal) return argVal;
 
     // 3. boxjs
-    const boxRaw = ctx.storage?.getJSON?.("Panel") ?? null;
-    if (boxRaw?.SubscribeInfo?.Settings) {
-      const s = boxRaw.SubscribeInfo.Settings;
-      const bv = cleanVal(s[key] ?? s[key.toLowerCase()] ?? s[key.toUpperCase()]);
+    try {
+      const raw = ctx.storage?.getJSON?.("Panel");
+      const settings = raw?.SubscribeInfo?.Settings ?? {};
+      const bv = cleanArg(settings[key] ?? settings[key.toUpperCase()] ?? settings[key.toLowerCase()]);
       if (bv) return bv;
-    }
+    } catch (_) {}
 
-    return defVal;
+    return null;
   }
 
-  // ─────────────────────────────────────────────
-  // 缓存（6小时）
-  // ─────────────────────────────────────────────
+  // ─── 读取订阅配置 ──────────────────────────────────────────
 
-  const CACHE_TTL = 6 * 60 * 60 * 1000;
-  const CACHE_KEY = "SubscribeWidget_Cache";
+  const slots = [];
+  for (let i = 1; i <= 10; i++) {
+    // URL：支持 URL1 / url1
+    const rawUrl = getParam(`URL${i}`) ?? getParam(`url${i}`);
+    const url = normalizeUrl(rawUrl, `url${i}`);
+    if (!url) { log("slot", i, "no valid url, skip"); continue; }
+
+    // 机场名：NAME1 / name1 / Title1 / title1，兜底用域名
+    const name = getParam(`NAME${i}`) ?? getParam(`name${i}`)
+              ?? getParam(`Title${i}`) ?? getParam(`title${i}`)
+              ?? inferName(url);
+
+    // 重置日：RESET1 / reset1 / ResetDay1 / resetDay1
+    const resetDay = getParam(`RESET${i}`) ?? getParam(`reset${i}`)
+                  ?? getParam(`ResetDay${i}`) ?? getParam(`resetDay${i}`);
+
+    log("slot", i, "| name:", name, "| url:", url, "| resetDay:", resetDay);
+    slots.push({ name, url, resetDay });
+  }
+
+  // ─── 时间 & 刷新 ───────────────────────────────────────────
+
+  const CACHE_TTL   = 12 * 60 * 60 * 1000;
+  const CACHE_KEY   = "SubscribeWidget_Cache_v1";
+  const now         = new Date();
+  const timeStr     = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  const refreshTime = new Date(Date.now() + CACHE_TTL).toISOString();
+
+  // ─── 缓存读写 ───────────────────────────────────────────────
 
   async function readCache() {
     try {
-      const raw = await ctx.storage?.get?.(CACHE_KEY);
+      const raw = await ctx.storage.get(CACHE_KEY);
       if (!raw) return null;
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      if (Date.now() - (parsed.ts || 0) < CACHE_TTL) return parsed.data;
+      const parsed = JSON.parse(raw);
+      if (Date.now() - (parsed.ts || 0) < CACHE_TTL) {
+        log("cache hit, age(min):", Math.round((Date.now() - parsed.ts) / 60000));
+        return parsed.data;
+      }
+      log("cache expired");
     } catch (_) {}
     return null;
   }
 
   async function writeCache(data) {
     try {
-      await ctx.storage?.set?.(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-    } catch (_) {}
-  }
-
-  // ─────────────────────────────────────────────
-  // 拉取订阅
-  // ─────────────────────────────────────────────
-
-  async function fetchSub(url, title, index) {
-    try {
-      const resp = await ctx.http.get(url, { timeout: 8000 });
-      const headerVal = findHeader(resp.headers, "subscription-userinfo");
-      if (!headerVal) return { title, error: "无 userinfo 头" };
-
-      const info = parseUserInfo(headerVal);
-      const upload = Number(info.upload || 0);
-      const download = Number(info.download || 0);
-      const total = Number(info.total || 0);
-      const used = upload + download;
-
-      let expireMs = null;
-      if (info.expire) {
-        let exp = Number(info.expire);
-        if (exp < 10000000000) exp *= 1000;
-        expireMs = exp;
-      }
-
-      return { title, used, total, expireMs, ok: true };
+      await ctx.storage.set(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+      log("cache written, count:", data.length);
     } catch (e) {
-      return { title, error: String(e) };
+      log("cache write error:", String(e));
     }
   }
 
-  // ─────────────────────────────────────────────
-  // 读取所有订阅配置
-  // ─────────────────────────────────────────────
+  // ─── 样式常量 ───────────────────────────────────────────────
 
-  const slots = [];
-  for (let i = 1; i <= 10; i++) {
-    const rawUrl = getParam(`url${i}`) ?? getParam(`URL${i}`);
-    let url = cleanVal(rawUrl);
-    if (url && !isHttpUrl(url)) {
-      try { url = decodeURIComponent(url); } catch (_) {}
-    }
-    if (!url || !isHttpUrl(url)) continue;
-    const title = getParam(`title${i}`) ?? getParam(`Title${i}`) ?? `机场${i}`;
-    const resetDay = getParam(`resetDay${i}`) ?? getParam(`ResetDay${i}`);
-    slots.push({ url, title, resetDay, index: i });
-  }
-
-  // ─────────────────────────────────────────────
-  // 获取数据（缓存优先）
-  // ─────────────────────────────────────────────
-
-  let subData = await readCache();
-
-  if (!subData) {
-    const results = await Promise.all(slots.map(s => fetchSub(s.url, s.title, s.index)));
-    subData = slots.map((s, i) => ({ ...results[i], resetDay: s.resetDay }));
-    await writeCache(subData);
-  }
-
-  // ─────────────────────────────────────────────
-  // 颜色系统（深浅色自适应）
-  // ─────────────────────────────────────────────
-
-  const C = {
-    textMain:   { light: "#111827", dark: "#F3F4F6" },
-    textSub:    { light: "#6B7280", dark: "#A1A1AA" },
-    textSoft:   { light: "#9CA3AF", dark: "#71717A" },
-    accent:     { light: "#1E90FF", dark: "#4DA3FF" },
-    ok:         { light: "#10B981", dark: "#34D399" },
-    warn:       { light: "#F59E0B", dark: "#FBBF24" },
-    bad:        { light: "#EF4444", dark: "#F87171" },
-    cardBg:     { light: "#FFFFFF", dark: "#23252A" },
-    cardBorder: { light: "#E8EAEE", dark: "#343741" },
-    barBg:      { light: "#E5E7EB", dark: "#374151" },
+  const bgGradient = {
+    type: "linear",
+    colors: ["#1B3A6B", "#1E3A8A", "#2D1B69", "#1A1040"],
+    stops: [0, 0.35, 0.7, 1],
+    startPoint: { x: 0, y: 0 },
+    endPoint:   { x: 0.8, y: 1 },
   };
 
-  // ─────────────────────────────────────────────
-  // 进度条渲染
-  // ─────────────────────────────────────────────
+  // 用量颜色：≥80% 红 / ≥60% 黄 / 其余绿
+  function usageColor(pct) {
+    if (pct >= 80) return "#FF453A";
+    if (pct >= 60) return "#FF9F0A";
+    return "#34D399";
+  }
 
-  function progressBar(percent, width = 80) {
-    const pct = Math.min(Math.max(Number(percent) || 0, 0), 100);
-    const barColor = pct >= 80 ? C.bad : pct >= 60 ? C.warn : C.ok;
+  // 渐变进度条色段：蓝→绿 / 绿→黄 / 黄→红
+  function barGradientColors(pct) {
+    if (pct >= 80) return ["#FF9F0A", "#FF453A"];
+    if (pct >= 60) return ["#34D399", "#FF9F0A"];
+    return ["#38BDF8", "#34D399"];
+  }
 
+  // ─── 无配置兜底 ─────────────────────────────────────────────
+
+  if (!slots.length) {
+    log("no slots configured");
     return {
-      type: "stack",
-      direction: "column",
-      gap: 2,
+      type: "widget",
+      padding: 16,
+      gap: 10,
+      backgroundGradient: bgGradient,
+      refreshAfter: refreshTime,
       children: [
-        // 进度条轨道
         {
-          type: "stack",
-          direction: "row",
-          height: 4,
-          cornerRadius: 2,
-          backgroundColor: C.barBg,
+          type: "stack", direction: "row", alignItems: "center", gap: 6,
           children: [
-            {
-              type: "stack",
-              width: `${pct}%`,
-              height: 4,
-              cornerRadius: 2,
-              backgroundColor: barColor,
-              children: []
-            }
-          ]
-        }
-      ]
+            { type: "image", src: "sf-symbol:chart.bar.fill", width: 13, height: 13, color: "#6E7FF3" },
+            { type: "text", text: "订阅流量", font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFF66" },
+          ],
+        },
+        { type: "spacer" },
+        { type: "text", text: "请配置 URL1 环境变量", font: { size: "caption1" }, textColor: "#FF453A", textAlign: "center" },
+      ],
     };
   }
 
-  // ─────────────────────────────────────────────
-  // 单个机场卡片
-  // ─────────────────────────────────────────────
+  // ─── 获取数据（缓存优先）────────────────────────────────────
 
-  function buildSubCard(item) {
-    if (!item) {
+  let results = await readCache();
+  if (!results) {
+    log("cache miss, fetching", slots.length, "slots");
+    results = await Promise.all(slots.map(s => fetchInfo(ctx, s)));
+    await writeCache(results);
+  }
+
+  // ─── 布局参数 ───────────────────────────────────────────────
+
+  const family    = String(ctx.widgetFamily || "").toLowerCase();
+  const isLarge   = family === "large" || family === "systemlarge";
+  const showCount = isLarge ? 8 : 4;
+
+  // 补齐到 showCount（空位用 null 占位）
+  const display = results.slice(0, showCount);
+  while (display.length < showCount) display.push(null);
+
+  log("render", family, "showCount:", showCount, "results:", results.length);
+
+  // ─── 单张卡片构建 ───────────────────────────────────────────
+
+  function buildCard(result) {
+
+    // 空占位卡
+    if (!result) {
       return {
-        type: "stack",
-        direction: "column",
-        padding: [8, 8, 8, 8],
-        backgroundColor: C.cardBg,
-        borderRadius: 12,
-        borderWidth: 0.5,
-        borderColor: C.cardBorder,
+        type: "stack", flex: 1, direction: "column",
+        padding: [9, 11, 9, 11],
+        backgroundColor: "#FFFFFF05",
+        borderRadius: 11, borderWidth: 0.5, borderColor: "#FFFFFF08",
         children: [
-          { type: "text", text: "未配置", font: { size: 11, weight: "medium" }, textColor: C.textSoft }
-        ]
+          { type: "text", text: "—", font: { size: "caption2" }, textColor: "#FFFFFF20", textAlign: "center" },
+        ],
       };
     }
 
-    if (item.error) {
+    const { name, error, used, totalBytes, percent, expire, resetText } = result;
+
+    // 错误卡
+    if (error) {
       return {
-        type: "stack",
-        direction: "column",
-        gap: 4,
-        padding: [8, 8, 8, 8],
-        backgroundColor: C.cardBg,
-        borderRadius: 12,
-        borderWidth: 0.5,
-        borderColor: C.cardBorder,
+        type: "stack", flex: 1, direction: "row", alignItems: "center", gap: 6,
+        padding: [9, 11, 9, 11],
+        backgroundColor: "#FFFFFF07",
+        borderRadius: 11, borderWidth: 0.5, borderColor: "#FF453A28",
         children: [
-          { type: "text", text: item.title, font: { size: 11, weight: "bold" }, textColor: C.textMain, maxLines: 1 },
-          { type: "text", text: "获取失败", font: { size: 9 }, textColor: C.bad }
-        ]
+          { type: "image", src: "sf-symbol:exclamationmark.circle.fill", width: 12, height: 12, color: "#FF453A" },
+          { type: "text", text: name, font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFFCC", maxLines: 1, minScale: 0.8, flex: 1 },
+          { type: "text", text: "获取失败", font: { size: "caption2" }, textColor: "#FF453A" },
+        ],
       };
     }
 
-    const pct = usedPercent(item.used, item.total);
-    const barColor = pct >= 80 ? C.bad : pct >= 60 ? C.warn : C.ok;
-    const used = bytesToSize(item.used);
-    const total = bytesToSize(item.total);
-    const remain = bytesToSize(Math.max((item.total || 0) - (item.used || 0), 0));
-    const expStr = item.expireMs ? formatDate(item.expireMs) : "未知";
-    const expDays = item.expireMs ? daysLeft(item.expireMs) : null;
+    const pct = Math.min(Math.max(percent || 0, 0), 100);
+    const uc  = usageColor(pct);
 
-    // 重置日
-    let resetStr = null;
-    if (item.resetDay) {
-      const day = parseInt(item.resetDay, 10);
-      if (!isNaN(day) && day >= 1 && day <= 31) {
-        const now = new Date();
-        let reset = new Date(now.getFullYear(), now.getMonth(), day);
-        if (reset <= now) reset = new Date(now.getFullYear(), now.getMonth() + 1, day);
-        const left = Math.ceil((reset - now) / 86400000);
-        resetStr = `重置 ${left}天`;
-      }
+    // 到期文字 & 颜色
+    let expireText  = resetText || "";
+    let expireColor = "#FFFFFF40";
+
+    if (expire) {
+      const daysLeft = Math.ceil((expire - Date.now()) / 86400000);
+      if (daysLeft < 0)       { expireText = "已到期";               expireColor = "#FF453A"; }
+      else if (daysLeft <= 7) { expireText = `${daysLeft}天后到期`;  expireColor = "#FF9F0A"; }
+      else                    { expireText = formatDate(expire);      expireColor = "#FFFFFF40"; }
+    }
+
+    // 渐变进度条（flex 分段模拟）
+    const filled = Math.round(pct);
+    const empty  = 100 - filled;
+    const barChildren = [];
+
+    if (filled > 0) {
+      barChildren.push({
+        type: "stack", flex: filled, height: 4, borderRadius: 99,
+        backgroundGradient: {
+          type: "linear",
+          colors: barGradientColors(pct),
+          stops: [0, 1],
+          startPoint: { x: 0, y: 0 },
+          endPoint:   { x: 1, y: 0 },
+        },
+        children: [],
+      });
+    }
+    if (empty > 0) {
+      barChildren.push({
+        type: "stack", flex: empty, height: 4, borderRadius: 99,
+        backgroundColor: "#FFFFFF15",
+        children: [],
+      });
     }
 
     return {
-      type: "stack",
-      direction: "column",
-      gap: 5,
-      padding: [8, 8, 8, 8],
-      backgroundColor: C.cardBg,
-      borderRadius: 12,
-      borderWidth: 0.5,
-      borderColor: C.cardBorder,
+      type: "stack", flex: 1, direction: "column", gap: 0,
+      padding: [9, 11, 9, 11],
+      backgroundColor: "#FFFFFF08",
+      borderRadius: 11, borderWidth: 0.5, borderColor: "#FFFFFF10",
       children: [
-        // 机场名
+
+        // ── 第一行：机场名 + 到期/重置 ──
         {
-          type: "text",
-          text: item.title,
-          font: { size: 11, weight: "bold" },
-          textColor: C.textMain,
-          maxLines: 1,
-          minScale: 0.8
-        },
-        // 进度条
-        {
-          type: "stack",
-          direction: "row",
-          height: 5,
-          cornerRadius: 2.5,
-          backgroundColor: C.barBg,
+          type: "stack", direction: "row", alignItems: "center", gap: 5,
           children: [
-            {
-              type: "stack",
-              direction: "row",
-              width: `${pct.toFixed(1)}%`,
-              height: 5,
-              cornerRadius: 2.5,
-              backgroundColor: barColor,
-              children: []
-            }
-          ]
+            { type: "image", src: "sf-symbol:dot.radiowaves.left.and.right", width: 12, height: 12, color: uc },
+            { type: "text", text: name, font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFFDD", maxLines: 1, minScale: 0.75, flex: 1 },
+            ...(expireText ? [{ type: "text", text: expireText, font: { size: "caption2" }, textColor: expireColor }] : []),
+          ],
         },
-        // 已用/总量
+
+        // ── 间距 ──
+        { type: "stack", height: 8, children: [] },
+
+        // ── 第二行：渐变进度条 ──
+        { type: "stack", direction: "row", gap: 0, alignItems: "center", children: barChildren },
+
+        // ── 间距 ──
+        { type: "stack", height: 5, children: [] },
+
+        // ── 第三行：已用/总量 + 百分比 ──
         {
-          type: "stack",
-          direction: "row",
-          alignItems: "center",
-          children: [
-            { type: "text", text: `${pct.toFixed(1)}%`, font: { size: 10, weight: "bold" }, textColor: barColor },
-            { type: "spacer" },
-            { type: "text", text: total, font: { size: 9 }, textColor: C.textSub }
-          ]
-        },
-        // 已用 & 剩余
-        {
-          type: "stack",
-          direction: "row",
-          alignItems: "center",
-          children: [
-            { type: "text", text: `已用 ${used}`, font: { size: 9 }, textColor: C.textSub },
-            { type: "spacer" },
-            { type: "text", text: `剩 ${remain}`, font: { size: 9 }, textColor: C.textSub }
-          ]
-        },
-        // 到期 & 重置
-        {
-          type: "stack",
-          direction: "row",
-          alignItems: "center",
+          type: "stack", direction: "row", alignItems: "center",
           children: [
             {
               type: "text",
-              text: `到期 ${expStr}`,
-              font: { size: 9 },
-              textColor: expDays != null && expDays <= 7 ? C.bad : expDays != null && expDays <= 30 ? C.warn : C.textSoft,
-              maxLines: 1
+              text: `${bytesToSize(used)} / ${bytesToSize(totalBytes)}`,
+              font: { size: "caption2", weight: "medium" },
+              textColor: "#FFFFFFAA",
             },
             { type: "spacer" },
-            resetStr ? { type: "text", text: resetStr, font: { size: 9 }, textColor: C.textSoft } : { type: "spacer" }
-          ]
-        }
-      ]
+            {
+              type: "text",
+              text: `${pct.toFixed(1)}%`,
+              font: { size: "caption2", weight: "semibold" },
+              textColor: uc,
+            },
+          ],
+        },
+
+      ],
     };
   }
 
-  // ─────────────────────────────────────────────
-  // 2×N 网格布局
-  // ─────────────────────────────────────────────
+  // ─── 2×N 网格构建 ───────────────────────────────────────────
 
-  function buildGrid(items, count) {
+  function buildGrid(items) {
     const rows = [];
-    for (let i = 0; i < count; i += 2) {
-      const left = buildSubCard(items[i] || null);
-      const right = buildSubCard(items[i + 1] || null);
+    for (let i = 0; i < items.length; i += 2) {
       rows.push({
-        type: "stack",
-        direction: "row",
-        gap: 8,
-        children: [
-          { type: "stack", flex: 1, children: [left] },
-          { type: "stack", flex: 1, children: [right] }
-        ]
+        type: "stack", direction: "row", gap: 8,
+        children: [buildCard(items[i]), buildCard(items[i + 1] ?? null)],
       });
     }
     return rows;
   }
 
-  // ─────────────────────────────────────────────
-  // 时间
-  // ─────────────────────────────────────────────
-
-  function nowStr() {
-    const d = new Date();
-    return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  }
-
-  const refreshTime = new Date(Date.now() + CACHE_TTL).toISOString();
-  const family = String(ctx.widgetFamily || "").toLowerCase();
-  const isLarge = family === "large" || family === "systemlarge";
-  const showCount = isLarge ? 8 : 4;
-  const displayData = subData ? subData.slice(0, showCount) : [];
-
-  // 补齐到 showCount
-  while (displayData.length < showCount) displayData.push(null);
-
-  const gridRows = buildGrid(displayData, showCount);
-
-  // ─────────────────────────────────────────────
-  // 顶部标题行
-  // ─────────────────────────────────────────────
-
-  const headerRow = {
-    type: "stack",
-    direction: "row",
-    alignItems: "center",
-    padding: [0, 0, 4, 0],
-    children: [
-      {
-        type: "image",
-        src: "sf-symbol:antenna.radiowaves.left.and.right.circle.fill",
-        width: 14,
-        height: 14,
-        color: C.accent
-      },
-      { type: "stack", width: 5, children: [] },
-      {
-        type: "text",
-        text: "订阅信息",
-        font: { size: 13, weight: "bold" },
-        textColor: C.textMain
-      },
-      { type: "spacer" },
-      {
-        type: "text",
-        text: nowStr(),
-        font: { size: 12, weight: "semibold" },
-        textColor: C.accent
-      }
-    ]
-  };
+  // ─── 最终 Widget 输出 ────────────────────────────────────────
 
   return {
     type: "widget",
     family: isLarge ? "large" : "medium",
-    padding: [12, 12, 12, 12],
-    backgroundColor: "transparent",
+    padding: [14, 14, 12, 14],
+    gap: 8,
+    backgroundGradient: bgGradient,
     refreshAfter: refreshTime,
     children: [
+
+      // 标题栏
       {
-        type: "stack",
-        direction: "column",
-        gap: 8,
-        children: [headerRow, ...gridRows]
-      }
-    ]
+        type: "stack", direction: "row", alignItems: "center", gap: 5,
+        children: [
+          { type: "image", src: "sf-symbol:chart.bar.fill", width: 13, height: 13, color: "#6E7FF3" },
+          { type: "text", text: "订阅流量", font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFF55" },
+          { type: "spacer" },
+          { type: "image", src: "sf-symbol:clock", width: 11, height: 11, color: "#FFFFFF33" },
+          { type: "text", text: timeStr, font: { size: "caption2" }, textColor: "#FFFFFF44" },
+        ],
+      },
+
+      // 卡片网格
+      {
+        type: "stack", direction: "column", gap: 8,
+        children: buildGrid(display),
+      },
+
+      { type: "spacer" },
+
+    ],
   };
 }
