@@ -40,6 +40,7 @@
  *   - reset1 / RESET1 / resetDay1 / ResetDay1（重置日）
  *   - cache / CACHE（缓存开关，1=开 0=关，默认 1）
  *   - cache_ttl / CACHE_TTL（缓存时长，单位小时，默认 12）
+ *   - cache_reset / CACHE_RESET（重置缓存，1=清空并重新拉取，用后改回 0）
  *
  * · 单值参数优先级（最终逻辑）
  *   1）env 显式设置
