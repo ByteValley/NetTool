@@ -5,12 +5,18 @@
  *
  * 概述 · 功能边界
  * · 支持最多 10 组订阅链接，2×N 网格展示
- * · 中卡显示 4 个机场（2×2），大卡显示 8 个机场（2×4）
+ * · 中卡显示 4 个机场（2×2），大卡显示 10 个机场（2×5）
  * · 自动解析 subscription-userinfo 头（upload / download / total / expire）
  * · 支持每个订阅配置单独重置规则（按日 / 年月日 / 自定义文本）
- * · 缓存 12 小时，避免频繁拉订阅触发机场风控
+ * · 缓存开关：CACHE=1（开）/ 0（关），默认开启
+ * · 缓存时长：CACHE_TTL=小时数，默认 12 小时，支持 env/arguments/boxjs 传入
  * · 渐变进度条：蓝→绿（<60%）/ 绿→黄（60~80%）/ 黄→红（>80%）
  * · 颜色提醒：用量 ≥80% 红 / ≥60% 黄 / 其余绿
+ * · 透明背景；不支持透明则回退深蓝 #202F44
+ * · 百分比显示在进度条正下方居中
+ * · 左下角：重置日期（YYYY-MM-DD 或原始文本）
+ * · 右下角：到期日期（YYYY-MM-DD）
+ * · 标题栏：执行时间，若缓存时间不同则附加显示 执行(缓存)
  *
  * 运行环境 · 依赖接口
  * · 兼容：Egern Widget
@@ -29,9 +35,11 @@
  *
  * 参数 · 命名 & 取值优先级
  * · 所有参数均支持「小写 + 大写」两种键名：
- *   - url1 / URL1, url2 / URL2, ... url10 / URL10
+ *   - url1 / URL1 ... url10 / URL10
  *   - name1 / NAME1 / title1 / Title1（机场名）
  *   - reset1 / RESET1 / resetDay1 / ResetDay1（重置日）
+ *   - cache / CACHE（缓存开关，1=开 0=关，默认 1）
+ *   - cache_ttl / CACHE_TTL（缓存时长，单位小时，默认 12）
  *
  * · 单值参数优先级（最终逻辑）
  *   1）env 显式设置
@@ -46,8 +54,7 @@
  *
  * 网络请求策略
  * · head → get 双轮尝试
- * · 三个 UA 轮询（Quantumult X / clash-verge-rev / mihomo）
- * · 每个 URL 自动追加 flag=clash / flag=meta / target=clash 变体
+ * · UA：Clash/1.18.0
  * · 单请求超时 9s
  * ========================================================= */
 
@@ -57,20 +64,20 @@
  * ===============================
  *
  * ① 每月重置（按日）
- *    RESET1=22
+ *    RESET1=22  → 显示下次重置日期，如 2026-04-22
  *
  * ② 每年重置（按月-日）
- *    RESET1=1-22
- *    RESET1=01/22
- *    RESET1=1月22日
+ *    RESET1=1-22 / RESET1=01/22 / RESET1=1月22日
+ *    → 显示下次重置日期，如 2027-01-22
  *
  * ③ 指定日期（绝对日期）
- *    RESET1=2027-01-22
- *    RESET1=2027年1月22日
- *    若已过去，将自动滚动为下一年同月同日（无需每年改年份）
+ *    RESET1=2027-01-22 / RESET1=2027年1月22日
+ *    若已过去，将自动滚动为下一年同月同日
+ *
+ * ④ 自定义文本（无法解析为日期时原样显示）
+ *    RESET1=工单重置 → 显示为"工单重置"
  *
  * 说明：
- * - 若填写非上述格式，将按文本原样显示
  * - 所有计算基于本地时间
  */
 
@@ -103,10 +110,15 @@ function bytesToSize(bytes) {
   return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 2)} ${sizes[i]}`;
 }
 
-function formatDate(ts) {
+function formatDateFull(ts) {
   const d = new Date(ts > 1e12 ? ts : ts * 1000);
   if (isNaN(d.getTime())) return "未知";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function toHHMM(ts) {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
 function startOfDay(d) {
@@ -118,16 +130,6 @@ function daysUntilDate(targetDate) {
   const t = startOfDay(targetDate);
   const diff = Math.ceil((t - today) / (1000 * 60 * 60 * 24));
   return diff > 0 ? diff : 0;
-}
-
-function getResetDaysLeft(resetDayNum) {
-  if (!resetDayNum) return null;
-  const now = new Date();
-  let resetDate = new Date(now.getFullYear(), now.getMonth(), resetDayNum);
-  if (startOfDay(resetDate) <= startOfDay(now)) {
-    resetDate = new Date(now.getFullYear(), now.getMonth() + 1, resetDayNum);
-  }
-  return daysUntilDate(resetDate);
 }
 
 function isHttpUrl(s) {
@@ -236,24 +238,34 @@ function nextResetDateFromSpec(spec) {
   return null;
 }
 
-function buildResetText(resetDayRaw) {
+/**
+ * 构建重置显示文本
+ * · 能解析为日期 → 返回 YYYY-MM-DD（下次重置日期）
+ * · 无法解析（如"工单重置"）→ 原样返回
+ * · 未配置 → null
+ */
+function buildResetDisplay(resetDayRaw) {
   const resetClean = cleanArg(resetDayRaw);
   if (!resetClean) return null;
 
   const spec = parseResetSpec(resetClean);
 
   if (spec && spec.type === "monthly") {
-    const left = getResetDaysLeft(spec.day);
-    return `${left ?? 0}天重置`;
+    const now = new Date();
+    let resetDate = new Date(now.getFullYear(), now.getMonth(), spec.day);
+    if (startOfDay(resetDate) <= startOfDay(now)) {
+      resetDate = new Date(now.getFullYear(), now.getMonth() + 1, spec.day);
+    }
+    return formatDateFull(resetDate.getTime());
   }
 
   if (spec && (spec.type === "yearly" || spec.type === "absolute")) {
     const nextDate = nextResetDateFromSpec(spec);
-    if (nextDate) return `${daysUntilDate(nextDate)}天重置`;
-    return `重置：${resetClean}`;
+    if (nextDate) return formatDateFull(nextDate.getTime());
+    return resetClean;
   }
 
-  // 兜底：原样显示
+  // 兜底：原样显示（如"工单重置"）
   return resetClean;
 }
 
@@ -296,9 +308,12 @@ async function fetchInfo(ctx, slot) {
           expire = exp;
         }
 
-        const resetText = buildResetText(slot.resetDay);
-        log("fetchInfo done", "name:", slot.name, "percent:", percent.toFixed(1) + "%");
-        return { name: slot.name, error: null, used, totalBytes, percent, expire, resetText };
+        // 重置显示文本在请求时计算并缓存，避免缓存字段丢失
+        const resetDisplay = buildResetDisplay(slot.resetDay);
+
+        log("fetchInfo done", "name:", slot.name, "percent:", percent.toFixed(1) + "%",
+            "expire:", expire, "resetDisplay:", resetDisplay);
+        return { name: slot.name, error: null, used, totalBytes, percent, expire, resetDisplay };
       }
     } catch (e) {
       log("fetchInfo attempt fail", "method:", method, "err:", String(e));
@@ -344,21 +359,30 @@ export default async function (ctx) {
     return null;
   }
 
+  // ─── 缓存参数 ───────────────────────────────────────────────
+
+  // 缓存开关：CACHE=1（开）/ 0（关），默认开
+  const cacheEnabled = (getParam("CACHE") ?? getParam("cache") ?? "1") !== "0";
+
+  // 缓存时长：CACHE_TTL=小时数，默认 12
+  const cacheTtlHours = Math.max(0.1, parseFloat(getParam("CACHE_TTL") ?? getParam("cache_ttl") ?? "12") || 12);
+  const CACHE_TTL = cacheTtlHours * 60 * 60 * 1000;
+  const CACHE_KEY = "SubscribeWidget_Cache";
+
+  log("cache enabled:", cacheEnabled, "ttl(h):", cacheTtlHours);
+
   // ─── 读取订阅配置 ──────────────────────────────────────────
 
   const slots = [];
   for (let i = 1; i <= 10; i++) {
-    // URL：支持 URL1 / url1
     const rawUrl = getParam(`URL${i}`) ?? getParam(`url${i}`);
     const url = normalizeUrl(rawUrl, `url${i}`);
     if (!url) { log("slot", i, "no valid url, skip"); continue; }
 
-    // 机场名：NAME1 / name1 / Title1 / title1，兜底用域名
     const name = getParam(`NAME${i}`) ?? getParam(`name${i}`)
               ?? getParam(`Title${i}`) ?? getParam(`title${i}`)
               ?? inferName(url);
 
-    // 重置日：RESET1 / reset1 / ResetDay1 / resetDay1
     const resetDay = getParam(`RESET${i}`) ?? getParam(`reset${i}`)
                   ?? getParam(`ResetDay${i}`) ?? getParam(`resetDay${i}`);
 
@@ -368,21 +392,23 @@ export default async function (ctx) {
 
   // ─── 时间 & 刷新 ───────────────────────────────────────────
 
-  const CACHE_TTL   = 12 * 60 * 60 * 1000;
-  const CACHE_KEY   = "SubscribeWidget_Cache_v1";
-  const now         = new Date();
-  const timeStr     = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-  const refreshTime = new Date(Date.now() + CACHE_TTL).toISOString();
+  const execTs     = Date.now();
+  const execHHMM   = toHHMM(execTs);
+  const refreshTime = new Date(execTs + CACHE_TTL).toISOString();
 
   // ─── 缓存读写 ───────────────────────────────────────────────
 
+  let cacheTs = null; // 记录缓存写入时间戳
+
   async function readCache() {
+    if (!cacheEnabled) { log("cache disabled, skip read"); return null; }
     try {
       const raw = await ctx.storage.get(CACHE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (Date.now() - (parsed.ts || 0) < CACHE_TTL) {
-        log("cache hit, age(min):", Math.round((Date.now() - parsed.ts) / 60000));
+      if (execTs - (parsed.ts || 0) < CACHE_TTL) {
+        cacheTs = parsed.ts;
+        log("cache hit, age(min):", Math.round((execTs - parsed.ts) / 60000));
         return parsed.data;
       }
       log("cache expired");
@@ -391,8 +417,9 @@ export default async function (ctx) {
   }
 
   async function writeCache(data) {
+    if (!cacheEnabled) { log("cache disabled, skip write"); return; }
     try {
-      await ctx.storage.set(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+      await ctx.storage.set(CACHE_KEY, JSON.stringify({ ts: execTs, data }));
       log("cache written, count:", data.length);
     } catch (e) {
       log("cache write error:", String(e));
@@ -401,22 +428,21 @@ export default async function (ctx) {
 
   // ─── 样式常量 ───────────────────────────────────────────────
 
-  const bgGradient = {
-    type: "linear",
-    colors: ["#1B3A6B", "#1E3A8A", "#2D1B69", "#1A1040"],
-    stops: [0, 0.35, 0.7, 1],
-    startPoint: { x: 0, y: 0 },
-    endPoint:   { x: 0.8, y: 1 },
-  };
+  const BG_COLOR      = "transparent";
+  const CARD_BG       = { light: "#FFFFFF18", dark: "#FFFFFF08" };
+  const CARD_BG_ERR   = { light: "#FF453A18", dark: "#FF453A10" };
+  const TEXT_PRIMARY  = { light: "#202F44",   dark: "#FFFFFFDD" };
+  const TEXT_SECOND   = { light: "#4A6080",   dark: "#FFFFFFAA" };
+  const TEXT_SOFT     = { light: "#7A90A8",   dark: "#FFFFFF55" };
+  const BORDER_NORMAL = { light: "#202F4420", dark: "#FFFFFF10" };
+  const BORDER_ERR    = { light: "#FF453A30", dark: "#FF453A28" };
 
-  // 用量颜色：≥80% 红 / ≥60% 黄 / 其余绿
   function usageColor(pct) {
     if (pct >= 80) return "#FF453A";
     if (pct >= 60) return "#FF9F0A";
     return "#34D399";
   }
 
-  // 渐变进度条色段：蓝→绿 / 绿→黄 / 黄→红
   function barGradientColors(pct) {
     if (pct >= 80) return ["#FF9F0A", "#FF453A"];
     if (pct >= 60) return ["#34D399", "#FF9F0A"];
@@ -428,17 +454,14 @@ export default async function (ctx) {
   if (!slots.length) {
     log("no slots configured");
     return {
-      type: "widget",
-      padding: 16,
-      gap: 10,
-      backgroundGradient: bgGradient,
-      refreshAfter: refreshTime,
+      type: "widget", padding: 16, gap: 10,
+      backgroundColor: BG_COLOR, refreshAfter: refreshTime,
       children: [
         {
           type: "stack", direction: "row", alignItems: "center", gap: 6,
           children: [
             { type: "image", src: "sf-symbol:chart.bar.fill", width: 13, height: 13, color: "#6E7FF3" },
-            { type: "text", text: "订阅流量", font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFF66" },
+            { type: "text", text: "订阅流量", font: { size: "caption1", weight: "semibold" }, textColor: TEXT_PRIMARY },
           ],
         },
         { type: "spacer" },
@@ -456,136 +479,161 @@ export default async function (ctx) {
     await writeCache(results);
   }
 
+  // ─── 标题栏时间：执行时间(缓存时间) ────────────────────────
+  // · 若有缓存且缓存时间与执行时间分钟不同，显示 "17:08(16:49)"
+  // · 否则只显示执行时间 "17:08"
+
+  const cacheHHMM   = cacheTs ? toHHMM(cacheTs) : null;
+  const timeDisplay = (cacheHHMM && cacheHHMM !== execHHMM)
+    ? `${execHHMM}(${cacheHHMM})`
+    : execHHMM;
+
   // ─── 布局参数 ───────────────────────────────────────────────
 
   const family    = String(ctx.widgetFamily || "").toLowerCase();
   const isLarge   = family === "large" || family === "systemlarge";
-  const showCount = isLarge ? 8 : 4;
+  const showCount = isLarge ? 10 : 4;
+  const compact   = isLarge;
 
-  // 补齐到 showCount（空位用 null 占位）
   const display = results.slice(0, showCount);
   while (display.length < showCount) display.push(null);
 
-  log("render", family, "showCount:", showCount, "results:", results.length);
+  log("render", family, "showCount:", showCount, "results:", results.length,
+      "execTime:", execHHMM, "cacheTime:", cacheHHMM);
 
   // ─── 单张卡片构建 ───────────────────────────────────────────
 
-  function buildCard(result) {
+  function buildCard(result, compact) {
 
-    // 空占位卡
     if (!result) {
       return {
         type: "stack", flex: 1, direction: "column",
-        padding: [9, 11, 9, 11],
-        backgroundColor: "#FFFFFF05",
-        borderRadius: 11, borderWidth: 0.5, borderColor: "#FFFFFF08",
+        padding: compact ? [5, 8, 5, 8] : [7, 10, 7, 10],
+        backgroundColor: CARD_BG,
+        borderRadius: 10, borderWidth: 0.5, borderColor: BORDER_NORMAL,
         children: [
-          { type: "text", text: "—", font: { size: "caption2" }, textColor: "#FFFFFF20", textAlign: "center" },
+          { type: "text", text: "—", font: { size: "caption2" }, textColor: TEXT_SOFT, textAlign: "center" },
         ],
       };
     }
 
-    const { name, error, used, totalBytes, percent, expire, resetText } = result;
+    const { name, error, used, totalBytes, percent, expire, resetDisplay } = result;
 
-    // 错误卡
     if (error) {
       return {
-        type: "stack", flex: 1, direction: "row", alignItems: "center", gap: 6,
-        padding: [9, 11, 9, 11],
-        backgroundColor: "#FFFFFF07",
-        borderRadius: 11, borderWidth: 0.5, borderColor: "#FF453A28",
+        type: "stack", flex: 1, direction: "row", alignItems: "center", gap: 5,
+        padding: compact ? [5, 8, 5, 8] : [7, 10, 7, 10],
+        backgroundColor: CARD_BG_ERR,
+        borderRadius: 10, borderWidth: 0.5, borderColor: BORDER_ERR,
         children: [
-          { type: "image", src: "sf-symbol:exclamationmark.circle.fill", width: 12, height: 12, color: "#FF453A" },
-          { type: "text", text: name, font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFFCC", maxLines: 1, minScale: 0.8, flex: 1 },
-          { type: "text", text: "获取失败", font: { size: "caption2" }, textColor: "#FF453A" },
+          { type: "image", src: "sf-symbol:exclamationmark.circle.fill", width: 10, height: 10, color: "#FF453A" },
+          { type: "text", text: name, font: { size: compact ? 9 : "caption1", weight: "semibold" }, textColor: "#FFFFFFCC", maxLines: 1, minScale: 0.8, flex: 1 },
+          { type: "text", text: "失败", font: { size: 9 }, textColor: "#FF453A" },
         ],
       };
     }
 
-    const pct = Math.min(Math.max(percent || 0, 0), 100);
-    const uc  = usageColor(pct);
+    const pct      = Math.min(Math.max(percent || 0, 0), 100);
+    const uc       = usageColor(pct);
+    const filled   = Math.round(pct);
+    const empty    = 100 - filled;
+    const barH     = compact ? 10 : 13;
+    const nameSize = compact ? 9  : "caption1";
+    const dataSize = compact ? 8  : "caption2";
+    const gapTop   = compact ? 4  : 6;
+    const gapMid   = compact ? 3  : 5;
+    const pad      = compact ? [5, 8, 5, 8] : [7, 10, 7, 10];
 
-    // 到期文字 & 颜色
-    let expireText  = resetText || "";
-    let expireColor = "#FFFFFF40";
+    // ── 到期文字 & 颜色（右下角）──
+    let expireText  = null;
+    let expireColor = TEXT_SOFT;
 
     if (expire) {
       const daysLeft = Math.ceil((expire - Date.now()) / 86400000);
-      if (daysLeft < 0)       { expireText = "已到期";               expireColor = "#FF453A"; }
-      else if (daysLeft <= 7) { expireText = `${daysLeft}天后到期`;  expireColor = "#FF9F0A"; }
-      else                    { expireText = formatDate(expire);      expireColor = "#FFFFFF40"; }
+      if (daysLeft < 0)      { expireText = "已过期";              expireColor = "#FF453A"; }
+      else if (daysLeft <= 7){ expireText = formatDateFull(expire); expireColor = "#FF9F0A"; }
+      else                   { expireText = formatDateFull(expire); expireColor = TEXT_SOFT; }
     }
 
-    // 渐变进度条（flex 分段模拟）
-    const filled = Math.round(pct);
-    const empty  = 100 - filled;
-    const barChildren = [];
-
-    if (filled > 0) {
-      barChildren.push({
-        type: "stack", flex: filled, height: 4, borderRadius: 99,
-        backgroundGradient: {
-          type: "linear",
-          colors: barGradientColors(pct),
-          stops: [0, 1],
-          startPoint: { x: 0, y: 0 },
-          endPoint:   { x: 1, y: 0 },
-        },
-        children: [],
+    // ── 底部行：左=重置  右=到期 ──
+    const bottomChildren = [];
+    if (resetDisplay) {
+      bottomChildren.push({
+        type: "text", text: resetDisplay,
+        font: { size: dataSize }, textColor: TEXT_SOFT,
+        maxLines: 1, minScale: 0.8, flex: 1,
       });
+    } else {
+      bottomChildren.push({ type: "spacer" });
     }
-    if (empty > 0) {
-      barChildren.push({
-        type: "stack", flex: empty, height: 4, borderRadius: 99,
-        backgroundColor: "#FFFFFF15",
-        children: [],
+    if (expireText) {
+      bottomChildren.push({
+        type: "text", text: expireText,
+        font: { size: dataSize }, textColor: expireColor,
+        maxLines: 1, minScale: 0.8, textAlign: "right",
       });
     }
 
     return {
       type: "stack", flex: 1, direction: "column", gap: 0,
-      padding: [9, 11, 9, 11],
-      backgroundColor: "#FFFFFF08",
-      borderRadius: 11, borderWidth: 0.5, borderColor: "#FFFFFF10",
+      padding: pad,
+      backgroundColor: CARD_BG,
+      borderRadius: 10, borderWidth: 0.5, borderColor: BORDER_NORMAL,
       children: [
 
-        // ── 第一行：机场名 + 到期/重置 ──
+        // ── 第一行：机场名 + 已用/总量 ──
         {
-          type: "stack", direction: "row", alignItems: "center", gap: 5,
+          type: "stack", direction: "row", alignItems: "center", gap: 4,
           children: [
-            { type: "image", src: "sf-symbol:dot.radiowaves.left.and.right", width: 12, height: 12, color: uc },
-            { type: "text", text: name, font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFFDD", maxLines: 1, minScale: 0.75, flex: 1 },
-            ...(expireText ? [{ type: "text", text: expireText, font: { size: "caption2" }, textColor: expireColor }] : []),
+            { type: "image", src: "sf-symbol:dot.radiowaves.left.and.right",
+              width: compact ? 9 : 11, height: compact ? 9 : 11, color: uc },
+            { type: "text", text: name,
+              font: { size: nameSize, weight: "semibold" }, textColor: TEXT_PRIMARY,
+              maxLines: 1, minScale: 0.75, flex: 1 },
+            { type: "text", text: `${bytesToSize(used)}/${bytesToSize(totalBytes)}`,
+              font: { size: dataSize, weight: "medium" }, textColor: TEXT_SECOND,
+              maxLines: 1, minScale: 0.75 },
           ],
         },
 
-        // ── 间距 ──
-        { type: "stack", height: 8, children: [] },
+        { type: "stack", height: gapTop, children: [] },
 
         // ── 第二行：渐变进度条 ──
-        { type: "stack", direction: "row", gap: 0, alignItems: "center", children: barChildren },
+        {
+          type: "stack", direction: "row", height: barH, gap: 0,
+          children: [
+            ...(filled > 0 ? [{
+              type: "stack", flex: filled, height: barH, borderRadius: 99,
+              backgroundGradient: {
+                type: "linear",
+                colors: barGradientColors(pct),
+                stops: [0, 1],
+                startPoint: { x: 0, y: 0 },
+                endPoint:   { x: 1, y: 0 },
+              },
+              children: [],
+            }] : []),
+            ...(empty > 0 ? [{
+              type: "stack", flex: empty, height: barH, borderRadius: 99,
+              backgroundColor: { light: "#00000015", dark: "#FFFFFF15" },
+              children: [],
+            }] : []),
+          ],
+        },
 
-        // ── 间距 ──
-        { type: "stack", height: 5, children: [] },
+        // ── 百分比居中 ──
+        {
+          type: "text", text: `${pct.toFixed(1)}%`,
+          font: { size: compact ? 7 : 8, weight: "bold" },
+          textColor: uc, textAlign: "center",
+        },
 
-        // ── 第三行：已用/总量 + 百分比 ──
+        { type: "stack", height: gapMid, children: [] },
+
+        // ── 第三行：左=重置  右=到期 ──
         {
           type: "stack", direction: "row", alignItems: "center",
-          children: [
-            {
-              type: "text",
-              text: `${bytesToSize(used)} / ${bytesToSize(totalBytes)}`,
-              font: { size: "caption2", weight: "medium" },
-              textColor: "#FFFFFFAA",
-            },
-            { type: "spacer" },
-            {
-              type: "text",
-              text: `${pct.toFixed(1)}%`,
-              font: { size: "caption2", weight: "semibold" },
-              textColor: uc,
-            },
-          ],
+          children: bottomChildren,
         },
 
       ],
@@ -594,12 +642,12 @@ export default async function (ctx) {
 
   // ─── 2×N 网格构建 ───────────────────────────────────────────
 
-  function buildGrid(items) {
+  function buildGrid(items, compact) {
     const rows = [];
     for (let i = 0; i < items.length; i += 2) {
       rows.push({
-        type: "stack", direction: "row", gap: 8,
-        children: [buildCard(items[i]), buildCard(items[i + 1] ?? null)],
+        type: "stack", direction: "row", gap: compact ? 6 : 8,
+        children: [buildCard(items[i], compact), buildCard(items[i + 1] ?? null, compact)],
       });
     }
     return rows;
@@ -610,28 +658,30 @@ export default async function (ctx) {
   return {
     type: "widget",
     family: isLarge ? "large" : "medium",
-    padding: [14, 14, 12, 14],
-    gap: 8,
-    backgroundGradient: bgGradient,
+    padding: compact ? [10, 10, 8, 10] : [14, 14, 12, 14],
+    gap: compact ? 5 : 8,
+    backgroundColor: BG_COLOR,
     refreshAfter: refreshTime,
     children: [
 
-      // 标题栏
+      // ── 标题栏 ──
       {
         type: "stack", direction: "row", alignItems: "center", gap: 5,
         children: [
-          { type: "image", src: "sf-symbol:chart.bar.fill", width: 13, height: 13, color: "#6E7FF3" },
-          { type: "text", text: "订阅流量", font: { size: "caption1", weight: "semibold" }, textColor: "#FFFFFF55" },
+          { type: "image", src: "sf-symbol:chart.bar.fill", width: 12, height: 12, color: "#6E7FF3" },
+          { type: "text", text: "订阅流量",
+            font: { size: compact ? 9 : "caption1", weight: "semibold" }, textColor: TEXT_SECOND },
           { type: "spacer" },
-          { type: "image", src: "sf-symbol:clock", width: 11, height: 11, color: "#FFFFFF33" },
-          { type: "text", text: timeStr, font: { size: "caption2" }, textColor: "#FFFFFF44" },
+          { type: "image", src: "sf-symbol:clock", width: 10, height: 10, color: TEXT_SOFT },
+          { type: "text", text: timeDisplay,
+            font: { size: compact ? 9 : "caption2" }, textColor: TEXT_SOFT },
         ],
       },
 
-      // 卡片网格
+      // ── 卡片网格 ──
       {
-        type: "stack", direction: "column", gap: 8,
-        children: buildGrid(display),
+        type: "stack", direction: "column", gap: compact ? 5 : 8,
+        children: buildGrid(display, compact),
       },
 
       { type: "spacer" },
