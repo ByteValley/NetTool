@@ -437,18 +437,16 @@ export default async function (ctx) {
 
   // ─── 样式常量 ───────────────────────────────────────────────
 
-  const BG_COLOR      = "transparent";
+  #const BG_COLOR      = "transparent";
 
-  // 深色模式：固定深色背景与 panel 保持一致
-  // 浅色模式：透明，文字用白色系（配合壁纸）
-  const BG_COLOR      = { light: "transparent", dark: "#1C1F26" };
-  const CARD_BG       = { light: "#00000018",   dark: "#FFFFFF0D" };
-  const CARD_BG_ERR   = { light: "#FF453A15",   dark: "#FF453A15" };
-  const TEXT_PRIMARY  = { light: "#FFFFFF",      dark: "#F3F4F6" };
-  const TEXT_SECOND   = { light: "#FFFFFFCC",    dark: "#A1A1AA" };
-  const TEXT_SOFT     = { light: "#FFFFFF99",    dark: "#71717A" };
-  const BORDER_NORMAL = { light: "#FFFFFF25",    dark: "#FFFFFF12" };
-  const BORDER_ERR    = { light: "#FF453A35",    dark: "#FF453A30" };
+  const BG_COLOR      = { light: "#FFFFFF",   dark: "#1B2836" };  // background
+  const CARD_BG       = { light: "#F2F2F7",   dark: "#202F44" };  // secondaryGroupedBackground
+  const CARD_BG_ERR   = { light: "#EB2E5315", dark: "#F8587215" }; // red 半透明
+  const TEXT_PRIMARY  = { light: "#000000",   dark: "#FFFFFF" };
+  const TEXT_SECOND   = { light: "#3C3C43CC", dark: "#EBEBF599" }; // iOS 系统次要文字
+  const TEXT_SOFT     = { light: "#3C3C4360", dark: "#EBEBF540" }; // iOS 系统软文字
+  const BORDER_NORMAL = { light: "#00000010", dark: "#FFFFFF12" };
+  const BORDER_ERR    = { light: "#EB2E5330", dark: "#F8587230" };
 
   function usageColor(pct) {
     if (pct >= 80) return "#FF453A";
