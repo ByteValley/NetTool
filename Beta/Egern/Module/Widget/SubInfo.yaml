@@ -1,0 +1,193 @@
+name: 订阅信息
+description: 机场订阅流量看板，展示总量/已用/剩余及到期日期，支持最多 10 个订阅；中卡4个/大卡10个；渐变进度条；12小时缓存防风控
+author: ByteValley
+homepage: https://github.com/ByteValley/NetTool
+dns: {}
+
+env_schema:
+
+  # 机场1
+  NAME1:
+    name: 机场1名称
+    description: 留空则自动从 URL 提取域名
+    default_value: ""
+  URL1:
+    name: 机场1订阅链接
+    description: http/https 链接，支持 encodeURIComponent 编码
+    default_value: ""
+  RESET1:
+    name: 机场1重置规则
+    description: "1~31=每月N日 | MM-DD=每年 | YYYY-MM-DD=指定日期(过期自动滚动) | 其他文本=原样显示"
+    default_value: ""
+
+  # 机场2
+  NAME2:
+    name: 机场2名称
+    default_value: ""
+  URL2:
+    name: 机场2订阅链接
+    default_value: ""
+  RESET2:
+    name: 机场2重置规则
+    default_value: ""
+
+  # 机场3
+  NAME3:
+    name: 机场3名称
+    default_value: ""
+  URL3:
+    name: 机场3订阅链接
+    default_value: ""
+  RESET3:
+    name: 机场3重置规则
+    default_value: ""
+
+  # 机场4
+  NAME4:
+    name: 机场4名称
+    default_value: ""
+  URL4:
+    name: 机场4订阅链接
+    default_value: ""
+  RESET4:
+    name: 机场4重置规则
+    default_value: ""
+
+  # 机场5
+  NAME5:
+    name: 机场5名称
+    default_value: ""
+  URL5:
+    name: 机场5订阅链接
+    default_value: ""
+  RESET5:
+    name: 机场5重置规则
+    default_value: ""
+
+  # 机场6
+  NAME6:
+    name: 机场6名称
+    default_value: ""
+  URL6:
+    name: 机场6订阅链接
+    default_value: ""
+  RESET6:
+    name: 机场6重置规则
+    default_value: ""
+
+  # 机场7
+  NAME7:
+    name: 机场7名称
+    default_value: ""
+  URL7:
+    name: 机场7订阅链接
+    default_value: ""
+  RESET7:
+    name: 机场7重置规则
+    default_value: ""
+
+  # 机场8
+  NAME8:
+    name: 机场8名称
+    default_value: ""
+  URL8:
+    name: 机场8订阅链接
+    default_value: ""
+  RESET8:
+    name: 机场8重置规则
+    default_value: ""
+
+  # 机场9
+  NAME9:
+    name: 机场9名称
+    default_value: ""
+  URL9:
+    name: 机场9订阅链接
+    default_value: ""
+  RESET9:
+    name: 机场9重置规则
+    default_value: ""
+
+  # 机场10
+  NAME10:
+    name: 机场10名称
+    default_value: ""
+  URL10:
+    name: 机场10订阅链接
+    default_value: ""
+  RESET10:
+    name: 机场10重置规则
+    default_value: ""
+
+  # 缓存设置
+  CACHE:
+    name: 缓存开关
+    description: 1=开启缓存（推荐，防止频繁拉取触发风控）/ 0=每次实时拉取
+    options: ["0", "1"]
+    default_value: "1"
+
+  CACHE_TTL:
+    name: 缓存时长（小时）
+    description: 缓存有效期，单位小时，建议不低于1小时
+    default_value: "12"
+
+compat_arguments:
+  NAME1: ''
+  URL1: ''
+  RESET1: ''
+  NAME2: ''
+  URL2: ''
+  RESET2: ''
+  NAME3: ''
+  URL3: ''
+  RESET3: ''
+  NAME4: ''
+  URL4: ''
+  RESET4: ''
+  NAME5: ''
+  URL5: ''
+  RESET5: ''
+  NAME6: ''
+  URL6: ''
+  RESET6: ''
+  NAME7: ''
+  URL7: ''
+  RESET7: ''
+  NAME8: ''
+  URL8: ''
+  RESET8: ''
+  NAME9: ''
+  URL9: ''
+  RESET9: ''
+  NAME10: ''
+  URL10: ''
+  RESET10: ''
+  CACHE: ''
+  CACHE_TTL: ''
+
+compat_arguments_desc: |-
+  参数（优先级：env > arguments > BoxJS > 默认）
+
+  — 机场配置（支持最多10组）—
+  • NAMEn: 机场名称，留空自动从URL提取域名
+  • URLn:  订阅链接（http/https），支持 encodeURIComponent 编码
+  • RESETn: 重置规则
+    1~31        = 每月第N日重置
+    MM-DD       = 每年对应月日重置
+    YYYY-MM-DD  = 指定日期（已过期自动滚动至下一年）
+    其他文本    = 原样显示（如"工单重置"）
+
+  — 缓存设置 —
+  • CACHE:     缓存开关(1=开/0=关)，默认开启，防止频繁拉取触发风控
+  • CACHE_TTL: 缓存时长(小时)，默认12小时
+
+scriptings:
+  - generic:
+      name: 订阅信息·组件
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/sub_info_ctx.js
+      update_interval: 21600
+      timeout: 30
+
+widgets:
+  - name: 订阅信息
+    script_name: 订阅信息·组件
