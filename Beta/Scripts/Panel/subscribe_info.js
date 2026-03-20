@@ -509,7 +509,7 @@ function pickStr(lowerKey, upperKey, defVal, defArgRaw) {
 const CONCURRENCY_LIMIT = 3;
 
 // 单请求硬超时（毫秒）：建议 4000~6000
-const REQ_TIMEOUT_MS = 5000;
+const REQ_TIMEOUT_MS = 9000;
 
 // 重试次数：面板建议 0~1
 const MAX_RETRY = 1;
