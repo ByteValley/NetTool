@@ -369,7 +369,15 @@ export default async function (ctx) {
   const CACHE_TTL = cacheTtlHours * 60 * 60 * 1000;
   const CACHE_KEY = "SubscribeWidget_Cache";
 
-  log("cache enabled:", cacheEnabled, "ttl(h):", cacheTtlHours);
+  // 缓存重置：CACHE_RESET=1 时清空缓存并强制重新拉取，用完自动恢复
+  const cacheReset = (getParam("CACHE_RESET") ?? getParam("cache_reset") ?? "0") === "1";
+  if (cacheReset) {
+    log("cache reset triggered, clearing cache");
+    try { await ctx.storage.set(CACHE_KEY, ""); } catch (_) {}
+  }
+
+  log("cache enabled:", cacheEnabled, "ttl(h):", cacheTtlHours, "reset:", cacheReset);
+
 
   // ─── 读取订阅配置 ──────────────────────────────────────────
 
