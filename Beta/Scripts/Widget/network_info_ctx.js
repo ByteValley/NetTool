@@ -1956,27 +1956,20 @@ function renderPanel(model) {
 
 function widgetColors() {
   return {
-    bgGradient: {
-      type: "linear",
-      colors: [
-        { light: "#F7F8FA", dark: "#111214" },
-        { light: "#FFFFFF", dark: "#1B1C1F" }
-      ],
-      stops: [0, 1],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 }
-    },
-    cardBg: { light: "#FFFFFF", dark: "#23252A" },
-    cardBorder: { light: "#E8EAEE", dark: "#343741" },
-    textMain: { light: "#111827", dark: "#F3F4F6" },
-    textSub: { light: "#6B7280", dark: "#A1A1AA" },
-    textSoft: { light: "#9CA3AF", dark: "#71717A" },
+    // 主题色背景，透明作为可选
+    bg: { light: "#F2F2F7", dark: "#202F44" },
+    cardBg: { light: "#FFFFFF", dark: "#2A3F58" },
+    cardBorder: { light: "#00000010", dark: "#FFFFFF15" },
+    textMain: { light: "#1C1C1E", dark: "#FFFFFF" },
+    textSub: { light: "#3C3C43CC", dark: "#EBEBF5CC" },
+    textSoft: { light: "#3C3C4399", dark: "#EBEBF566" },
     accent: { light: S().CFG.IconColor || "#1E90FF", dark: S().CFG.IconColor || "#4DA3FF" },
-    ok: { light: "#10B981", dark: "#34D399" },
-    warn: { light: "#F59E0B", dark: "#FBBF24" },
-    bad: { light: "#EF4444", dark: "#F87171" }
+    ok:   { light: "#0BA875", dark: "#22C68D" },
+    warn: { light: "#F26611", dark: "#FA8329" },
+    bad:  { light: "#EB2E53", dark: "#F85872" }
   };
 }
+
 
 function widgetText(v, fallback = "-") {
   const s = String(v == null ? "" : v).trim();
