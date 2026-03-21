@@ -443,19 +443,23 @@ export default async function (ctx) {
 
   const BG_COLOR      = useTransparent ? "transparent"
                       : { light: "#F2F2F7", dark: "#202F44" };
-  const CARD_BG       = useTransparent ? { light: "#00000018", dark: "#FFFFFF10" }
-                      : { light: "#FFFFFF",  dark: "#2A3F58" };
-  const CARD_BG_ERR   = useTransparent ? { light: "#FF453A18", dark: "#FF453A15" }
+  const CARD_BG       = useTransparent
+                      ? { light: "#00000030", dark: "#00000045" }
+                      : { light: "#FFFFFF",   dark: "#2A3F58" };
+  const CARD_BG_ERR   = useTransparent
+                      ? { light: "#FF453A20", dark: "#FF453A20" }
                       : { light: "#FF453A10", dark: "#FF453A15" };
   const TEXT_PRIMARY  = useTransparent ? "#FFFFFF"
-                      : { light: "#1C1C1E", dark: "#FFFFFF" };
+                      : { light: "#1C1C1E",   dark: "#FFFFFF" };
   const TEXT_SECOND   = useTransparent ? "#FFFFFFCC"
                       : { light: "#3C3C43CC", dark: "#EBEBF5CC" };
   const TEXT_SOFT     = useTransparent ? "#FFFFFF88"
                       : { light: "#3C3C4399", dark: "#EBEBF566" };
-  const BORDER_NORMAL = useTransparent ? { light: "#FFFFFF25", dark: "#FFFFFF15" }
+  const BORDER_NORMAL = useTransparent
+                      ? { light: "#FFFFFF20", dark: "#FFFFFF20" }
                       : { light: "#00000010", dark: "#FFFFFF15" };
-  const BORDER_ERR    = useTransparent ? { light: "#FF453A30", dark: "#FF453A30" }
+  const BORDER_ERR    = useTransparent
+                      ? { light: "#FF453A30", dark: "#FF453A30" }
                       : { light: "#FF453A20", dark: "#FF453A30" };
 
   function usageColor(pct) {
