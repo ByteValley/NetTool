@@ -450,11 +450,11 @@ export default async function (ctx) {
 
   // 透明模式和主题色模式共用同一套颜色，系统自动适配
   const BG_COLOR = useTransparent
-    ? "transparent"
+    ? "systemMaterial"
     : { light: "#F2F2F7", dark: "#202F44" };
 
   const CARD_BG = useTransparent
-    ? "transparent"
+    ? "systemMaterial"
     : { light: "#FFFFFF", dark: "#1E2B3D" };
 
   const CARD_BG_ERR = { light: "#FF453A10", dark: "#FF453A20" };
