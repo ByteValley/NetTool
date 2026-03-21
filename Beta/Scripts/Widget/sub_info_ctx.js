@@ -437,27 +437,27 @@ export default async function (ctx) {
 
   // ─── 样式常量 ───────────────────────────────────────────────
 
-  // 透明开关：TRANSPARENT=1 启用透明背景（文字统一白色系）
-  // 默认不透明，使用 Egern 主题色
   const useTransparent = (getParam("TRANSPARENT") ?? getParam("transparent") ?? "0") === "1";
 
+    // 透明模式：固定深色半透明卡片 + 白色文字（专为壁纸叠加设计）
+  // 非透明模式：跟随系统主题色（Egern 面板预览也走这套）
   const BG_COLOR      = useTransparent ? "transparent"
-                      : { light: "#F2F2F7", dark: "#202F44" };
-  const CARD_BG       = useTransparent
-                      ? { light: "systemThinMaterial", dark: "systemThinMaterial" }
+                      : { light: "#F2F2F7",   dark: "#202F44" };
+  const CARD_BG       = useTransparent ? "#1C1C1ECC"
                       : { light: "#FFFFFF",   dark: "#2A3F58" };
-  const CARD_BG_ERR   = useTransparent ? { light: "#FF453A18", dark: "#FF453A15" }
+  const CARD_BG_ERR   = useTransparent ? "#FF453A22"
                       : { light: "#FF453A10", dark: "#FF453A15" };
   const TEXT_PRIMARY  = useTransparent ? "#FFFFFF"
-                      : { light: "#1C1C1E", dark: "#FFFFFF" };
+                      : { light: "#1C1C1E",   dark: "#FFFFFF" };
   const TEXT_SECOND   = useTransparent ? "#FFFFFFCC"
                       : { light: "#3C3C43CC", dark: "#EBEBF5CC" };
   const TEXT_SOFT     = useTransparent ? "#FFFFFF88"
                       : { light: "#3C3C4399", dark: "#EBEBF566" };
-  const BORDER_NORMAL = useTransparent ? { light: "#FFFFFF25", dark: "#FFFFFF15" }
+  const BORDER_NORMAL = useTransparent ? "#FFFFFF18"
                       : { light: "#00000010", dark: "#FFFFFF15" };
-  const BORDER_ERR    = useTransparent ? { light: "#FF453A30", dark: "#FF453A30" }
+  const BORDER_ERR    = useTransparent ? "#FF453A30"
                       : { light: "#FF453A20", dark: "#FF453A30" };
+
 
   function usageColor(pct) {
     if (pct >= 80) return "#FF453A";
