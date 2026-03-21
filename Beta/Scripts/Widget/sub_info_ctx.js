@@ -286,40 +286,42 @@ function parseUserInfo(header) {
 async function fetchInfo(ctx, slot) {
   log("fetchInfo start", "name:", slot.name, "url:", slot.url, "resetDay:", slot.resetDay);
 
-  for (const method of ["head", "get"]) {
-    try {
-      const resp = await ctx.http[method](slot.url, {
-        headers: { "User-Agent": "Clash/1.18.0" },
-        timeout: 9000
-      });
-      const raw  = resp.headers.get("subscription-userinfo") || "";
-      const info = parseUserInfo(raw);
+  try {
+    const resp = await ctx.http.get(slot.url, {
+      headers: { "User-Agent": "Clash/1.18.0" },
+      timeout: 9000
+    });
+    const raw  = resp.headers.get("subscription-userinfo") || "";
+    const info = parseUserInfo(raw);
 
-      if (info) {
-        const upload     = info.upload   || 0;
-        const download   = info.download || 0;
-        const totalBytes = info.total    || 0;
-        const used       = upload + download;
-        const percent    = totalBytes > 0 ? (used / totalBytes) * 100 : 0;
+    if (info) {
+      const upload     = info.upload   || 0;
+      const download   = info.download || 0;
+      const totalBytes = info.total    || 0;
+      const used       = upload + download;
+      const percent    = totalBytes > 0 ? (used / totalBytes) * 100 : 0;
 
-        let expire = null;
-        if (info.expire) {
-          let exp = Number(info.expire);
-          if (exp < 10000000000) exp *= 1000;
-          expire = exp;
-        }
-
-        // 重置显示文本在请求时计算并缓存，避免缓存字段丢失
-        const resetDisplay = buildResetDisplay(slot.resetDay);
-
-        log("fetchInfo done", "name:", slot.name, "percent:", percent.toFixed(1) + "%",
-            "expire:", expire, "resetDisplay:", resetDisplay);
-        return { name: slot.name, error: null, used, totalBytes, percent, expire, resetDisplay };
+      let expire = null;
+      if (info.expire) {
+        let exp = Number(info.expire);
+        if (exp < 10000000000) exp *= 1000;
+        expire = exp;
       }
-    } catch (e) {
-      log("fetchInfo attempt fail", "method:", method, "err:", String(e));
+
+      const resetDisplay = buildResetDisplay(slot.resetDay);
+
+      log("fetchInfo done", "name:", slot.name, "percent:", percent.toFixed(1) + "%",
+          "expire:", expire, "resetDisplay:", resetDisplay);
+      return { name: slot.name, error: null, used, totalBytes, percent, expire, resetDisplay };
     }
+  } catch (e) {
+    log("fetchInfo fail", "err:", String(e));
   }
+
+  log("fetchInfo final error", "name:", slot.name);
+  return { name: slot.name, error: true };
+}
+
 
   log("fetchInfo final error", "name:", slot.name);
   return { name: slot.name, error: true };
