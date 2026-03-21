@@ -330,6 +330,15 @@ async function fetchInfo(ctx, slot) {
 // =====================================================================
 
 export default async function (ctx) {
+  
+    // ─── 环境探测（调试用，确认后删除）──────────────────────────
+  try {
+    log("ctx keys:", Object.keys(ctx).join(", "));
+    log("widgetFamily:", ctx.widgetFamily);
+    log("env keys:", Object.keys(ctx.env || {}).join(", "));
+  } catch (e) {
+    log("ctx inspect error:", String(e));
+  }
 
   // ─── 参数读取：env > arguments > boxjs ─────────────────────
 
@@ -439,29 +448,24 @@ export default async function (ctx) {
 
   const useTransparent = (getParam("TRANSPARENT") ?? getParam("transparent") ?? "0") === "1";
 
-  const BG_COLOR      = useTransparent ? "transparent" : { light: "#F2F2F7", dark: "#202F44" };
+  // 透明模式和主题色模式共用同一套颜色，系统自动适配
+  const BG_COLOR = useTransparent
+    ? "transparent"
+    : { light: "#F2F2F7", dark: "#1E2B3D" };
+
   const CARD_BG = useTransparent
-    ? { light: "#00000025", dark: "#00000045" }
-    : { light: "#FFFFFF", dark: "#2A3F58" };
+    ? { light: "#00000012", dark: "#00000030" }
+    : { light: "#FFFFFF",   dark: "#2A3F58" };
 
-  const TEXT_PRIMARY = useTransparent
-    ? { light: "#FFFFFF", dark: "#FFFFFF" }
-    : { light: "#1C1C1E", dark: "#FFFFFF" };
+  const CARD_BG_ERR = { light: "#FF453A10", dark: "#FF453A20" };
 
-  const TEXT_SECOND = useTransparent
-    ? { light: "#FFFFFFCC", dark: "#FFFFFFCC" }
-    : { light: "#3C3C43CC", dark: "#EBEBF5CC" };
+  // 文字颜色统一用系统自适应，不强制白色
+  const TEXT_PRIMARY  = { light: "#1C1C1E",   dark: "#FFFFFF" };
+  const TEXT_SECOND   = { light: "#3C3C43CC", dark: "#EBEBF5CC" };
+  const TEXT_SOFT     = { light: "#3C3C4399", dark: "#EBEBF566" };
+  const BORDER_NORMAL = { light: "#00000010", dark: "#FFFFFF18" };
+  const BORDER_ERR    = { light: "#FF453A20", dark: "#FF453A30" };
 
-  const TEXT_SOFT = useTransparent
-    ? { light: "#FFFFFF88", dark: "#FFFFFF88" }
-    : { light: "#3C3C4399", dark: "#EBEBF566" };
-
-  const BORDER_NORMAL = useTransparent
-    ? { light: "#FFFFFF20", dark: "#FFFFFF20" }
-    : { light: "#00000010", dark: "#FFFFFF15" };
-
-  const BORDER_ERR = { light: "#FF453A25", dark: "#FF453A30" };
-  
   function usageColor(pct) {
     if (pct >= 80) return "#FF453A";
     if (pct >= 60) return "#FF9F0A";
