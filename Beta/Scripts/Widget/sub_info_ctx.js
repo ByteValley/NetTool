@@ -439,15 +439,13 @@ export default async function (ctx) {
 
   const useTransparent = (getParam("TRANSPARENT") ?? getParam("transparent") ?? "0") === "1";
 
-  const BG_COLOR      = "transparent";  // 始终透明，让 Egern/系统决定背景
-  const CARD_BG       = { light: "#FFFFFFCC", dark: "#2A3F58CC" };  // 半透明，面板和桌面都好看
-  const CARD_BG_ERR   = { light: "#FF453A15", dark: "#FF453A20" };
-  const TEXT_PRIMARY  = { light: "#1C1C1E",   dark: "#FFFFFF" };
-  const TEXT_SECOND   = { light: "#3C3C43CC", dark: "#EBEBF5CC" };
-  const TEXT_SOFT     = { light: "#3C3C4399", dark: "#EBEBF566" };
-  const BORDER_NORMAL = { light: "#00000015", dark: "#FFFFFF18" };
-  const BORDER_ERR    = { light: "#FF453A25", dark: "#FF453A30" };
-  
+  const CARD_BG       = "#1C1C1E99";  // 统一深色半透明，不区分深浅色
+  const TEXT_PRIMARY  = "#FFFFFF";
+  const TEXT_SECOND   = "#FFFFFFCC";
+  const TEXT_SOFT     = "#FFFFFF88";
+  const BORDER_NORMAL = "#FFFFFF18";
+  const BORDER_ERR    = "#FF453A30";
+
   function usageColor(pct) {
     if (pct >= 80) return "#FF453A";
     if (pct >= 60) return "#FF9F0A";
