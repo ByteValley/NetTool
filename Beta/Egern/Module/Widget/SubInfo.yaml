@@ -204,8 +204,6 @@ scriptings:
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Widget/sub_info_ctx.js
       env:
         _compat.$argument: TRANSPARENT={{{TRANSPARENT}}}&title1={{{NAME1}}}&url1={{{URL1}}}&resetDay1={{{RESET1}}}&title2={{{NAME2}}}&url2={{{URL2}}}&resetDay2={{{RESET2}}}&title3={{{NAME3}}}&url3={{{URL3}}}&resetDay3={{{RESET3}}}&title4={{{NAME4}}}&url4={{{URL4}}}&resetDay4={{{RESET4}}}&title5={{{NAME5}}}&url5={{{URL5}}}&resetDay5={{{RESET5}}}&title6={{{NAME6}}}&url6={{{URL6}}}&resetDay6={{{RESET6}}}&title7={{{NAME7}}}&url7={{{URL7}}}&resetDay7={{{RESET7}}}&title8={{{NAME8}}}&url8={{{URL8}}}&resetDay8={{{RESET8}}}&title9={{{NAME9}}}&url9={{{URL9}}}&resetDay9={{{RESET9}}}&title10={{{NAME10}}}&url10={{{URL10}}}&resetDay10={{{RESET10}}}&CACHE={{{CACHE}}}&CACHE_TTL={{{CACHE_TTL}}}
-      update_interval: 21600
-      timeout: 30
 
 widgets:
   - name: 订阅信息
