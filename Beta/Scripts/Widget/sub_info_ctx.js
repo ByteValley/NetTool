@@ -322,11 +322,6 @@ async function fetchInfo(ctx, slot) {
   return { name: slot.name, error: true };
 }
 
-
-  log("fetchInfo final error", "name:", slot.name);
-  return { name: slot.name, error: true };
-}
-
 // =====================================================================
 // 模块分类 · 主入口
 // =====================================================================
