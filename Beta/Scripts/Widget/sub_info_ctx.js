@@ -443,8 +443,9 @@ export default async function (ctx) {
 
   const BG_COLOR      = useTransparent ? "transparent"
                       : { light: "#F2F2F7", dark: "#202F44" };
-  const CARD_BG       = useTransparent ? { light: "#00000018", dark: "#FFFFFF10" }
-                      : { light: "#FFFFFF",  dark: "#2A3F58" };
+  const CARD_BG       = useTransparent
+                      ? { light: "systemThinMaterial", dark: "systemThinMaterial" }
+                      : { light: "#FFFFFF",   dark: "#2A3F58" };
   const CARD_BG_ERR   = useTransparent ? { light: "#FF453A18", dark: "#FF453A15" }
                       : { light: "#FF453A10", dark: "#FF453A15" };
   const TEXT_PRIMARY  = useTransparent ? "#FFFFFF"
