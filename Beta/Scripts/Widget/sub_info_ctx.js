@@ -439,6 +439,7 @@ export default async function (ctx) {
 
   const useTransparent = (getParam("TRANSPARENT") ?? getParam("transparent") ?? "0") === "1";
 
+  const BG_COLOR      = "transparent";
   const CARD_BG       = "#1C1C1E99";  // 统一深色半透明，不区分深浅色
   const TEXT_PRIMARY  = "#FFFFFF";
   const TEXT_SECOND   = "#FFFFFFCC";
