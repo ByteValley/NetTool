@@ -330,7 +330,16 @@ async function fetchInfo(ctx, slot) {
 // =====================================================================
 
 export default async function (ctx) {
-
+  
+    // ─── 环境探测（调试用，确认后删除）──────────────────────────
+  try {
+    log("ctx keys:", Object.keys(ctx).join(", "));
+    log("widgetFamily:", ctx.widgetFamily);
+    log("env keys:", Object.keys(ctx.env || {}).join(", "));
+  } catch (e) {
+    log("ctx inspect error:", String(e));
+  }
+  
   // ─── 参数读取：env > arguments > boxjs ─────────────────────
 
   function getParam(key) {
