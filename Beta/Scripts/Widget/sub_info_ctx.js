@@ -1,15 +1,16 @@
 /* =========================================================
  * 模块：订阅信息 Widget（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2026-03-26R2
+ * 版本：2026-03-26R1
  *
  * 模块分类 · 布局样式
- * · 恢复 2×N 双列网格布局
+ * · 2×N 双列网格布局
  * · 中卡显示 4 个机场（2×2）
  * · 大卡显示 10 个机场（2×5）
- * · 每个机场使用彩色描边卡片
- * · 不额外包裹总底板，避免与宿主组件背景形成两层底色
- * · 单个订阅小卡改为透明背景，仅保留彩色线框
+ * · 整个组件保留统一底色
+ * · 浅色模式：白色底板
+ * · 深色模式：#202F44 底板
+ * · 单个订阅小卡透明，仅保留彩色描边
  *
  * 模块分类 · 功能边界
  * · 支持最多 10 组订阅链接
@@ -110,15 +111,6 @@ function isHttpUrl(s) {
 function inferName(url) {
   const m = String(url || "").match(/^https?:\/\/([^\/?#]+)/i);
   return m ? m[1] : "未命名订阅";
-}
-
-function alphaHex(hex, alpha) {
-  const raw = String(hex || "").replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(raw)) return hex;
-  const a = Math.max(0, Math.min(255, Math.round(alpha * 255)))
-    .toString(16)
-    .padStart(2, "0");
-  return `#${raw}${a}`;
 }
 
 function parseArgString(raw) {
@@ -488,9 +480,8 @@ export default async function (ctx) {
 
   const BG_COLOR = useTransparent
     ? "transparent"
-    : { light: "#F2F2F7", dark: "#202F44" };
+    : { light: "#FFFFFF", dark: "#202F44" };
 
-  // 小卡保持透明，避免宿主背景上再叠一层独立底色
   const CARD_BG = "transparent";
   const CARD_BG_ERR = "transparent";
 
