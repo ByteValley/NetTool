@@ -1,14 +1,15 @@
 /* =========================================================
  * 模块：订阅信息 Widget（多机场流量 / 到期展示）
  * 作者：ByteValley
- * 版本：2026-03-25R1
+ * 版本：2026-03-26R2
  *
  * 模块分类 · 布局样式
  * · 恢复 2×N 双列网格布局
  * · 中卡显示 4 个机场（2×2）
  * · 大卡显示 10 个机场（2×5）
  * · 每个机场使用彩色描边卡片
- * · 保留主底板与透明背景适配
+ * · 不额外包裹总底板，避免与宿主组件背景形成两层底色
+ * · 单个订阅小卡改为透明背景，仅保留彩色线框
  *
  * 模块分类 · 功能边界
  * · 支持最多 10 组订阅链接
@@ -489,17 +490,15 @@ export default async function (ctx) {
     ? "transparent"
     : { light: "#F2F2F7", dark: "#202F44" };
 
-  const CARD_BG = useTransparent
-    ? "transparent"
-    : { light: "#FFFFFF", dark: "#1E2B3D" };
-
-  const CARD_BG_ERR = { light: "#FF453A10", dark: "#FF453A20" };
+  // 小卡保持透明，避免宿主背景上再叠一层独立底色
+  const CARD_BG = "transparent";
+  const CARD_BG_ERR = "transparent";
 
   const TEXT_PRIMARY  = { light: "#1C1C1E",   dark: "#FFFFFF" };
   const TEXT_SECOND   = { light: "#3C3C43CC", dark: "#EBEBF5CC" };
   const TEXT_SOFT     = { light: "#3C3C4399", dark: "#EBEBF566" };
-  const BORDER_NORMAL = { light: "#00000010", dark: "#FFFFFF18" };
-  const BORDER_ERR    = { light: "#FF453A30", dark: "#FF453A40" };
+  const BORDER_NORMAL = { light: "#00000012", dark: "#FFFFFF1A" };
+  const BORDER_ERR    = { light: "#FF453A66", dark: "#FF453A88" };
   const TRACK_BG      = { light: "#00000014", dark: "#FFFFFF14" };
 
   function usageColor(pct) {
@@ -584,8 +583,8 @@ export default async function (ctx) {
         direction: "column",
         padding: compactMode ? [5, 8, 5, 8] : [7, 10, 7, 10],
         backgroundColor: CARD_BG,
-        borderRadius: 10,
-        borderWidth: 0.5,
+        borderRadius: 12,
+        borderWidth: 1,
         borderColor: BORDER_NORMAL,
         children: [
           {
@@ -610,8 +609,8 @@ export default async function (ctx) {
         gap: 5,
         padding: compactMode ? [5, 8, 5, 8] : [7, 10, 7, 10],
         backgroundColor: CARD_BG_ERR,
-        borderRadius: 10,
-        borderWidth: 1,
+        borderRadius: 12,
+        borderWidth: 1.2,
         borderColor: BORDER_ERR,
         children: [
           {
@@ -704,12 +703,10 @@ export default async function (ctx) {
       gap: 0,
       padding: pad,
       backgroundColor: CARD_BG,
-      borderRadius: 10,
-      borderWidth: 1,
+      borderRadius: 12,
+      borderWidth: 1.2,
       borderColor: uc,
       children: [
-
-        // 第一行：机场名 + 百分比
         {
           type: "stack",
           direction: "row",
@@ -743,7 +740,6 @@ export default async function (ctx) {
 
         { type: "stack", height: gapTop, children: [] },
 
-        // 第二行：已用/总量
         {
           type: "text",
           text: `${bytesToSize(used)}/${bytesToSize(totalBytes)}`,
@@ -755,7 +751,6 @@ export default async function (ctx) {
 
         { type: "stack", height: gapMid, children: [] },
 
-        // 第三行：进度条
         {
           type: "stack",
           direction: "row",
@@ -789,7 +784,6 @@ export default async function (ctx) {
 
         { type: "stack", height: gapMid, children: [] },
 
-        // 第四行：左=重置 右=到期
         {
           type: "stack",
           direction: "row",
@@ -828,8 +822,6 @@ export default async function (ctx) {
     backgroundColor: BG_COLOR,
     refreshAfter: refreshTime,
     children: [
-
-      // 标题栏
       {
         type: "stack",
         direction: "row",
@@ -854,7 +846,6 @@ export default async function (ctx) {
         ]
       },
 
-      // 卡片网格
       {
         type: "stack",
         direction: "column",
