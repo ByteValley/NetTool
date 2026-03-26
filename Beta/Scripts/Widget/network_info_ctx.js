@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 网络信息组件
  * 作者 · ByteValley
- * 版本 · 2026-03-18R1
+ * 版本 · 2026-03-26R1
  *
  * 模块分类 · 说明
  * · 参数优先级：
@@ -16,6 +16,8 @@
  * · 策略 / 入口支持自动捕获（若宿主提供 recent requests 能力），否则回退手动传参
  * · 日志统一输出到宿主日志（console.log）
  * · Widget 采用单页卡片模式，通过 WIDGET_PAGE 切换摘要/本地/入口/落地/风险/服务检测
+ * · Widget 背景统一：
+ *   浅色 #FFFFFF / 深色 #202F44
  * ========================================================= */
 
 const CONSTS = Object.freeze({
@@ -112,7 +114,15 @@ const SD_STR = {
     regionBlocked: "区域受限",
     nfFull: "已完整解锁",
     nfOriginals: "仅解锁自制剧",
-    debug: "调试"
+    debug: "调试",
+    networkType: "网络类型",
+    proxyFeature: "代理特征",
+    evidence: "证据",
+    riskValue: "风险值",
+    completeShort: "完整",
+    partialShort: "部分",
+    failedShort: "失败",
+    componentError: "网络信息组件异常"
   },
   "zh-Hant": {
     localIPv4: "本地 IPv4",
@@ -158,7 +168,15 @@ const SD_STR = {
     regionBlocked: "區域受限",
     nfFull: "已完整解鎖",
     nfOriginals: "僅解鎖自製劇",
-    debug: "除錯"
+    debug: "除錯",
+    networkType: "網路類型",
+    proxyFeature: "代理特徵",
+    evidence: "證據",
+    riskValue: "風險值",
+    completeShort: "完整",
+    partialShort: "部分",
+    failedShort: "失敗",
+    componentError: "網路資訊組件異常"
   }
 };
 
@@ -168,6 +186,36 @@ function S() { return G; }
 function t(key) {
   const pack = SD_STR[S()?.CFG?.SD_LANG || "zh-Hans"] || SD_STR["zh-Hans"];
   return pack[key] != null ? pack[key] : key;
+}
+
+function isHant() {
+  return S()?.CFG?.SD_LANG === "zh-Hant";
+}
+
+function riskReason(type, delta = 0) {
+  const sign = delta > 0 ? `+${delta}` : `${delta}`;
+  const mapHans = {
+    ptrDatacenter: "PTR 命中机房域名后缀",
+    ptrHome: `PTR 命中住宅/接入网关键词(${sign})`,
+    ptrMobile: `PTR 命中移动网络关键词(${sign})`,
+    orgDatacenter: "ORG/ISP/AS 命中机房/云/托管关键词(+55)",
+    orgHome: `ORG/ISP/AS 命中家宽/接入关键词(${sign})`,
+    orgMobile: `ORG/ISP/AS 命中移动网络关键词(${sign})`,
+    countryRisk: "国家风险加成(+18)",
+    infoLess: "信息不足惩罚(+10)"
+  };
+  const mapHant = {
+    ptrDatacenter: "PTR 命中機房網域後綴",
+    ptrHome: `PTR 命中住宅/接入網關鍵詞(${sign})`,
+    ptrMobile: `PTR 命中行動網路關鍵詞(${sign})`,
+    orgDatacenter: "ORG/ISP/AS 命中機房/雲/託管關鍵詞(+55)",
+    orgHome: `ORG/ISP/AS 命中家寬/接入關鍵詞(${sign})`,
+    orgMobile: `ORG/ISP/AS 命中行動網路關鍵詞(${sign})`,
+    countryRisk: "國家風險加成(+18)",
+    infoLess: "資訊不足懲罰(+10)"
+  };
+  const pack = isHant() ? mapHant : mapHans;
+  return pack[type] || "";
 }
 
 function safeJSON(s, d = {}) {
@@ -1072,19 +1120,47 @@ function calculateRiskValueSafe(isp, org, country, asField, rdnsHost) {
   const rdnsHitHB = _hasAny(rdnsHost, RISK_RULES.rdnsHomeKeywords);
   const rdnsHitMobile = _hasAny(rdnsHost, RISK_RULES.rdnsMobileKeywords);
 
-  if (rdnsHitDC) { riskValue += 75; reasons.push("PTR 命中机房域名后缀"); }
-  if (rdnsHitHB) { const delta = rdnsHitDC ? -6 : -26; riskValue += delta; reasons.push(`PTR 命中住宅/接入网关键词(${delta})`); }
-  if (rdnsHitMobile) { const delta = rdnsHitDC ? 0 : -8; riskValue += delta; reasons.push(`PTR 命中移动网络关键词(${delta})`); }
+  if (rdnsHitDC) {
+    riskValue += 75;
+    reasons.push(riskReason("ptrDatacenter"));
+  }
+  if (rdnsHitHB) {
+    const delta = rdnsHitDC ? -6 : -26;
+    riskValue += delta;
+    reasons.push(riskReason("ptrHome", delta));
+  }
+  if (rdnsHitMobile) {
+    const delta = rdnsHitDC ? 0 : -8;
+    riskValue += delta;
+    reasons.push(riskReason("ptrMobile", delta));
+  }
 
   const dcHit = _hasAny(hay, RISK_RULES.dataCenterKeywords);
   const hbHit = _hasAny(hay, RISK_RULES.homeBroadbandKeywords);
   const mobileHit = _hasAny(hay, RISK_RULES.mobileKeywords);
 
-  if (dcHit) { riskValue += 55; reasons.push("ORG/ISP/AS 命中机房/云/托管关键词(+55)"); }
-  if (hbHit) { const delta = (rdnsHitDC || dcHit) ? -10 : -22; riskValue += delta; reasons.push(`ORG/ISP/AS 命中家宽/接入关键词(${delta})`); }
-  if (mobileHit) { const delta = (rdnsHitDC || dcHit) ? 0 : -10; riskValue += delta; reasons.push(`ORG/ISP/AS 命中移动网络关键词(${delta})`); }
-  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(normStr(x)))) { riskValue += 18; reasons.push("国家风险加成(+18)"); }
-  if (!ORG && !AS && ISP.length <= 3) { riskValue += 10; reasons.push("信息不足惩罚(+10)"); }
+  if (dcHit) {
+    riskValue += 55;
+    reasons.push(riskReason("orgDatacenter"));
+  }
+  if (hbHit) {
+    const delta = (rdnsHitDC || dcHit) ? -10 : -22;
+    riskValue += delta;
+    reasons.push(riskReason("orgHome", delta));
+  }
+  if (mobileHit) {
+    const delta = (rdnsHitDC || dcHit) ? 0 : -10;
+    riskValue += delta;
+    reasons.push(riskReason("orgMobile", delta));
+  }
+  if (RISK_RULES.highRiskCountries.some((x) => CTRY.includes(normStr(x)))) {
+    riskValue += 18;
+    reasons.push(riskReason("countryRisk"));
+  }
+  if (!ORG && !AS && ISP.length <= 3) {
+    riskValue += 10;
+    reasons.push(riskReason("infoLess"));
+  }
 
   riskValue = clamp(Math.round(riskValue), 0, 100);
 
@@ -1904,10 +1980,10 @@ function buildPanelContent(model) {
 
   if (model.risk) {
     pushGroupTitle(lines, t("risk"));
-    lines.push(`网络类型：${model.risk.lineType} · ${model.risk.nativeHint}`);
-    lines.push(`代理特征：${model.risk.tunnelHint}`);
-    lines.push(`证据：${(model.risk.reasons || []).slice(0, 4).join("；") || "-"}`);
-    lines.push(`风险值：${model.risk.riskValue}%`);
+    lines.push(`${t("networkType")}：${model.risk.lineType} · ${model.risk.nativeHint}`);
+    lines.push(`${t("proxyFeature")}：${model.risk.tunnelHint}`);
+    lines.push(`${t("evidence")}：${(model.risk.reasons || []).slice(0, 4).join("；") || "-"}`);
+    lines.push(`${t("riskValue")}：${model.risk.riskValue}%`);
   }
 
   pushGroupTitle(lines, t("services"));
@@ -1956,9 +2032,8 @@ function renderPanel(model) {
 
 function widgetColors() {
   return {
-    // 主题色背景，透明作为可选
-    bg: { light: "#F2F2F7", dark: "#202F44" },
-    cardBg: { light: "#FFFFFF", dark: "#2A3F58" },
+    bg: { light: "#FFFFFF", dark: "#202F44" },
+    cardBg: { light: "#FFFFFF", dark: "#202F44" },
     cardBorder: { light: "#00000010", dark: "#FFFFFF15" },
     textMain: { light: "#1C1C1E", dark: "#FFFFFF" },
     textSub: { light: "#3C3C43CC", dark: "#EBEBF5CC" },
@@ -1969,7 +2044,6 @@ function widgetColors() {
     bad:  { light: "#EB2E53", dark: "#F85872" }
   };
 }
-
 
 function widgetText(v, fallback = "-") {
   const s = String(v == null ? "" : v).trim();
@@ -2156,7 +2230,7 @@ function buildRiskCard(model, colors) {
       `${risk.lineType}`,
       `${risk.nativeHint}`,
       `${risk.tunnelHint}`,
-      `风险值 ${risk.riskValue}%`
+      `${t("riskValue")} ${risk.riskValue}%`
     ],
     colors,
     "sf-symbol:shield.lefthalf.filled",
@@ -2169,7 +2243,7 @@ function buildServiceCard(model, colors) {
   const summary = widgetServiceSummary(model);
 
   const rows = [
-    `完整 ${summary.ok} · 部分 ${summary.partial} · 失败 ${summary.bad}`
+    `${t("completeShort")} ${summary.ok} · ${t("partialShort")} ${summary.partial} · ${t("failedShort")} ${summary.bad}`
   ];
 
   for (const item of svs.slice(0, 3)) {
@@ -2230,25 +2304,21 @@ function buildSummaryCard(model, colors) {
     };
   }
 
-  // 本地
   const localLoc = model.local?.loc
     ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
     : "";
   const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
   const localPosVal = [localLoc, localIsp].filter(Boolean).join(" ") || null;
 
-  // 落地
   const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
   const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
   const landingPosVal = [landingLoc, landingIsp].filter(Boolean).join(" ") || null;
 
-  // 落地IP
   const isDatacenter = model.risk && model.risk.riskValue >= 60;
   const landingIPDisplay = model.landing?.ip
     ? maskIP(model.landing.ip) + (isDatacenter ? t("datacenter") : "")
     : null;
 
-  // 风险一行
   const riskColor = widgetRiskTone(model, colors);
   function riskLevelLabel(riskValue) {
     if (riskValue >= 70) return t("highRisk");
@@ -2260,16 +2330,15 @@ function buildSummaryCard(model, colors) {
     ? `${riskLevelLabel(model.risk.riskValue)} (${model.risk.riskValue}%) · ${model.risk.lineType} · ${model.risk.tunnelHint}`
     : null;
 
-  // 流媒体：中文名/英文全称
   const SD_NAME = {
-    youtube:     "YouTube",
-    netflix:     "Netflix",
-    disney:      "Disney+",
+    youtube: "YouTube",
+    netflix: "Netflix",
+    disney: "Disney+",
     chatgpt_app: "ChatGPT",
     chatgpt_web: "ChatGPT Web",
-    hulu_us:     "Hulu US",
-    hulu_jp:     "Hulu JP",
-    hbo:         "Max"
+    hulu_us: "Hulu US",
+    hulu_jp: "Hulu JP",
+    hbo: "Max"
   };
   const sdParts = svs.map(x => {
     const name = SD_NAME[x.key] || x.name;
@@ -2279,12 +2348,10 @@ function buildSummaryCard(model, colors) {
   });
   const sdLine = sdParts.length ? sdParts.join(" · ") : t("noData");
 
-  // 标题图标：Wi-Fi 还是蜂窝
   const n = S().RT.device || {};
   const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
   const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
 
-  // 顶部标题行
   const headerRow = {
     type: "stack",
     direction: "row",
@@ -2334,7 +2401,7 @@ function buildSummaryCard(model, colors) {
   if (landingPosVal) rows.push(kvRow("mappin.and.ellipse", "#9B59B6", t("landingPos"), landingPosVal));
   if (riskVal) rows.push(kvRow("exclamationmark.shield.fill", "#F59E0B", t("riskLevel"), riskVal, riskColor));
   rows.push(kvRow("play.rectangle.fill", "#27AE60", t("serviceCheck"), sdLine));
-  
+
   return {
     type: "stack",
     direction: "column",
@@ -2347,13 +2414,12 @@ function buildSummaryCard(model, colors) {
   };
 }
 
-// ===================== large card =====================
 function buildLargeCard(model, colors) {
   const n = S().RT.device || {};
   const isWifi = !!n.wifi?.ssid || /^(en|eth|wlan)/i.test(n.ipv4?.interface || n.ipv6?.interface || "");
   const headerIcon = isWifi ? "wifi" : "antenna.radiowaves.left.and.right";
 
-  function groupTitle(sfIcon, iconColor, label) {
+  function groupTitle(label, sfIcon = "circle.fill", iconColor = colors.accent) {
     return {
       type: "stack",
       direction: "row",
@@ -2410,7 +2476,6 @@ function buildLargeCard(model, colors) {
   function svcRow(x) {
     if (!x) return null;
     const regionCC = x.cc ? x.cc.toUpperCase() : "";
-    // 有地区时显示旗帜，无地区时不显示
     const regionFlag = regionCC ? sd_flagFromCC(regionCC) || regionCC : "";
     const stateText = x.state === "full"
       ? (x.tag || t("unlocked"))
@@ -2445,30 +2510,24 @@ function buildLargeCard(model, colors) {
     };
   }
 
-  // 本地
   const localLoc = model.local?.loc
     ? (S().CFG.MASK_POS ? onlyFlag(model.local.loc) : flagFirst(model.local.loc))
     : "";
   const localIsp = model.local?.isp ? fmtISP(model.local.isp, model.local.loc) : "";
 
-  // 落地
   const landingLoc = model.landing?.loc ? flagFirst(model.landing.loc) : "";
   const landingIsp = model.landing?.isp ? fmtISP(model.landing.isp, model.landing.loc) : "";
 
-  // 入口
   const entShow = (model.entrance && (model.entrance.loc1 || model.entrance.isp1))
     ? model.entrance : model.entrance6;
   const hasEntrance = model.entrance?.ip || model.entrance6?.ip || entShow?.loc1;
 
-  // 风险
   const risk = model.risk;
   const riskColor = widgetRiskTone(model, colors);
 
-  // 服务
   const svs = Array.isArray(model.services) ? model.services : [];
 
   const rows = [
-    // 标题行
     {
       type: "stack",
       direction: "row",
@@ -2509,36 +2568,31 @@ function buildLargeCard(model, colors) {
       ]
     },
 
-    // 本地
-    groupTitle(t("local")),
+    groupTitle(t("local"), "house.fill", "#4A9EFF"),
     model.local?.ip ? kvRow(t("localIPv4"), maskIP(model.local.ip)) : null,
     model.local6?.ip ? kvRow(t("localIPv6"), maskIP(model.local6.ip)) : null,
     localLoc ? kvRow(t("location"), localLoc) : null,
     localIsp ? kvRow(t("isp"), localIsp) : null,
 
-    // 入口（有数据才显示）
-    hasEntrance ? groupTitle(t("entrance")) : null,
+    hasEntrance ? groupTitle(t("entrance"), "arrow.down.forward.circle", colors.textSoft) : null,
     hasEntrance && model.entrance?.ip ? kvRow(t("localIPv4"), maskIP(model.entrance.ip)) : null,
     hasEntrance && model.entrance6?.ip ? kvRow(t("localIPv6"), maskIP(model.entrance6.ip)) : null,
     hasEntrance && entShow?.loc1 ? kvRow(t("location"), flagFirst(entShow.loc1)) : null,
     hasEntrance && entShow?.isp1 ? kvRow(t("isp"), fmtISP(entShow.isp1, entShow.loc1)) : null,
 
-    // 落地
-    groupTitle(t("landing")),
+    groupTitle(t("landing"), "airplane.circle", "#9B59B6"),
     model.landing?.ip ? kvRow(t("landingIPv4"), maskIP(model.landing.ip)) : null,
     model.landing6?.ip ? kvRow(t("landingIPv6"), maskIP(model.landing6.ip)) : null,
     landingLoc ? kvRow(t("location"), landingLoc) : null,
     landingIsp ? kvRow(t("isp"), landingIsp) : null,
 
-    // 风险
-    risk ? groupTitle(t("risk")) : null,
-    risk ? kvRow("网络类型", `${risk.lineType} · ${risk.nativeHint}`) : null,
-    risk ? kvRow("代理特征", risk.tunnelHint) : null,
-    risk ? kvRow("证据", (risk.reasons || []).slice(0, 2).join("；") || "-") : null,
-    risk ? kvRow("风险值", `${risk.riskValue}%`, riskColor) : null,
+    risk ? groupTitle(t("risk"), "shield.lefthalf.filled", riskColor) : null,
+    risk ? kvRow(t("networkType"), `${risk.lineType} · ${risk.nativeHint}`) : null,
+    risk ? kvRow(t("proxyFeature"), risk.tunnelHint) : null,
+    risk ? kvRow(t("evidence"), (risk.reasons || []).slice(0, 2).join("；") || "-") : null,
+    risk ? kvRow(t("riskValue"), `${risk.riskValue}%`, riskColor) : null,
 
-    // 服务检测
-    svs.length ? groupTitle(t("services")) : null,
+    svs.length ? groupTitle(t("services"), "sparkles.tv", colors.ok) : null,
     ...svs.map(svcRow)
   ];
 
@@ -2553,7 +2607,6 @@ function buildLargeCard(model, colors) {
   };
 }
 
-// ===================== renderWidget（替换原有的）=====================
 function renderWidget(model) {
   const colors = widgetColors();
   const refreshTime = new Date(
@@ -2571,7 +2624,7 @@ function renderWidget(model) {
       type: "widget",
       family: "medium",
       padding: [0, 0, 0, 0],
-      backgroundGradient: colors.bgGradient,
+      backgroundColor: colors.bg,
       refreshAfter: refreshTime,
       children: [buildSummaryCard(model, colors)]
     },
@@ -2579,7 +2632,7 @@ function renderWidget(model) {
       type: "widget",
       family: "large",
       padding: [0, 0, 0, 0],
-      backgroundGradient: colors.bgGradient,
+      backgroundColor: colors.bg,
       refreshAfter: refreshTime,
       children: [buildLargeCard(model, colors)]
     }
@@ -2594,16 +2647,7 @@ function renderErrorWidget(err) {
     type: "widget",
     padding: [6, 6, 6, 6],
     gap: 0,
-    backgroundGradient: {
-      type: "linear",
-      colors: [
-        { light: "#FFF7F7", dark: "#2A1414" },
-        { light: "#FFFFFF", dark: "#1A1A1A" }
-      ],
-      stops: [0, 1],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 }
-    },
+    backgroundColor: { light: "#FFFFFF", dark: "#202F44" },
     refreshAfter: new Date(Date.now() + 60000).toISOString(),
     children: [
       {
@@ -2611,7 +2655,7 @@ function renderErrorWidget(err) {
         direction: "column",
         gap: 8,
         padding: [10, 10, 10, 10],
-        backgroundColor: { light: "#FFFFFF", dark: "#23252A" },
+        backgroundColor: { light: "#FFFFFF", dark: "#202F44" },
         borderRadius: 14,
         borderWidth: 0.5,
         borderColor: { light: "#E8EAEE", dark: "#343741" },
@@ -2631,7 +2675,7 @@ function renderErrorWidget(err) {
               },
               {
                 type: "text",
-                text: "网络信息组件异常",
+                text: t("componentError"),
                 font: { size: "caption1", weight: "semibold" },
                 textColor: { light: "#111827", dark: "#F3F4F6" }
               }
@@ -2661,7 +2705,6 @@ export default async function(ctx) {
     const family = String(ctx.widgetFamily || "").toLowerCase();
     const isLarge = family === "systemlarge" || family === "large";
 
-    // TRANSPARENT=1 启用透明背景，默认主题色
     const useTransparent = String(S().CFG.ENV_DIRECT?.TRANSPARENT ?? "0") === "1";
 
     log("info", "widget-family", { family, isLarge, transparent: useTransparent });
