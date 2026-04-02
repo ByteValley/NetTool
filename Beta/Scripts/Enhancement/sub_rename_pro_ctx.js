@@ -1,16 +1,23 @@
 /* =========================================================
  * 模块分类 · 通用订阅改名 / Egern 原生版
  * 作者 · ByteValley
- * 版本 · 2026-03-24R1
+ * 版本 · 2026-04-02R1
  *
  * 模块分类 · 说明
  * · 运行方式：Egern http_response 脚本
  * · 用途：直接改写订阅响应内容
+ * · 适配格式：
+ *   · Surge 托管配置 / Surge Profile
+ *   · 通用订阅（URI / Base64）
+ *   · Clash YAML
  * · 环境变量：
  *   PREFIX = 自定义前缀，如 "【ByteEden】 "
- *   TWFLAG = 台湾旗帜修正开关，1=启用，0=关闭
+ *   TWFLAG = 台湾旗帜修正模式，1=台湾旗帜，0=关闭，-1=萨摩亚旗帜替代
  *
  * 模块分类 · 设计原则
+ * · Surge Profile：改 [Proxy] 名称，并同步更新 [Proxy Group] / [Rule] 引用
+ * · 通用订阅：改 # 后名称 / vmess 的 ps 字段
+ * · Clash YAML：改 proxies.name
  * · 旗帜优先于英文国家名
  * · 城市优先于国家
  * · 先替换，再清理重复
@@ -32,8 +39,8 @@ export default async function (ctx) {
     return passthroughResponse(ctx);
   }
 
-  let content = String(rawBody || "").trim();
-  if (!content) {
+  let content = String(rawBody || "");
+  if (!content.trim()) {
     console.log("[SubRename] 响应体为空，跳过处理");
     return passthroughResponse(ctx);
   }
@@ -41,21 +48,41 @@ export default async function (ctx) {
   let isBase64Wrapped = false;
 
   try {
+    const original = content;
+    let decoded = content;
+
     if (looksLikeBase64(content)) {
-      const decoded = tryDecodeBase64ToText(content);
-      if (decoded && looksLikeUsefulDecodedText(decoded)) {
+      const maybeDecoded = tryDecodeBase64ToText(content);
+      if (maybeDecoded && looksLikeUsefulDecodedText(maybeDecoded)) {
         isBase64Wrapped = true;
-        content = decoded.trim();
+        decoded = maybeDecoded;
       }
     }
 
-    const isClash = looksLikeClashYaml(content);
-    const outText = isClash
-      ? rewriteClashYamlProxyNames(content, prefix, twFlagMode)
-      : rewriteSubscriptionLines(content, prefix, twFlagMode);
+    decoded = String(decoded || "");
+
+    let mode = "unknown";
+    let outText = decoded;
+
+    if (looksLikeSurgeProfile(decoded)) {
+      mode = "surge-profile";
+      outText = rewriteSurgeProfile(decoded, prefix, twFlagMode);
+    } else if (looksLikeClashYaml(decoded)) {
+      mode = "clash";
+      outText = rewriteClashYamlProxyNames(decoded, prefix, twFlagMode);
+    } else if (looksLikeUniversalSubscription(decoded)) {
+      mode = "universal";
+      outText = rewriteSubscriptionLines(decoded, prefix, twFlagMode);
+    } else {
+      console.log("[SubRename] 未识别格式，透传");
+      return passthroughResponse(ctx);
+    }
 
     const finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText;
-    console.log(`[SubRename] 处理完成，base64=${isBase64Wrapped}, clash=${isClash}`);
+
+    console.log(
+      `[SubRename] 处理完成, mode=${mode}, twflag=${twFlagMode}, base64=${isBase64Wrapped}, oldLen=${original.length}, newLen=${finalBody.length}`
+    );
 
     return buildModifiedResponse(ctx, finalBody);
   } catch (e) {
@@ -137,7 +164,7 @@ const FLAG_TO_ZH = {
   "🇵🇹": "葡萄牙",
   "🇦🇺": "澳洲",
   "🇳🇿": "新西兰",
-  // 以下为新增补充
+
   "🇲🇴": "澳门",
   "🇦🇪": "阿联酋",
   "🇶🇦": "卡塔尔",
@@ -161,28 +188,37 @@ const FLAG_TO_ZH = {
   "🇮🇩": "印尼",
   "🇮🇳": "印度",
   "🇧🇩": "孟加拉",
-  "🇰🇭": "柬埔寨"
+  "🇰🇭": "柬埔寨",
+  "🇵🇰": "巴基斯坦"
 };
 
 /* =========================================================
- * 中文地区名 → 旗帜（由 FLAG_TO_ZH 自动反转 + 城市归属补充）
+ * 中文地区名 → 旗帜
  * ========================================================= */
 
-// 由 FLAG_TO_ZH 自动生成基础反查表
 const ZH_TO_FLAG = Object.fromEntries(
   Object.entries(FLAG_TO_ZH).map(([flag, zh]) => [zh, flag])
 );
 
-// 城市中文名 → 旗帜（城市归属国旗帜）
 const CITY_ZH_TO_FLAG = {
-  // 香港 / 澳门
   "香港": "🇭🇰",
   "澳门": "🇲🇴",
 
-  // 台湾
   "台北": "🇹🇼",
+  "新北": "🇹🇼",
+  "桃园": "🇹🇼",
+  "台中": "🇹🇼",
+  "台南": "🇹🇼",
+  "高雄": "🇹🇼",
+  "基隆": "🇹🇼",
+  "新竹": "🇹🇼",
+  "嘉义": "🇹🇼",
+  "宜兰": "🇹🇼",
+  "花莲": "🇹🇼",
+  "台东": "🇹🇼",
+  "屏东": "🇹🇼",
+  "澎湖": "🇹🇼",
 
-  // 日本
   "东京": "🇯🇵",
   "大阪": "🇯🇵",
   "名古屋": "🇯🇵",
@@ -190,13 +226,11 @@ const CITY_ZH_TO_FLAG = {
   "福冈": "🇯🇵",
   "冲绳": "🇯🇵",
 
-  // 韩国
   "首尔": "🇰🇷",
   "釜山": "🇰🇷",
   "仁川": "🇰🇷",
   "春川": "🇰🇷",
 
-  // 美国
   "洛杉矶": "🇺🇸",
   "圣何塞": "🇺🇸",
   "硅谷": "🇺🇸",
@@ -211,106 +245,79 @@ const CITY_ZH_TO_FLAG = {
   "亚特兰大": "🇺🇸",
   "拉斯维加斯": "🇺🇸",
 
-  // 加拿大
   "多伦多": "🇨🇦",
   "温哥华": "🇨🇦",
   "蒙特利尔": "🇨🇦",
   "渥太华": "🇨🇦",
 
-  // 墨西哥
   "墨西哥城": "🇲🇽",
 
-  // 英国
   "伦敦": "🇬🇧",
   "曼彻斯特": "🇬🇧",
   "伯明翰": "🇬🇧",
 
-  // 德国
   "法兰克福": "🇩🇪",
   "柏林": "🇩🇪",
   "慕尼黑": "🇩🇪",
   "杜塞尔多夫": "🇩🇪",
 
-  // 法国
   "巴黎": "🇫🇷",
   "马赛": "🇫🇷",
   "里昂": "🇫🇷",
 
-  // 荷兰
   "阿姆斯特丹": "🇳🇱",
   "鹿特丹": "🇳🇱",
 
-  // 意大利
   "米兰": "🇮🇹",
   "罗马": "🇮🇹",
   "那不勒斯": "🇮🇹",
 
-  // 西班牙
   "马德里": "🇪🇸",
   "巴塞罗那": "🇪🇸",
   "瓦伦西亚": "🇪🇸",
 
-  // 澳洲
   "悉尼": "🇦🇺",
   "墨尔本": "🇦🇺",
   "布里斯班": "🇦🇺",
   "珀斯": "🇦🇺",
   "阿德莱德": "🇦🇺",
 
-  // 阿联酋
   "迪拜": "🇦🇪",
   "阿布扎比": "🇦🇪",
 
-  // 卡塔尔
   "多哈": "🇶🇦",
 
-  // 沙特
   "利雅得": "🇸🇦",
   "吉达": "🇸🇦",
 
-  // 巴林
   "麦纳麦": "🇧🇭",
-
-  // 阿曼
   "马斯喀特": "🇴🇲",
 
-  // 以色列
   "特拉维夫": "🇮🇱",
   "耶路撒冷": "🇮🇱",
 
-  // 摩洛哥
   "卡萨布兰卡": "🇲🇦",
 
-  // 南非
   "约翰内斯堡": "🇿🇦",
   "开普敦": "🇿🇦",
 
-  // 埃及
   "开罗": "🇪🇬",
 
-  // 尼日利亚
   "拉各斯": "🇳🇬",
 
-  // 北马其顿
   "马其顿": "🇲🇰",
 
-  // 哈萨克斯坦
   "阿拉木图": "🇰🇿",
   "阿斯塔纳": "🇰🇿",
 
-  // 吉尔吉斯斯坦
   "比什凯克": "🇰🇬",
 
-  // 阿塞拜疆
   "巴库": "🇦🇿",
 
-  // 孟加拉
   "达卡": "🇧🇩",
 
-  // 柬埔寨
   "金边": "🇰🇭",
 
-  // 巴基斯坦
   "卡拉奇": "🇵🇰",
   "拉合尔": "🇵🇰"
 };
@@ -324,6 +331,20 @@ const CITY_RULES = [
   { zh: "澳门", alias: ["Macau", "Macao"] },
 
   { zh: "台北", alias: ["Taipei", "Taibei"] },
+  { zh: "新北", alias: ["New Taipei", "NewTaipei"] },
+  { zh: "桃园", alias: ["Taoyuan"] },
+  { zh: "台中", alias: ["Taichung"] },
+  { zh: "台南", alias: ["Tainan"] },
+  { zh: "高雄", alias: ["Kaohsiung"] },
+  { zh: "基隆", alias: ["Keelung"] },
+  { zh: "新竹", alias: ["Hsinchu"] },
+  { zh: "嘉义", alias: ["Chiayi"] },
+  { zh: "宜兰", alias: ["Yilan"] },
+  { zh: "花莲", alias: ["Hualien"] },
+  { zh: "台东", alias: ["Taitung"] },
+  { zh: "屏东", alias: ["Pingtung"] },
+  { zh: "澎湖", alias: ["Penghu"] },
+
   { zh: "东京", alias: ["Tokyo"] },
   { zh: "大阪", alias: ["Osaka"] },
   { zh: "名古屋", alias: ["Nagoya"] },
@@ -492,7 +513,8 @@ const COUNTRY_RULES = [
   { zh: "摩洛哥", alias: ["Maroc", "Morocco", "MA"] },
   { zh: "多哥", alias: ["Togo", "TG"] },
   { zh: "哈萨克斯坦", alias: ["Қазақстан", "Kazakhstan", "KZ"] },
-  { zh: "吉尔吉斯斯坦", alias: ["Кыргызстан", "Kyrgyzstan", "KG"] }
+  { zh: "吉尔吉斯斯坦", alias: ["Кыргызстан", "Kyrgyzstan", "KG"] },
+  { zh: "巴基斯坦", alias: ["Pakistan", "PAK", "PK"] }
 ];
 
 /* =========================================================
@@ -524,6 +546,20 @@ const CITY_PREFERRED_DISPLAY = {
 };
 
 /* =========================================================
+ * 台湾地区识别
+ * ========================================================= */
+
+const TAIWAN_LIKE_REG = /(台湾|台北|新北|桃园|台中|台南|高雄|基隆|新竹|嘉义|宜兰|花莲|台东|屏东|澎湖)/;
+
+function hasTaiwanLikeKeyword(name) {
+  return TAIWAN_LIKE_REG.test(String(name || ""));
+}
+
+function getTaiwanTargetFlag(mode) {
+  return String(mode || "0") === "-1" ? "🇼🇸" : "🇹🇼";
+}
+
+/* =========================================================
  * 核心逻辑
  * ========================================================= */
 
@@ -542,15 +578,12 @@ function applySmartRewrite(name, prefix, twFlagMode) {
   n = cleanupAfterReplace(n);
   n = cleanupPreferredCityDisplay(n);
 
-  if (twFlagMode === "1" && hasTaiwanKeyword(n)) {
-    n = fixTaiwanFlag(n);
+  if ((twFlagMode === "1" || twFlagMode === "-1") && hasTaiwanLikeKeyword(n)) {
+    n = fixTaiwanFlag(n, twFlagMode);
   }
 
   n = cleanupNodeName(n);
-
-  // ── 新增：无旗帜时自动补充 ──────────────────────────────
-  n = injectFlagIfMissing(n);
-  // ───────────────────────────────────────────────────────
+  n = injectFlagIfMissing(n, twFlagMode);
 
   return compactName(prefix + n);
 }
@@ -570,29 +603,18 @@ function injectZhFromFlag(name) {
   return s;
 }
 
-/**
- * 检测名称中是否已有 emoji 旗帜（Regional Indicator 双字符序列）。
- * 旗帜由两个 Regional Indicator Symbol 字母（U+1F1E6–U+1F1FF）组成。
- */
 function hasEmojiFlag(name) {
   return /[\u{1F1E6}-\u{1F1FF}]{2}/u.test(String(name || ""));
 }
 
-/**
- * 根据名称中出现的中文地区名推断旗帜。
- * 优先匹配城市名（更精确），再匹配国家名。
- * 返回找到的第一个旗帜，找不到返回空字符串。
- */
 function inferFlagFromZhName(name) {
   const s = String(name || "");
 
-  // 优先：城市名查表（按名称长度降序，避免短名称误匹配）
   const cityKeys = Object.keys(CITY_ZH_TO_FLAG).sort((a, b) => b.length - a.length);
   for (const city of cityKeys) {
     if (s.includes(city)) return CITY_ZH_TO_FLAG[city];
   }
 
-  // 其次：国家/地区名查表
   const countryKeys = Object.keys(ZH_TO_FLAG).sort((a, b) => b.length - a.length);
   for (const zh of countryKeys) {
     if (s.includes(zh)) return ZH_TO_FLAG[zh];
@@ -601,16 +623,16 @@ function inferFlagFromZhName(name) {
   return "";
 }
 
-/**
- * 若名称中没有旗帜 emoji，则根据地区名推断并插入到名称最前面。
- * 插入格式：<旗帜><空格><原名称>
- */
-function injectFlagIfMissing(name) {
+function injectFlagIfMissing(name, twFlagMode) {
   const s = String(name || "");
-  if (hasEmojiFlag(s)) return s;          // 已有旗帜，不处理
+  if (hasEmojiFlag(s)) return s;
+
+  if ((twFlagMode === "1" || twFlagMode === "-1") && hasTaiwanLikeKeyword(s)) {
+    return `${getTaiwanTargetFlag(twFlagMode)} ${s}`;
+  }
 
   const flag = inferFlagFromZhName(s);
-  if (!flag) return s;                    // 推断不出，不处理
+  if (!flag) return s;
 
   return `${flag} ${s}`;
 }
@@ -706,16 +728,17 @@ function cleanupPreferredCityDisplay(name) {
   return s;
 }
 
-function hasTaiwanKeyword(name) {
-  return /台湾/.test(String(name || ""));
-}
-
-function fixTaiwanFlag(name) {
+function fixTaiwanFlag(name, mode) {
   let s = String(name || "");
-  s = s.replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, "");
-  s = s.replace(/台湾/g, "🇹🇼 台湾");
-  s = s.replace(/(🇹🇼\s*){2,}/g, "🇹🇼 ");
-  return s;
+  const targetFlag = getTaiwanTargetFlag(mode);
+
+  s = s.replace(/[\u{1F1E6}-\u{1F1FF}]{2}\s*/gu, "");
+  s = compactName(`${targetFlag} ${s}`);
+
+  const reg = new RegExp(`(${escapeRegExp(targetFlag)}\\s*){2,}`, "g");
+  s = s.replace(reg, `${targetFlag} `);
+
+  return compactName(s);
 }
 
 /* =========================================================
@@ -766,8 +789,56 @@ function compactName(s) {
     .trim();
 }
 
+function isCommentOrEmpty(line) {
+  return /^\s*(#|;|\/\/|$)/.test(String(line || ""));
+}
+
+function cleanText(v) {
+  return String(v == null ? "" : v).trim();
+}
+
+function makeUniqueName(name, usedSet) {
+  const base = compactName(name || "Node");
+  if (!usedSet[base]) {
+    usedSet[base] = true;
+    return base;
+  }
+
+  let i = 2;
+  while (usedSet[`${base} ${i}`]) i++;
+  const out = `${base} ${i}`;
+  usedSet[out] = true;
+  return out;
+}
+
 /* =========================================================
- * 订阅改写
+ * 格式识别
+ * ========================================================= */
+
+function looksLikeBase64(s) {
+  const t = String(s || "").replace(/\s+/g, "");
+  return t.length >= 16 && t.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(t);
+}
+
+function looksLikeClashYaml(s) {
+  return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s);
+}
+
+function looksLikeUniversalSubscription(s) {
+  return /(vmess|vless|trojan|ss|ssr|hy2|hysteria2|hysteria|tuic):\/\//i.test(String(s || ""));
+}
+
+function looksLikeSurgeProfile(s) {
+  const t = String(s || "");
+  return /^\s*#!MANAGED-CONFIG\b/m.test(t) || /\[\s*Proxy\s*\]/i.test(t);
+}
+
+function looksLikeUsefulDecodedText(s) {
+  return looksLikeUniversalSubscription(s) || looksLikeClashYaml(s) || looksLikeSurgeProfile(s);
+}
+
+/* =========================================================
+ * 订阅改写 · 通用订阅
  * ========================================================= */
 
 function rewriteSubscriptionLines(text, prefix, twFlagMode) {
@@ -827,8 +898,136 @@ function rewriteClashYamlProxyNames(text, prefix, twFlagMode) {
     }
 
     const newName = applySmartRewrite(oldName, prefix, twFlagMode);
-    return `${head}"${newName}"`;
+    return `${head}"${escapeYamlDoubleQuoted(newName)}"`;
   }).join("\n");
+}
+
+function escapeYamlDoubleQuoted(s) {
+  return String(s || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
+}
+
+/* =========================================================
+ * Surge Profile 改写
+ * ========================================================= */
+
+function rewriteSurgeProfile(text, prefix, twFlagMode) {
+  const parsed = parseSurgeProfile(text);
+  const renameMap = {};
+  const usedNames = {};
+
+  for (let i = 0; i < parsed.sections.length; i++) {
+    const sec = parsed.sections[i];
+    if (normalizeSectionName(sec.name) !== "proxy") continue;
+
+    for (let j = 0; j < sec.lines.length; j++) {
+      const line = sec.lines[j];
+      if (isCommentOrEmpty(line)) continue;
+
+      const idx = line.indexOf("=");
+      if (idx === -1) continue;
+
+      const oldName = line.slice(0, idx).trim();
+      const rhs = line.slice(idx + 1).trim();
+      if (!oldName || !rhs) continue;
+
+      const renamedRaw = applySmartRewrite(oldName, prefix, twFlagMode);
+      const renamed = makeUniqueName(renamedRaw, usedNames);
+      renameMap[oldName] = renamed;
+      sec.lines[j] = `${renamed} = ${rhs}`;
+    }
+  }
+
+  for (let i = 0; i < parsed.sections.length; i++) {
+    const sec = parsed.sections[i];
+    const normalized = normalizeSectionName(sec.name);
+
+    if (normalized === "proxy group" || normalized === "rule") {
+      for (let j = 0; j < sec.lines.length; j++) {
+        sec.lines[j] = replacePolicyReferencesInLine(sec.lines[j], renameMap);
+      }
+    }
+  }
+
+  return buildSurgeProfileText(parsed);
+}
+
+function parseSurgeProfile(text) {
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  let managedHeader = "";
+  let i = 0;
+
+  if (lines.length && /^\s*#!MANAGED-CONFIG\b/i.test(lines[0].trim())) {
+    managedHeader = lines[0];
+    i = 1;
+  }
+
+  const preamble = [];
+  const sections = [];
+  let current = null;
+
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+    const m = line.match(/^\s*\[([^\]]+)\]\s*$/);
+    if (m) {
+      current = { name: m[1].trim(), lines: [] };
+      sections.push(current);
+      continue;
+    }
+
+    if (!current) {
+      preamble.push(line);
+    } else {
+      current.lines.push(line);
+    }
+  }
+
+  return {
+    managedHeader,
+    preamble,
+    sections
+  };
+}
+
+function buildSurgeProfileText(parsed) {
+  const out = [];
+
+  if (parsed.managedHeader) out.push(parsed.managedHeader);
+
+  if (parsed.preamble && parsed.preamble.length) {
+    for (let i = 0; i < parsed.preamble.length; i++) out.push(parsed.preamble[i]);
+    if (parsed.sections.length) out.push("");
+  }
+
+  for (let i = 0; i < parsed.sections.length; i++) {
+    const sec = parsed.sections[i];
+    out.push(`[${sec.name}]`);
+    for (let j = 0; j < sec.lines.length; j++) out.push(sec.lines[j]);
+    if (i !== parsed.sections.length - 1) out.push("");
+  }
+
+  return out.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+function normalizeSectionName(s) {
+  return String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function replacePolicyReferencesInLine(line, renameMap) {
+  if (isCommentOrEmpty(line)) return line;
+
+  let s = String(line || "");
+  const keys = Object.keys(renameMap).sort((a, b) => b.length - a.length);
+
+  for (let i = 0; i < keys.length; i++) {
+    const oldName = keys[i];
+    const newName = renameMap[oldName];
+    const reg = new RegExp(`([=,]\\s*)${escapeRegExp(oldName)}(?=\\s*(,|$))`, "g");
+    s = s.replace(reg, `$1${newName}`);
+  }
+
+  return s;
 }
 
 /* =========================================================
@@ -915,19 +1114,6 @@ function tryDecodeBase64ToText(b64) {
   } catch {
     return null;
   }
-}
-
-function looksLikeBase64(s) {
-  const t = String(s || "").replace(/\s+/g, "");
-  return t.length >= 16 && t.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(t);
-}
-
-function looksLikeClashYaml(s) {
-  return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s);
-}
-
-function looksLikeUsefulDecodedText(s) {
-  return /(vmess|vless|trojan|ss|ssr|hy2|hysteria|tuic):\/\//i.test(s) || looksLikeClashYaml(s);
 }
 
 function escapeRegExp(s) {
