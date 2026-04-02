@@ -1,7 +1,7 @@
 /* =========================================================
  * 模块分类 · 通用订阅改名 / Surge 下载改写版
  * 作者 · ByteValley
- * 版本 · 2026-04-02R3
+ * 版本 · 2026-04-02R4
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
@@ -12,7 +12,7 @@
  *   · Clash YAML
  * · 参数来源：argument=PREFIX=...&TWFLAG=...
  * · PREFIX = 自定义前缀，如 "【ByteEden】 "
- * · TWFLAG = 台湾旗帜修正开关，1=启用，0=关闭
+ * · TWFLAG = 台湾旗帜修正模式，1=台湾旗帜，0=关闭，-1=萨摩亚旗帜替代
  *
  * 模块分类 · 设计原则
  * · Surge Profile：改 [Proxy] 名称，并同步更新 [Proxy Group] / [Rule] 引用
@@ -155,6 +155,19 @@ var CITY_ZH_TO_FLAG = {
   "澳门": "🇲🇴",
 
   "台北": "🇹🇼",
+  "新北": "🇹🇼",
+  "桃园": "🇹🇼",
+  "台中": "🇹🇼",
+  "台南": "🇹🇼",
+  "高雄": "🇹🇼",
+  "基隆": "🇹🇼",
+  "新竹": "🇹🇼",
+  "嘉义": "🇹🇼",
+  "宜兰": "🇹🇼",
+  "花莲": "🇹🇼",
+  "台东": "🇹🇼",
+  "屏东": "🇹🇼",
+  "澎湖": "🇹🇼",
 
   "东京": "🇯🇵",
   "大阪": "🇯🇵",
@@ -263,6 +276,20 @@ var CITY_RULES = [
   { zh: "澳门", alias: ["Macau", "Macao"] },
 
   { zh: "台北", alias: ["Taipei", "Taibei"] },
+  { zh: "新北", alias: ["New Taipei", "NewTaipei"] },
+  { zh: "桃园", alias: ["Taoyuan"] },
+  { zh: "台中", alias: ["Taichung"] },
+  { zh: "台南", alias: ["Tainan"] },
+  { zh: "高雄", alias: ["Kaohsiung"] },
+  { zh: "基隆", alias: ["Keelung"] },
+  { zh: "新竹", alias: ["Hsinchu"] },
+  { zh: "嘉义", alias: ["Chiayi"] },
+  { zh: "宜兰", alias: ["Yilan"] },
+  { zh: "花莲", alias: ["Hualien"] },
+  { zh: "台东", alias: ["Taitung"] },
+  { zh: "屏东", alias: ["Pingtung"] },
+  { zh: "澎湖", alias: ["Penghu"] },
+
   { zh: "东京", alias: ["Tokyo"] },
   { zh: "大阪", alias: ["Osaka"] },
   { zh: "名古屋", alias: ["Nagoya"] },
@@ -464,6 +491,20 @@ var CITY_PREFERRED_DISPLAY = {
 }
 
 /* =========================================================
+ * 台湾地区识别
+ * ========================================================= */
+
+var TAIWAN_LIKE_REG = /(台湾|台北|新北|桃园|台中|台南|高雄|基隆|新竹|嘉义|宜兰|花莲|台东|屏东|澎湖)/
+
+function hasTaiwanLikeKeyword(name) {
+  return TAIWAN_LIKE_REG.test(String(name || ""))
+}
+
+function getTaiwanTargetFlag(mode) {
+  return String(mode || "0") === "-1" ? "🇼🇸" : "🇹🇼"
+}
+
+/* =========================================================
  * 参数解析
  * ========================================================= */
 
@@ -507,12 +548,12 @@ function applySmartRewrite(name, prefix, twFlagMode) {
   n = cleanupAfterReplace(n)
   n = cleanupPreferredCityDisplay(n)
 
-  if (twFlagMode === "1" && hasTaiwanKeyword(n)) {
-    n = fixTaiwanFlag(n)
+  if ((twFlagMode === "1" || twFlagMode === "-1") && hasTaiwanLikeKeyword(n)) {
+    n = fixTaiwanFlag(n, twFlagMode)
   }
 
   n = cleanupNodeName(n)
-  n = injectFlagIfMissing(n)
+  n = injectFlagIfMissing(n, twFlagMode)
 
   return compactName(prefix + n)
 }
@@ -561,9 +602,13 @@ function sortKeysByLengthDesc(obj) {
   })
 }
 
-function injectFlagIfMissing(name) {
+function injectFlagIfMissing(name, twFlagMode) {
   var s = String(name || "")
   if (hasEmojiFlag(s)) return s
+
+  if ((twFlagMode === "1" || twFlagMode === "-1") && hasTaiwanLikeKeyword(s)) {
+    return getTaiwanTargetFlag(twFlagMode) + " " + s
+  }
 
   var flag = inferFlagFromZhName(s)
   if (!flag) return s
@@ -689,12 +734,17 @@ function hasTaiwanKeyword(name) {
   return /台湾/.test(String(name || ""))
 }
 
-function fixTaiwanFlag(name) {
+function fixTaiwanFlag(name, mode) {
   var s = String(name || "")
-  s = s.replace(/[\u{1F1E6}-\u{1F1FF}]{2}/gu, "")
-  s = s.replace(/台湾/g, "🇹🇼 台湾")
-  s = s.replace(/(🇹🇼\s*){2,}/g, "🇹🇼 ")
-  return s
+  var targetFlag = getTaiwanTargetFlag(mode)
+
+  s = s.replace(/[\u{1F1E6}-\u{1F1FF}]{2}\s*/gu, "")
+  s = compactName(targetFlag + " " + s)
+
+  var reg = new RegExp("(" + escapeRegExp(targetFlag) + "\\s*){2,}", "g")
+  s = s.replace(reg, targetFlag + " ")
+
+  return compactName(s)
 }
 
 /* =========================================================
@@ -1176,6 +1226,7 @@ function escapeRegExp(s) {
     console.log(
       "[SubRename] 处理完成"
       + ", mode=" + mode
+      + ", twflag=" + TWFLAG
       + ", base64=" + isBase64Wrapped
       + ", oldLen=" + original.length
       + ", newLen=" + finalBody.length
