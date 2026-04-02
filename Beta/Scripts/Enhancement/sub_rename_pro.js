@@ -1,16 +1,23 @@
 /* =========================================================
- * 模块分类 · 通用订阅改名 / Surge 原生版
+ * 模块分类 · 通用订阅改名 / Surge 下载改写版
  * 作者 · ByteValley
- * 版本 · 2026-04-02R1
+ * 版本 · 2026-04-02R3
  *
  * 模块分类 · 说明
  * · 运行方式：Surge http-response 脚本
- * · 用途：直接改写命中 URL 的订阅响应内容
+ * · 用途：在下载阶段直接改写响应内容，再交回 Surge 继续解析
+ * · 适配格式：
+ *   · Surge 托管配置 / Surge Profile
+ *   · 通用订阅（URI / Base64）
+ *   · Clash YAML
  * · 参数来源：argument=PREFIX=...&TWFLAG=...
  * · PREFIX = 自定义前缀，如 "【ByteEden】 "
  * · TWFLAG = 台湾旗帜修正开关，1=启用，0=关闭
  *
  * 模块分类 · 设计原则
+ * · Surge Profile：改 [Proxy] 名称，并同步更新 [Proxy Group] / [Rule] 引用
+ * · 通用订阅：改 # 后名称 / vmess 的 ps 字段
+ * · Clash YAML：改 proxies.name
  * · 旗帜优先于英文国家名
  * · 城市优先于国家
  * · 先替换，再清理重复
@@ -19,34 +26,13 @@
  * · 无旗帜节点自动在前缀后补充旗帜
  * ========================================================= */
 
+/* =========================================================
+ * 参数
+ * ========================================================= */
+
 var ENV = parseArgument(typeof $argument !== "undefined" ? $argument : "")
 var PREFIX = String(ENV.PREFIX || "")
 var TWFLAG = String(ENV.TWFLAG || "0")
-
-/* =========================================================
- * 参数解析
- * ========================================================= */
-
-function parseArgument(str) {
-  var out = {}
-  if (!str) return out
-
-  String(str)
-    .split("&")
-    .forEach(function(part) {
-      if (!part) return
-      var idx = part.indexOf("=")
-      var key = idx === -1 ? part : part.slice(0, idx)
-      var val = idx === -1 ? "" : part.slice(idx + 1)
-
-      try { key = decodeURIComponent(key) } catch (e) {}
-      try { val = decodeURIComponent(val) } catch (e) {}
-
-      out[key] = val
-    })
-
-  return out
-}
 
 /* =========================================================
  * 公告型伪节点
@@ -167,17 +153,21 @@ function buildZhToFlagMap(map) {
 var CITY_ZH_TO_FLAG = {
   "香港": "🇭🇰",
   "澳门": "🇲🇴",
+
   "台北": "🇹🇼",
+
   "东京": "🇯🇵",
   "大阪": "🇯🇵",
   "名古屋": "🇯🇵",
   "札幌": "🇯🇵",
   "福冈": "🇯🇵",
   "冲绳": "🇯🇵",
+
   "首尔": "🇰🇷",
   "釜山": "🇰🇷",
   "仁川": "🇰🇷",
   "春川": "🇰🇷",
+
   "洛杉矶": "🇺🇸",
   "圣何塞": "🇺🇸",
   "硅谷": "🇺🇸",
@@ -191,55 +181,75 @@ var CITY_ZH_TO_FLAG = {
   "波特兰": "🇺🇸",
   "亚特兰大": "🇺🇸",
   "拉斯维加斯": "🇺🇸",
+
   "多伦多": "🇨🇦",
   "温哥华": "🇨🇦",
   "蒙特利尔": "🇨🇦",
   "渥太华": "🇨🇦",
+
   "墨西哥城": "🇲🇽",
+
   "伦敦": "🇬🇧",
   "曼彻斯特": "🇬🇧",
   "伯明翰": "🇬🇧",
+
   "法兰克福": "🇩🇪",
   "柏林": "🇩🇪",
   "慕尼黑": "🇩🇪",
   "杜塞尔多夫": "🇩🇪",
+
   "巴黎": "🇫🇷",
   "马赛": "🇫🇷",
   "里昂": "🇫🇷",
+
   "阿姆斯特丹": "🇳🇱",
   "鹿特丹": "🇳🇱",
+
   "米兰": "🇮🇹",
   "罗马": "🇮🇹",
   "那不勒斯": "🇮🇹",
+
   "马德里": "🇪🇸",
   "巴塞罗那": "🇪🇸",
   "瓦伦西亚": "🇪🇸",
+
   "悉尼": "🇦🇺",
   "墨尔本": "🇦🇺",
   "布里斯班": "🇦🇺",
   "珀斯": "🇦🇺",
   "阿德莱德": "🇦🇺",
+
   "迪拜": "🇦🇪",
   "阿布扎比": "🇦🇪",
+
   "多哈": "🇶🇦",
+
   "利雅得": "🇸🇦",
   "吉达": "🇸🇦",
+
   "麦纳麦": "🇧🇭",
   "马斯喀特": "🇴🇲",
+
   "特拉维夫": "🇮🇱",
   "耶路撒冷": "🇮🇱",
+
   "卡萨布兰卡": "🇲🇦",
   "约翰内斯堡": "🇿🇦",
   "开普敦": "🇿🇦",
   "开罗": "🇪🇬",
   "拉各斯": "🇳🇬",
+
   "马其顿": "🇲🇰",
+
   "阿拉木图": "🇰🇿",
   "阿斯塔纳": "🇰🇿",
   "比什凯克": "🇰🇬",
+
   "巴库": "🇦🇿",
+
   "达卡": "🇧🇩",
   "金边": "🇰🇭",
+
   "卡拉奇": "🇵🇰",
   "拉合尔": "🇵🇰"
 }
@@ -251,6 +261,7 @@ var CITY_ZH_TO_FLAG = {
 var CITY_RULES = [
   { zh: "香港", alias: ["Hong Kong", "HongKong"] },
   { zh: "澳门", alias: ["Macau", "Macao"] },
+
   { zh: "台北", alias: ["Taipei", "Taibei"] },
   { zh: "东京", alias: ["Tokyo"] },
   { zh: "大阪", alias: ["Osaka"] },
@@ -450,6 +461,31 @@ var CITY_PREFERRED_DISPLAY = {
 
   "卡萨布兰卡": "摩洛哥",
   "马其顿": "北马其顿"
+}
+
+/* =========================================================
+ * 参数解析
+ * ========================================================= */
+
+function parseArgument(str) {
+  var out = {}
+  if (!str) return out
+
+  String(str)
+    .split("&")
+    .forEach(function(part) {
+      if (!part) return
+      var idx = part.indexOf("=")
+      var key = idx === -1 ? part : part.slice(0, idx)
+      var val = idx === -1 ? "" : part.slice(idx + 1)
+
+      try { key = decodeURIComponent(key) } catch (e) {}
+      try { val = decodeURIComponent(val) } catch (e) {}
+
+      out[key] = val
+    })
+
+  return out
 }
 
 /* =========================================================
@@ -733,8 +769,57 @@ function compactName(s) {
     .trim()
 }
 
+function isCommentOrEmpty(line) {
+  return /^\s*(#|;|\/\/|$)/.test(String(line || ""))
+}
+
+function cleanText(v) {
+  return String(v == null ? "" : v).trim()
+}
+
+function makeUniqueName(name, usedSet) {
+  var base = compactName(name || "Node")
+  if (!usedSet[base]) {
+    usedSet[base] = true
+    return base
+  }
+
+  var i = 2
+  while (usedSet[base + " " + i]) i++
+  var out = base + " " + i
+  usedSet[out] = true
+  return out
+}
+
 /* =========================================================
- * 订阅改写
+ * 格式识别
+ * ========================================================= */
+
+function looksLikeBase64(s) {
+  var t = String(s || "").replace(/\s+/g, "")
+  while (t.length % 4 !== 0) t += "="
+  return t.length >= 16 && /^[A-Za-z0-9+/=]+$/.test(t)
+}
+
+function looksLikeClashYaml(s) {
+  return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s)
+}
+
+function looksLikeUniversalSubscription(s) {
+  return /(vmess|vless|trojan|ss|ssr|hy2|hysteria2|hysteria|tuic):\/\//i.test(String(s || ""))
+}
+
+function looksLikeSurgeProfile(s) {
+  var t = String(s || "")
+  return /^\s*#!MANAGED-CONFIG\b/m.test(t) || /\[\s*Proxy\s*\]/i.test(t)
+}
+
+function looksLikeUsefulDecodedText(s) {
+  return looksLikeUniversalSubscription(s) || looksLikeClashYaml(s) || looksLikeSurgeProfile(s)
+}
+
+/* =========================================================
+ * 订阅改写 · 通用订阅
  * ========================================================= */
 
 function rewriteSubscriptionLines(text, prefix, twFlagMode) {
@@ -803,29 +888,147 @@ function escapeYamlDoubleQuoted(s) {
 }
 
 /* =========================================================
- * 文本 / 编码工具
+ * Surge Profile 改写
  * ========================================================= */
 
-function cloneHeaders(headers) {
-  var out = {}
-  if (!headers) return out
+function rewriteSurgeProfile(text, prefix, twFlagMode) {
+  var parsed = parseSurgeProfile(text)
+  var renameMap = {}
+  var usedNames = {}
 
-  for (var key in headers) {
-    if (Object.prototype.hasOwnProperty.call(headers, key)) {
-      out[key] = String(headers[key])
+  var i, j
+  for (i = 0; i < parsed.sections.length; i++) {
+    var sec = parsed.sections[i]
+    if (normalizeSectionName(sec.name) !== "proxy") continue
+
+    for (j = 0; j < sec.lines.length; j++) {
+      var line = sec.lines[j]
+      if (isCommentOrEmpty(line)) continue
+
+      var idx = line.indexOf("=")
+      if (idx === -1) continue
+
+      var oldName = line.slice(0, idx).trim()
+      var rhs = line.slice(idx + 1).trim()
+      if (!oldName || !rhs) continue
+
+      var renamedRaw = applySmartRewrite(oldName, prefix, twFlagMode)
+      var renamed = makeUniqueName(renamedRaw, usedNames)
+      renameMap[oldName] = renamed
+      sec.lines[j] = renamed + " = " + rhs
     }
   }
 
-  return out
+  for (i = 0; i < parsed.sections.length; i++) {
+    var sec2 = parsed.sections[i]
+    var normalized = normalizeSectionName(sec2.name)
+
+    if (normalized === "proxy group" || normalized === "rule") {
+      for (j = 0; j < sec2.lines.length; j++) {
+        sec2.lines[j] = replacePolicyReferencesInLine(sec2.lines[j], renameMap)
+      }
+    }
+  }
+
+  return buildSurgeProfileText(parsed)
+}
+
+function parseSurgeProfile(text) {
+  var lines = String(text || "").replace(/\r/g, "").split("\n")
+  var managedHeader = ""
+  var i = 0
+
+  if (lines.length && /^\s*#!MANAGED-CONFIG\b/i.test(lines[0].trim())) {
+    managedHeader = lines[0]
+    i = 1
+  }
+
+  var preamble = []
+  var sections = []
+  var current = null
+
+  for (; i < lines.length; i++) {
+    var line = lines[i]
+    var m = line.match(/^\s*\[([^\]]+)\]\s*$/)
+    if (m) {
+      current = { name: m[1].trim(), lines: [] }
+      sections.push(current)
+      continue
+    }
+
+    if (!current) {
+      preamble.push(line)
+    } else {
+      current.lines.push(line)
+    }
+  }
+
+  return {
+    managedHeader: managedHeader,
+    preamble: preamble,
+    sections: sections
+  }
+}
+
+function buildSurgeProfileText(parsed) {
+  var out = []
+  var i, j
+
+  if (parsed.managedHeader) out.push(parsed.managedHeader)
+
+  if (parsed.preamble && parsed.preamble.length) {
+    for (i = 0; i < parsed.preamble.length; i++) out.push(parsed.preamble[i])
+    if (parsed.sections.length) out.push("")
+  }
+
+  for (i = 0; i < parsed.sections.length; i++) {
+    var sec = parsed.sections[i]
+    out.push("[" + sec.name + "]")
+    for (j = 0; j < sec.lines.length; j++) out.push(sec.lines[j])
+    if (i !== parsed.sections.length - 1) out.push("")
+  }
+
+  return out.join("\n").replace(/\n{3,}/g, "\n\n")
+}
+
+function normalizeSectionName(s) {
+  return String(s || "").trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function replacePolicyReferencesInLine(line, renameMap) {
+  if (isCommentOrEmpty(line)) return line
+
+  var s = String(line || "")
+  var keys = Object.keys(renameMap).sort(function(a, b) { return b.length - a.length })
+
+  for (var i = 0; i < keys.length; i++) {
+    var oldName = keys[i]
+    var newName = renameMap[oldName]
+    var reg = new RegExp("([=,]\\s*)" + escapeRegExp(oldName) + "(?=\\s*(,|$))", "g")
+    s = s.replace(reg, "$1" + newName)
+  }
+
+  return s
+}
+
+/* =========================================================
+ * 文本 / 编码工具
+ * ========================================================= */
+
+function normalizeBase64(s) {
+  var t = String(s || "").replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/")
+  while (t.length % 4 !== 0) t += "="
+  return t
 }
 
 function encodeTextToBase64(text) {
-  return base64EncodeBinary(utf8Encode(String(text || "")))
+  var utf8 = utf8Encode(String(text || ""))
+  return base64EncodeBinary(utf8)
 }
 
 function tryDecodeBase64ToText(b64) {
   try {
-    var bin = base64DecodeBinary(String(b64 || "").replace(/\s+/g, ""))
+    var bin = base64DecodeBinary(normalizeBase64(String(b64 || "")))
     return utf8Decode(bin)
   } catch (e) {
     return null
@@ -896,22 +1099,26 @@ function base64DecodeBinary(input) {
   return out
 }
 
-function looksLikeBase64(s) {
-  var t = String(s || "").replace(/\s+/g, "")
-  return t.length >= 16 && t.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(t)
-}
+function cloneHeaders(headers) {
+  var out = {}
+  if (!headers) return out
 
-function looksLikeClashYaml(s) {
-  return /proxies\s*:/i.test(s) && /-\s*name\s*:/i.test(s)
-}
+  for (var key in headers) {
+    if (Object.prototype.hasOwnProperty.call(headers, key)) {
+      out[key] = String(headers[key])
+    }
+  }
 
-function looksLikeUsefulDecodedText(s) {
-  return /(vmess|vless|trojan|ss|ssr|hy2|hysteria|tuic):\/\//i.test(s) || looksLikeClashYaml(s)
+  return out
 }
 
 function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
+
+/* =========================================================
+ * 主入口
+ * ========================================================= */
 
 ;(function main() {
   try {
@@ -919,26 +1126,41 @@ function escapeRegExp(s) {
       ? $response.body
       : ""
 
-    var content = String(rawBody || "").trim()
-    if (!content) {
+    var content = String(rawBody || "")
+    if (!content.trim()) {
       console.log("[SubRename] 响应体为空，跳过处理")
       return $done({})
     }
 
+    var original = content
+    var decoded = content
     var isBase64Wrapped = false
 
     if (looksLikeBase64(content)) {
-      var decoded = tryDecodeBase64ToText(content)
-      if (decoded && looksLikeUsefulDecodedText(decoded)) {
+      var maybeDecoded = tryDecodeBase64ToText(content)
+      if (maybeDecoded && looksLikeUsefulDecodedText(maybeDecoded)) {
         isBase64Wrapped = true
-        content = decoded.trim()
+        decoded = maybeDecoded
       }
     }
 
-    var isClash = looksLikeClashYaml(content)
-    var outText = isClash
-      ? rewriteClashYamlProxyNames(content, PREFIX, TWFLAG)
-      : rewriteSubscriptionLines(content, PREFIX, TWFLAG)
+    decoded = String(decoded || "")
+    var mode = "unknown"
+    var outText = decoded
+
+    if (looksLikeSurgeProfile(decoded)) {
+      mode = "surge-profile"
+      outText = rewriteSurgeProfile(decoded, PREFIX, TWFLAG)
+    } else if (looksLikeClashYaml(decoded)) {
+      mode = "clash"
+      outText = rewriteClashYamlProxyNames(decoded, PREFIX, TWFLAG)
+    } else if (looksLikeUniversalSubscription(decoded)) {
+      mode = "universal"
+      outText = rewriteSubscriptionLines(decoded, PREFIX, TWFLAG)
+    } else {
+      console.log("[SubRename] 未识别格式，透传")
+      return $done({})
+    }
 
     var finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText
     var headers = cloneHeaders($response && $response.headers ? $response.headers : {})
@@ -952,12 +1174,12 @@ function escapeRegExp(s) {
     }
 
     console.log(
-      "[SubRename] 处理完成, base64=" +
-        isBase64Wrapped +
-        ", clash=" +
-        isClash +
-        ", url=" +
-        (($request && $request.url) || "")
+      "[SubRename] 处理完成"
+      + ", mode=" + mode
+      + ", base64=" + isBase64Wrapped
+      + ", oldLen=" + original.length
+      + ", newLen=" + finalBody.length
+      + ", url=" + (($request && $request.url) || "")
     )
 
     return $done({
