@@ -23,63 +23,6 @@ var ENV = parseArgument(typeof $argument !== "undefined" ? $argument : "")
 var PREFIX = String(ENV.PREFIX || "")
 var TWFLAG = String(ENV.TWFLAG || "0")
 
-;(function main() {
-  try {
-    var rawBody = typeof $response !== "undefined" && typeof $response.body === "string"
-      ? $response.body
-      : ""
-
-    var content = String(rawBody || "").trim()
-    if (!content) {
-      console.log("[SubRename] 响应体为空，跳过处理")
-      return $done({})
-    }
-
-    var isBase64Wrapped = false
-
-    if (looksLikeBase64(content)) {
-      var decoded = tryDecodeBase64ToText(content)
-      if (decoded && looksLikeUsefulDecodedText(decoded)) {
-        isBase64Wrapped = true
-        content = decoded.trim()
-      }
-    }
-
-    var isClash = looksLikeClashYaml(content)
-    var outText = isClash
-      ? rewriteClashYamlProxyNames(content, PREFIX, TWFLAG)
-      : rewriteSubscriptionLines(content, PREFIX, TWFLAG)
-
-    var finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText
-    var headers = cloneHeaders($response && $response.headers ? $response.headers : {})
-
-    delete headers["content-length"]
-    delete headers["Content-Length"]
-    headers["cache-control"] = "no-store"
-
-    if (!headers["content-type"] && !headers["Content-Type"]) {
-      headers["content-type"] = "text/plain; charset=utf-8"
-    }
-
-    console.log(
-      "[SubRename] 处理完成, base64=" +
-        isBase64Wrapped +
-        ", clash=" +
-        isClash +
-        ", url=" +
-        (($request && $request.url) || "")
-    )
-
-    return $done({
-      body: finalBody,
-      headers: headers
-    })
-  } catch (e) {
-    console.log("[SubRename] 改写失败: " + String(e))
-    return $done({})
-  }
-})()
-
 /* =========================================================
  * 参数解析
  * ========================================================= */
@@ -969,3 +912,60 @@ function looksLikeUsefulDecodedText(s) {
 function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
+
+;(function main() {
+  try {
+    var rawBody = typeof $response !== "undefined" && typeof $response.body === "string"
+      ? $response.body
+      : ""
+
+    var content = String(rawBody || "").trim()
+    if (!content) {
+      console.log("[SubRename] 响应体为空，跳过处理")
+      return $done({})
+    }
+
+    var isBase64Wrapped = false
+
+    if (looksLikeBase64(content)) {
+      var decoded = tryDecodeBase64ToText(content)
+      if (decoded && looksLikeUsefulDecodedText(decoded)) {
+        isBase64Wrapped = true
+        content = decoded.trim()
+      }
+    }
+
+    var isClash = looksLikeClashYaml(content)
+    var outText = isClash
+      ? rewriteClashYamlProxyNames(content, PREFIX, TWFLAG)
+      : rewriteSubscriptionLines(content, PREFIX, TWFLAG)
+
+    var finalBody = isBase64Wrapped ? encodeTextToBase64(outText) : outText
+    var headers = cloneHeaders($response && $response.headers ? $response.headers : {})
+
+    delete headers["content-length"]
+    delete headers["Content-Length"]
+    headers["cache-control"] = "no-store"
+
+    if (!headers["content-type"] && !headers["Content-Type"]) {
+      headers["content-type"] = "text/plain; charset=utf-8"
+    }
+
+    console.log(
+      "[SubRename] 处理完成, base64=" +
+        isBase64Wrapped +
+        ", clash=" +
+        isClash +
+        ", url=" +
+        (($request && $request.url) || "")
+    )
+
+    return $done({
+      body: finalBody,
+      headers: headers
+    })
+  } catch (e) {
+    console.log("[SubRename] 改写失败: " + String(e))
+    return $done({})
+  }
+})()
