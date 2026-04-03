@@ -1,6 +1,6 @@
 function operator(proxies, targetPlatform, context) {
-  const PREFIX = "【Kitty】 ";
-  const TWFLAG = "1"; // 1=台湾旗帜 0=关闭 -1=萨摩亚旗帜替代
+  const PREFIX = typeof $arguments.prefix === "string" ? $arguments.prefix : "";
+  const TWFLAG = String($arguments.twflag ?? "1"); // 1=台湾旗帜 0=关闭 -1=萨摩亚旗帜替代
 
   return proxies.map(proxy => {
     const p = { ...proxy };
