@@ -1,0 +1,41 @@
+name: 鲍鱼盒子
+description: 鲍鱼盒子增强，解锁会员功能
+compat_arguments:
+  token: bearer
+author: ByteValley
+dns: {}
+map_locals:
+- match: ^https?://siajksslwiso\.anningsh\.com/report
+  status_code: 200
+  body: ' '
+scriptings:
+- http_request:
+    name: 鲍鱼盒子
+    match: ^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile)
+    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/abaloneBox_injector.js
+    env:
+      _compat.$argument: token={{{Token}}}
+    timeout: 60
+    body_required: false
+mitm:
+  hostnames:
+    includes:
+    - 211.154.21.150
+    - w1c2.ooat88.com
+    - tu.dfgfdg.win
+    - 103.44.236.*
+    - '*.artrg.cn'
+    - vkfqb.ojyrz.com
+    - byapi.*.com
+    - 211.99.98.*
+    - 103.39.222.*
+    - yubaoyu.oss-cn-shenzhen.aliyuncs.com
+    - '*api.h8h4h.com'
+    - 42.157.129.25
+    - siajksslwiso.anningsh.com
+    - 211.99.98.63
+    - 111.180.204.11
+    - 88.gbvdfe.com
+    - vdop.fqoas.com
+    - ica.ooat88.com
+    - 103.44.236.131:8001
