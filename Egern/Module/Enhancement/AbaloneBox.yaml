@@ -1,7 +1,7 @@
 name: 鲍鱼盒子
 description: 鲍鱼盒子增强，解锁会员功能
 compat_arguments:
-  token: bearer
+  Token: bearer
 author: ByteValley
 dns: {}
 map_locals:
