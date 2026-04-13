@@ -1,0 +1,75 @@
+#!name=腾讯系音乐净化
+#!desc=整合 酷我/酷狗/QQ音乐：拦截开屏/弹窗/横幅/信息流/播放器广告及埋点，尽量保留核心播放与会员功能（可选项已注释）
+#!author=ByteValley（整合自 可莉🅥 / QingRex / zqzess 等公开规则）
+#!icon=https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Tencent.png
+#!tag=功能净化
+#!updated=2025-12-03
+
+[Rule]
+# ===============================
+DOMAIN,ad.tencentmusic.com,REJECT
+DOMAIN,adstats.tencentmusic.com,REJECT
+DOMAIN,tmead.y.qq.com,REJECT
+DOMAIN,tmeadquic.y.qq.com,REJECT
+DOMAIN,tmeadbak.y.qq.com,REJECT
+DOMAIN,monitor.music.qq.com,REJECT
+DOMAIN,stat.y.qq.com,REJECT
+DOMAIN,otheve.beacon.qq.com,REJECT
+DOMAIN,oth.str.mdt.qq.com,REJECT
+DOMAIN,h.trace.qq.com,REJECT
+DOMAIN,sdk.e.qq.com,REJECT
+DOMAIN,tangram.e.qq.com,REJECT
+DOMAIN,p.l.qq.com,REJECT
+DOMAIN,us.l.qq.com,REJECT
+DOMAIN-SUFFIX,imtmp.net,REJECT
+# ===============================
+URL-REGEX,"^https?:\/\/rich\.kuwo\.cn\/AdService\/",REJECT-IMG
+URL-REGEX,"^https?:\/\/rich\.kuwo\.cn\/EcomResourceServer\/",REJECT-IMG
+URL-REGEX,"^https?:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/startup\/config",REJECT-IMG
+URL-REGEX,"^https?:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/pasterAdvert\/",REJECT-IMG
+URL-REGEX,"^https?:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/user\/freeMode\/",REJECT-IMG
+URL-REGEX,"^https?:\/\/searchrecterm\.kuwo\.cn\/recterm\.s",REJECT-IMG
+URL-REGEX,"^https?:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/app\/newMenuList\/menuListInfo",REJECT-IMG
+URL-REGEX,"^https?:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/album\/adBar\/",REJECT-IMG
+# URL-REGEX,^https?:\/\/vip\d\.kuwo\.cn\/vip\/v\d\/sysinfo\?op=getRePayAndDoPayBox,REJECT-TINYGIF    # 酷我 | 支付弹窗/续费引导
+IP-CIDR,111.206.98.63/32,REJECT,no-resolve
+# ===============================
+DOMAIN,ads.service.kugou.com,REJECT
+DOMAIN,adservice.kugou.com,REJECT
+DOMAIN,adserviceretry.kugou.com,REJECT
+DOMAIN,adserviceretry.kglink.cn,REJECT
+DOMAIN,splashimgretrybssdl.cloud.kugou.com,REJECT
+DOMAIN,adsmind.gdtimg.com,REJECT
+URL-REGEX,"^https?:\/\/log\.stat\.kugou\.com\/mobile\/ad\.html",REJECT
+# ===============================
+DOMAIN,adcdn.tencentmusic.com,REJECT
+DOMAIN,adcdn6.tencentmusic.com,REJECT
+DOMAIN,adexpo.tencentmusic.com,REJECT
+DOMAIN,adclick.tencentmusic.com,REJECT
+
+[Rewrite]
+http-response response-body-json-jq ^https?:\/\/wapi\.kuwo\.cn\/openapi\/v\d\/tingshu\/index\/radio 'walk(if type == "object" and .type == "stripAdvert" then del(.child) else . end)'
+^https?:\/\/gateway(retry)?\.kugou\.com\/ocean\/v\d\/tab\/list_v\d response-body-json-jq 'def namesToRemove:["AI帮唱","长相思2","K歌","小说","游戏"];def removeParentIfNameMatches:if type=="object"then with_entries(select(.value|(type=="object"and .name as $name|$name|IN(namesToRemove[])|not)))|map_values(removeParentIfNameMatches)else .end;removeParentIfNameMatches'
+# ^https:\/\/vip\d\.kuwo\.cn\/commercia\/vipconf\/projectPage\/getPageContent data-type=text data="{}" status-code=200 header="Content-Type:application/json"   # 酷我 | 会员活动页注入
+^https:\/\/tingshu\.kuwo\.cn\/v2\/api\/pay\/user\/info mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/appi\.kuwo\.cn\/kuwopay\/personal\/cells mock-response-body data-type=text data="{}" status-code=200
+# ===============================
+^https:\/\/fx\.service\.kugou\.com\/mfx-kugoulive\/ad\/ mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/adp\/ad\/ mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/ads\.gateway\/ mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/adp\/bubble\/v\d\/song_play mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/ocean\/v\d\/sound\/banner mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/r\/v\d\/general\/putin\/midad mock-response-body data-type=text data="{}" status-code=200
+# ===============================
+^https:\/\/gateway(retry)?\.kugou\.com\/v\d\/feeds\/follow_feed_fallback mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/mstc\/musicsymbol\/v\d\/system\/profile mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/searchnofocus\/v\d\/search_no_focus_word mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gateway(retry)?\.kugou\.com\/singerdiscuss\/v\d\/entrance\/comment mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gzacshow\.kugou\.com\/mfanxing-home\/cdn\/room\/index\/list_v2 mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/gzacshow\.kugou\.com\/mfx-rt-show\/cdn\/mo\/show\/headline mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/m1fxgroup\.kugou\.com\/fxsing\/yqc\/alongInfo\/getUserAlongInfo mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/hwstore\.kugou\.com\/v\d\/get_store_data mock-response-body data-type=text data="{}" status-code=200
+^https:\/\/ep\.kugou\.com\/v\d\/album_shop\/get_entrance_info mock-response-body data-type=text data="{}" status-code=200
+
+[MITM]
+hostname = wapi.kuwo.cn, appi.kuwo.cn, rich.kuwo.cn, searchrecterm.kuwo.cn, vip*.kuwo.cn, tingshu.kuwo.cn, gateway.kugou.com, gatewayretry.kugou.com, fx.service.kugou.com, hwstore.kugou.com, ep.kugou.com, gzacshow.kugou.com, m1fxgroup.kugou.com, log.stat.kugou.com
