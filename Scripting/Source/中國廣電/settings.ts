@@ -45,7 +45,11 @@ export type ChinaBroadnetSettings = UiSwitchSource & {
 
 export const defaultChinaBroadnetSettings: ChinaBroadnetSettings = {
   // UI switches（会被 pickUiSettings 归一化）
-  ...pickUiSettings({}),
+  ...pickUiSettings({
+    mediumUseThreeCard: true,
+    includeDirectionalInTotal: false,
+    smallMiniBarUseTotalFlow: true,
+  }),
 
   session: "",
   access: "",
