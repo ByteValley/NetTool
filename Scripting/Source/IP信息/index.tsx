@@ -38,8 +38,8 @@ const REFRESH_OPTIONS = [
 ]
 
 const TIMEOUT_OPTIONS = [
-  { label: "3 秒", value: 3000 },
-  { label: "6 秒（默认）", value: 6000 },
+  { label: "3 秒（默认）", value: 3000 },
+  { label: "6 秒", value: 6000 },
   { label: "10 秒", value: 10000 },
   { label: "15 秒", value: 15000 },
 ]
@@ -171,7 +171,7 @@ function SettingsView() {
           <Picker
             title="单项超时"
             value={timeoutMs}
-            onChanged={(value: number) => setTimeoutMs(Number(value) || 6000)}
+            onChanged={(value: number) => setTimeoutMs(Number(value) || 3000)}
             pickerStyle="menu"
           >
             {TIMEOUT_OPTIONS.map((option) => (

@@ -5,7 +5,6 @@ import {
   Text,
   Spacer,
   WidgetReloadPolicy,
-  DynamicShapeStyle,
 } from "scripting"
 
 import {
@@ -38,7 +37,7 @@ function maskIp(ip?: string) {
   if (raw.includes(":")) {
     const parts = raw.split(":").filter(Boolean)
     if (parts.length <= 2) return raw
-    return `${parts.slice(0, 2).join(":")}:…:${parts.slice(-1)[0]}`
+    return `${parts.slice(0, 2).join(":")}:...:${parts.slice(-1)[0]}`
   }
   const parts = raw.split(".")
   if (parts.length !== 4) return raw
@@ -48,6 +47,12 @@ function maskIp(ip?: string) {
 function text(value?: string, fallback = "—") {
   const s = String(value ?? "").trim()
   return s || fallback
+}
+
+function ellipsis(value?: string, limit = 30) {
+  const raw = text(value, "")
+  if (!raw) return "—"
+  return raw.length > limit ? `${raw.slice(0, limit - 1)}…` : raw
 }
 
 function displayIp(item: IpSourceResult | undefined, settings: SkkIpInfoSettings) {
@@ -78,6 +83,12 @@ function pickSources(data: NetworkInfoData) {
   return preferred
 }
 
+function riskColor(risk: RiskInfo): any {
+  if (risk.level === "高") return "systemRed"
+  if (risk.level === "中") return "systemYellow"
+  return "systemGreen"
+}
+
 function statusColor(ok: boolean, statusText?: string): any {
   if (ok && /仅自制|部分/i.test(String(statusText || ""))) return "systemYellow"
   return ok ? "systemGreen" : "systemRed"
@@ -88,16 +99,24 @@ function latencyText(value?: number) {
   return `${Math.round(value)}ms`
 }
 
-function Root(props: { children: any }) {
-  const bg: DynamicShapeStyle = { light: "#FBFBFA", dark: "#111312" }
+function serviceLabel(item: ServiceResult) {
+  if (item.region === "流媒体") return "流媒"
+  return item.region
+}
+
+function Root(props: { children: any; compact?: boolean }) {
+  const pad = props.compact
+    ? { top: 8, leading: 8, bottom: 8, trailing: 8 }
+    : { top: 8, leading: 8, bottom: 8, trailing: 8 }
+
   return (
     <VStack
-      frame={{ maxWidth: Infinity, maxHeight: Infinity }}
-      padding={{ top: 12, leading: 12, bottom: 12, trailing: 12 }}
-      spacing={10}
+      frame={{ minWidth: 0, maxWidth: Infinity, minHeight: 0, maxHeight: Infinity }}
+      padding={pad}
+      spacing={6}
       widgetBackground={{
-        style: bg,
-        shape: { type: "rect", cornerRadius: 18, style: "continuous" },
+        style: "systemBackground",
+        shape: { type: "rect", cornerRadius: 22, style: "continuous" },
       }}
     >
       {props.children}
@@ -105,15 +124,33 @@ function Root(props: { children: any }) {
   )
 }
 
-function Card(props: { children: any; padding?: number }) {
-  const pad = props.padding ?? 10
+function Card(props: { children: any; padding?: number; spacing?: number }) {
+  const pad = props.padding ?? 7
   return (
     <VStack
-      spacing={8}
+      alignment="leading"
+      spacing={props.spacing ?? 5}
       padding={{ top: pad, leading: pad, bottom: pad, trailing: pad }}
-      frame={{ maxWidth: Infinity }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "#FFFFFF", dark: "#1B1D1C" } as any,
+        style: { light: "rgba(0,0,0,0.035)", dark: "rgba(255,255,255,0.075)" } as any,
+        shape: { type: "rect", cornerRadius: 10, style: "continuous" },
+      }}
+    >
+      {props.children}
+    </VStack>
+  )
+}
+
+function ServicePanel(props: { children: any }) {
+  return (
+    <VStack
+      alignment="leading"
+      spacing={5}
+      padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
+      widgetBackground={{
+        style: { light: "rgba(0,0,0,0.028)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 10, style: "continuous" },
       }}
     >
@@ -123,28 +160,23 @@ function Card(props: { children: any; padding?: number }) {
 }
 
 function Badge(props: { text: string; tone: "domestic" | "international" | "risk" }) {
-  const style =
+  const bg =
     props.tone === "domestic"
-      ? ({ light: "#D9E5FF", dark: "#213A73" } as any)
+      ? "systemBlue"
       : props.tone === "risk"
-        ? ({ light: "#FFF2CC", dark: "#523C12" } as any)
-        : ({ light: "#D7F2EC", dark: "#1D4D45" } as any)
-  const fg =
-    props.tone === "domestic"
-      ? ({ light: "#1F4AA8", dark: "#D8E5FF" } as any)
-      : props.tone === "risk"
-        ? ({ light: "#825A00", dark: "#FFE4A0" } as any)
-        : ({ light: "#14675B", dark: "#BDEFE7" } as any)
+        ? "systemYellow"
+        : "systemGreen"
+  const fg = props.tone === "risk" ? "#3E2A00" : "white"
 
   return (
     <VStack
-      padding={{ top: 2, leading: 6, bottom: 2, trailing: 6 }}
+      padding={{ top: 1, leading: 5, bottom: 1, trailing: 5 }}
       widgetBackground={{
-        style,
+        style: bg,
         shape: { type: "capsule", style: "continuous" },
       }}
     >
-      <Text font={8} fontWeight="bold" foregroundStyle={fg} lineLimit={1}>
+      <Text font={7.5} fontWeight="bold" foregroundStyle={fg} lineLimit={1} minScaleFactor={0.7}>
         {props.text}
       </Text>
     </VStack>
@@ -157,99 +189,186 @@ function Header(props: {
   fromCache: boolean
   staleFallback?: boolean
 }) {
-  const accent: DynamicShapeStyle = { light: "#0F8B8D", dark: "#5EE0CF" }
   return (
-    <HStack alignment="center" spacing={8}>
+    <HStack alignment="center" spacing={6}>
       <VStack
-        frame={{ width: 4, height: 22 }}
+        frame={{ width: 4, height: 18 }}
         widgetBackground={{
-          style: accent,
+          style: "systemGreen",
           shape: { type: "capsule", style: "continuous" },
         }}
       />
-      <Text font={14} fontWeight="bold" lineLimit={1} minScaleFactor={0.75}>
+      <Text font={13} fontWeight="bold" lineLimit={1} minScaleFactor={0.72}>
         {props.title}
       </Text>
       <Spacer />
-      <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
-        {formatTime(props.updatedAt)}{props.fromCache ? " 缓存" : ""}{props.staleFallback ? " 兜底" : ""}
+      <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
+        {formatTime(props.updatedAt)}
+        {props.fromCache ? " 缓存" : ""}
+        {props.staleFallback ? " 兜底" : ""}
       </Text>
     </HStack>
   )
 }
 
-function DetailRow(props: { label: string; value: string; strong?: boolean }) {
+function InfoBlock(props: { label: string; value: string; strong?: boolean }) {
   return (
-    <VStack spacing={2} alignment="leading">
-      <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1}>
+    <VStack spacing={1} alignment="leading" frame={{ maxWidth: Infinity }}>
+      <Text font={8.2} foregroundStyle="secondaryLabel" lineLimit={1}>
         {props.label}
       </Text>
-      <Text font={props.strong ? 13 : 11} fontWeight={props.strong ? "bold" : "medium"} lineLimit={1} minScaleFactor={0.65}>
+      <Text
+        font={props.strong ? 10.8 : 9.8}
+        fontWeight={props.strong ? "semibold" : "regular"}
+        lineLimit={1}
+        minScaleFactor={0.58}
+      >
         {props.value}
       </Text>
     </VStack>
   )
 }
 
-function RiskCard(props: { risk: RiskInfo }) {
-  const riskColor: any =
-    props.risk.level === "高" ? "systemRed" : props.risk.level === "中" ? "systemYellow" : "systemGreen"
+function StatusPill(props: { text: string }) {
   return (
     <VStack
-      spacing={5}
-      padding={{ top: 8, leading: 9, bottom: 8, trailing: 9 }}
+      padding={{ top: 2, leading: 5, bottom: 2, trailing: 5 }}
       widgetBackground={{
-        style: { light: "#F7F8F8", dark: "#242827" } as any,
-        shape: { type: "rect", cornerRadius: 8, style: "continuous" },
+        style: { light: "rgba(0,0,0,0.04)", dark: "rgba(255,255,255,0.08)" } as any,
+        shape: { type: "capsule", style: "continuous" },
       }}
     >
-      <HStack alignment="center" spacing={6}>
-        <Text font={9} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1}>
-          风险值
-        </Text>
-        <Spacer />
-        <Badge text={props.risk.level} tone="risk" />
-      </HStack>
-      <HStack alignment="center" spacing={4}>
-        <Text font={21} fontWeight="bold" foregroundStyle={riskColor} lineLimit={1}>
-          {String(props.risk.score)}
-        </Text>
-        <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1}>
-          / 100 · {props.risk.title}
-        </Text>
-      </HStack>
-      <Text font={9} foregroundStyle="secondaryLabel" lineLimit={2} minScaleFactor={0.7}>
-        {props.risk.items.length ? props.risk.items.join(" · ") : "暂无异常信号"}
+      <Text font={7.4} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
+        {props.text}
       </Text>
     </VStack>
   )
 }
 
+function StatusStrip(props: {
+  data: NetworkInfoData
+  settings: SkkIpInfoSettings
+  fromCache: boolean
+  staleFallback?: boolean
+}) {
+  const ipMode = props.settings.maskIp ? "IP 隐藏" : "IP 明文"
+  const infoMode = props.settings.maskLocation ? "位置隐藏" : "位置明文"
+  return (
+    <VStack
+      padding={{ top: 5, leading: 7, bottom: 5, trailing: 7 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
+      widgetBackground={{
+        style: { light: "rgba(0,0,0,0.028)", dark: "rgba(255,255,255,0.07)" } as any,
+        shape: { type: "rect", cornerRadius: 10, style: "continuous" },
+      }}
+    >
+      <HStack alignment="center" spacing={6} frame={{ maxWidth: Infinity }}>
+        <VStack
+          frame={{ width: 13, height: 13 }}
+          widgetBackground={{
+            style: "systemGray4",
+            shape: { type: "capsule", style: "continuous" },
+          }}
+        >
+          <Text font={8} fontWeight="bold" foregroundStyle="white" lineLimit={1}>
+            i
+          </Text>
+        </VStack>
+        <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1}>
+          风险值
+        </Text>
+        <Text font={12} fontWeight="bold" foregroundStyle={riskColor(props.data.risk)} lineLimit={1}>
+          {String(props.data.risk.score)}
+        </Text>
+        <Text font={8.4} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.66}>
+          / 100 · {props.data.risk.title}
+        </Text>
+        <Spacer />
+        <StatusPill text={ipMode} />
+        <StatusPill text={infoMode} />
+        <Text font={7.8} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
+          {formatTime(props.data.updatedAt)}
+          {props.fromCache ? " 缓存" : ""}
+          {props.staleFallback ? " 兜底" : ""}
+        </Text>
+      </HStack>
+    </VStack>
+  )
+}
+
+function RiskStrip(props: { risk: RiskInfo }) {
+  const reason = props.risk.items.length ? props.risk.items.join(" · ") : "暂无异常信号"
+  return (
+    <VStack
+      spacing={2}
+      padding={{ top: 5, leading: 7, bottom: 5, trailing: 7 }}
+      widgetBackground={{
+        style: { light: "rgba(0,0,0,0.035)", dark: "rgba(255,255,255,0.07)" } as any,
+        shape: { type: "rect", cornerRadius: 8, style: "continuous" },
+      }}
+    >
+      <HStack alignment="center" spacing={5}>
+        <Text font={8.5} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1}>
+          风险值
+        </Text>
+        <Spacer />
+        <Badge text={props.risk.level} tone="risk" />
+      </HStack>
+      <HStack alignment="lastTextBaseline" spacing={4}>
+        <Text font={17} fontWeight="bold" foregroundStyle={riskColor(props.risk)} lineLimit={1}>
+          {String(props.risk.score)}
+        </Text>
+        <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
+          / 100 · {props.risk.title}
+        </Text>
+      </HStack>
+      <Text font={7.6} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
+        {reason}
+      </Text>
+    </VStack>
+  )
+}
+
+function countryLabel(item?: IpSourceResult) {
+  const cc = String(item?.countryCode || "").trim().toUpperCase()
+  if (/^[A-Z]{2}$/.test(cc)) return cc
+  return item?.kind === "domestic" ? "国内" : "国际"
+}
+
+function sourceTone(item?: IpSourceResult): "domestic" | "international" {
+  return item?.kind === "domestic" ? "domestic" : "international"
+}
+
 function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
   const primary =
     props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
+
   return (
-    <Card>
-      <HStack alignment="center" spacing={6}>
-        <Text font={10} foregroundStyle="secondaryLabel" lineLimit={1}>
+    <Card padding={8} spacing={5}>
+      <HStack alignment="center" spacing={6} frame={{ maxWidth: Infinity }}>
+        <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1}>
           IPv4
         </Text>
         <Spacer />
-        <Badge text={countryLabel(primary)} tone="international" />
+        <Badge text={countryLabel(primary)} tone={sourceTone(primary)} />
       </HStack>
 
-      <Text font={18} fontWeight="bold" lineLimit={1} minScaleFactor={0.58}>
+      <Text font={14.5} fontWeight="semibold" lineLimit={1} minScaleFactor={0.48}>
         {displayIp(primary, props.settings)}
       </Text>
 
-      <DetailRow label="Location" value={displayLocation(primary, props.settings)} />
-      <DetailRow label="ISP" value={text(primary?.isp)} />
-      <DetailRow label="ASN" value={text(primary?.asn || primary?.isp)} />
+      <InfoBlock label="Location" value={displayLocation(primary, props.settings)} strong />
+      <InfoBlock label="ISP" value={ellipsis(primary?.isp, 28)} />
+      <InfoBlock label="ASN" value={ellipsis(primary?.asn || primary?.isp, 28)} />
 
-      <RiskCard risk={props.data.risk} />
+      <Separator />
 
-      <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.65}>
-        {props.data.primaryIPv6 ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}` : "你的网络可能不支持 IPv6"}
+      <RiskStrip risk={props.data.risk} />
+
+      <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.6}>
+        {props.data.primaryIPv6
+          ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
+          : "你的网络可能不支持 IPv6"}
       </Text>
     </Card>
   )
@@ -258,32 +377,29 @@ function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
 function CompactIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
   const primary =
     props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
-  const riskColor: any =
-    props.data.risk.level === "高" ? "systemRed" : props.data.risk.level === "中" ? "systemYellow" : "systemGreen"
 
   return (
-    <Card padding={9}>
-      <HStack alignment="center" spacing={8}>
-        <VStack spacing={3} alignment="leading">
-          <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1}>
+    <Card padding={8} spacing={5}>
+      <HStack alignment="center" spacing={8} frame={{ maxWidth: Infinity }}>
+        <VStack spacing={2} alignment="leading" frame={{ maxWidth: Infinity }}>
+          <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1}>
             IPv4
           </Text>
-          <Text font={17} fontWeight="bold" lineLimit={1} minScaleFactor={0.58}>
+          <Text font={15.5} fontWeight="bold" lineLimit={1} minScaleFactor={0.5}>
             {displayIp(primary, props.settings)}
           </Text>
-          <Text font={10} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.65}>
+          <Text font={8.8} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.6}>
             {displayLocation(primary, props.settings)}
           </Text>
         </VStack>
-        <Spacer />
-        <VStack spacing={2} alignment="trailing">
-          <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1}>
+        <VStack spacing={1} alignment="trailing">
+          <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1}>
             风险值
           </Text>
-          <Text font={20} fontWeight="bold" foregroundStyle={riskColor} lineLimit={1}>
+          <Text font={18} fontWeight="bold" foregroundStyle={riskColor(props.data.risk)} lineLimit={1}>
             {String(props.data.risk.score)}
           </Text>
-          <Text font={9} foregroundStyle="secondaryLabel" lineLimit={1}>
+          <Text font={8.2} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
             {props.data.risk.level} · {props.data.risk.title}
           </Text>
         </VStack>
@@ -292,50 +408,51 @@ function CompactIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
   )
 }
 
-function countryLabel(item?: IpSourceResult) {
-  const cc = String(item?.countryCode || item?.location || "").trim()
-  return cc ? cc.slice(0, 8) : "国际"
-}
-
-function sourceTone(item: IpSourceResult): "domestic" | "international" {
-  return item.kind === "domestic" ? "domestic" : "international"
-}
-
 function SourceLine(props: { item: IpSourceResult; settings: SkkIpInfoSettings }) {
+  const name = props.settings.showSourceName
+    ? props.item.name
+    : props.item.kind === "domestic"
+      ? "国内探针"
+      : "国际探针"
+
   return (
-    <VStack spacing={5}>
-      <HStack alignment="center" spacing={6}>
-        <Text font={11} fontWeight="bold" lineLimit={1} minScaleFactor={0.7}>
-          {props.item.name}
+    <VStack spacing={1} frame={{ maxWidth: Infinity }}>
+      <HStack alignment="center" spacing={5} frame={{ maxWidth: Infinity }}>
+        <Text font={9.2} fontWeight="bold" lineLimit={1} minScaleFactor={0.68}>
+          {name}
         </Text>
         <Spacer />
         <Badge text={props.item.kind === "domestic" ? "国内" : "国际"} tone={sourceTone(props.item)} />
       </HStack>
-      <Text font={10} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
+      <Text font={8.2} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
         IP: {displayIp(props.item, props.settings)}
       </Text>
-      <Text font={10} lineLimit={1} minScaleFactor={0.65}>
-        {displayLocation(props.item, props.settings)} {text(props.item.isp || props.item.asn, "")}
+      <Text font={8.2} lineLimit={1} minScaleFactor={0.58}>
+        {ellipsis(`${displayLocation(props.item, props.settings)} ${text(props.item.isp || props.item.asn, "")}`, 34)}
       </Text>
     </VStack>
+  )
+}
+
+function Separator() {
+  return (
+    <VStack
+      frame={{ maxWidth: Infinity, height: 1 }}
+      widgetBackground={{
+        style: "systemGray5",
+        shape: { type: "rect", cornerRadius: 0, style: "continuous" },
+      }}
+    />
   )
 }
 
 function SourceListCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
   const sources = pickSources(props.data).slice(0, 4)
   return (
-    <Card>
+    <Card padding={8} spacing={4}>
       {sources.map((item, index) => (
-        <VStack key={item.id} spacing={7}>
-          {index > 0 ? (
-            <VStack
-              frame={{ maxWidth: Infinity, height: 1 }}
-              widgetBackground={{
-                style: "systemGray4",
-                shape: { type: "rect", cornerRadius: 0, style: "continuous" },
-              }}
-            />
-          ) : null}
+        <VStack key={item.id} spacing={4} frame={{ maxWidth: Infinity }}>
+          {index > 0 ? <Separator /> : null}
           <SourceLine item={item} settings={props.settings} />
         </VStack>
       ))}
@@ -344,25 +461,24 @@ function SourceListCard(props: { data: NetworkInfoData; settings: SkkIpInfoSetti
 }
 
 function dotColor(item: ServiceResult, index: number): any {
-  if (!item.ok) return index < 3 ? "systemRed" : "systemGray3"
+  if (!item.ok) return index < 2 ? "systemRed" : "systemGray4"
   const latency = item.latencyMs || 0
   if (/仅自制|部分/i.test(String(item.statusText || ""))) {
-    return index % 4 === 0 ? "systemYellow" : "systemGreen"
+    return index % 3 === 0 ? "systemYellow" : "systemGreen"
   }
-  if (latency <= 80) return index % 5 === 0 ? "systemGreen" : "#2F8D46"
-  if (latency <= 150) return index % 4 === 0 ? "systemYellow" : "systemGreen"
-  if (latency <= 260) return index % 3 === 0 ? "systemYellow" : "systemGreen"
-  return index % 3 === 0 ? "systemOrange" : "systemYellow"
+  if (latency <= 120) return index % 5 === 0 ? "systemGreen" : "#2F8D46"
+  if (latency <= 350) return index % 3 === 0 ? "systemYellow" : "systemGreen"
+  return index % 2 === 0 ? "systemOrange" : "systemYellow"
 }
 
 function DotStrip(props: { item: ServiceResult; count?: number }) {
-  const count = props.count ?? 8
+  const count = props.count ?? 6
   return (
-    <HStack spacing={4}>
+    <HStack spacing={2.4}>
       {Array.from({ length: count }).map((_, index) => (
         <VStack
           key={index}
-          frame={{ width: 5, height: 5 }}
+          frame={{ width: 4, height: 4 }}
           widgetBackground={{
             style: dotColor(props.item, index),
             shape: { type: "capsule", style: "continuous" },
@@ -376,33 +492,44 @@ function DotStrip(props: { item: ServiceResult; count?: number }) {
 function ServiceTile(props: { item: ServiceResult }) {
   return (
     <VStack
-      spacing={5}
-      padding={{ top: 7, leading: 7, bottom: 7, trailing: 7 }}
-      frame={{ maxWidth: Infinity }}
+      alignment="leading"
+      spacing={2.5}
+      padding={{ top: 4, leading: 5, bottom: 4, trailing: 5 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "#FFFFFF", dark: "#1B1D1C" } as any,
+        style: { light: "rgba(0,0,0,0.03)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 8, style: "continuous" },
       }}
     >
-      <HStack alignment="center" spacing={4}>
+      <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
         <VStack
-          frame={{ width: 7, height: 7 }}
+          frame={{ width: 6.5, height: 6.5 }}
           widgetBackground={{
             style: statusColor(props.item.ok, props.item.statusText),
             shape: { type: "capsule", style: "continuous" },
           }}
         />
-        <Text font={10} fontWeight="bold" lineLimit={1} minScaleFactor={0.65}>
+        <Text font={8.4} fontWeight="bold" lineLimit={1} minScaleFactor={0.52}>
           {props.item.name}
         </Text>
         <Spacer />
-        <Badge text={props.item.region} tone={props.item.region === "国内" ? "domestic" : "international"} />
+        <Badge
+          text={serviceLabel(props.item)}
+          tone={props.item.region === "国内" ? "domestic" : "international"}
+        />
       </HStack>
-      <HStack alignment="center" spacing={6}>
-        <Text font={10} fontWeight="bold" foregroundStyle={statusColor(props.item.ok, props.item.statusText)} lineLimit={1}>
+      <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
+        <Text
+          font={8.8}
+          fontWeight="bold"
+          foregroundStyle={statusColor(props.item.ok, props.item.statusText)}
+          lineLimit={1}
+          minScaleFactor={0.7}
+        >
           {props.item.ok ? latencyText(props.item.latencyMs) : "失败"}
         </Text>
-        <Text font={8} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
+        <Spacer />
+        <Text font={7.2} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.58}>
           {props.item.countryCode || props.item.statusText || ""}
         </Text>
       </HStack>
@@ -420,10 +547,11 @@ function servicePriority(item: ServiceResult) {
     "youtube",
     "chatgpt",
     "netflix",
+    "disney",
+    "jsdelivr",
     "wechat",
     "taobao",
     "openai_api",
-    "disney",
     "max",
     "spotify",
   ]
@@ -437,7 +565,7 @@ function pickServices(data: NetworkInfoData, limit: number) {
     .slice(0, limit)
 }
 
-function ServiceGrid(props: { items: ServiceResult[]; columns: 2 | 3 }) {
+function ServiceGrid(props: { items: ServiceResult[]; columns: 2 | 3 | 4 }) {
   const rows: ServiceResult[][] = []
   props.items.forEach((item, index) => {
     const row = Math.floor(index / props.columns)
@@ -446,9 +574,9 @@ function ServiceGrid(props: { items: ServiceResult[]; columns: 2 | 3 }) {
   })
 
   return (
-    <VStack spacing={6}>
+    <VStack spacing={5} frame={{ maxWidth: Infinity }}>
       {rows.map((row, index) => (
-        <HStack key={index} spacing={6}>
+        <HStack key={index} spacing={5} frame={{ maxWidth: Infinity }}>
           {row.map((item) => (
             <ServiceTile key={item.id} item={item} />
           ))}
@@ -466,32 +594,30 @@ function SmallView(props: {
   staleFallback?: boolean
 }) {
   const primary =
-    props.data.primaryDomestic || props.data.primaryInternational || props.data.primaryIPv6
+    props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
 
   return (
-    <Root>
+    <Root compact>
       <Header
         title={props.settings.title}
         updatedAt={props.data.updatedAt}
         fromCache={props.fromCache}
         staleFallback={props.staleFallback}
       />
-      <Spacer />
-      <VStack spacing={4}>
-        <Text font={18} fontWeight="bold" lineLimit={1} minScaleFactor={0.58}>
+      <Spacer minLength={2} />
+      <VStack spacing={4} frame={{ maxWidth: Infinity }}>
+        <Text font={16} fontWeight="bold" lineLimit={1} minScaleFactor={0.48}>
           {displayIp(primary, props.settings)}
         </Text>
-        <Text font={11} foregroundStyle="secondaryLabel" lineLimit={2} minScaleFactor={0.7}>
+        <Text font={9.5} foregroundStyle="secondaryLabel" lineLimit={2} minScaleFactor={0.62}>
           {displayLocation(primary, props.settings)}
         </Text>
-        <Text font={10} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
-          {text(primary?.isp || primary?.asn)}
+        <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
+          风险值 {props.data.risk.score} · {props.data.risk.title}
         </Text>
       </VStack>
       <Spacer />
-      {props.data.services.length ? (
-        <ServiceGrid items={pickServices(props.data, 2)} columns={2} />
-      ) : null}
+      <RiskStrip risk={props.data.risk} />
     </Root>
   )
 }
@@ -504,7 +630,7 @@ function MediumView(props: {
 }) {
   const services = pickServices(props.data, 2)
   return (
-    <Root>
+    <Root compact>
       <Header
         title={props.settings.title}
         updatedAt={props.data.updatedAt}
@@ -517,7 +643,7 @@ function MediumView(props: {
       {services.length ? (
         <ServiceGrid items={services} columns={2} />
       ) : (
-        <Text font={10} foregroundStyle="secondaryLabel">
+        <Text font={9} foregroundStyle="secondaryLabel">
           服务检测未开启
         </Text>
       )}
@@ -531,36 +657,40 @@ function LargeView(props: {
   fromCache: boolean
   staleFallback?: boolean
 }) {
-  const services = pickServices(props.data, 9)
+  const services = pickServices(props.data, 8)
   return (
     <Root>
-      <Header
-        title={props.settings.title}
-        updatedAt={props.data.updatedAt}
-        fromCache={props.fromCache}
-        staleFallback={props.staleFallback}
-      />
-
-      <HStack spacing={8}>
+      <HStack alignment="top" spacing={7} frame={{ maxWidth: Infinity }}>
         <PrimaryIpCard data={props.data} settings={props.settings} />
         <SourceListCard data={props.data} settings={props.settings} />
       </HStack>
 
+      <StatusStrip
+        data={props.data}
+        settings={props.settings}
+        fromCache={props.fromCache}
+        staleFallback={props.staleFallback}
+      />
+
       {services.length ? (
-        <VStack spacing={6}>
-          <Text font={10} fontWeight="semibold" foregroundStyle="secondaryLabel">
+        <ServicePanel>
+          <Text font={9.5} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1}>
             服务检测
           </Text>
-          <ServiceGrid items={services} columns={3} />
-        </VStack>
-      ) : null}
+          <ServiceGrid items={services} columns={4} />
+        </ServicePanel>
+      ) : (
+        <Text font={9} foregroundStyle="secondaryLabel">
+          服务检测未开启
+        </Text>
+      )}
     </Root>
   )
 }
 
 function ErrorView(props: { title: string; message: string }) {
   return (
-    <Root>
+    <Root compact>
       <Spacer />
       <VStack spacing={6} alignment="center">
         <Text font="headline" foregroundStyle="systemRed">

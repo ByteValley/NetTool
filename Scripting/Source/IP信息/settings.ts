@@ -19,7 +19,7 @@ export type SkkIpInfoSettings = {
 export const defaultSkkIpInfoSettings: SkkIpInfoSettings = {
   title: "IP 信息",
   refreshIntervalMinutes: 30,
-  timeoutMs: 6000,
+  timeoutMs: 3000,
   cacheEnabled: true,
   cacheMinutes: 10,
   enableIPv6: true,

@@ -301,7 +301,7 @@ async function service(
 ): Promise<ServiceResult> {
   const start = Date.now()
   try {
-    const data = await loader(timeoutMs)
+    const data = await withTimeout(loader(timeoutMs), timeoutMs + 800, `${name} service`)
     return {
       id,
       name,
@@ -441,15 +441,16 @@ async function testSpotify(timeoutMs: number) {
 }
 
 async function runServiceChecks(timeoutMs: number): Promise<ServiceResult[]> {
-  const basic = BASIC_SERVICE_TARGETS.map((target) => testBasicService(target, timeoutMs))
+  const ms = Math.max(1200, Math.min(3000, timeoutMs))
+  const basic = BASIC_SERVICE_TARGETS.map((target) => testBasicService(target, ms))
   const unlock = [
-    testYouTube(timeoutMs),
-    testChatGPT(timeoutMs),
-    testOpenAIAPI(timeoutMs),
-    testNetflix(timeoutMs),
-    testDisney(timeoutMs),
-    testMax(timeoutMs),
-    testSpotify(timeoutMs),
+    testYouTube(ms),
+    testChatGPT(ms),
+    testOpenAIAPI(ms),
+    testNetflix(ms),
+    testDisney(ms),
+    testMax(ms),
+    testSpotify(ms),
   ]
   return Promise.all([...basic, ...unlock])
 }
@@ -540,10 +541,10 @@ function computeRisk(
 
 function cacheSignature(settings: SkkIpInfoSettings) {
   return JSON.stringify({
-    v: 2,
+    v: 3,
     enableIPv6: settings.enableIPv6 !== false,
     enableConnectivity: settings.enableConnectivity !== false,
-    timeoutMs: Math.max(1500, Math.min(15000, settings.timeoutMs || 6000)),
+    timeoutMs: Math.max(1500, Math.min(15000, settings.timeoutMs || 3000)),
   })
 }
 
@@ -566,7 +567,7 @@ function writeCache(data: NetworkInfoData, signature: string) {
 }
 
 export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<NetworkInfoData> {
-  const timeoutMs = Math.max(1500, Math.min(15000, settings.timeoutMs || 6000))
+  const timeoutMs = Math.max(1500, Math.min(15000, settings.timeoutMs || 3000))
   const sourceTasks: Array<Promise<IpSourceResult>> = [
     source("ipip", "IPIP 国内", "domestic", timeoutMs, loadIpip),
     source("bilibili", "Bilibili 国内", "domestic", timeoutMs, loadBilibili),
@@ -581,8 +582,11 @@ export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<Net
     sourceTasks.push(source("ipv6_ipify", "IPv6 IPify", "ipv6", timeoutMs, loadIpv6Plain))
   }
 
-  const sources = await Promise.all(sourceTasks)
-  const services = settings.enableConnectivity ? await runServiceChecks(timeoutMs) : []
+  const sourcesPromise = Promise.all(sourceTasks)
+  const servicesPromise = settings.enableConnectivity
+    ? runServiceChecks(timeoutMs)
+    : Promise.resolve([] as ServiceResult[])
+  const [sources, services] = await Promise.all([sourcesPromise, servicesPromise])
   const primaryDomestic = firstOk(sources, "domestic")
   const primaryInternational =
     firstOk(sources, "cloudflare") || firstOk(sources, "international")
