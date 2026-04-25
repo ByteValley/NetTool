@@ -20,6 +20,7 @@ import {
   saveSkkIpInfoSettings,
   type SkkIpInfoSettings,
 } from "./settings"
+import { fetchNetworkInfoCached } from "./api"
 
 declare const Safari: any
 declare const Dialog: any
@@ -70,23 +71,45 @@ function SettingsView() {
   const [maskLocation, setMaskLocation] = useState(initial.maskLocation)
   const [showSourceName, setShowSourceName] = useState(initial.showSourceName)
 
+  const currentSettings = (overrides: Partial<SkkIpInfoSettings> = {}): SkkIpInfoSettings => ({
+    ...defaultSkkIpInfoSettings,
+    ...initial,
+    title: title.trim() || defaultSkkIpInfoSettings.title,
+    refreshIntervalMinutes,
+    timeoutMs,
+    cacheEnabled,
+    cacheMinutes,
+    enableIPv6,
+    enableConnectivity,
+    maskIp,
+    maskLocation,
+    showSourceName,
+    ...overrides,
+  })
+
   const handleSave = () => {
-    const settings: SkkIpInfoSettings = {
-      ...defaultSkkIpInfoSettings,
-      ...initial,
-      title: title.trim() || defaultSkkIpInfoSettings.title,
-      refreshIntervalMinutes,
-      timeoutMs,
-      cacheEnabled,
-      cacheMinutes,
-      enableIPv6,
-      enableConnectivity,
-      maskIp,
-      maskLocation,
-      showSourceName,
-    }
+    const settings = currentSettings()
     saveSkkIpInfoSettings(settings)
     dismiss()
+  }
+
+  const handleRefreshCache = async () => {
+    const settings = currentSettings({ cacheEnabled: true })
+    saveSkkIpInfoSettings(settings)
+    try {
+      await fetchNetworkInfoCached(settings, { forceRefresh: true })
+      await Dialog?.alert?.({
+        title: "刷新完成",
+        message: "完整检测结果已写入缓存，桌面小组件会优先读取这份结果。",
+        buttonLabel: "知道了",
+      })
+    } catch (error: any) {
+      await Dialog?.alert?.({
+        title: "刷新失败",
+        message: error?.message ? String(error.message) : String(error),
+        buttonLabel: "知道了",
+      })
+    }
   }
 
   const handleAbout = async () => {
@@ -225,10 +248,15 @@ function SettingsView() {
           header={<Text font="body" fontWeight="semibold">外部工具</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              可打开原站点查看完整网页检测结果。
+              桌面小组件会先读取缓存；需要更新 ChatGPT、Netflix 等检测结果时，可先在这里刷新完整缓存。
             </Text>
           }
         >
+          <Button
+            title="刷新完整检测缓存"
+            systemImage="arrow.clockwise"
+            action={handleRefreshCache}
+          />
           <Button
             title="打开 ip.skk.moe"
             systemImage="safari"

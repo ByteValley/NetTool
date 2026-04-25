@@ -5,6 +5,9 @@ import {
   Text,
   Spacer,
   WidgetReloadPolicy,
+  Circle,
+  Rectangle,
+  RoundedRectangle,
 } from "scripting"
 
 import {
@@ -100,10 +103,23 @@ function pickReferenceSources(data: NetworkInfoData) {
   return picked
 }
 
-function riskColor(risk: RiskInfo): any {
-  if (risk.level === "高") return "systemRed"
-  if (risk.level === "中") return "systemYellow"
+function riskColor(risk?: Partial<RiskInfo>): any {
+  if (risk?.level === "高") return "systemRed"
+  if (risk?.level === "中") return "systemYellow"
   return "systemGreen"
+}
+
+function riskScore(risk?: Partial<RiskInfo>) {
+  const score = Number(risk?.score)
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 50
+}
+
+function riskLevel(risk?: Partial<RiskInfo>) {
+  return risk?.level || "中"
+}
+
+function riskTitle(risk?: Partial<RiskInfo>) {
+  return text(risk?.title, "需要留意")
 }
 
 function statusColor(ok: boolean, statusText?: string): any {
@@ -208,12 +224,11 @@ function Header(props: {
 }) {
   return (
     <HStack alignment="center" spacing={6}>
-      <VStack
+      <RoundedRectangle
+        cornerRadius={2}
+        style="continuous"
+        fill="systemGreen"
         frame={{ width: 4, height: 18 }}
-        widgetBackground={{
-          style: "systemGreen",
-          shape: { type: "capsule", style: "continuous" },
-        }}
       />
       <Text font={13} fontWeight="bold" lineLimit={1} minScaleFactor={0.72}>
         {props.title}
@@ -269,6 +284,7 @@ function StatusStrip(props: {
   staleFallback?: boolean
 }) {
   void props.settings
+  const risk = props.data.risk || ({} as RiskInfo)
   return (
     <VStack
       padding={{ top: 5, leading: 7, bottom: 5, trailing: 7 }}
@@ -282,7 +298,7 @@ function StatusStrip(props: {
         <VStack
           frame={{ width: 13, height: 13 }}
           widgetBackground={{
-            style: riskColor(props.data.risk),
+            style: riskColor(risk),
             shape: { type: "capsule", style: "continuous" },
           }}
         >
@@ -293,16 +309,16 @@ function StatusStrip(props: {
         <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1}>
           风险值
         </Text>
-        <Text font={12} fontWeight="bold" foregroundStyle={riskColor(props.data.risk)} lineLimit={1}>
-          {String(props.data.risk.score)}
+        <Text font={12} fontWeight="bold" foregroundStyle={riskColor(risk)} lineLimit={1}>
+          {String(riskScore(risk))}
         </Text>
         <Text font={8.4} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.66}>
-          / 100 · {props.data.risk.title}
+          / 100 · {riskTitle(risk)}
         </Text>
         <Spacer />
-        <StatusPill text={props.data.risk.lineType} />
-        <StatusPill text={props.data.risk.nativeHint} />
-        <StatusPill text={props.data.risk.subtype} />
+        <StatusPill text={text(risk.lineType, "未知")} />
+        <StatusPill text={text(risk.nativeHint, riskTitle(risk))} />
+        <StatusPill text={text(risk.subtype, riskLevel(risk))} />
         <Text font={7.8} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
           {formatTime(props.data.updatedAt)}
           {props.fromCache ? " 缓存" : ""}
@@ -314,7 +330,7 @@ function StatusStrip(props: {
 }
 
 function RiskStrip(props: { risk: RiskInfo }) {
-  const reason = props.risk.items.length ? props.risk.items.join(" · ") : "暂无异常信号"
+  const reason = props.risk.items?.length ? props.risk.items.join(" · ") : "暂无异常信号"
   return (
     <VStack
       spacing={2}
@@ -329,14 +345,14 @@ function RiskStrip(props: { risk: RiskInfo }) {
           风险值
         </Text>
         <Spacer />
-        <Badge text={props.risk.level} tone="risk" />
+        <Badge text={riskLevel(props.risk)} tone="risk" />
       </HStack>
       <HStack alignment="lastTextBaseline" spacing={4}>
         <Text font={17} fontWeight="bold" foregroundStyle={riskColor(props.risk)} lineLimit={1}>
-          {String(props.risk.score)}
+          {String(riskScore(props.risk))}
         </Text>
         <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
-          / 100 · {props.risk.title}
+          / 100 · {riskTitle(props.risk)}
         </Text>
       </HStack>
       <Text font={7.6} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
@@ -352,16 +368,6 @@ function countryLabel(item?: IpSourceResult) {
   return item?.kind === "domestic" ? "国内" : "国际"
 }
 
-function flagEmoji(item?: IpSourceResult) {
-  const cc = String(item?.countryCode || "").trim().toUpperCase()
-  if (!/^[A-Z]{2}$/.test(cc)) return ""
-  const base = 0x1f1e6
-  return String.fromCodePoint(
-    base + cc.charCodeAt(0) - 65,
-    base + cc.charCodeAt(1) - 65,
-  )
-}
-
 function sourceTone(item?: IpSourceResult): "domestic" | "international" {
   return item?.kind === "domestic" ? "domestic" : "international"
 }
@@ -369,7 +375,6 @@ function sourceTone(item?: IpSourceResult): "domestic" | "international" {
 function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
   const primary =
     props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
-  const flag = flagEmoji(primary)
 
   return (
     <Card padding={8} spacing={5}>
@@ -378,13 +383,7 @@ function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
           IPv4
         </Text>
         <Spacer />
-        {flag ? (
-          <Text font={18} lineLimit={1}>
-            {flag}
-          </Text>
-        ) : (
-          <Badge text={countryLabel(primary)} tone={sourceTone(primary)} />
-        )}
+        <Badge text={countryLabel(primary)} tone={sourceTone(primary)} />
       </HStack>
 
       <Text font={14.5} fontWeight="semibold" lineLimit={1} minScaleFactor={0.48}>
@@ -397,15 +396,20 @@ function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
 
       <Separator />
 
-      <VStack alignment="center" spacing={4} frame={{ maxWidth: Infinity, minHeight: 76 }}>
-        <Spacer minLength={18} />
-        <Text font={9.8} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
-          {props.data.primaryIPv6
-            ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
-            : "你的网络可能不支持 IPv6"}
-        </Text>
-        <Spacer />
-      </VStack>
+      <Text
+        font={9.8}
+        fontWeight="semibold"
+        foregroundStyle="secondaryLabel"
+        lineLimit={1}
+        minScaleFactor={0.62}
+        multilineTextAlignment="center"
+        frame={{ maxWidth: Infinity }}
+        padding={{ top: 28, bottom: 28 }}
+      >
+        {props.data.primaryIPv6
+          ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
+          : "你的网络可能不支持 IPv6"}
+      </Text>
     </Card>
   )
 }
@@ -433,10 +437,10 @@ function CompactIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
             风险值
           </Text>
           <Text font={18} fontWeight="bold" foregroundStyle={riskColor(props.data.risk)} lineLimit={1}>
-            {String(props.data.risk.score)}
+            {String(riskScore(props.data.risk))}
           </Text>
           <Text font={8.2} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
-            {props.data.risk.level} · {props.data.risk.title}
+            {riskLevel(props.data.risk)} · {riskTitle(props.data.risk)}
           </Text>
         </VStack>
       </HStack>
@@ -472,26 +476,23 @@ function SourceLine(props: { item: IpSourceResult; settings: SkkIpInfoSettings }
 
 function Separator() {
   return (
-    <VStack
+    <Rectangle
+      fill="systemGray5"
       frame={{ maxWidth: Infinity, height: 1 }}
-      widgetBackground={{
-        style: "systemGray5",
-        shape: { type: "rect", cornerRadius: 0, style: "continuous" },
-      }}
     />
   )
 }
 
 function SourceListCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
   const sources = pickReferenceSources(props.data).slice(0, 4)
+  const rows: any[] = []
+  sources.forEach((item, index) => {
+    if (index > 0) rows.push(<Separator key={`${item.id}-separator`} />)
+    rows.push(<SourceLine key={item.id} item={item} settings={props.settings} />)
+  })
   return (
     <Card padding={8} spacing={4}>
-      {sources.map((item, index) => (
-        <VStack key={item.id} spacing={4} frame={{ maxWidth: Infinity }}>
-          {index > 0 ? <Separator /> : null}
-          <SourceLine item={item} settings={props.settings} />
-        </VStack>
-      ))}
+      {rows}
     </Card>
   )
 }
@@ -512,13 +513,10 @@ function DotStrip(props: { item: ServiceResult; count?: number }) {
   return (
     <HStack spacing={2.4}>
       {Array.from({ length: count }).map((_, index) => (
-        <VStack
+        <Circle
+          fill={dotColor(props.item, index)}
           key={index}
           frame={{ width: 4, height: 4 }}
-          widgetBackground={{
-            style: dotColor(props.item, index),
-            shape: { type: "capsule", style: "continuous" },
-          }}
         />
       ))}
     </HStack>
@@ -538,12 +536,9 @@ function ServiceTile(props: { item: ServiceResult }) {
       }}
     >
       <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
-        <VStack
+        <Circle
+          fill={statusColor(props.item.ok, props.item.statusText)}
           frame={{ width: 6.5, height: 6.5 }}
-          widgetBackground={{
-            style: statusColor(props.item.ok, props.item.statusText),
-            shape: { type: "capsule", style: "continuous" },
-          }}
         />
         <Text font={8.4} fontWeight="bold" lineLimit={1} minScaleFactor={0.52}>
           {props.item.name}
@@ -649,7 +644,7 @@ function SmallView(props: {
           {displayLocation(primary, props.settings)}
         </Text>
         <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
-          风险值 {props.data.risk.score} · {props.data.risk.title}
+          风险值 {riskScore(props.data.risk)} · {riskTitle(props.data.risk)}
         </Text>
       </VStack>
       <Spacer />
@@ -741,6 +736,15 @@ function ErrorView(props: { title: string; message: string }) {
   )
 }
 
+function widgetSafeSettings(settings: SkkIpInfoSettings): SkkIpInfoSettings {
+  return {
+    ...settings,
+    timeoutMs: Math.min(settings.timeoutMs || 3000, 1500),
+    enableIPv6: false,
+    enableConnectivity: false,
+  }
+}
+
 async function render() {
   const settings = loadSkkIpInfoSettings()
   const refreshMinutes = clampRefreshMinutes(settings.refreshIntervalMinutes)
@@ -750,7 +754,10 @@ async function render() {
   }
 
   try {
-    const result = await fetchNetworkInfoCached(settings)
+    const result = await fetchNetworkInfoCached(widgetSafeSettings(settings), {
+      preferAnyCache: true,
+      lite: true,
+    })
     const props = {
       data: result.data,
       settings,
