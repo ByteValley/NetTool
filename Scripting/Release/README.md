@@ -1,7 +1,7 @@
 # 📌 NetTool — 中国三大运营商话费/流量查询组件
 
 > ✨ 基于 **Scripting App** 的电信运营商账户信息展示脚本  
-> 支持中国移动 / 中国联通 / 中国电信  
+> 支持中国移动 / 中国联通 / 中国电信 / 中国广电  
 > 显示话费、流量、语音剩余等关键信息  
 > 支持自定义样式、自动刷新、BoxJS 同步配置  
 > iOS 主屏幕小组件一键查看剩余资源
@@ -15,6 +15,7 @@
 | 🇨🇳 中国移动 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaMobile/) |
 | 🇨🇳 中国联通 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaUnicom/) |
 | 🇨🇳 中国电信 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaTelecom/) |
+| 🇨🇳 中国广电 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaBroadnet/) |
 > 如脚本未自动启动，请确保已安装 Scripting App  
 > App Store: https://apps.apple.com/tw/app/scripting/id6479691128
 

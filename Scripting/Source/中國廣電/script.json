@@ -1,0 +1,46 @@
+{
+  "name" : "中國廣電",
+  "version" : "1.0.0",
+  "color" : "rgba(48, 123, 216,1)",
+  "author" : {
+    "name" : "ByteValley",
+    "homepage" : null,
+    "email" : null
+  },
+  "contributors" : [
+
+  ],
+  "runInApp" : false,
+  "description" : "",
+  "remoteResource" : {
+    "hash" : "",
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/中國廣電.scripting",
+    "autoUpdateInterval" : 300
+  },
+  "localizedNames" : {
+    "fr" : "",
+    "ja" : "",
+    "it" : "",
+    "zh" : "",
+    "pt" : "",
+    "ru" : "",
+    "en" : "",
+    "de" : "",
+    "es" : ""
+  },
+  "localizedDescriptions" : {
+    "zh" : "",
+    "de" : "",
+    "ja" : "",
+    "ru" : "",
+    "es" : "",
+    "fr" : "",
+    "it" : "",
+    "en" : "",
+    "pt" : ""
+  },
+  "icon" : "antenna.radiowaves.left.and.right",
+  "intentInputTypes" : [
+
+  ]
+}

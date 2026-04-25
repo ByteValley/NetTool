@@ -1,0 +1,251 @@
+/* =====================================================================
+ * index.tsx（中国广电）
+ *
+ * 模块分类 · 背景
+ * - 设置页支持「页面（全屏）/ 弹层弹出」切换；偏好存 Storage
+ * - main() 不在组件渲染树内，不能调用 hook（useFullscreenPref）
+ * - settings.ts 负责 merge + normalize；UI 层只做“确定值收敛”
+ *
+ * 模块分类 · 目标
+ * - 广电 10099：配置 Session / Access / 请求体 data
+ * - 渲染配置：复用联通组件 UI
+ * - 缓存策略：CacheSection（deferPersist=true）
+ * ===================================================================== */
+
+import {
+  Navigation,
+  NavigationStack,
+  List,
+  Section,
+  TextField,
+  Button,
+  Text,
+  Script,
+  useState,
+} from "scripting"
+
+import {
+  type ChinaBroadnetSettings,
+  defaultChinaBroadnetSettings,
+  loadChinaBroadnetSettings,
+  saveChinaBroadnetSettings,
+  FULLSCREEN_KEY,
+} from "./settings"
+
+import { RenderConfigSection } from "./shared/ui-kit/renderConfigSection"
+import type { SmallCardStyle } from "./shared/carrier/cards/small"
+import { useFullscreenPref, readFullscreenPref } from "./shared/ui-kit/useFullscreenPref"
+import { CacheSection, type CacheConfig } from "./shared/ui-kit/cacheSection"
+import { formatDuration } from "./shared/utils/time"
+
+declare const Dialog: any
+
+const VERSION = "1.0.0"
+const BUILD_DATE = "2026-04-25"
+
+function SettingsView() {
+  const dismiss = Navigation.useDismiss()
+  const { fullscreenPref, toggleFullscreen } = useFullscreenPref(FULLSCREEN_KEY)
+
+  const initial = loadChinaBroadnetSettings()
+
+  const initialRefreshInterval =
+    typeof initial.refreshInterval === "number" && Number.isFinite(initial.refreshInterval)
+      ? initial.refreshInterval
+      : defaultChinaBroadnetSettings.refreshInterval
+
+  const initialShowRemainRatio =
+    typeof initial.showRemainRatio === "boolean"
+      ? initial.showRemainRatio
+      : !!defaultChinaBroadnetSettings.showRemainRatio
+
+  const initialMediumStyle =
+    (initial.mediumStyle ?? defaultChinaBroadnetSettings.mediumStyle ?? "FullRing") as "FullRing" | "DialRing"
+
+  const initialMediumUseThreeCard =
+    typeof initial.mediumUseThreeCard === "boolean"
+      ? initial.mediumUseThreeCard
+      : !!defaultChinaBroadnetSettings.mediumUseThreeCard
+
+  const initialIncludeDirectionalInTotal =
+    typeof initial.includeDirectionalInTotal === "boolean"
+      ? initial.includeDirectionalInTotal
+      : (defaultChinaBroadnetSettings.includeDirectionalInTotal ?? true)
+
+  const initialSmallCardStyle =
+    ((initial.smallCardStyle ?? defaultChinaBroadnetSettings.smallCardStyle) as SmallCardStyle) ??
+    ("summary" as SmallCardStyle)
+
+  const initialSmallMiniBarUseTotalFlow =
+    typeof initial.smallMiniBarUseTotalFlow === "boolean"
+      ? initial.smallMiniBarUseTotalFlow
+      : !!defaultChinaBroadnetSettings.smallMiniBarUseTotalFlow
+
+  const initialCache = (initial.cache ?? defaultChinaBroadnetSettings.cache) as CacheConfig
+
+  const [session, setSession] = useState<string>(String(initial.session ?? ""))
+  const [access, setAccess] = useState<string>(String(initial.access ?? ""))
+  const [bodyData, setBodyData] = useState<string>(String(initial.bodyData ?? ""))
+  const [refreshInterval, setRefreshInterval] = useState<number>(initialRefreshInterval)
+
+  const [showRemainRatio, setShowRemainRatio] = useState<boolean>(initialShowRemainRatio)
+  const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(initialMediumStyle)
+  const [mediumUseThreeCard, setMediumUseThreeCard] = useState<boolean>(initialMediumUseThreeCard)
+  const [includeDirectionalInTotal, setIncludeDirectionalInTotal] = useState<boolean>(
+    !!initialIncludeDirectionalInTotal,
+  )
+  const [smallCardStyle, setSmallCardStyle] = useState<SmallCardStyle>(initialSmallCardStyle)
+  const [smallMiniBarUseTotalFlow, setSmallMiniBarUseTotalFlow] = useState<boolean>(
+    initialSmallMiniBarUseTotalFlow,
+  )
+  const [cacheDraft, setCacheDraft] = useState<CacheConfig>(initialCache)
+
+  const cacheStore = {
+    title: "启用缓存",
+    load: () => loadChinaBroadnetSettings(),
+    save: (next: ChinaBroadnetSettings) => saveChinaBroadnetSettings(next),
+    getCache: (s: ChinaBroadnetSettings) => (s.cache ?? defaultChinaBroadnetSettings.cache),
+    setCache: (s: ChinaBroadnetSettings, cache: CacheConfig) => ({ ...s, cache }),
+  }
+
+  const handleSave = () => {
+    const next: ChinaBroadnetSettings = {
+      ...initial,
+
+      session: String(session ?? "").trim(),
+      access: String(access ?? "").trim(),
+      bodyData: String(bodyData ?? "").trim(),
+      refreshInterval:
+        typeof refreshInterval === "number" && Number.isFinite(refreshInterval)
+          ? refreshInterval
+          : defaultChinaBroadnetSettings.refreshInterval,
+
+      showRemainRatio: !!showRemainRatio,
+      mediumStyle,
+      mediumUseThreeCard: !!mediumUseThreeCard,
+      includeDirectionalInTotal: !!includeDirectionalInTotal,
+      smallCardStyle,
+      smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
+
+      cacheScopeKey: `${String(session ?? "").trim()}|${String(access ?? "").trim()}`,
+      cache: cacheDraft,
+    }
+
+    saveChinaBroadnetSettings(next)
+    dismiss()
+  }
+
+  const handleAbout = async () => {
+    try {
+      await Dialog?.alert?.({
+        title: "广电余量组件",
+        message: `作者：©ByteValley\n版本：v${VERSION}（${BUILD_DATE}）\n接口：10099 微信小程序`,
+        buttonLabel: "关闭",
+      })
+    } catch { }
+  }
+
+  return (
+    <NavigationStack>
+      <List
+        navigationTitle="广电余量组件"
+        navigationBarTitleDisplayMode="inline"
+        toolbar={{
+          topBarLeading: [<Button title="关闭" action={dismiss} />],
+          topBarTrailing: [
+            <Button
+              title={fullscreenPref ? "页面" : "弹层"}
+              systemImage={fullscreenPref ? "rectangle.arrowtriangle.2.outward" : "rectangle"}
+              action={toggleFullscreen}
+            />,
+            <Button title="完成" action={handleSave} />,
+          ],
+          bottomBar: [
+            <Button
+              systemImage="info.circle"
+              title="关于本组件"
+              action={handleAbout}
+              foregroundStyle="secondaryLabel"
+            />,
+          ],
+        }}
+      >
+        <Section
+          header={<Text font="body" fontWeight="semibold">登录凭证</Text>}
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中复制 Session、Access 和请求体 data。
+            </Text>
+          }
+        >
+          <TextField title="Session" value={session} prompt="请求头 Session" onChanged={setSession} />
+          <TextField title="Access" value={access} prompt="请求头 Access" onChanged={setAccess} />
+          <TextField title="data" value={bodyData} prompt="请求体 data（Base64 整段）" onChanged={setBodyData} />
+        </Section>
+
+        <RenderConfigSection
+          smallCardStyle={smallCardStyle}
+          setSmallCardStyle={setSmallCardStyle}
+          showRemainRatio={showRemainRatio}
+          setShowRemainRatio={setShowRemainRatio}
+          smallMiniBarUseTotalFlow={smallMiniBarUseTotalFlow}
+          setSmallMiniBarUseTotalFlow={setSmallMiniBarUseTotalFlow}
+          mediumStyle={mediumStyle}
+          setMediumStyle={setMediumStyle}
+          mediumUseThreeCard={mediumUseThreeCard}
+          setMediumUseThreeCard={setMediumUseThreeCard}
+          includeDirectionalInTotal={includeDirectionalInTotal}
+          setIncludeDirectionalInTotal={setIncludeDirectionalInTotal}
+          refreshInterval={refreshInterval}
+          setRefreshInterval={setRefreshInterval}
+        />
+
+        <CacheSection
+          store={cacheStore as any}
+          refreshKey={refreshInterval}
+          draft={cacheDraft}
+          onDraftChange={(next) => setCacheDraft(next)}
+          deferPersist={true}
+        />
+
+        <Section
+          footer={
+            <Text font="caption2" foregroundStyle="secondaryLabel">
+              当前生效示例：refresh={refreshInterval} 分钟，TTL 自动为 max(4 小时, refresh)；固定 TTL 则为 max(4 小时, 固定值)。
+              {"\n"}提示：你设置的“兜底旧缓存最长允许”会被自动纠偏为 ≥ TTL（避免反直觉）。
+              {"\n"}（用于说明：
+              {formatDuration(Math.max(240, Number(refreshInterval) || 0), { includeSeconds: false })}）
+            </Text>
+          }
+        />
+      </List>
+    </NavigationStack>
+  )
+}
+
+type AppProps = { interactiveDismissDisabled?: boolean }
+function App(_props: AppProps) {
+  return <SettingsView />
+}
+
+async function main() {
+  try {
+    const fullscreen = readFullscreenPref(FULLSCREEN_KEY, true)
+
+    await Navigation.present({
+      element: <App interactiveDismissDisabled />,
+      ...(fullscreen ? { modalPresentationStyle: "fullScreen" } : {}),
+    })
+
+    Script.exit()
+  } catch (e) {
+    const msg =
+      e && typeof e === "object" && "stack" in e ? String((e as { stack?: unknown }).stack ?? e) : String(e)
+    try {
+      await Dialog?.alert?.({ title: "脚本执行失败", message: msg, buttonLabel: "知道了" })
+    } catch { }
+    Script.exit()
+  }
+}
+
+main()
