@@ -31,10 +31,14 @@ import {
   loadChinaBroadnetSettings,
   saveChinaBroadnetSettings,
   FULLSCREEN_KEY,
+  MODULE_COLLAPSE_KEY,
 } from "./settings"
 
 import { RenderConfigSection } from "./shared/ui-kit/renderConfigSection"
 import type { SmallCardStyle } from "./shared/carrier/cards/small"
+import { ModuleSection } from "./shared/ui-kit/moduleSection"
+import type { ModuleLinks } from "./shared/ui-kit/moduleActions"
+import { createModuleHandles, createModuleActions } from "./shared/ui-kit/moduleActions"
 import { useFullscreenPref, readFullscreenPref } from "./shared/ui-kit/useFullscreenPref"
 import { CacheSection, type CacheConfig } from "./shared/ui-kit/cacheSection"
 import { formatDuration } from "./shared/utils/time"
@@ -43,6 +47,34 @@ declare const Dialog: any
 
 const VERSION = "1.0.0"
 const BUILD_DATE = "2026-04-25"
+
+const BROADNET_BOXJS_SUB_URL =
+  "http://boxjs.com/#/sub/add/https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/ComponentService.boxjs.json"
+const BROADNET_MODULE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Component/ChinaBroadnet.module"
+const BROADNET_LOON_PLUGIN_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/Component/ChinaBroadnet.lpx"
+const BROADNET_QX_REWRITE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/refs/heads/main/QuantumultX/Rewrite/Component/ChinaBroadnet.conf"
+const BROADNET_STASH_OVERRIDE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/main/Stash/Stoverride/Component/ChinaBroadnet.stoverride"
+
+const links: ModuleLinks = {
+  boxjsSubUrl: BROADNET_BOXJS_SUB_URL,
+  surgeModuleUrl: BROADNET_MODULE_URL,
+  loonPluginUrl: BROADNET_LOON_PLUGIN_URL,
+  qxRewriteUrl: BROADNET_QX_REWRITE_URL,
+  extras: [
+    {
+      title: "复制/打开 Stash 覆写",
+      systemImage: "slider.horizontal.3",
+      url: BROADNET_STASH_OVERRIDE_URL,
+    },
+  ],
+}
+
+const handles = createModuleHandles({ egernName: "中国广电组件服务" }, links)
+const moduleActions = createModuleActions(handles, links)
 
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
@@ -178,6 +210,19 @@ function SettingsView() {
           ],
         }}
       >
+        <ModuleSection
+          footerLines={[
+            "使用前建议按顺序完成：",
+            "1）在 BoxJS 中订阅配置（用于保存 Session / Access / data）",
+            "2）安装中国广电组件服务模块/插件/重写到支持的客户端",
+            "3）打开中国广电 10099 微信小程序并进入套餐/余量页面触发抓取",
+          ]}
+          collapsible
+          collapseStorageKey={MODULE_COLLAPSE_KEY}
+          defaultCollapsed={true}
+          actions={moduleActions}
+        />
+
         <Section header={<Text font="body" fontWeight="semibold">BoxJs 配置</Text>}>
           <Toggle
             title="启用 BoxJs 自动读取"
