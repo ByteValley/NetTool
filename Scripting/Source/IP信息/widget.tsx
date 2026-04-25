@@ -83,6 +83,23 @@ function pickSources(data: NetworkInfoData) {
   return preferred
 }
 
+function pickReferenceSources(data: NetworkInfoData) {
+  const ids = ["ipip", "bilibili", "cloudflare", "ipinfo"]
+  const picked: IpSourceResult[] = []
+  ids.forEach((id) => {
+    const found = data.sources.find((item) => item.id === id && item.ok && item.ip)
+    if (found) picked.push(found)
+  })
+  const seen = new Set(picked.map((item) => item.id))
+  pickSources(data).forEach((item) => {
+    if (!seen.has(item.id)) {
+      picked.push(item)
+      seen.add(item.id)
+    }
+  })
+  return picked
+}
+
 function riskColor(risk: RiskInfo): any {
   if (risk.level === "高") return "systemRed"
   if (risk.level === "中") return "systemYellow"
@@ -251,8 +268,7 @@ function StatusStrip(props: {
   fromCache: boolean
   staleFallback?: boolean
 }) {
-  const ipMode = props.settings.maskIp ? "IP 隐藏" : "IP 明文"
-  const infoMode = props.settings.maskLocation ? "位置隐藏" : "位置明文"
+  void props.settings
   return (
     <VStack
       padding={{ top: 5, leading: 7, bottom: 5, trailing: 7 }}
@@ -266,7 +282,7 @@ function StatusStrip(props: {
         <VStack
           frame={{ width: 13, height: 13 }}
           widgetBackground={{
-            style: "systemGray4",
+            style: riskColor(props.data.risk),
             shape: { type: "capsule", style: "continuous" },
           }}
         >
@@ -284,8 +300,9 @@ function StatusStrip(props: {
           / 100 · {props.data.risk.title}
         </Text>
         <Spacer />
-        <StatusPill text={ipMode} />
-        <StatusPill text={infoMode} />
+        <StatusPill text={props.data.risk.lineType} />
+        <StatusPill text={props.data.risk.nativeHint} />
+        <StatusPill text={props.data.risk.subtype} />
         <Text font={7.8} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
           {formatTime(props.data.updatedAt)}
           {props.fromCache ? " 缓存" : ""}
@@ -335,6 +352,16 @@ function countryLabel(item?: IpSourceResult) {
   return item?.kind === "domestic" ? "国内" : "国际"
 }
 
+function flagEmoji(item?: IpSourceResult) {
+  const cc = String(item?.countryCode || "").trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(cc)) return ""
+  const base = 0x1f1e6
+  return String.fromCodePoint(
+    base + cc.charCodeAt(0) - 65,
+    base + cc.charCodeAt(1) - 65,
+  )
+}
+
 function sourceTone(item?: IpSourceResult): "domestic" | "international" {
   return item?.kind === "domestic" ? "domestic" : "international"
 }
@@ -342,6 +369,7 @@ function sourceTone(item?: IpSourceResult): "domestic" | "international" {
 function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
   const primary =
     props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
+  const flag = flagEmoji(primary)
 
   return (
     <Card padding={8} spacing={5}>
@@ -350,7 +378,13 @@ function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
           IPv4
         </Text>
         <Spacer />
-        <Badge text={countryLabel(primary)} tone={sourceTone(primary)} />
+        {flag ? (
+          <Text font={18} lineLimit={1}>
+            {flag}
+          </Text>
+        ) : (
+          <Badge text={countryLabel(primary)} tone={sourceTone(primary)} />
+        )}
       </HStack>
 
       <Text font={14.5} fontWeight="semibold" lineLimit={1} minScaleFactor={0.48}>
@@ -363,13 +397,15 @@ function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
 
       <Separator />
 
-      <RiskStrip risk={props.data.risk} />
-
-      <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.6}>
-        {props.data.primaryIPv6
-          ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
-          : "你的网络可能不支持 IPv6"}
-      </Text>
+      <VStack alignment="center" spacing={4} frame={{ maxWidth: Infinity, minHeight: 76 }}>
+        <Spacer minLength={18} />
+        <Text font={9.8} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
+          {props.data.primaryIPv6
+            ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
+            : "你的网络可能不支持 IPv6"}
+        </Text>
+        <Spacer />
+      </VStack>
     </Card>
   )
 }
@@ -447,7 +483,7 @@ function Separator() {
 }
 
 function SourceListCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
-  const sources = pickSources(props.data).slice(0, 4)
+  const sources = pickReferenceSources(props.data).slice(0, 4)
   return (
     <Card padding={8} spacing={4}>
       {sources.map((item, index) => (

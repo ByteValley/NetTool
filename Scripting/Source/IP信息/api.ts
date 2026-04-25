@@ -14,6 +14,7 @@ export type IpSourceResult = {
   countryCode?: string
   location?: string
   isp?: string
+  org?: string
   asn?: string
   latencyMs?: number
   error?: string
@@ -39,6 +40,10 @@ export type RiskInfo = {
   score: number
   level: "低" | "中" | "高"
   title: string
+  lineType: string
+  subtype: string
+  nativeHint: string
+  tunnelHint: string
   items: string[]
 }
 
@@ -214,7 +219,8 @@ async function loadIpApi(timeoutMs: number): Promise<Partial<IpSourceResult>> {
     countryCode: data?.countryCode,
     location: compact([data?.country, data?.regionName, data?.city]),
     isp: compact([data?.isp || data?.org]),
-    asn: parseAsn(data?.as),
+    org: data?.org,
+    asn: String(data?.as || "").trim() || parseAsn(data?.as),
   }
 }
 
@@ -225,7 +231,10 @@ async function loadIpSb(timeoutMs: number): Promise<Partial<IpSourceResult>> {
     countryCode: data?.country_code,
     location: compact([data?.country, data?.region, data?.city]),
     isp: compact([data?.isp || data?.organization || data?.asn_organization]),
-    asn: parseAsn(data?.asn),
+    org: compact([data?.organization || data?.asn_organization]),
+    asn: data?.asn
+      ? compact([`AS${data.asn}`, data?.asn_organization || data?.organization])
+      : parseAsn(data?.asn),
   }
 }
 
@@ -236,7 +245,8 @@ async function loadIpInfo(timeoutMs: number): Promise<Partial<IpSourceResult>> {
     countryCode: data?.country,
     location: compact([data?.country, data?.region, data?.city]),
     isp: data?.org,
-    asn: parseAsn(data?.org),
+    org: data?.org,
+    asn: data?.org,
   }
 }
 
@@ -259,7 +269,10 @@ async function loadIpv6IpSb(timeoutMs: number): Promise<Partial<IpSourceResult>>
     countryCode: data?.country_code,
     location: compact([data?.country, data?.region, data?.city]),
     isp: compact([data?.isp || data?.organization || data?.asn_organization]),
-    asn: parseAsn(data?.asn),
+    org: compact([data?.organization || data?.asn_organization]),
+    asn: data?.asn
+      ? compact([`AS${data.asn}`, data?.asn_organization || data?.organization])
+      : parseAsn(data?.asn),
   }
 }
 
@@ -459,14 +472,261 @@ function firstOk(sources: IpSourceResult[], kind: IpSourceKind) {
   return sources.find((item) => item.kind === kind && item.ok && item.ip)
 }
 
-function hasDatacenterSignal(source?: IpSourceResult) {
-  const raw = `${source?.isp || ""} ${source?.asn || ""}`.toLowerCase()
-  return /cloud|hosting|colo|datacenter|vps|server|amazon|aws|google|microsoft|azure|oracle|alibaba|tencent|digitalocean|vultr|hetzner|ovh|linode/.test(raw)
+function firstOkById(sources: IpSourceResult[], ids: string[]) {
+  for (const id of ids) {
+    const found = sources.find((item) => item.id === id && item.ok && item.ip)
+    if (found) return found
+  }
+  return undefined
 }
 
-function countryOf(source?: IpSourceResult) {
-  const cc = String(source?.countryCode || "").toUpperCase()
-  return /^[A-Z]{2}$/.test(cc) ? cc : ""
+function sameIp(a?: string, b?: string) {
+  return Boolean(a && b && String(a).trim() === String(b).trim())
+}
+
+function enrichSources(sources: IpSourceResult[]) {
+  const richIds = ["ipapi", "ipsb", "ipinfo"]
+  return sources.map((item) => {
+    if (item.id !== "cloudflare" || !item.ip) return item
+    const rich = richIds
+      .map((id) => sources.find((source) => source.id === id && sameIp(source.ip, item.ip)))
+      .find((source) => source?.isp || source?.asn || source?.location)
+    if (!rich) return item
+    return {
+      ...item,
+      countryCode: rich.countryCode || item.countryCode,
+      location: rich.location || item.location,
+      isp: rich.isp || item.isp,
+      org: rich.org || item.org,
+      asn: rich.asn || item.asn,
+    }
+  })
+}
+
+const RISK_RULES = {
+  dataCenterKeywords: [
+    "datacenter",
+    "data center",
+    "hosting",
+    "cloud",
+    "cdn",
+    "edge",
+    "vps",
+    "colo",
+    "colocation",
+    "proxy",
+    "vpn",
+    "tunnel",
+    "relay",
+    "compute",
+    "server",
+    "amazon",
+    "aws",
+    "google",
+    "gcp",
+    "microsoft",
+    "azure",
+    "digitalocean",
+    "linode",
+    "ovh",
+    "hetzner",
+    "vultr",
+    "oracle",
+    "alibaba cloud",
+    "tencent cloud",
+    "cloudflare",
+    "fastly",
+    "akamai",
+    "leaseweb",
+    "choopa",
+    "dmit",
+    "racknerd",
+  ],
+  homeBroadbandKeywords: [
+    "china telecom",
+    "chinanet",
+    "ctcc",
+    "as4134",
+    "as4809",
+    "china mobile",
+    "cmcc",
+    "cmnet",
+    "cmi",
+    "as9808",
+    "china unicom",
+    "unicom",
+    "cucc",
+    "as4837",
+    "cernet",
+    "china education",
+    "comcast",
+    "xfinity",
+    "verizon",
+    "at&t",
+    "charter",
+    "spectrum",
+    "cox",
+    "rogers",
+    "bell canada",
+    "telus",
+    "bt",
+    "virgin media",
+    "sky broadband",
+    "deutsche telekom",
+    "telefonica",
+    "orange",
+    "vodafone",
+    "isp",
+    "broadband",
+    "fiber",
+    "ftth",
+    "residential",
+    "cable",
+    "docsis",
+    "pppoe",
+    "dsl",
+    "adsl",
+    "vdsl",
+    "pon",
+    "gpon",
+    "epon",
+    "cpe",
+    "dynamic",
+    "dyn",
+    "pool",
+    "subscriber",
+    "cust",
+    "customer",
+    "telecom",
+    "communication",
+    "communications",
+    "as3462",
+    "data communication business group",
+    "chunghwa telecom",
+    "chunghwa",
+    "cht",
+    "hinet",
+    "kbro",
+    "formosabroadband",
+    "formosa broadband",
+    "seednet",
+    "taiwan broadband",
+    "tbc",
+    "cable tv",
+    "cablemodem",
+  ],
+  mobileKeywords: ["mobile", "lte", "4g", "5g", "cell", "cellular", "wireless", "epc", "ims", "gprs", "wimax"],
+  highRiskCountries: ["俄罗斯", "russia", "印度", "india", "乌克兰", "ukraine"],
+}
+
+const ASN_HOME_STRONG = new Set([3462, 38841])
+
+function parseASNNumber(s?: string) {
+  const str = String(s || "")
+  const m = str.match(/\bAS(\d{1,10})\b/i)
+  if (m) return Number(m[1]) || 0
+  const m2 = str.match(/\b(\d{1,10})\b/)
+  return m2 ? Number(m2[1]) || 0 : 0
+}
+
+function normStr(x?: string) {
+  return String(x || "")
+    .replace(/\s+/g, " ")
+    .replace(/[（(].*?[）)]/g, " ")
+    .trim()
+    .toLowerCase()
+}
+
+function hasAny(hay: string, list: string[]) {
+  const raw = normStr(hay)
+  if (!raw) return false
+  return list.some((kw) => {
+    const needle = normStr(kw)
+    return Boolean(needle && raw.includes(needle))
+  })
+}
+
+function riskSubject(data: {
+  primaryInternational?: IpSourceResult
+  primaryDomestic?: IpSourceResult
+}) {
+  return data.primaryInternational || data.primaryDomestic
+}
+
+function calculateLineRisk(source?: IpSourceResult): RiskInfo {
+  const hay = compact([source?.isp, source?.org, source?.asn])
+  const country = normStr(source?.location || source?.countryCode)
+  const asn = parseASNNumber(source?.asn)
+  const reasons: string[] = []
+  let score = 0
+
+  const dcHit = hasAny(hay, RISK_RULES.dataCenterKeywords)
+  const hbHit = hasAny(hay, RISK_RULES.homeBroadbandKeywords)
+  const mobileHit = hasAny(hay, RISK_RULES.mobileKeywords)
+
+  if (dcHit) {
+    score += 55
+    reasons.push("命中机房/云/托管关键词")
+  }
+  if (hbHit) {
+    const delta = dcHit ? -10 : -22
+    score += delta
+    reasons.push("命中家宽/接入网关键词")
+  }
+  if (mobileHit) {
+    const delta = dcHit ? 0 : -10
+    score += delta
+    reasons.push("命中移动网络关键词")
+  }
+  if (RISK_RULES.highRiskCountries.some((item) => country.includes(normStr(item)))) {
+    score += 18
+    reasons.push("地区存在额外风险")
+  }
+  if (!hay || hay.length <= 3) {
+    score += 10
+    reasons.push("落地信息不足")
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)))
+
+  const hbEvidence = (hbHit ? 1 : 0) + (ASN_HOME_STRONG.has(asn) ? 1 : 0)
+  const dcEvidence = dcHit ? 1 : 0
+  const tunnelLike = dcEvidence >= 1 || score >= 70
+  const isHomeBroadband =
+    hbEvidence >= 2 && !tunnelLike && score <= 50
+      ? true
+      : hbEvidence >= 1 && dcEvidence === 0 && !tunnelLike && score <= 38
+
+  const lineType = isHomeBroadband ? "家宽" : "非家宽"
+  const subtype = mobileHit
+    ? "移动网络"
+    : tunnelLike
+      ? "机房/专线特征"
+      : isHomeBroadband
+        ? "住宅/接入特征"
+        : hbEvidence >= 1
+          ? "运营商/接入"
+          : "普通 ISP"
+  const nativeHint = !tunnelLike && score < 55 ? "更像原生" : "可能非原生"
+  const tunnelHint = tunnelLike ? "机房/代理特征偏强" : "机房/代理特征偏弱"
+  const level: RiskInfo["level"] = score >= 70 ? "高" : score >= 40 ? "中" : "低"
+  const title =
+    level === "高"
+      ? "机房/代理特征"
+      : level === "中"
+        ? `${lineType} · ${nativeHint}`
+        : `${lineType} · ${nativeHint}`
+
+  return {
+    score,
+    level,
+    title,
+    lineType,
+    subtype,
+    nativeHint,
+    tunnelHint,
+    items: [lineType, nativeHint, tunnelHint, subtype, ...reasons].slice(0, 5),
+  }
 }
 
 function computeRisk(
@@ -478,70 +738,14 @@ function computeRisk(
     primaryIPv6?: IpSourceResult
   },
 ): RiskInfo {
-  let score = 12
-  const items: string[] = []
-
-  const domestic = data.primaryDomestic
-  const intl = data.primaryInternational
-  const domesticIp = domestic?.ip || ""
-  const intlIp = intl?.ip || ""
-
-  if (domesticIp && intlIp && domesticIp !== intlIp) {
-    score += 12
-    items.push("国内/国际出口不一致")
-  } else if (domesticIp && intlIp) {
-    items.push("出口 IP 一致")
-  }
-
-  if (!data.primaryIPv6) {
-    score += 6
-    items.push("IPv6 不可用")
-  }
-
-  if (hasDatacenterSignal(intl)) {
-    score += 18
-    items.push("ASN 存在机房特征")
-  }
-
-  const intlCountry = countryOf(intl)
-  const domesticCountry = countryOf(domestic)
-  if (intlCountry && domesticCountry && intlCountry !== domesticCountry) {
-    score += 8
-    items.push("落地地区与国内探针不同")
-  }
-
-  const checked = services.filter((item) => item.region === "AI" || item.region === "流媒体")
-  const failed = checked.filter((item) => !item.ok)
-  if (checked.length && failed.length / checked.length >= 0.5) {
-    score += 18
-    items.push("主流服务受限较多")
-  } else if (failed.length) {
-    score += 8
-    items.push("部分服务受限")
-  }
-
-  if (services.some((item) => item.id === "chatgpt" && !item.ok)) {
-    score += 6
-    items.push("ChatGPT 受限")
-  }
-  if (services.some((item) => item.id === "netflix" && !item.ok)) {
-    score += 6
-    items.push("Netflix 受限")
-  }
-
-  score = Math.max(0, Math.min(100, score))
-  const level: RiskInfo["level"] = score >= 60 ? "高" : score >= 35 ? "中" : "低"
-  return {
-    score,
-    level,
-    title: level === "高" ? "风险偏高" : level === "中" ? "需要留意" : "状态良好",
-    items: items.slice(0, 4),
-  }
+  void sources
+  void services
+  return calculateLineRisk(riskSubject(data))
 }
 
 function cacheSignature(settings: SkkIpInfoSettings) {
   return JSON.stringify({
-    v: 3,
+    v: 4,
     enableIPv6: settings.enableIPv6 !== false,
     enableConnectivity: settings.enableConnectivity !== false,
     timeoutMs: Math.max(1500, Math.min(15000, settings.timeoutMs || 3000)),
@@ -569,8 +773,8 @@ function writeCache(data: NetworkInfoData, signature: string) {
 export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<NetworkInfoData> {
   const timeoutMs = Math.max(1500, Math.min(15000, settings.timeoutMs || 3000))
   const sourceTasks: Array<Promise<IpSourceResult>> = [
-    source("ipip", "IPIP 国内", "domestic", timeoutMs, loadIpip),
-    source("bilibili", "Bilibili 国内", "domestic", timeoutMs, loadBilibili),
+    source("ipip", "iP138.com", "domestic", timeoutMs, loadIpip),
+    source("bilibili", "IP.cn 查询网", "domestic", timeoutMs, loadBilibili),
     source("ipapi", "IP-API", "international", timeoutMs, loadIpApi),
     source("ipsb", "IP.SB", "international", timeoutMs, loadIpSb),
     source("cloudflare", "Cloudflare", "cloudflare", timeoutMs, loadCloudflare),
@@ -586,10 +790,13 @@ export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<Net
   const servicesPromise = settings.enableConnectivity
     ? runServiceChecks(timeoutMs)
     : Promise.resolve([] as ServiceResult[])
-  const [sources, services] = await Promise.all([sourcesPromise, servicesPromise])
+  const [rawSources, services] = await Promise.all([sourcesPromise, servicesPromise])
+  const sources = enrichSources(rawSources)
   const primaryDomestic = firstOk(sources, "domestic")
   const primaryInternational =
-    firstOk(sources, "cloudflare") || firstOk(sources, "international")
+    firstOkById(sources, ["ipinfo", "ipsb", "ipapi", "cloudflare"]) ||
+    firstOk(sources, "international") ||
+    firstOk(sources, "cloudflare")
   const primaryIPv6 = firstOk(sources, "ipv6")
 
   const data: NetworkInfoData = {
