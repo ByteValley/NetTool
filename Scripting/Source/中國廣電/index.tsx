@@ -20,6 +20,7 @@ import {
   TextField,
   Button,
   Text,
+  Toggle,
   Script,
   useState,
 } from "scripting"
@@ -82,11 +83,16 @@ function SettingsView() {
       : !!defaultChinaBroadnetSettings.smallMiniBarUseTotalFlow
 
   const initialCache = (initial.cache ?? defaultChinaBroadnetSettings.cache) as CacheConfig
+  const initialEnableBoxJs =
+    typeof initial.enableBoxJs === "boolean" ? initial.enableBoxJs : !!defaultChinaBroadnetSettings.enableBoxJs
+  const initialBoxJsUrl = String(initial.boxJsUrl ?? defaultChinaBroadnetSettings.boxJsUrl ?? "").trim()
 
   const [session, setSession] = useState<string>(String(initial.session ?? ""))
   const [access, setAccess] = useState<string>(String(initial.access ?? ""))
   const [bodyData, setBodyData] = useState<string>(String(initial.bodyData ?? ""))
   const [refreshInterval, setRefreshInterval] = useState<number>(initialRefreshInterval)
+  const [enableBoxJs, setEnableBoxJs] = useState<boolean>(initialEnableBoxJs)
+  const [boxJsUrl, setBoxJsUrl] = useState<string>(initialBoxJsUrl)
 
   const [showRemainRatio, setShowRemainRatio] = useState<boolean>(initialShowRemainRatio)
   const [mediumStyle, setMediumStyle] = useState<"FullRing" | "DialRing">(initialMediumStyle)
@@ -119,6 +125,8 @@ function SettingsView() {
         typeof refreshInterval === "number" && Number.isFinite(refreshInterval)
           ? refreshInterval
           : defaultChinaBroadnetSettings.refreshInterval,
+      enableBoxJs: !!enableBoxJs,
+      boxJsUrl: String(boxJsUrl ?? "").trim(),
 
       showRemainRatio: !!showRemainRatio,
       mediumStyle,
@@ -170,11 +178,23 @@ function SettingsView() {
           ],
         }}
       >
+        <Section header={<Text font="body" fontWeight="semibold">BoxJs 配置</Text>}>
+          <Toggle
+            title="启用 BoxJs 自动读取"
+            value={enableBoxJs}
+            onChanged={(value) => {
+              setEnableBoxJs(value)
+              if (value && !String(boxJsUrl || "").trim()) setBoxJsUrl("https://boxjs.com")
+            }}
+          />
+          {enableBoxJs ? <TextField title="BoxJs 地址" value={boxJsUrl} onChanged={setBoxJsUrl} /> : null}
+        </Section>
+
         <Section
           header={<Text font="body" fontWeight="semibold">登录凭证</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中复制 Session、Access 和请求体 data。
+              可由 BoxJs 自动读取；也可以从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中手动复制 Session、Access 和请求体 data。
             </Text>
           }
         >

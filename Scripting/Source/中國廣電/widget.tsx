@@ -115,9 +115,11 @@ function computeTtlMs(cache: NormalizedCache, refreshIntervalMinutes: number): n
   return Math.max(4 * 60 * 60 * 1000, refreshMs)
 }
 
-function boundKeyFromSettings(settings: ChinaBroadnetSettings): string {
+function boundKeyFromSettings(settings: ChinaBroadnetSettings, credentials?: BroadnetCredentials): string {
   const k = String(settings.cacheScopeKey || "").trim()
-  return k ? k : `${SETTINGS_KEY}:${settings.session}:${settings.access}`
+  const session = String(credentials?.session ?? settings.session ?? "").trim()
+  const access = String(credentials?.access ?? settings.access ?? "").trim()
+  return k ? k : `${SETTINGS_KEY}:${session}:${access}`
 }
 
 function readBroadnetCache(
@@ -168,6 +170,59 @@ function writeBroadnetCache(boundKey: string, data: CarrierData): number {
 
 function presentMessage(message: string, reloadPolicy: WidgetReloadPolicy) {
   Widget.present(<Text>{message}</Text>, reloadPolicy)
+}
+
+type BroadnetCredentials = {
+  session: string
+  access: string
+  bodyData: string
+}
+
+async function fetchCredentialsFromBoxJs(boxJsUrl: string): Promise<BroadnetCredentials | null> {
+  const boxKey = "ComponentService"
+
+  try {
+    const base = String(boxJsUrl || "").replace(/\/$/, "")
+    const url = `${base}/query/data/${boxKey}`
+    console.log("📡 凭证 | 读取 BoxJS：ComponentService.ChinaBroadnet.Settings")
+
+    const response = await fetch(url, { headers: { Accept: "application/json" } })
+    if (!response.ok) {
+      console.warn(`⚠️ 凭证 | BoxJS HTTP 失败：status=${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+    const rawVal = data?.val
+    if (!rawVal) {
+      console.warn("⚠️ 凭证 | BoxJS 返回 val 为空")
+      return null
+    }
+
+    let root: any
+    try {
+      root = typeof rawVal === "string" ? JSON.parse(rawVal) : rawVal
+    } catch (e) {
+      console.warn(`⚠️ 凭证 | BoxJS val JSON 解析失败：${errToString(e)}`)
+      return null
+    }
+
+    const settings = root?.ChinaBroadnet?.Settings
+    const session = String(settings?.Session || "").trim()
+    const access = String(settings?.Access || "").trim()
+    const bodyData = String(settings?.BodyData || "").trim()
+
+    if (session && access && bodyData) {
+      console.log("✅ 凭证 | BoxJS 命中")
+      return { session, access, bodyData }
+    }
+
+    console.warn("⚠️ 凭证 | BoxJS 未找到完整 ChinaBroadnet.Settings")
+    return null
+  } catch (e) {
+    console.warn(`⚠️ 凭证 | BoxJS 异常：${errToString(e)}`)
+    return null
+  }
 }
 
 type BroadnetApiResponse = {
@@ -242,10 +297,10 @@ function parseBroadnetData(json: BroadnetApiResponse): CarrierData | null {
   }
 }
 
-async function fetchBroadnetData(settings: ChinaBroadnetSettings): Promise<CarrierData | null> {
-  const session = String(settings.session || "").trim()
-  const access = String(settings.access || "").trim()
-  const bodyData = String(settings.bodyData || "").trim()
+async function fetchBroadnetData(credentials: BroadnetCredentials): Promise<CarrierData | null> {
+  const session = String(credentials.session || "").trim()
+  const access = String(credentials.access || "").trim()
+  const bodyData = String(credentials.bodyData || "").trim()
 
   if (!session || !access || !bodyData) return null
 
@@ -292,16 +347,35 @@ async function render() {
   const nextUpdate = new Date(Date.now() + refreshInterval * 60 * 1000)
   const reloadPolicy: WidgetReloadPolicy = { policy: "after", date: nextUpdate }
 
-  const hasCredentials = !!(
-    String(settings.session || "").trim() &&
-    String(settings.access || "").trim() &&
-    String(settings.bodyData || "").trim()
-  )
+  const enableBoxJs = !!settings.enableBoxJs
+  const boxJsUrl = String(settings.boxJsUrl ?? "").trim()
+  let credentials: BroadnetCredentials = {
+    session: String(settings.session || "").trim(),
+    access: String(settings.access || "").trim(),
+    bodyData: String(settings.bodyData || "").trim(),
+  }
+
+  if (enableBoxJs && boxJsUrl) {
+    const box = await fetchCredentialsFromBoxJs(boxJsUrl)
+    if (box) {
+      credentials = box
+      console.log("✅ 凭证 | source=BoxJS")
+    } else {
+      console.warn("⚠️ 凭证 | BoxJS 失败，回退手动设置")
+      console.log(`✅ 凭证 | source=${credentials.session && credentials.access && credentials.bodyData ? "Settings" : "None"}`)
+    }
+  } else {
+    console.log(`✅ 凭证 | source=${credentials.session && credentials.access && credentials.bodyData ? "Settings" : "None"}`)
+  }
+
+  const hasCredentials = !!(credentials.session && credentials.access && credentials.bodyData)
 
   console.log(`🚀 组件启动 | carrier=CBN | refresh=${refreshInterval}m`)
   console.log(
     `⚙️ 配置读取 | ${kv({
       hasCredentials: hasCredentials ? "Y" : "N",
+      enableBoxJs: enableBoxJs ? "Y" : "N",
+      boxJsUrl: boxJsUrl ? "Y" : "N",
       cacheEnabled: cache.enabled ? "Y" : "N",
       cacheMode: cache.mode,
       ttlPolicy: cache.ttlPolicy,
@@ -313,7 +387,7 @@ async function render() {
   )
 
   const ttlMs = computeTtlMs(cache, refreshInterval)
-  const boundKey = boundKeyFromSettings(settings)
+  const boundKey = boundKeyFromSettings(settings, credentials)
   const boundKeyShort = fingerprint(boundKey).slice(0, 12)
 
   const hit = cache.enabled && cache.mode !== "cache_disabled" ? readBroadnetCache(boundKey, cache.allowStaleOnKeyMismatch) : null
@@ -389,7 +463,7 @@ async function render() {
     return
   }
 
-  const networkData = await fetchBroadnetData(settings)
+  const networkData = await fetchBroadnetData(credentials)
 
   if (!networkData) {
     console.warn("⚠️ 网络失败 | broadnet=N")

@@ -34,6 +34,50 @@
       ]
     },
     {
+      "id": "ComponentService.ChinaBroadnet",
+      "name": "中国广电",
+      "descs_html": [
+        "用于保存中国广电 10099 微信小程序抓取到的 <code>Session</code>、<code>Access</code> 和请求体 <code>data</code>，供 Scripting 小组件复用。",
+        "<b>获取方式：</b><br/>1）启用中国广电组件服务模块/插件/重写，并开启 MITM：<code>wx.10099.com.cn</code>；<br/>2）打开 <b>中国广电 10099 微信小程序</b>；<br/>3）进入套餐/余量相关页面，触发 <code>/contact-web/api/busi/qryUserInfo</code> 接口后自动写入。",
+        "<b>说明：</b><br/>• 推荐通过脚本自动抓取，手动填写仅用于调试或紧急情况；<br/>• 如果数据失效，重新打开小程序触发一次接口即可刷新。"
+      ],
+      "icons": [
+        "https://m.10099.com.cn/gwecdq/qiuti20230807.png",
+        "https://m.10099.com.cn/gwecdq/qiuti20230807.png"
+      ],
+      "keys": [
+        "@ComponentService.ChinaBroadnet.Settings",
+        "@ComponentService.ChinaBroadnet.Caches"
+      ],
+      "settings": [
+        {
+          "id": "@ComponentService.ChinaBroadnet.Settings.Session",
+          "name": "广电 Session",
+          "type": "text",
+          "val": "",
+          "placeholder": "建议通过脚本自动抓取，无需手动填写",
+          "desc": "来自 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 请求头 Session。"
+        },
+        {
+          "id": "@ComponentService.ChinaBroadnet.Settings.Access",
+          "name": "广电 Access",
+          "type": "text",
+          "val": "",
+          "placeholder": "建议通过脚本自动抓取，无需手动填写",
+          "desc": "来自 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 请求头 Access。"
+        },
+        {
+          "id": "@ComponentService.ChinaBroadnet.Settings.BodyData",
+          "name": "广电 data",
+          "type": "textarea",
+          "rows": 4,
+          "val": "",
+          "placeholder": "建议通过脚本自动抓取，无需手动填写",
+          "desc": "来自 qryUserInfo POST 请求体 JSON 中的 data 字段。"
+        }
+      ]
+    },
+    {
       "id": "ComponentService.SGCC",
       "name": "网上国网（95598）",
       "descs_html": [

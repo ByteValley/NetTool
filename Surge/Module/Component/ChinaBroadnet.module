@@ -1,0 +1,10 @@
+#!name=中国广电组件服务
+#!desc=获取中国广电 10099 微信小程序 Session / Access / data
+#!category=组件服务
+#!author=ByteValley
+
+[Script]
+广电组件 = type=http-request, pattern=^https:\/\/wx\.10099\.com\.cn\/contact-web\/api\/busi\/qryUserInfo, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaBroadnet.js, requires-body=true, max-size=0, script-update-interval=0
+
+[MITM]
+hostname = %APPEND% wx.10099.com.cn

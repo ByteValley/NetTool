@@ -36,6 +36,9 @@ export type ChinaBroadnetSettings = UiSwitchSource & {
 
   refreshInterval: number
 
+  enableBoxJs?: boolean
+  boxJsUrl?: string
+
   // ✅ 缓存（Storage meta + fileCache data）
   cacheScopeKey: string
   cache: CacheConfig
@@ -56,6 +59,9 @@ export const defaultChinaBroadnetSettings: ChinaBroadnetSettings = {
   bodyData: "",
 
   refreshInterval: 180,
+
+  enableBoxJs: true,
+  boxJsUrl: "https://boxjs.com",
 
   cacheScopeKey: "",
   cache: {
@@ -113,6 +119,8 @@ function mergeSettings(raw: any, defaults: ChinaBroadnetSettings): ChinaBroadnet
   merged.session = typeof merged.session === "string" ? merged.session : defaults.session
   merged.access = typeof merged.access === "string" ? merged.access : defaults.access
   merged.bodyData = typeof merged.bodyData === "string" ? merged.bodyData : defaults.bodyData
+  merged.enableBoxJs = typeof merged.enableBoxJs === "boolean" ? merged.enableBoxJs : defaults.enableBoxJs
+  merged.boxJsUrl = typeof merged.boxJsUrl === "string" ? merged.boxJsUrl : defaults.boxJsUrl
 
   return merged as ChinaBroadnetSettings
 }

@@ -1,0 +1,26 @@
+name: |-
+  中国广电组件服务
+desc: |-
+  获取中国广电 10099 微信小程序 Session / Access / data，并写入 BoxJS ComponentService.ChinaBroadnet.Settings。
+author: |-
+  ByteValley
+icon: |-
+  https://m.10099.com.cn/gwecdq/qiuti20230807.png
+category: |-
+  组件服务
+
+http:
+  mitm:
+    - "wx.10099.com.cn"
+
+  script:
+    - match: ^https:\/\/wx\.10099\.com\.cn\/contact-web\/api\/busi\/qryUserInfo
+      name: "china_broadnet_capture"
+      type: request
+      require-body: true
+      timeout: 60
+
+script-providers:
+  "china_broadnet_capture":
+    url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaBroadnet.js
+    interval: 86400
