@@ -459,10 +459,10 @@ function SourceLine(props: { item: IpSourceResult; settings: SkkIpInfoSettings }
         <Spacer />
         <Badge text={props.item.kind === "domestic" ? "国内" : "国际"} tone={sourceTone(props.item)} />
       </HStack>
-      <Text font={7.4} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.58}>
+      <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.58}>
         IP: {displayIp(props.item, props.settings)}
       </Text>
-      <Text font={7.4} lineLimit={1} minScaleFactor={0.54}>
+      <Text font={7.8} lineLimit={1} minScaleFactor={0.54}>
         {ellipsis(`${displayLocation(props.item, props.settings)} ${text(props.item.isp || props.item.asn, "")}`, 34)}
       </Text>
     </VStack>
