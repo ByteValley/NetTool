@@ -8,6 +8,7 @@ import {
   Circle,
   Rectangle,
   RoundedRectangle,
+  ZStack,
 } from "scripting"
 
 import {
@@ -137,6 +138,19 @@ function serviceLabel(item: ServiceResult) {
   return item.region
 }
 
+const UI = {
+  rootBg: { light: "rgba(248,250,252,0.92)", dark: "rgba(27,38,49,0.86)" } as any,
+  blockBg: { light: "rgba(255,255,255,0.48)", dark: "rgba(255,255,255,0.045)" } as any,
+  cardBg: { light: "rgba(255,255,255,0.58)", dark: "rgba(255,255,255,0.07)" } as any,
+  text: { light: "#1F2937", dark: "#F8FAFC" } as any,
+  subtext: { light: "#6B7280", dark: "rgba(255,255,255,0.62)" } as any,
+  green: { light: "#57D694", dark: "#63D98E" } as any,
+  blue: { light: "#3B82F6", dark: "#58A6FF" } as any,
+  teal: { light: "#38BDB2", dark: "#5DD6C9" } as any,
+  orange: { light: "#F59E0B", dark: "#FDBA45" } as any,
+  red: { light: "#EF4444", dark: "#FF6B6B" } as any,
+}
+
 function Root(props: { children: any; compact?: boolean }) {
   const pad = props.compact
     ? { top: 8, leading: 8, bottom: 8, trailing: 8 }
@@ -148,7 +162,7 @@ function Root(props: { children: any; compact?: boolean }) {
       padding={pad}
       spacing={6}
       widgetBackground={{
-        style: "systemBackground",
+        style: UI.rootBg,
         shape: { type: "rect", cornerRadius: 22, style: "continuous" },
       }}
     >
@@ -166,7 +180,7 @@ function Card(props: { children: any; padding?: number; spacing?: number }) {
       padding={{ top: pad, leading: pad, bottom: pad, trailing: pad }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.035)", dark: "rgba(255,255,255,0.075)" } as any,
+        style: UI.cardBg,
         shape: { type: "rect", cornerRadius: 10, style: "continuous" },
       }}
     >
@@ -183,9 +197,53 @@ function ServicePanel(props: { children: any }) {
       padding={{ top: 8, leading: 8, bottom: 8, trailing: 8 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.028)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: UI.cardBg,
         shape: { type: "rect", cornerRadius: 10, style: "continuous" },
       }}
+    >
+      {props.children}
+    </VStack>
+  )
+}
+
+function OutlineBlock(props: {
+  children: any
+  tone: any
+  padding?: number
+  spacing?: number
+  minHeight?: number
+}) {
+  const pad = props.padding ?? 6
+  const frame = props.minHeight
+    ? { minWidth: 0, maxWidth: Infinity, minHeight: props.minHeight }
+    : { minWidth: 0, maxWidth: Infinity }
+  return (
+    <ZStack frame={{ minWidth: 0, maxWidth: Infinity }}>
+      <RoundedRectangle cornerRadius={12} style="continuous" fill={UI.blockBg} />
+      <RoundedRectangle
+        cornerRadius={12}
+        style="continuous"
+        stroke={{ shapeStyle: props.tone, strokeStyle: { lineWidth: 1.35 } }}
+      />
+      <VStack
+        zIndex={10 as any}
+        alignment="leading"
+        spacing={props.spacing ?? 4}
+        padding={{ top: pad, leading: pad, bottom: pad, trailing: pad }}
+        frame={frame}
+      >
+        {props.children}
+      </VStack>
+    </ZStack>
+  )
+}
+
+function MainPanel(props: { children: any }) {
+  return (
+    <VStack
+      alignment="leading"
+      spacing={5}
+      frame={{ minWidth: 0, maxWidth: Infinity, minHeight: 0, maxHeight: Infinity }}
     >
       {props.children}
     </VStack>
@@ -246,12 +304,13 @@ function Header(props: {
 function InfoBlock(props: { label: string; value: string; strong?: boolean }) {
   return (
     <VStack spacing={1} alignment="leading" frame={{ maxWidth: Infinity }}>
-      <Text font={8.2} foregroundStyle="secondaryLabel" lineLimit={1}>
+      <Text font={8.2} foregroundStyle={UI.subtext} lineLimit={1}>
         {props.label}
       </Text>
       <Text
         font={props.strong ? 10.8 : 9.8}
         fontWeight={props.strong ? "semibold" : "regular"}
+        foregroundStyle={UI.text}
         lineLimit={1}
         minScaleFactor={0.58}
       >
@@ -497,6 +556,136 @@ function SourceListCard(props: { data: NetworkInfoData; settings: SkkIpInfoSetti
   )
 }
 
+function CompactSourceLine(props: { item: IpSourceResult; settings: SkkIpInfoSettings }) {
+  return (
+    <VStack spacing={1} frame={{ maxWidth: Infinity }}>
+      <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
+        <Text font={7.8} fontWeight="bold" lineLimit={1} minScaleFactor={0.58} foregroundStyle={UI.text}>
+          {props.item.name}
+        </Text>
+        <Spacer />
+        <Badge text={props.item.kind === "domestic" ? "国内" : "国际"} tone={sourceTone(props.item)} />
+      </HStack>
+      <Text font={7.1} foregroundStyle={UI.subtext} lineLimit={1} minScaleFactor={0.55}>
+        IP: {displayIp(props.item, props.settings)}
+      </Text>
+      <Text font={7.1} foregroundStyle={UI.text} lineLimit={1} minScaleFactor={0.5}>
+        {ellipsis(`${displayLocation(props.item, props.settings)} ${text(props.item.isp || props.item.asn, "")}`, 42)}
+      </Text>
+    </VStack>
+  )
+}
+
+function IpOverviewBlock(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
+  const primary =
+    props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
+  return (
+    <OutlineBlock tone={UI.green} padding={7} spacing={4} minHeight={128}>
+      <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
+        <Text font={8.2} foregroundStyle={UI.subtext} lineLimit={1}>
+          IPv4
+        </Text>
+        <Spacer />
+        <Badge text={countryLabel(primary)} tone={sourceTone(primary)} />
+      </HStack>
+      <Text font={15.5} fontWeight="bold" foregroundStyle={UI.text} lineLimit={1} minScaleFactor={0.5}>
+        {displayIp(primary, props.settings)}
+      </Text>
+      <InfoBlock label="Location" value={displayLocation(primary, props.settings)} strong />
+      <InfoBlock label="ISP" value={ellipsis(primary?.isp, 30)} />
+      <InfoBlock label="ASN" value={ellipsis(primary?.asn || primary?.isp, 30)} />
+      <Text font={8.4} fontWeight="semibold" foregroundStyle={UI.subtext} lineLimit={1} minScaleFactor={0.58}>
+        {props.data.primaryIPv6
+          ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
+          : "你的网络可能不支持 IPv6"}
+      </Text>
+    </OutlineBlock>
+  )
+}
+
+function ProbeBlock(props: { data: NetworkInfoData; settings: SkkIpInfoSettings }) {
+  const sources = pickReferenceSources(props.data).slice(0, 4)
+  const rows: any[] = []
+  sources.forEach((item, index) => {
+    if (index > 0) rows.push(<Separator key={`${item.id}-compact-separator`} />)
+    rows.push(<CompactSourceLine key={item.id} item={item} settings={props.settings} />)
+  })
+  return (
+    <OutlineBlock tone={UI.blue} padding={7} spacing={3} minHeight={128}>
+      {rows}
+    </OutlineBlock>
+  )
+}
+
+function MiniInfoCell(props: { label: string; value: string; tone?: any }) {
+  return (
+    <VStack
+      spacing={1}
+      padding={{ top: 4, leading: 6, bottom: 4, trailing: 6 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
+      widgetBackground={{
+        style: { light: "rgba(255,255,255,0.50)", dark: "rgba(255,255,255,0.06)" } as any,
+        shape: { type: "rect", cornerRadius: 8, style: "continuous" },
+      }}
+    >
+      <Text font={7.2} foregroundStyle={UI.subtext} lineLimit={1}>
+        {props.label}
+      </Text>
+      <Text
+        font={8.2}
+        fontWeight="bold"
+        foregroundStyle={props.tone || UI.text}
+        lineLimit={1}
+        minScaleFactor={0.52}
+      >
+        {props.value}
+      </Text>
+    </VStack>
+  )
+}
+
+function NetworkSummaryBlock(props: {
+  data: NetworkInfoData
+  settings: SkkIpInfoSettings
+  fromCache: boolean
+  staleFallback?: boolean
+}) {
+  const primary =
+    props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
+  const risk = props.data.risk || ({} as RiskInfo)
+  return (
+    <OutlineBlock tone={riskColor(risk)} padding={7} spacing={4}>
+      <HStack alignment="center" spacing={5} frame={{ maxWidth: Infinity }}>
+        <Text font={8.4} fontWeight="semibold" foregroundStyle={UI.subtext} lineLimit={1}>
+          网络摘要
+        </Text>
+        <Spacer />
+        <Text font={7.4} foregroundStyle={UI.subtext} lineLimit={1}>
+          {formatTime(props.data.updatedAt)}
+          {props.fromCache ? " 缓存" : ""}
+          {props.staleFallback ? " 兜底" : ""}
+        </Text>
+      </HStack>
+      <HStack spacing={5} frame={{ maxWidth: Infinity }}>
+        <MiniInfoCell label="出口" value={`${countryLabel(primary)} / 国际`} tone={UI.blue} />
+        <MiniInfoCell
+          label="IPv6"
+          value={props.data.primaryIPv6 ? "可用" : "不可用"}
+          tone={props.data.primaryIPv6 ? UI.green : UI.orange}
+        />
+      </HStack>
+      <HStack spacing={5} frame={{ maxWidth: Infinity }}>
+        <MiniInfoCell label="ISP" value={ellipsis(primary?.isp || primary?.asn, 18)} />
+        <MiniInfoCell
+          label="风险"
+          value={`${riskLevel(risk)} · ${text(risk.lineType, "未知")}`}
+          tone={riskColor(risk)}
+        />
+      </HStack>
+    </OutlineBlock>
+  )
+}
+
 function dotColor(item: ServiceResult, index: number): any {
   if (!item.ok) return index < 2 ? "systemRed" : "systemGray4"
   const latency = item.latencyMs || 0
@@ -569,22 +758,68 @@ function ServiceTile(props: { item: ServiceResult }) {
   )
 }
 
+function ServiceCompactTile(props: { item: ServiceResult }) {
+  return (
+    <VStack
+      alignment="leading"
+      spacing={2}
+      padding={{ top: 4, leading: 5, bottom: 4, trailing: 5 }}
+      frame={{ minWidth: 0, maxWidth: Infinity }}
+      widgetBackground={{
+        style: { light: "rgba(255,255,255,0.50)", dark: "rgba(255,255,255,0.06)" } as any,
+        shape: { type: "rect", cornerRadius: 8, style: "continuous" },
+      }}
+    >
+      <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
+        <Circle
+          fill={statusColor(props.item.ok, props.item.statusText)}
+          frame={{ width: 5.5, height: 5.5 }}
+        />
+        <Text font={7.8} fontWeight="bold" foregroundStyle={UI.text} lineLimit={1} minScaleFactor={0.48}>
+          {props.item.name}
+        </Text>
+        <Spacer />
+        <Badge
+          text={serviceLabel(props.item)}
+          tone={props.item.region === "国内" ? "domestic" : "international"}
+        />
+      </HStack>
+      <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
+        <Text
+          font={9.2}
+          fontWeight="bold"
+          foregroundStyle={statusColor(props.item.ok, props.item.statusText)}
+          lineLimit={1}
+          minScaleFactor={0.66}
+        >
+          {props.item.ok ? latencyText(props.item.latencyMs) : "失败"}
+        </Text>
+        <Spacer />
+        <Text font={7.1} foregroundStyle={UI.subtext} lineLimit={1} minScaleFactor={0.52}>
+          {props.item.countryCode || props.item.statusText || ""}
+        </Text>
+      </HStack>
+      <DotStrip item={props.item} count={4} />
+    </VStack>
+  )
+}
+
 function servicePriority(item: ServiceResult) {
   const order = [
-    "bytedance",
-    "bilibili",
-    "github",
-    "cloudflare",
     "youtube",
     "chatgpt",
+    "spotify",
     "netflix",
     "disney",
+    "max",
+    "openai_api",
+    "github",
+    "cloudflare",
     "jsdelivr",
+    "bytedance",
+    "bilibili",
     "wechat",
     "taobao",
-    "openai_api",
-    "max",
-    "spotify",
   ]
   const index = order.indexOf(item.id)
   return index >= 0 ? index : 99
@@ -594,6 +829,28 @@ function pickServices(data: NetworkInfoData, limit: number) {
   return [...(data.services || data.connectivity || [])]
     .sort((a, b) => servicePriority(a) - servicePriority(b))
     .slice(0, limit)
+}
+
+function ServiceCompactGrid(props: { items: ServiceResult[] }) {
+  const rows: ServiceResult[][] = []
+  props.items.forEach((item, index) => {
+    const row = Math.floor(index / 3)
+    if (!rows[row]) rows[row] = []
+    rows[row].push(item)
+  })
+
+  return (
+    <VStack spacing={5} frame={{ maxWidth: Infinity }}>
+      {rows.map((row, index) => (
+        <HStack key={index} spacing={5} frame={{ maxWidth: Infinity }}>
+          {row.map((item) => (
+            <ServiceCompactTile key={item.id} item={item} />
+          ))}
+          {row.length < 3 ? <Spacer /> : null}
+        </HStack>
+      ))}
+    </VStack>
+  )
 }
 
 function ServiceGrid(props: { items: ServiceResult[]; columns: 2 | 3 | 4 }) {
@@ -688,33 +945,46 @@ function LargeView(props: {
   fromCache: boolean
   staleFallback?: boolean
 }) {
-  const services = pickServices(props.data, 8)
+  const services = pickServices(props.data, 6)
   return (
     <Root>
-      <HStack alignment="top" spacing={7} frame={{ maxWidth: Infinity }}>
-        <PrimaryIpCard data={props.data} settings={props.settings} />
-        <SourceListCard data={props.data} settings={props.settings} />
-      </HStack>
+      <MainPanel>
+        <HStack alignment="center" spacing={6} frame={{ maxWidth: Infinity }}>
+          <Text font={9} fontWeight="semibold" foregroundStyle={UI.subtext} lineLimit={1}>
+            IP 信息
+          </Text>
+          <Spacer />
+          <Text font={7.8} foregroundStyle={UI.subtext} lineLimit={1}>
+            {formatTime(props.data.updatedAt)}
+            {props.fromCache ? " 缓存" : ""}
+          </Text>
+        </HStack>
 
-      <StatusStrip
-        data={props.data}
-        settings={props.settings}
-        fromCache={props.fromCache}
-        staleFallback={props.staleFallback}
-      />
+        <HStack alignment="top" spacing={6} frame={{ maxWidth: Infinity }}>
+          <IpOverviewBlock data={props.data} settings={props.settings} />
+          <ProbeBlock data={props.data} settings={props.settings} />
+        </HStack>
 
-      {services.length ? (
-        <ServicePanel>
-          <Text font={9.5} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1}>
+        <NetworkSummaryBlock
+          data={props.data}
+          settings={props.settings}
+          fromCache={props.fromCache}
+          staleFallback={props.staleFallback}
+        />
+
+        <OutlineBlock tone={UI.green} padding={7} spacing={5}>
+          <Text font={8.8} fontWeight="semibold" foregroundStyle={UI.subtext} lineLimit={1}>
             服务检测
           </Text>
-          <ServiceGrid items={services} columns={4} />
-        </ServicePanel>
-      ) : (
-        <Text font={9} foregroundStyle="secondaryLabel">
-          服务检测未开启
-        </Text>
-      )}
+          {services.length ? (
+            <ServiceCompactGrid items={services} />
+          ) : (
+            <Text font={8.2} foregroundStyle={UI.subtext} lineLimit={1}>
+              完整检测缓存未刷新
+            </Text>
+          )}
+        </OutlineBlock>
+      </MainPanel>
     </Root>
   )
 }

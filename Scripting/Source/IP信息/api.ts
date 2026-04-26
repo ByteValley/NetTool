@@ -201,7 +201,7 @@ async function loadIpip(timeoutMs: number): Promise<Partial<IpSourceResult>> {
   const list = Array.isArray(data?.data?.location) ? data.data.location : []
   return {
     ip: data?.data?.ip,
-    location: compact([list[0], list[1], list[2]]),
+    location: compact([list[0], list[1], list[2], list[3]]),
     isp: compact([list[4]]),
   }
 }
@@ -490,21 +490,38 @@ function sameIp(a?: string, b?: string) {
   return Boolean(a && b && String(a).trim() === String(b).trim())
 }
 
+function locationWeight(value?: string) {
+  const s = String(value || "").trim()
+  if (!s) return 0
+  return s.split(/\s+/).filter(Boolean).length * 10 + s.length / 100
+}
+
 function enrichSources(sources: IpSourceResult[]) {
   const richIds = ["ipapi", "ipsb", "ipinfo"]
   return sources.map((item) => {
-    if (item.id !== "cloudflare" || !item.ip) return item
-    const rich = richIds
-      .map((id) => sources.find((source) => source.id === id && sameIp(source.ip, item.ip)))
-      .find((source) => source?.isp || source?.asn || source?.location)
-    if (!rich) return item
+    if (!item.ip) return item
+    const sameIpSources = sources.filter((source) => source.id !== item.id && sameIp(source.ip, item.ip))
+    const richerLocation = sameIpSources
+      .map((source) => source.location)
+      .filter(Boolean)
+      .sort((a, b) => locationWeight(b) - locationWeight(a))[0]
+    const rich =
+      item.id === "cloudflare"
+        ? richIds
+            .map((id) => sources.find((source) => source.id === id && sameIp(source.ip, item.ip)))
+            .find((source) => source?.isp || source?.asn || source?.location)
+        : sameIpSources.find((source) => source?.isp || source?.asn || source?.org)
+    if (!rich && !richerLocation) return item
     return {
       ...item,
-      countryCode: rich.countryCode || item.countryCode,
-      location: rich.location || item.location,
-      isp: rich.isp || item.isp,
-      org: rich.org || item.org,
-      asn: rich.asn || item.asn,
+      countryCode: rich?.countryCode || item.countryCode,
+      location:
+        richerLocation && locationWeight(richerLocation) > locationWeight(item.location)
+          ? richerLocation
+          : item.location,
+      isp: item.isp || rich?.isp,
+      org: item.org || rich?.org,
+      asn: item.asn || rich?.asn,
     }
   })
 }
@@ -751,11 +768,20 @@ function computeRisk(
 
 function cacheSignature(settings: SkkIpInfoSettings) {
   return JSON.stringify({
-    v: 4,
+    v: 5,
     enableIPv6: settings.enableIPv6 !== false,
     enableConnectivity: settings.enableConnectivity !== false,
     timeoutMs: Math.max(1500, Math.min(15000, settings.timeoutMs || 3000)),
   })
+}
+
+function signatureVersion(signature?: string) {
+  try {
+    const parsed = JSON.parse(String(signature || "{}"))
+    return Number(parsed?.v || 0) || 0
+  } catch {
+    return 0
+  }
 }
 
 function readCache(): { updatedAt: number; signature?: string; data: NetworkInfoData } | null {
@@ -881,7 +907,13 @@ export async function fetchNetworkInfoCached(
   const cacheUsable = cache && cache.signature === signature
   const cacheFresh = cacheUsable && Date.now() - cache.updatedAt <= cacheMs
 
-  if (settings.cacheEnabled && !options.forceRefresh && options.preferAnyCache && cache?.data) {
+  if (
+    settings.cacheEnabled &&
+    !options.forceRefresh &&
+    options.preferAnyCache &&
+    cache?.data &&
+    signatureVersion(cache.signature) >= 5
+  ) {
     return {
       data: cache.data,
       fromCache: true,
