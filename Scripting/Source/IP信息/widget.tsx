@@ -945,46 +945,33 @@ function LargeView(props: {
   fromCache: boolean
   staleFallback?: boolean
 }) {
-  const services = pickServices(props.data, 6)
+  const services = pickServices(props.data, 8)
   return (
     <Root>
-      <MainPanel>
-        <HStack alignment="center" spacing={6} frame={{ maxWidth: Infinity }}>
-          <Text font={9} fontWeight="semibold" foregroundStyle={UI.subtext} lineLimit={1}>
-            IP 信息
-          </Text>
-          <Spacer />
-          <Text font={7.8} foregroundStyle={UI.subtext} lineLimit={1}>
-            {formatTime(props.data.updatedAt)}
-            {props.fromCache ? " 缓存" : ""}
-          </Text>
-        </HStack>
+      <HStack alignment="top" spacing={7} frame={{ maxWidth: Infinity }}>
+        <PrimaryIpCard data={props.data} settings={props.settings} />
+        <SourceListCard data={props.data} settings={props.settings} />
+      </HStack>
 
-        <HStack alignment="top" spacing={6} frame={{ maxWidth: Infinity }}>
-          <IpOverviewBlock data={props.data} settings={props.settings} />
-          <ProbeBlock data={props.data} settings={props.settings} />
-        </HStack>
+      <StatusStrip
+        data={props.data}
+        settings={props.settings}
+        fromCache={props.fromCache}
+        staleFallback={props.staleFallback}
+      />
 
-        <NetworkSummaryBlock
-          data={props.data}
-          settings={props.settings}
-          fromCache={props.fromCache}
-          staleFallback={props.staleFallback}
-        />
-
-        <OutlineBlock tone={UI.green} padding={7} spacing={5}>
-          <Text font={8.8} fontWeight="semibold" foregroundStyle={UI.subtext} lineLimit={1}>
+      {services.length ? (
+        <ServicePanel>
+          <Text font={9.5} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1}>
             服务检测
           </Text>
-          {services.length ? (
-            <ServiceCompactGrid items={services} />
-          ) : (
-            <Text font={8.2} foregroundStyle={UI.subtext} lineLimit={1}>
-              完整检测缓存未刷新
-            </Text>
-          )}
-        </OutlineBlock>
-      </MainPanel>
+          <ServiceGrid items={services} columns={4} />
+        </ServicePanel>
+      ) : (
+        <Text font={9} foregroundStyle="secondaryLabel">
+          完整检测缓存未刷新
+        </Text>
+      )}
     </Root>
   )
 }
