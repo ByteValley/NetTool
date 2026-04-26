@@ -65,6 +65,11 @@ export type CachedNetworkInfoResult = {
   error?: string
 }
 
+export type FetchNetworkInfoCachedOptions = {
+  preferAnyCache?: boolean
+  lite?: boolean
+}
+
 type SourceFetcher = (timeoutMs: number) => Promise<Partial<IpSourceResult>>
 
 const CACHE_KEY = "skkIpInfo.cache.v1"
@@ -833,8 +838,51 @@ export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<Net
   return data
 }
 
+export async function fetchNetworkInfoLite(settings: SkkIpInfoSettings): Promise<NetworkInfoData> {
+  const timeoutMs = Math.max(800, Math.min(1200, settings.timeoutMs || 1000))
+  const rawSources: IpSourceResult[] = []
+
+  const ipinfo = await withTimeout(
+    source("ipinfo", "IPinfo.io", "international", timeoutMs, loadIpInfo),
+    timeoutMs + 250,
+    "lite ipinfo",
+  ).catch(() => null)
+  if (ipinfo) rawSources.push(ipinfo)
+
+  if (!ipinfo?.ok) {
+    const cloudflare = await withTimeout(
+      source("cloudflare", "Cloudflare", "cloudflare", timeoutMs, loadCloudflare),
+      timeoutMs + 250,
+      "lite cloudflare",
+    ).catch(() => null)
+    if (cloudflare) rawSources.push(cloudflare)
+  }
+
+  const sources = enrichSources(rawSources)
+  const primaryInternational =
+    firstOkById(sources, ["ipinfo", "cloudflare"]) ||
+    firstOk(sources, "international") ||
+    firstOk(sources, "cloudflare")
+
+  const data: NetworkInfoData = {
+    updatedAt: Date.now(),
+    sources,
+    services: [],
+    connectivity: [],
+    primaryInternational,
+    risk: computeRisk(sources, [], { primaryInternational }),
+  }
+
+  if (!sources.some((item) => item.ok)) {
+    throw new Error("IP 探针请求失败")
+  }
+
+  return data
+}
+
 export async function fetchNetworkInfoCached(
   settings: SkkIpInfoSettings,
+  options: FetchNetworkInfoCachedOptions = {},
 ): Promise<CachedNetworkInfoResult> {
   const cache = readCache()
   const signature = cacheSignature(settings)
@@ -842,12 +890,20 @@ export async function fetchNetworkInfoCached(
   const cacheUsable = cache && cache.signature === signature
   const cacheFresh = cacheUsable && Date.now() - cache.updatedAt <= cacheMs
 
+  if (settings.cacheEnabled && options.preferAnyCache && cache?.data) {
+    return {
+      data: cache.data,
+      fromCache: true,
+      staleFallback: cache.signature !== signature,
+    }
+  }
+
   if (settings.cacheEnabled && cacheFresh) {
     return { data: cache.data, fromCache: true }
   }
 
   try {
-    const data = await fetchNetworkInfo(settings)
+    const data = options.lite ? await fetchNetworkInfoLite(settings) : await fetchNetworkInfo(settings)
     if (settings.cacheEnabled) writeCache(data, signature)
     return { data, fromCache: false }
   } catch (error) {

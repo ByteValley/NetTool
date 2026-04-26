@@ -734,7 +734,7 @@ function MediumView(props: {
         <ServiceGrid items={services} columns={2} />
       ) : (
         <Text font={9} foregroundStyle="secondaryLabel">
-          服务检测未开启
+          请在脚本内刷新完整检测缓存
         </Text>
       )}
     </Root>
@@ -774,7 +774,7 @@ function LargeView(props: {
         </ServicePanel>
       ) : (
         <Text font={9} foregroundStyle="secondaryLabel">
-          服务检测未开启
+          请在脚本内刷新完整检测缓存
         </Text>
       )}
     </Root>
@@ -798,6 +798,15 @@ function ErrorView(props: { title: string; message: string }) {
   )
 }
 
+function widgetSafeSettings(settings: SkkIpInfoSettings): SkkIpInfoSettings {
+  return {
+    ...settings,
+    timeoutMs: Math.min(settings.timeoutMs || 3000, 1200),
+    enableIPv6: false,
+    enableConnectivity: false,
+  }
+}
+
 async function render() {
   const settings = loadSkkIpInfoSettings()
   const refreshMinutes = clampRefreshMinutes(settings.refreshIntervalMinutes)
@@ -807,7 +816,10 @@ async function render() {
   }
 
   try {
-    const result = await fetchNetworkInfoCached(settings)
+    const result = await fetchNetworkInfoCached(widgetSafeSettings(settings), {
+      preferAnyCache: true,
+      lite: true,
+    })
     const props = {
       data: result.data,
       settings,
