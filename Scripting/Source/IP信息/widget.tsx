@@ -148,7 +148,7 @@ function Root(props: { children: any; compact?: boolean }) {
       padding={pad}
       spacing={4}
       widgetBackground={{
-        style: { light: "rgba(248,250,252,0.92)", dark: "rgba(33,52,70,0.88)" } as any,
+        style: { light: "#F5F8FA", dark: "rgba(33,52,70,0.88)" } as any,
         shape: { type: "rect", cornerRadius: 22, style: "continuous" },
       }}
     >
@@ -166,7 +166,7 @@ function Card(props: { children: any; padding?: number; spacing?: number }) {
       padding={{ top: pad, leading: pad, bottom: pad, trailing: pad }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(255,255,255,0.70)", dark: "rgba(255,255,255,0.075)" } as any,
+        style: { light: "rgba(255,255,255,0.92)", dark: "rgba(255,255,255,0.075)" } as any,
         shape: { type: "rect", cornerRadius: 10, style: "continuous" },
       }}
     >
@@ -183,7 +183,7 @@ function ServicePanel(props: { children: any }) {
       padding={{ top: 6, leading: 6, bottom: 6, trailing: 6 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(255,255,255,0.70)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: { light: "rgba(255,255,255,0.86)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 9, style: "continuous" },
       }}
     >
@@ -290,7 +290,7 @@ function StatusStrip(props: {
       padding={{ top: 4, leading: 6, bottom: 4, trailing: 6 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(255,255,255,0.70)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: { light: "rgba(255,255,255,0.86)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 10, style: "continuous" },
       }}
     >
@@ -336,7 +336,7 @@ function RiskStrip(props: { risk: RiskInfo }) {
       spacing={2}
       padding={{ top: 5, leading: 7, bottom: 5, trailing: 7 }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.035)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: { light: "rgba(255,255,255,0.78)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 8, style: "continuous" },
       }}
     >
@@ -459,10 +459,10 @@ function SourceLine(props: { item: IpSourceResult; settings: SkkIpInfoSettings }
         <Spacer />
         <Badge text={props.item.kind === "domestic" ? "国内" : "国际"} tone={sourceTone(props.item)} />
       </HStack>
-      <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.58}>
+      <Text font={7.4} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.58}>
         IP: {displayIp(props.item, props.settings)}
       </Text>
-      <Text font={7.8} lineLimit={1} minScaleFactor={0.54}>
+      <Text font={7.4} lineLimit={1} minScaleFactor={0.54}>
         {ellipsis(`${displayLocation(props.item, props.settings)} ${text(props.item.isp || props.item.asn, "")}`, 34)}
       </Text>
     </VStack>
@@ -511,7 +511,7 @@ function SummaryItem(props: { label: string; value: string }) {
       padding={{ top: 3, leading: 5, bottom: 3, trailing: 5 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(255,255,255,0.52)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: { light: "rgba(0,0,0,0.04)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 7, style: "continuous" },
       }}
     >
@@ -587,7 +587,7 @@ function ServiceTile(props: { item: ServiceResult }) {
       padding={{ top: 3, leading: 4, bottom: 3, trailing: 4 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(255,255,255,0.52)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: { light: "rgba(255,255,255,0.72)", dark: "rgba(255,255,255,0.07)" } as any,
         shape: { type: "rect", cornerRadius: 7, style: "continuous" },
       }}
     >
@@ -734,7 +734,7 @@ function MediumView(props: {
         <ServiceGrid items={services} columns={2} />
       ) : (
         <Text font={9} foregroundStyle="secondaryLabel">
-          请在脚本内刷新完整检测缓存
+          服务检测未开启
         </Text>
       )}
     </Root>
@@ -774,7 +774,7 @@ function LargeView(props: {
         </ServicePanel>
       ) : (
         <Text font={9} foregroundStyle="secondaryLabel">
-          请在脚本内刷新完整检测缓存
+          服务检测未开启
         </Text>
       )}
     </Root>
@@ -798,15 +798,6 @@ function ErrorView(props: { title: string; message: string }) {
   )
 }
 
-function widgetSafeSettings(settings: SkkIpInfoSettings): SkkIpInfoSettings {
-  return {
-    ...settings,
-    timeoutMs: Math.min(settings.timeoutMs || 3000, 1200),
-    enableIPv6: false,
-    enableConnectivity: false,
-  }
-}
-
 async function render() {
   const settings = loadSkkIpInfoSettings()
   const refreshMinutes = clampRefreshMinutes(settings.refreshIntervalMinutes)
@@ -816,10 +807,7 @@ async function render() {
   }
 
   try {
-    const result = await fetchNetworkInfoCached(widgetSafeSettings(settings), {
-      preferAnyCache: true,
-      lite: true,
-    })
+    const result = await fetchNetworkInfoCached(settings)
     const props = {
       data: result.data,
       settings,

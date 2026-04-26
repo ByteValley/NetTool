@@ -1,48 +1,26 @@
 {
-  "iconImage" : null,
   "name" : "IP 信息",
-  "localizedNames" : {
-    "it" : "",
-    "fr" : "",
-    "en" : "",
-    "de" : "",
-    "ru" : "",
-    "ja" : "",
-    "zh" : "",
-    "es" : "",
-    "pt" : ""
-  },
-  "icon" : "network",
-  "description" : "参考 ip.skk.moe 的本机 IP 与连通性检测组件。",
-  "remoteResource" : {
-    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/IP 信息.scripting",
-    "autoUpdateInterval" : 600,
-    "hash" : "2fcdbaa52df4703f2fa4742b79d1191c"
-  },
-  "runInApp" : false,
-  "localizedDescriptions" : {
-    "it" : "",
-    "fr" : "",
-    "en" : "",
-    "de" : "",
-    "ru" : "",
-    "ja" : "",
-    "zh" : "",
-    "es" : "",
-    "pt" : ""
-  },
-  "contributors" : [
-
-  ],
-  "intentInputTypes" : [
-
-  ],
-  "entry" : "index.tsx",
   "version" : "1.0.0",
   "color" : "rgba(15, 139, 141,1)",
   "author" : {
     "name" : "ByteValley",
     "email" : null,
     "homepage" : null
-  }
+  },
+  "contributors" : [
+
+  ],
+  "runInApp" : false,
+  "description" : "参考 ip.skk.moe 的本机 IP 与连通性检测组件。",
+  "remoteResource" : {
+    "hash" : "6eaeee9e390deb13555e96bd0a4146e5",
+    "url" : "https:\/\/raw.githubusercontent.com\/ByteValley\/NetTool\/main\/Scripting\/Release\/IP信息.scripting",
+    "autoUpdateInterval" : 300
+  },
+  "localizedNames" : null,
+  "localizedDescriptions" : null,
+  "icon" : "network",
+  "intentInputTypes" : [
+
+  ]
 }

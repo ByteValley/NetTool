@@ -20,7 +20,7 @@ import {
   saveSkkIpInfoSettings,
   type SkkIpInfoSettings,
 } from "./settings"
-import { clearSkkIpInfoCache, fetchNetworkInfoCached } from "./api"
+import { clearSkkIpInfoCache } from "./api"
 
 declare const Safari: any
 declare const Dialog: any
@@ -71,24 +71,21 @@ function SettingsView() {
   const [maskLocation, setMaskLocation] = useState(initial.maskLocation)
   const [showSourceName, setShowSourceName] = useState(initial.showSourceName)
 
-  const currentSettings = (overrides: Partial<SkkIpInfoSettings> = {}): SkkIpInfoSettings => ({
-    ...defaultSkkIpInfoSettings,
-    ...initial,
-    title: title.trim() || defaultSkkIpInfoSettings.title,
-    refreshIntervalMinutes,
-    timeoutMs,
-    cacheEnabled,
-    cacheMinutes,
-    enableIPv6,
-    enableConnectivity,
-    maskIp,
-    maskLocation,
-    showSourceName,
-    ...overrides,
-  })
-
   const handleSave = () => {
-    const settings = currentSettings()
+    const settings: SkkIpInfoSettings = {
+      ...defaultSkkIpInfoSettings,
+      ...initial,
+      title: title.trim() || defaultSkkIpInfoSettings.title,
+      refreshIntervalMinutes,
+      timeoutMs,
+      cacheEnabled,
+      cacheMinutes,
+      enableIPv6,
+      enableConnectivity,
+      maskIp,
+      maskLocation,
+      showSourceName,
+    }
     saveSkkIpInfoSettings(settings)
     dismiss()
   }
@@ -111,30 +108,6 @@ function SettingsView() {
       message: "已清除 IP 信息与服务检测缓存，不影响组件配置。",
       buttonLabel: "确定",
     })
-  }
-
-  const handleRefreshFullCache = async () => {
-    const settings = currentSettings({
-      cacheEnabled: true,
-      enableConnectivity: true,
-    })
-    saveSkkIpInfoSettings(settings)
-    clearSkkIpInfoCache()
-
-    try {
-      await fetchNetworkInfoCached(settings)
-      await Dialog?.alert?.({
-        title: "刷新完成",
-        message: "完整检测结果已写入缓存，桌面小组件会读取缓存显示完整信息。",
-        buttonLabel: "确定",
-      })
-    } catch (error: any) {
-      await Dialog?.alert?.({
-        title: "刷新失败",
-        message: error?.message ? String(error.message) : String(error),
-        buttonLabel: "知道了",
-      })
-    }
   }
 
   const toggleFullscreen = () => {
@@ -269,15 +242,10 @@ function SettingsView() {
           header={<Text font="body" fontWeight="semibold">外部工具</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              完整检测在 App 内运行并写入缓存，桌面小组件只负责读取缓存显示。
+              可打开原站点查看完整网页检测结果。
             </Text>
           }
         >
-          <Button
-            title="刷新完整检测缓存"
-            systemImage="arrow.clockwise"
-            action={handleRefreshFullCache}
-          />
           <Button
             title="打开 ip.skk.moe"
             systemImage="safari"
