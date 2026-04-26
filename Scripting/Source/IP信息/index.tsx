@@ -20,7 +20,7 @@ import {
   saveSkkIpInfoSettings,
   type SkkIpInfoSettings,
 } from "./settings"
-import { fetchNetworkInfoCached } from "./api"
+import { clearSkkIpInfoCache, fetchNetworkInfoCached } from "./api"
 
 declare const Safari: any
 declare const Dialog: any
@@ -93,15 +93,40 @@ function SettingsView() {
     dismiss()
   }
 
-  const handleRefreshCache = async () => {
-    const settings = currentSettings({ cacheEnabled: true })
+  const handleAbout = async () => {
+    await Dialog?.alert?.({
+      title: "IP 信息组件",
+      message:
+        `作者：ByteValley\n` +
+        `版本：v${VERSION}（${BUILD_DATE}）\n` +
+        `数据源：ip.skk.moe（聚合 IP 信息服务）`,
+      buttonLabel: "关闭",
+    })
+  }
+
+  const handleClearCache = async () => {
+    clearSkkIpInfoCache()
+    await Dialog?.alert?.({
+      title: "缓存已清空",
+      message: "已清除 IP 信息与服务检测缓存，不影响组件配置。",
+      buttonLabel: "确定",
+    })
+  }
+
+  const handleRefreshFullCache = async () => {
+    const settings = currentSettings({
+      cacheEnabled: true,
+      enableConnectivity: true,
+    })
     saveSkkIpInfoSettings(settings)
+    clearSkkIpInfoCache()
+
     try {
-      await fetchNetworkInfoCached(settings, { forceRefresh: true })
+      await fetchNetworkInfoCached(settings)
       await Dialog?.alert?.({
         title: "刷新完成",
         message: "完整检测结果已写入缓存，桌面小组件会优先读取这份结果。",
-        buttonLabel: "知道了",
+        buttonLabel: "确定",
       })
     } catch (error: any) {
       await Dialog?.alert?.({
@@ -110,17 +135,6 @@ function SettingsView() {
         buttonLabel: "知道了",
       })
     }
-  }
-
-  const handleAbout = async () => {
-    await Dialog?.alert?.({
-      title: "IP 信息组件",
-      message:
-        `作者：ByteValley\n` +
-        `版本：v${VERSION}（${BUILD_DATE}）\n` +
-        `数据源参考：ip.skk.moe / network_info.js`,
-      buttonLabel: "关闭",
-    })
   }
 
   const toggleFullscreen = () => {
@@ -242,20 +256,27 @@ function SettingsView() {
               ))}
             </Picker>
           ) : null}
+
+          <Button
+            title="清空缓存"
+            systemImage="trash"
+            action={handleClearCache}
+            foregroundStyle="red"
+          />
         </Section>
 
         <Section
           header={<Text font="body" fontWeight="semibold">外部工具</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              桌面小组件会先读取缓存；需要更新 ChatGPT、Netflix 等检测结果时，可先在这里刷新完整缓存。
+              可打开原站点查看完整网页检测结果，也可手动刷新小组件缓存。
             </Text>
           }
         >
           <Button
             title="刷新完整检测缓存"
             systemImage="arrow.clockwise"
-            action={handleRefreshCache}
+            action={handleRefreshFullCache}
           />
           <Button
             title="打开 ip.skk.moe"
@@ -284,7 +305,7 @@ async function main() {
         message,
         buttonLabel: "知道了",
       })
-    } catch {}
+    } catch { }
     Script.exit()
   }
 }

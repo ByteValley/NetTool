@@ -65,12 +65,6 @@ export type CachedNetworkInfoResult = {
   error?: string
 }
 
-export type FetchNetworkInfoCachedOptions = {
-  preferAnyCache?: boolean
-  forceRefresh?: boolean
-  lite?: boolean
-}
-
 type SourceFetcher = (timeoutMs: number) => Promise<Partial<IpSourceResult>>
 
 const CACHE_KEY = "skkIpInfo.cache.v1"
@@ -129,7 +123,7 @@ async function fetchText(
     timeoutMs,
     url,
   )
-  const text = await withTimeout(response.text(), timeoutMs, `${url} body`)
+  const text = String(await withTimeout(response.text() as Promise<string>, timeoutMs, ` body`))
   return { text, status: Number(response.status || 0), headers: response.headers || {} }
 }
 
@@ -201,7 +195,7 @@ async function loadIpip(timeoutMs: number): Promise<Partial<IpSourceResult>> {
   const list = Array.isArray(data?.data?.location) ? data.data.location : []
   return {
     ip: data?.data?.ip,
-    location: compact([list[0], list[1], list[2], list[3]]),
+    location: compact([list[0], list[1], list[2]]),
     isp: compact([list[4]]),
   }
 }
@@ -461,17 +455,15 @@ async function testSpotify(timeoutMs: number) {
 
 async function runServiceChecks(timeoutMs: number): Promise<ServiceResult[]> {
   const ms = Math.max(1200, Math.min(3000, timeoutMs))
-  const basic = BASIC_SERVICE_TARGETS.map((target) => testBasicService(target, ms))
   const unlock = [
     testYouTube(ms),
     testChatGPT(ms),
-    testOpenAIAPI(ms),
+    testSpotify(ms),
     testNetflix(ms),
     testDisney(ms),
     testMax(ms),
-    testSpotify(ms),
   ]
-  return Promise.all([...basic, ...unlock])
+  return Promise.all(unlock)
 }
 
 function firstOk(sources: IpSourceResult[], kind: IpSourceKind) {
@@ -490,38 +482,21 @@ function sameIp(a?: string, b?: string) {
   return Boolean(a && b && String(a).trim() === String(b).trim())
 }
 
-function locationWeight(value?: string) {
-  const s = String(value || "").trim()
-  if (!s) return 0
-  return s.split(/\s+/).filter(Boolean).length * 10 + s.length / 100
-}
-
 function enrichSources(sources: IpSourceResult[]) {
   const richIds = ["ipapi", "ipsb", "ipinfo"]
   return sources.map((item) => {
-    if (!item.ip) return item
-    const sameIpSources = sources.filter((source) => source.id !== item.id && sameIp(source.ip, item.ip))
-    const richerLocation = sameIpSources
-      .map((source) => source.location)
-      .filter(Boolean)
-      .sort((a, b) => locationWeight(b) - locationWeight(a))[0]
-    const rich =
-      item.id === "cloudflare"
-        ? richIds
-            .map((id) => sources.find((source) => source.id === id && sameIp(source.ip, item.ip)))
-            .find((source) => source?.isp || source?.asn || source?.location)
-        : sameIpSources.find((source) => source?.isp || source?.asn || source?.org)
-    if (!rich && !richerLocation) return item
+    if (item.id !== "cloudflare" || !item.ip) return item
+    const rich = richIds
+      .map((id) => sources.find((source) => source.id === id && sameIp(source.ip, item.ip)))
+      .find((source) => source?.isp || source?.asn || source?.location)
+    if (!rich) return item
     return {
       ...item,
-      countryCode: rich?.countryCode || item.countryCode,
-      location:
-        richerLocation && locationWeight(richerLocation) > locationWeight(item.location)
-          ? richerLocation
-          : item.location,
-      isp: item.isp || rich?.isp,
-      org: item.org || rich?.org,
-      asn: item.asn || rich?.asn,
+      countryCode: rich.countryCode || item.countryCode,
+      location: rich.location || item.location,
+      isp: rich.isp || item.isp,
+      org: rich.org || item.org,
+      asn: rich.asn || item.asn,
     }
   })
 }
@@ -775,15 +750,6 @@ function cacheSignature(settings: SkkIpInfoSettings) {
   })
 }
 
-function signatureVersion(signature?: string) {
-  try {
-    const parsed = JSON.parse(String(signature || "{}"))
-    return Number(parsed?.v || 0) || 0
-  } catch {
-    return 0
-  }
-}
-
 function readCache(): { updatedAt: number; signature?: string; data: NetworkInfoData } | null {
   try {
     const raw = Storage?.get?.(CACHE_KEY)
@@ -799,6 +765,20 @@ function readCache(): { updatedAt: number; signature?: string; data: NetworkInfo
 function writeCache(data: NetworkInfoData, signature: string) {
   try {
     Storage?.set?.(CACHE_KEY, { updatedAt: Date.now(), signature, data })
+  } catch {}
+}
+
+export function clearSkkIpInfoCache() {
+  try {
+    if (typeof Storage?.remove === "function") {
+      Storage.remove(CACHE_KEY)
+      return
+    }
+    if (typeof Storage?.delete === "function") {
+      Storage.delete(CACHE_KEY)
+      return
+    }
+    Storage?.set?.(CACHE_KEY, null)
   } catch {}
 }
 
@@ -853,53 +833,8 @@ export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<Net
   return data
 }
 
-export async function fetchNetworkInfoLite(settings: SkkIpInfoSettings): Promise<NetworkInfoData> {
-  const timeoutMs = Math.max(800, Math.min(1200, settings.timeoutMs || 1000))
-  const sources: IpSourceResult[] = []
-
-  const ipinfo = await withTimeout(
-    source("ipinfo", "IPinfo.io", "international", timeoutMs, loadIpInfo),
-    timeoutMs + 250,
-    "lite ipinfo",
-  ).catch(() => null)
-  if (ipinfo) sources.push(ipinfo)
-
-  if (!ipinfo?.ok) {
-    const cloudflare = await withTimeout(
-      source("cloudflare", "Cloudflare", "cloudflare", timeoutMs, loadCloudflare),
-      timeoutMs + 250,
-      "lite cloudflare",
-    ).catch(() => null)
-    if (cloudflare) sources.push(cloudflare)
-  }
-
-  const enriched = enrichSources(sources)
-  const primaryInternational =
-    firstOkById(enriched, ["ipinfo", "cloudflare"]) ||
-    firstOk(enriched, "international") ||
-    firstOk(enriched, "cloudflare")
-
-  const data: NetworkInfoData = {
-    updatedAt: Date.now(),
-    sources: enriched,
-    services: [],
-    connectivity: [],
-    primaryInternational,
-    risk: computeRisk(enriched, [], {
-      primaryInternational,
-    }),
-  }
-
-  if (!enriched.some((item) => item.ok)) {
-    throw new Error("IP 探针请求失败")
-  }
-
-  return data
-}
-
 export async function fetchNetworkInfoCached(
   settings: SkkIpInfoSettings,
-  options: FetchNetworkInfoCachedOptions = {},
 ): Promise<CachedNetworkInfoResult> {
   const cache = readCache()
   const signature = cacheSignature(settings)
@@ -907,26 +842,12 @@ export async function fetchNetworkInfoCached(
   const cacheUsable = cache && cache.signature === signature
   const cacheFresh = cacheUsable && Date.now() - cache.updatedAt <= cacheMs
 
-  if (
-    settings.cacheEnabled &&
-    !options.forceRefresh &&
-    options.preferAnyCache &&
-    cache?.data &&
-    signatureVersion(cache.signature) >= 5
-  ) {
-    return {
-      data: cache.data,
-      fromCache: true,
-      staleFallback: cache.signature !== signature,
-    }
-  }
-
-  if (settings.cacheEnabled && !options.forceRefresh && cacheFresh) {
+  if (settings.cacheEnabled && cacheFresh) {
     return { data: cache.data, fromCache: true }
   }
 
   try {
-    const data = options.lite ? await fetchNetworkInfoLite(settings) : await fetchNetworkInfo(settings)
+    const data = await fetchNetworkInfo(settings)
     if (settings.cacheEnabled) writeCache(data, signature)
     return { data, fromCache: false }
   } catch (error) {
