@@ -2,6 +2,7 @@ import {
   Widget,
   VStack,
   HStack,
+  Image,
   Text,
   Spacer,
   WidgetReloadPolicy,
@@ -12,7 +13,7 @@ import {
   type NetworkInfoData,
   type RiskInfo,
   type ServiceResult,
-  fetchNetworkInfoCached,
+  fetchNetworkInfo,
 } from "./api"
 import { loadSkkIpInfoSettings, type SkkIpInfoSettings } from "./settings"
 
@@ -82,36 +83,12 @@ function displayLocationCompact(item: IpSourceResult | undefined, settings: SkkI
     .replace(/China\s+([\u4e00-\u9fa5A-Za-z-]+)/i, "China · $1")
 }
 
-function pickSources(data: NetworkInfoData) {
-  const preferred = [
-    data.primaryDomestic,
-    data.primaryInternational,
-    data.primaryIPv6,
-  ].filter(Boolean) as IpSourceResult[]
-
-  const seen = new Set(preferred.map((item) => item.id))
-  data.sources.forEach((item) => {
-    if (item.ok && !seen.has(item.id)) {
-      preferred.push(item)
-      seen.add(item.id)
-    }
-  })
-  return preferred
-}
-
 function pickReferenceSources(data: NetworkInfoData) {
   const ids = ["ipip", "bilibili", "cloudflare", "ipinfo"]
   const picked: IpSourceResult[] = []
   ids.forEach((id) => {
     const found = data.sources.find((item) => item.id === id && item.ok && item.ip)
     if (found) picked.push(found)
-  })
-  const seen = new Set(picked.map((item) => item.id))
-  pickSources(data).forEach((item) => {
-    if (!seen.has(item.id)) {
-      picked.push(item)
-      seen.add(item.id)
-    }
   })
   return picked
 }
@@ -219,8 +196,6 @@ function Badge(props: { text: string; tone: "domestic" | "international" | "risk
 function Header(props: {
   title: string
   updatedAt: number
-  fromCache: boolean
-  staleFallback?: boolean
 }) {
   return (
     <HStack alignment="center" spacing={6}>
@@ -237,8 +212,6 @@ function Header(props: {
       <Spacer />
       <Text font={8.5} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.7}>
         {formatTime(props.updatedAt)}
-        {props.fromCache ? " 缓存" : ""}
-        {props.staleFallback ? " 兜底" : ""}
       </Text>
     </HStack>
   )
@@ -281,8 +254,6 @@ function StatusPill(props: { text: string }) {
 function StatusStrip(props: {
   data: NetworkInfoData
   settings: SkkIpInfoSettings
-  fromCache: boolean
-  staleFallback?: boolean
 }) {
   void props.settings
   return (
@@ -295,17 +266,12 @@ function StatusStrip(props: {
       }}
     >
       <HStack alignment="center" spacing={5} frame={{ maxWidth: Infinity }}>
-        <VStack
+        <Image
+          systemName="info.circle.fill"
+          resizable
           frame={{ width: 13, height: 13 }}
-          widgetBackground={{
-            style: riskColor(props.data.risk),
-            shape: { type: "capsule", style: "continuous" },
-          }}
-        >
-          <Text font={8} fontWeight="bold" foregroundStyle="white" lineLimit={1}>
-            i
-          </Text>
-        </VStack>
+          foregroundStyle={riskColor(props.data.risk)}
+        />
         <Text font={8} foregroundStyle="secondaryLabel" lineLimit={1}>
           风险值
         </Text>
@@ -321,8 +287,6 @@ function StatusStrip(props: {
         <StatusPill text={props.data.risk.subtype} />
         <Text font={7.2} foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.62}>
           {formatTime(props.data.updatedAt)}
-          {props.fromCache ? " 缓存" : ""}
-          {props.staleFallback ? " 兜底" : ""}
         </Text>
       </HStack>
     </VStack>
@@ -397,7 +361,7 @@ function PrimaryIpCard(props: { data: NetworkInfoData; settings: SkkIpInfoSettin
       <Separator />
 
       <VStack alignment="center" spacing={2} frame={{ maxWidth: Infinity, minHeight: 42 }}>
-        <Spacer minLength={6} />
+        <VStack frame={{ height: 2 }} />
         <Text font={8.8} fontWeight="semibold" foregroundStyle="secondaryLabel" lineLimit={1} minScaleFactor={0.58}>
           {props.data.primaryIPv6
             ? `IPv6 ${displayIp(props.data.primaryIPv6, props.settings)}`
@@ -562,18 +526,13 @@ function dotColor(item: ServiceResult, index: number): any {
 }
 
 function DotStrip(props: { item: ServiceResult; count?: number }) {
-  const count = props.count ?? 4
+  const count = props.count ?? 5
   return (
-    <HStack spacing={2}>
+    <HStack spacing={1.4}>
       {Array.from({ length: count }).map((_, index) => (
-        <VStack
-          key={index}
-          frame={{ width: 3.5, height: 3.5 }}
-          widgetBackground={{
-            style: dotColor(props.item, index),
-            shape: { type: "capsule", style: "continuous" },
-          }}
-        />
+        <Text key={index} font={7.2} foregroundStyle={dotColor(props.item, index)} lineLimit={1}>
+          ●
+        </Text>
       ))}
     </HStack>
   )
@@ -592,13 +551,13 @@ function ServiceTile(props: { item: ServiceResult }) {
       }}
     >
       <HStack alignment="center" spacing={4} frame={{ maxWidth: Infinity }}>
-        <VStack
-          frame={{ width: 5.5, height: 5.5 }}
-          widgetBackground={{
-            style: statusColor(props.item.ok, props.item.statusText),
-            shape: { type: "capsule", style: "continuous" },
-          }}
-        />
+        <Text
+          font={8}
+          foregroundStyle={statusColor(props.item.ok, props.item.statusText)}
+          lineLimit={1}
+        >
+          ●
+        </Text>
         <Text font={7.4} fontWeight="bold" lineLimit={1} minScaleFactor={0.5}>
           {props.item.name}
         </Text>
@@ -680,8 +639,6 @@ function ServiceGrid(props: { items: ServiceResult[]; columns: 2 | 3 | 4 }) {
 function SmallView(props: {
   data: NetworkInfoData
   settings: SkkIpInfoSettings
-  fromCache: boolean
-  staleFallback?: boolean
 }) {
   const primary =
     props.data.primaryInternational || props.data.primaryDomestic || props.data.primaryIPv6
@@ -691,8 +648,6 @@ function SmallView(props: {
       <Header
         title={props.settings.title}
         updatedAt={props.data.updatedAt}
-        fromCache={props.fromCache}
-        staleFallback={props.staleFallback}
       />
       <Spacer minLength={2} />
       <VStack spacing={4} frame={{ maxWidth: Infinity }}>
@@ -715,8 +670,6 @@ function SmallView(props: {
 function MediumView(props: {
   data: NetworkInfoData
   settings: SkkIpInfoSettings
-  fromCache: boolean
-  staleFallback?: boolean
 }) {
   const services = pickServices(props.data, 2)
   return (
@@ -724,8 +677,6 @@ function MediumView(props: {
       <Header
         title={props.settings.title}
         updatedAt={props.data.updatedAt}
-        fromCache={props.fromCache}
-        staleFallback={props.staleFallback}
       />
 
       <CompactIpCard data={props.data} settings={props.settings} />
@@ -744,8 +695,6 @@ function MediumView(props: {
 function LargeView(props: {
   data: NetworkInfoData
   settings: SkkIpInfoSettings
-  fromCache: boolean
-  staleFallback?: boolean
 }) {
   const services = pickServices(props.data, 6)
   return (
@@ -761,8 +710,6 @@ function LargeView(props: {
       <StatusStrip
         data={props.data}
         settings={props.settings}
-        fromCache={props.fromCache}
-        staleFallback={props.staleFallback}
       />
 
       {services.length ? (
@@ -807,12 +754,10 @@ async function render() {
   }
 
   try {
-    const result = await fetchNetworkInfoCached(settings)
+    const data = await fetchNetworkInfo(settings)
     const props = {
-      data: result.data,
+      data,
       settings,
-      fromCache: result.fromCache,
-      staleFallback: result.staleFallback,
     }
 
     if (Widget.family === "systemSmall") {

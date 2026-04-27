@@ -20,7 +20,6 @@ import {
   saveSkkIpInfoSettings,
   type SkkIpInfoSettings,
 } from "./settings"
-import { clearSkkIpInfoCache } from "./api"
 
 declare const Safari: any
 declare const Dialog: any
@@ -45,14 +44,6 @@ const TIMEOUT_OPTIONS = [
   { label: "15 秒", value: 15000 },
 ]
 
-const CACHE_OPTIONS = [
-  { label: "5 分钟", value: 5 },
-  { label: "10 分钟（默认）", value: 10 },
-  { label: "30 分钟", value: 30 },
-  { label: "1 小时", value: 60 },
-  { label: "6 小时", value: 360 },
-]
-
 function SettingsView() {
   const dismiss = Navigation.useDismiss()
   const initial = loadSkkIpInfoSettings()
@@ -63,8 +54,6 @@ function SettingsView() {
     initial.refreshIntervalMinutes,
   )
   const [timeoutMs, setTimeoutMs] = useState(initial.timeoutMs)
-  const [cacheEnabled, setCacheEnabled] = useState(initial.cacheEnabled)
-  const [cacheMinutes, setCacheMinutes] = useState(initial.cacheMinutes)
   const [enableIPv6, setEnableIPv6] = useState(initial.enableIPv6)
   const [enableConnectivity, setEnableConnectivity] = useState(initial.enableConnectivity)
   const [maskIp, setMaskIp] = useState(initial.maskIp)
@@ -78,8 +67,6 @@ function SettingsView() {
       title: title.trim() || defaultSkkIpInfoSettings.title,
       refreshIntervalMinutes,
       timeoutMs,
-      cacheEnabled,
-      cacheMinutes,
       enableIPv6,
       enableConnectivity,
       maskIp,
@@ -98,15 +85,6 @@ function SettingsView() {
         `版本：v${VERSION}（${BUILD_DATE}）\n` +
         `数据源：ip.skk.moe（聚合 IP 信息服务）`,
       buttonLabel: "关闭",
-    })
-  }
-
-  const handleClearCache = async () => {
-    clearSkkIpInfoCache()
-    await Dialog?.alert?.({
-      title: "缓存已清空",
-      message: "已清除 IP 信息与服务检测缓存，不影响组件配置。",
-      buttonLabel: "确定",
     })
   }
 
@@ -193,10 +171,10 @@ function SettingsView() {
         </Section>
 
         <Section
-          header={<Text font="body" fontWeight="semibold">刷新与缓存</Text>}
+          header={<Text font="body" fontWeight="semibold">刷新</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              刷新间隔是系统小组件调度建议；缓存用于减少探针请求并在网络失败时兜底。
+              刷新间隔是系统小组件调度建议；每次刷新都会实时请求探针数据。
             </Text>
           }
         >
@@ -212,30 +190,6 @@ function SettingsView() {
               </Text>
             ))}
           </Picker>
-
-          <Toggle title="启用缓存" value={cacheEnabled} onChanged={setCacheEnabled} />
-
-          {cacheEnabled ? (
-            <Picker
-              title="缓存有效期"
-              value={cacheMinutes}
-              onChanged={(value: number) => setCacheMinutes(Number(value) || 10)}
-              pickerStyle="menu"
-            >
-              {CACHE_OPTIONS.map((option) => (
-                <Text key={option.value} tag={option.value as any}>
-                  {option.label}
-                </Text>
-              ))}
-            </Picker>
-          ) : null}
-
-          <Button
-            title="清空缓存"
-            systemImage="trash"
-            action={handleClearCache}
-            foregroundStyle="red"
-          />
         </Section>
 
         <Section

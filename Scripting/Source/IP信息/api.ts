@@ -1,8 +1,6 @@
 import { fetch } from "scripting"
 import type { SkkIpInfoSettings } from "./settings"
 
-declare const Storage: any
-
 export type IpSourceKind = "domestic" | "international" | "cloudflare" | "ipv6"
 
 export type IpSourceResult = {
@@ -58,16 +56,7 @@ export type NetworkInfoData = {
   primaryIPv6?: IpSourceResult
 }
 
-export type CachedNetworkInfoResult = {
-  data: NetworkInfoData
-  fromCache: boolean
-  staleFallback?: boolean
-  error?: string
-}
-
 type SourceFetcher = (timeoutMs: number) => Promise<Partial<IpSourceResult>>
-
-const CACHE_KEY = "skkIpInfo.cache.v1"
 
 const BASIC_SERVICE_TARGETS: Array<{
   id: string
@@ -208,33 +197,6 @@ async function loadBilibili(timeoutMs: number): Promise<Partial<IpSourceResult>>
     countryCode: d.country_code ? String(d.country_code) : undefined,
     location: compact([d.country, d.province, d.city]),
     isp: d.isp,
-  }
-}
-
-async function loadIpApi(timeoutMs: number): Promise<Partial<IpSourceResult>> {
-  const data = await fetchJson("http://ip-api.com/json?lang=zh-CN", timeoutMs)
-  if (data?.status && data.status !== "success") throw new Error("ip-api failed")
-  return {
-    ip: data?.query,
-    countryCode: data?.countryCode,
-    location: compact([data?.country, data?.regionName, data?.city]),
-    isp: compact([data?.isp || data?.org]),
-    org: data?.org,
-    asn: String(data?.as || "").trim() || parseAsn(data?.as),
-  }
-}
-
-async function loadIpSb(timeoutMs: number): Promise<Partial<IpSourceResult>> {
-  const data = await fetchJson("https://api-ipv4.ip.sb/geoip", timeoutMs)
-  return {
-    ip: data?.ip,
-    countryCode: data?.country_code,
-    location: compact([data?.country, data?.region, data?.city]),
-    isp: compact([data?.isp || data?.organization || data?.asn_organization]),
-    org: compact([data?.organization || data?.asn_organization]),
-    asn: data?.asn
-      ? compact([`AS${data.asn}`, data?.asn_organization || data?.organization])
-      : parseAsn(data?.asn),
   }
 }
 
@@ -483,7 +445,7 @@ function sameIp(a?: string, b?: string) {
 }
 
 function enrichSources(sources: IpSourceResult[]) {
-  const richIds = ["ipapi", "ipsb", "ipinfo"]
+  const richIds = ["ipinfo"]
   return sources.map((item) => {
     if (item.id !== "cloudflare" || !item.ip) return item
     const rich = richIds
@@ -741,54 +703,11 @@ function computeRisk(
   return calculateLineRisk(riskSubject(data))
 }
 
-function cacheSignature(settings: SkkIpInfoSettings) {
-  return JSON.stringify({
-    v: 5,
-    enableIPv6: settings.enableIPv6 !== false,
-    enableConnectivity: settings.enableConnectivity !== false,
-    timeoutMs: Math.max(1500, Math.min(15000, settings.timeoutMs || 3000)),
-  })
-}
-
-function readCache(): { updatedAt: number; signature?: string; data: NetworkInfoData } | null {
-  try {
-    const raw = Storage?.get?.(CACHE_KEY)
-    if (!raw) return null
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw
-    if (!parsed || typeof parsed.updatedAt !== "number" || !parsed.data) return null
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-function writeCache(data: NetworkInfoData, signature: string) {
-  try {
-    Storage?.set?.(CACHE_KEY, { updatedAt: Date.now(), signature, data })
-  } catch {}
-}
-
-export function clearSkkIpInfoCache() {
-  try {
-    if (typeof Storage?.remove === "function") {
-      Storage.remove(CACHE_KEY)
-      return
-    }
-    if (typeof Storage?.delete === "function") {
-      Storage.delete(CACHE_KEY)
-      return
-    }
-    Storage?.set?.(CACHE_KEY, null)
-  } catch {}
-}
-
 export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<NetworkInfoData> {
   const timeoutMs = Math.max(1500, Math.min(15000, settings.timeoutMs || 3000))
   const sourceTasks: Array<Promise<IpSourceResult>> = [
     source("ipip", "iP138.com", "domestic", timeoutMs, loadIpip),
     source("bilibili", "IP.cn 查询网", "domestic", timeoutMs, loadBilibili),
-    source("ipapi", "IP-API", "international", timeoutMs, loadIpApi),
-    source("ipsb", "IP.SB", "international", timeoutMs, loadIpSb),
     source("cloudflare", "Cloudflare", "cloudflare", timeoutMs, loadCloudflare),
     source("ipinfo", "IPinfo.io", "international", timeoutMs, loadIpInfo),
   ]
@@ -806,7 +725,7 @@ export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<Net
   const sources = enrichSources(rawSources)
   const primaryDomestic = firstOk(sources, "domestic")
   const primaryInternational =
-    firstOkById(sources, ["ipinfo", "ipsb", "ipapi", "cloudflare"]) ||
+    firstOkById(sources, ["ipinfo", "cloudflare"]) ||
     firstOk(sources, "international") ||
     firstOk(sources, "cloudflare")
   const primaryIPv6 = firstOk(sources, "ipv6")
@@ -831,34 +750,4 @@ export async function fetchNetworkInfo(settings: SkkIpInfoSettings): Promise<Net
   }
 
   return data
-}
-
-export async function fetchNetworkInfoCached(
-  settings: SkkIpInfoSettings,
-): Promise<CachedNetworkInfoResult> {
-  const cache = readCache()
-  const signature = cacheSignature(settings)
-  const cacheMs = Math.max(1, settings.cacheMinutes || 10) * 60 * 1000
-  const cacheUsable = cache && cache.signature === signature
-  const cacheFresh = cacheUsable && Date.now() - cache.updatedAt <= cacheMs
-
-  if (settings.cacheEnabled && cacheFresh) {
-    return { data: cache.data, fromCache: true }
-  }
-
-  try {
-    const data = await fetchNetworkInfo(settings)
-    if (settings.cacheEnabled) writeCache(data, signature)
-    return { data, fromCache: false }
-  } catch (error) {
-    if (settings.cacheEnabled && cacheUsable && cache?.data) {
-      return {
-        data: cache.data,
-        fromCache: true,
-        staleFallback: true,
-        error: errToString(error),
-      }
-    }
-    throw error
-  }
 }

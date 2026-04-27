@@ -7,8 +7,6 @@ export type SkkIpInfoSettings = {
   title: string
   refreshIntervalMinutes: number
   timeoutMs: number
-  cacheEnabled: boolean
-  cacheMinutes: number
   enableIPv6: boolean
   enableConnectivity: boolean
   maskIp: boolean
@@ -20,8 +18,6 @@ export const defaultSkkIpInfoSettings: SkkIpInfoSettings = {
   title: "IP 信息",
   refreshIntervalMinutes: 30,
   timeoutMs: 3000,
-  cacheEnabled: true,
-  cacheMinutes: 10,
   enableIPv6: true,
   enableConnectivity: true,
   maskIp: false,
@@ -85,13 +81,6 @@ export function loadSkkIpInfoSettings(): SkkIpInfoSettings {
     1500,
     15000,
   )
-  merged.cacheMinutes = clampNumber(
-    merged.cacheMinutes,
-    defaultSkkIpInfoSettings.cacheMinutes,
-    1,
-    1440,
-  )
-  merged.cacheEnabled = readBool(merged.cacheEnabled, defaultSkkIpInfoSettings.cacheEnabled)
   merged.enableIPv6 = readBool(merged.enableIPv6, defaultSkkIpInfoSettings.enableIPv6)
   merged.enableConnectivity = readBool(
     merged.enableConnectivity,
