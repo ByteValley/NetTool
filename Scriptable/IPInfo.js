@@ -13,20 +13,36 @@ const { DmYY, Runing } = DmYYModule;
 
 const DEFAULT_SETTINGS = {
   title: "IP 信息",
-  refreshAfterDate: "30",
+  refreshAfterDate: "5",
   timeoutMs: "3000",
-  cacheEnabled: "true",
-  cacheMinutes: "10",
   enableIPv6: "true",
   enableConnectivity: "true",
+  serviceYouTube: "true",
+  serviceChatGPT: "true",
+  serviceSpotify: "true",
+  serviceNetflix: "false",
+  serviceDisney: "false",
+  serviceMax: "false",
   maskIp: "false",
   maskLocation: "false",
   showSourceName: "true",
+  showServiceDots: "true",
+  serviceDotAuto: "false",
+  serviceDotCount: "5",
   lightColor: "#1F2933",
   darkColor: "#F2F5F8",
   lightBgColor: "#F5F8FA",
   darkBgColor: "#213446",
 };
+
+const SERVICE_CHOICES = [
+  { id: "youtube", key: "serviceYouTube", name: "YouTube", icon: "play.rectangle", color: "#FF0000", defaultEnabled: true },
+  { id: "chatgpt", key: "serviceChatGPT", name: "ChatGPT", icon: "sparkles", color: "#00B978", defaultEnabled: true },
+  { id: "spotify", key: "serviceSpotify", name: "Spotify", icon: "music.note", color: "#1DB954", defaultEnabled: true },
+  { id: "netflix", key: "serviceNetflix", name: "Netflix", icon: "tv", color: "#E50914", defaultEnabled: false },
+  { id: "disney", key: "serviceDisney", name: "Disney+", icon: "sparkle", color: "#2F54EB", defaultEnabled: false },
+  { id: "max", key: "serviceMax", name: "Max", icon: "play.tv", color: "#1677FF", defaultEnabled: false },
+];
 
 const BASIC_SERVICE_TARGETS = [
   { id: "bytedance", name: "字节跳动", region: "国内", url: "https://www.bytedance.com/favicon.ico" },
@@ -155,6 +171,13 @@ const RISK_RULES = {
 
 const ASN_HOME_STRONG = new Set([3462, 38841]);
 
+// 仅检测用户勾选的服务；服务检测直接全量并发执行，减少等待。
+const VISIBLE_SERVICE_LIMIT = 6;
+const DOT_FAST_COLOR = Color.green();
+const DOT_WARN_COLOR = Color.yellow();
+const DOT_SLOW_COLOR = new Color("#FF9500");
+const DOT_FAIL_COLOR = Color.red();
+
 function clampInt(value, fallback, min, max) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -219,11 +242,21 @@ function getHeader(headers, name) {
 
 function countryFromText(text) {
   const content = String(text || "");
-  const m =
-    content.match(/loc=([A-Z]{2})/) ||
-    content.match(/"countryCode"\s*:\s*"([A-Z]{2})"/i) ||
-    content.match(/data-country=["']([A-Z]{2})["']/i);
-  return m ? m[1].toUpperCase() : "";
+  const patterns = [
+    /loc=([A-Z]{2})/,
+    /"countryCode"\s*:\s*"([A-Z]{2})"/i,
+    /"INNERTUBE_CONTEXT_GL"\s*:\s*"([A-Z]{2})"/i,
+    /"GL"\s*:\s*"([A-Z]{2})"/i,
+    /"gl"\s*:\s*"([A-Z]{2})"/i,
+    /data-country=["']([A-Z]{2})["']/i,
+    /[?&]gl=([A-Z]{2})(?:[&"'\\]|$)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const m = content.match(pattern);
+    if (m?.[1]) return m[1].toUpperCase();
+  }
+  return "";
 }
 
 function parseASNNumber(s) {
@@ -368,10 +401,18 @@ class Widget extends DmYY {
     this.name = "IP 信息";
     this.en = "IPInfo";
     this.logo = "https://raw.githubusercontent.com/58xinian/icon/main/globe.png";
-    this.cacheKey = `${this.SETTING_KEY}.ipCache.v1`;
     this.hasBgImage = false;
     this.appearanceMode = Device.isUsingDarkAppearance() ? "dark" : "light";
     this.registerMenus();
+  }
+
+  safeIcon(name, color, fallback = "gear") {
+    try {
+      if (typeof SFSymbol !== "undefined" && SFSymbol.named(name)?.image) {
+        return { name, color };
+      }
+    } catch (e) {}
+    return { name: fallback, color };
   }
 
   registerMenus() {
@@ -381,38 +422,25 @@ class Widget extends DmYY {
       title: "IP 信息设置",
       menu: [
         {
-          icon: { name: "character.cursor.ibeam", color: "#1677ff" },
+          icon: this.safeIcon("character.cursor.ibeam", "#1677ff", "gear"),
           type: "input",
           title: "顶部标题",
           placeholder: "IP 信息",
           val: "title",
         },
         {
-          icon: { name: "clock.arrow.2.circlepath", color: "#0958d9" },
+          icon: this.safeIcon("clock.arrow.2.circlepath", "#0958d9", "gear"),
           type: "select",
           title: "刷新间隔（分钟）",
           options: ["5", "10", "30", "60", "120", "360", "720"],
           val: "refreshAfterDate",
         },
         {
-          icon: { name: "timer", color: "#13a8a8" },
+          icon: this.safeIcon("timer", "#13a8a8", "gear"),
           type: "input",
           title: "超时（毫秒）",
           placeholder: "3000",
           val: "timeoutMs",
-        },
-        {
-          icon: { name: "archivebox", color: "#52c41a" },
-          type: "switch",
-          title: "启用缓存",
-          val: "cacheEnabled",
-        },
-        {
-          icon: { name: "clock.badge.checkmark", color: "#73d13d" },
-          type: "input",
-          title: "缓存分钟数",
-          placeholder: "10",
-          val: "cacheMinutes",
         },
       ],
     });
@@ -421,136 +449,131 @@ class Widget extends DmYY {
       title: "探针与显示",
       menu: [
         {
-          icon: { name: "ipv6", color: "#2f54eb" },
+          icon: this.safeIcon("ipv6", "#2f54eb", "globe"),
           type: "switch",
           title: "启用 IPv6 探针",
           val: "enableIPv6",
         },
         {
-          icon: { name: "network", color: "#722ed1" },
+          icon: this.safeIcon("network", "#722ed1", "gear"),
           type: "switch",
           title: "启用服务检测",
           val: "enableConnectivity",
         },
         {
-          icon: { name: "eye.slash", color: "#d4380d" },
+          icon: this.safeIcon("eye.slash", "#d4380d", "gear"),
           type: "switch",
           title: "隐藏 IP",
           val: "maskIp",
         },
         {
-          icon: { name: "mappin.slash", color: "#d46b08" },
+          icon: this.safeIcon("mappin.slash", "#d46b08", "gear"),
           type: "switch",
           title: "隐藏位置",
           val: "maskLocation",
         },
         {
-          icon: { name: "text.badge.star", color: "#faad14" },
+          icon: this.safeIcon("text.badge.star", "#faad14", "gear"),
           type: "switch",
           title: "显示探针名称",
           val: "showSourceName",
         },
+        {
+          icon: this.safeIcon("circle.grid.2x2", "#13c2c2", "gear"),
+          type: "switch",
+          title: "显示服务圆点",
+          val: "showServiceDots",
+        },
+        {
+          icon: this.safeIcon("waveform.path.ecg", "#08979c", "gear"),
+          type: "switch",
+          title: "根据延迟自动显示圆点",
+          val: "serviceDotAuto",
+        },
+        {
+          icon: this.safeIcon("ellipsis", "#08979c", "gear"),
+          type: "select",
+          title: "固定圆点个数",
+          options: ["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+          val: "serviceDotCount",
+        },
       ],
+    });
+
+    this.registerAction({
+      title: "服务选择",
+      menu: SERVICE_CHOICES.map((item) => ({
+        icon: this.safeIcon(item.icon, item.color, "circle"),
+        type: "switch",
+        title: item.name,
+        val: item.key,
+      })),
     });
 
     this.registerAction({
       title: "操作",
       menu: [
         {
-          icon: { name: "paintbrush", color: "#531dab" },
+          icon: this.safeIcon("paintbrush", "#531dab", "gear"),
           type: "input",
           title: "基础样式设置",
           name: "baseStyle",
           onClick: () => this.setWidgetConfig(),
         },
-        {
-          icon: { name: "trash", color: "#cf1322" },
-          type: "input",
-          title: "清空数据缓存",
-          name: "clearCache",
-          onClick: async () => {
-            const options = ["取消", "确认清空"];
-            const index = await this.generateAlert("将清空 IP 信息缓存。", options);
-            if (index !== 1) return;
-            this.clearCache();
-            await this.notify(this.name, "缓存已清空");
-          },
-        },
       ],
     });
   }
 
+  getRequestTimeoutSeconds(timeoutMs) {
+    return Math.max(0.8, Math.min(15, Number(timeoutMs || 3000) / 1000));
+  }
+
+  getSelectedServiceIds() {
+    const selected = [];
+    SERVICE_CHOICES.forEach((item) => {
+      const enabled = toBool(this.settings[item.key], item.defaultEnabled);
+      this.settings[item.key] = String(enabled);
+      if (enabled) selected.push(item.id);
+    });
+    return selected;
+  }
+
   getSettingsValue() {
     const title = String(this.settings.title || DEFAULT_SETTINGS.title).trim() || DEFAULT_SETTINGS.title;
-    const refresh = clampInt(this.settings.refreshAfterDate, 30, 5, 1440);
-    const timeoutMs = clampInt(this.settings.timeoutMs, 3000, 1500, 15000);
-    const cacheEnabled = toBool(this.settings.cacheEnabled, true);
-    const cacheMinutes = clampInt(this.settings.cacheMinutes, 10, 1, 1440);
+    const refresh = clampInt(this.settings.refreshAfterDate, 5, 5, 1440);
+    const timeoutMs = clampInt(this.settings.timeoutMs, 3000, 1000, 15000);
     const enableIPv6 = toBool(this.settings.enableIPv6, true);
     const enableConnectivity = toBool(this.settings.enableConnectivity, true);
+    const selectedServices = this.getSelectedServiceIds();
     const maskIp = toBool(this.settings.maskIp, false);
     const maskLocation = toBool(this.settings.maskLocation, false);
     const showSourceName = toBool(this.settings.showSourceName, true);
+    const showServiceDots = toBool(this.settings.showServiceDots, true);
+    const serviceDotAuto = toBool(this.settings.serviceDotAuto, false);
+    const serviceDotCount = clampInt(this.settings.serviceDotCount, 5, 0, 8);
     this.settings.refreshAfterDate = String(refresh);
+    this.settings.serviceDotAuto = String(serviceDotAuto);
+    this.settings.serviceDotCount = String(serviceDotCount);
     return {
       title,
       refreshIntervalMinutes: refresh,
       timeoutMs,
-      cacheEnabled,
-      cacheMinutes,
       enableIPv6,
       enableConnectivity,
+      selectedServices,
       maskIp,
       maskLocation,
       showSourceName,
+      showServiceDots,
+      serviceDotAuto,
+      serviceDotCount,
     };
-  }
-
-  readCache() {
-    try {
-      if (!Keychain.contains(this.cacheKey)) return null;
-      const raw = Keychain.get(this.cacheKey);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed.updatedAt !== "number" || !parsed.data) return null;
-      return parsed;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  writeCache(data, signature) {
-    try {
-      Keychain.set(
-        this.cacheKey,
-        JSON.stringify({
-          updatedAt: Date.now(),
-          signature,
-          data,
-        })
-      );
-    } catch (e) {}
-  }
-
-  clearCache() {
-    try {
-      if (Keychain.contains(this.cacheKey)) Keychain.remove(this.cacheKey);
-    } catch (e) {}
-  }
-
-  cacheSignature(settings) {
-    return JSON.stringify({
-      v: 1,
-      enableIPv6: settings.enableIPv6 !== false,
-      enableConnectivity: settings.enableConnectivity !== false,
-      timeoutMs: settings.timeoutMs,
-    });
   }
 
   async fetchText(url, timeoutMs, options = {}) {
     const req = new Request(url);
     req.method = options.method || "GET";
-    req.timeoutInterval = Math.max(2, Math.ceil(timeoutMs / 1000));
+    req.timeoutInterval = this.getRequestTimeoutSeconds(timeoutMs);
     req.headers = {
       Accept: "text/plain,application/json,*/*",
       "Accept-Language": "en",
@@ -562,6 +585,25 @@ class Widget extends DmYY {
     const response = req.response || {};
     return {
       text: String(text || ""),
+      status: Number(response.statusCode || 0),
+      headers: response.headers || {},
+    };
+  }
+
+  async fetchStatus(url, timeoutMs, options = {}) {
+    const req = new Request(url);
+    req.method = options.method || "HEAD";
+    req.timeoutInterval = this.getRequestTimeoutSeconds(timeoutMs);
+    req.headers = {
+      Accept: "*/*",
+      "Accept-Language": "en",
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
+      ...(options.headers || {}),
+    };
+    await req.load();
+    const response = req.response || {};
+    return {
+      text: "",
       status: Number(response.statusCode || 0),
       headers: response.headers || {},
     };
@@ -726,11 +768,42 @@ class Widget extends DmYY {
     });
   }
 
+  async fetchYouTubeRegion(timeoutMs) {
+    const headers = {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Cookie: "CONSENT=YES+cb",
+    };
+    const urls = [
+      "https://m.youtube.com/?persist_app=1&app=m&hl=en",
+      "https://www.youtube.com/premium?persist_app=1&app=desktop&hl=en",
+    ];
+    let last = null;
+
+    for (const url of urls) {
+      try {
+        const r = await this.fetchText(url, timeoutMs, { method: "GET", headers });
+        last = r;
+        const cc = countryFromText(r.text) || this.responseCountryCode(r.text, r.headers);
+        if (/^[A-Z]{2}$/.test(cc)) return { response: r, countryCode: cc };
+      } catch (e) {}
+    }
+
+    if (last) return { response: last, countryCode: "" };
+    throw new Error("YouTube region unavailable");
+  }
+
   async testYouTube(timeoutMs) {
     return this.service("youtube", "YouTube", "流媒体", timeoutMs, async (ms) => {
-      const r = await this.fetchText("https://www.youtube.com/premium?hl=en", ms);
-      const cc = countryFromText(r.text) || "US";
-      return { ok: r.status >= 200 && r.status < 500, status: r.status, countryCode: cc, statusText: "可用" };
+      const { response: r, countryCode: cc } = await this.fetchYouTubeRegion(ms);
+      const ok = r.status >= 200 && r.status < 500;
+      return {
+        ok,
+        status: r.status,
+        countryCode: /^[A-Z]{2}$/.test(cc) ? cc : "",
+        statusText: ok ? "可用" : "区域未知",
+      };
     });
   }
 
@@ -738,8 +811,8 @@ class Widget extends DmYY {
     return this.service("chatgpt", "ChatGPT", "AI", timeoutMs, async (ms) => {
       const r = await this.fetchText("https://chatgpt.com/cdn-cgi/trace", ms);
       const cc = countryFromText(r.text);
-      const ok = r.status >= 200 && r.status < 500 && Boolean(cc);
-      return { ok, status: r.status, countryCode: cc, statusText: ok ? "可用" : "受限" };
+      const ok = r.status >= 200 && r.status < 500;
+      return { ok, status: r.status, countryCode: /^[A-Z]{2}$/.test(cc) ? cc : "", statusText: ok ? "可用" : "区域未知" };
     });
   }
 
@@ -750,6 +823,17 @@ class Widget extends DmYY {
       const ok = r.status === 401 || r.status === 403 || (r.status >= 200 && r.status < 500);
       return { ok, status: r.status, countryCode: cc, statusText: ok ? "可达" : "不可达" };
     });
+  }
+
+  responseCountryCode(text = "", headers = {}) {
+    const fromHeader =
+      getHeader(headers, "cf-ipcountry") ||
+      getHeader(headers, "x-country-code") ||
+      getHeader(headers, "x-region-code") ||
+      getHeader(headers, "x-geo-country");
+    const cc = String(fromHeader || "").trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(cc)) return cc;
+    return countryFromText(text);
   }
 
   parseNetflixRegion(text, headers) {
@@ -768,22 +852,26 @@ class Widget extends DmYY {
       if (r1.status === 404) {
         const r2 = await this.fetchText(`https://www.netflix.com/title/${NF_ORIGINAL}`, ms);
         if (r2.status === 200) {
+          const cc = this.parseNetflixRegion(r2.text, r2.headers);
+          const precise = /^[A-Z]{2}$/.test(cc);
           return {
             ok: true,
             status: r2.status,
-            countryCode: this.parseNetflixRegion(r2.text, r2.headers),
-            statusText: "仅自制",
+            countryCode: precise ? cc : "",
+            statusText: precise ? "仅自制" : "区域未知",
             detail: "Originals",
           };
         }
         return { ok: false, status: r2.status, statusText: "区域受限" };
       }
+      const cc = this.parseNetflixRegion(r1.text, r1.headers);
+      const precise = /^[A-Z]{2}$/.test(cc);
       const ok = r1.status === 200;
       return {
         ok,
         status: r1.status,
-        countryCode: this.parseNetflixRegion(r1.text, r1.headers),
-        statusText: ok ? "完整解锁" : `HTTP ${r1.status}`,
+        countryCode: precise ? cc : "",
+        statusText: r1.status === 200 ? (precise ? "完整解锁" : "区域未知") : `HTTP ${r1.status}`,
       };
     });
   }
@@ -795,11 +883,13 @@ class Widget extends DmYY {
       });
       const blocked = /not\s+available|Sorry,\s*Disney\+\s*is\s*not\s*available/i.test(r.text || "");
       const ok = r.status === 200 && !blocked;
+      const cc = ok ? countryFromText(r.text) : "";
+      const precise = /^[A-Z]{2}$/.test(cc);
       return {
         ok,
         status: r.status,
-        countryCode: ok ? countryFromText(r.text) : "",
-        statusText: ok ? "可用" : "区域受限",
+        countryCode: precise ? cc : "",
+        statusText: blocked ? "区域受限" : precise ? "可用" : "区域未知",
       };
     });
   }
@@ -809,36 +899,141 @@ class Widget extends DmYY {
       const r = await this.fetchText("https://www.max.com/", ms);
       const blocked = /not\s+available\s+in\s+your\s+region|country\s+not\s+supported/i.test(r.text || "");
       const ok = r.status >= 200 && r.status < 500 && !blocked;
+      const cc = ok ? countryFromText(r.text) : "";
+      const precise = /^[A-Z]{2}$/.test(cc);
       return {
         ok,
         status: r.status,
-        countryCode: ok ? countryFromText(r.text) : "",
-        statusText: ok ? "可用" : "区域受限",
+        countryCode: precise ? cc : "",
+        statusText: blocked ? "区域受限" : precise ? "可用" : "区域未知",
       };
     });
   }
 
   async testSpotify(timeoutMs) {
     return this.service("spotify", "Spotify", "流媒体", timeoutMs, async (ms) => {
-      const r = await this.fetchText("https://www.spotify.com/", ms);
+      const r = await this.fetchText(
+        "https://spclient.wg.spotify.com/signup/public/v1/account?validate=1&email=scriptable-ipinfo-test%40example.com",
+        ms,
+        { headers: { Accept: "application/json,*/*" } }
+      );
+      let country = this.responseCountryCode(r.text, r.headers);
+      try {
+        const json = JSON.parse(r.text || "{}");
+        country = String(json.country || json.countryCode || country || "").trim().toUpperCase();
+      } catch (e) {}
       const ok = r.status >= 200 && r.status < 500;
-      return { ok, status: r.status, countryCode: countryFromText(r.text), statusText: ok ? "可用" : "不可达" };
+      return {
+        ok,
+        status: r.status,
+        countryCode: /^[A-Z]{2}$/.test(country) ? country : "",
+        statusText: ok ? "可用" : "区域未知",
+      };
     });
   }
 
-  async runServiceChecks(timeoutMs) {
-    const ms = Math.max(1200, Math.min(3000, timeoutMs));
-    const checks = [
-      this.testYouTube(ms),
-      this.testChatGPT(ms),
-      this.testSpotify(ms),
-      this.testNetflix(ms),
-      this.testDisney(ms),
-      this.testMax(ms),
-      this.testOpenAIAPI(ms),
-      ...BASIC_SERVICE_TARGETS.slice(0, 3).map((item) => this.testBasicService(item, ms)),
+  async testYouTubeFast(timeoutMs) {
+    return this.service("youtube", "YouTube", "流媒体", timeoutMs, async (ms) => {
+      const r = await this.fetchStatus("https://www.youtube.com/generate_204", ms, { method: "GET" });
+      const ok = r.status === 204 || (r.status >= 200 && r.status < 500);
+      return { ok, status: r.status, countryCode: this.responseCountryCode("", r.headers), statusText: ok ? "可用" : "不可达" };
+    });
+  }
+
+  async testSpotifyFast(timeoutMs) {
+    return this.service("spotify", "Spotify", "流媒体", timeoutMs, async (ms) => {
+      try {
+        const r = await this.fetchText(
+          "https://spclient.wg.spotify.com/signup/public/v1/account?validate=1&email=scriptable-ipinfo-test%40example.com",
+          ms,
+          { headers: { Accept: "application/json,*/*" } }
+        );
+        let country = this.responseCountryCode(r.text, r.headers);
+        try {
+          const json = JSON.parse(r.text || "{}");
+          country = String(json.country || json.countryCode || country || "").trim().toUpperCase();
+        } catch (e) {}
+        const ok = r.status >= 200 && r.status < 500;
+        return { ok, status: r.status, countryCode: /^[A-Z]{2}$/.test(country) ? country : "", statusText: ok ? "可用" : "不可达" };
+      } catch (e) {
+        const r = await this.fetchStatus("https://www.spotify.com/", ms, { method: "HEAD" });
+        const ok = r.status >= 200 && r.status < 500;
+        return { ok, status: r.status, countryCode: this.responseCountryCode("", r.headers), statusText: ok ? "可用" : "不可达" };
+      }
+    });
+  }
+
+  async testNetflixFast(timeoutMs) {
+    return this.service("netflix", "Netflix", "流媒体", timeoutMs, async (ms) => {
+      const r = await this.fetchStatus("https://www.netflix.com/title/81280792", ms, { method: "HEAD" });
+      const ok = r.status >= 200 && r.status < 500 && r.status !== 403;
+      const statusText = r.status === 403 ? "区域受限" : ok ? "可达" : `HTTP ${r.status}`;
+      const countryCode = this.parseNetflixRegion("", r.headers) || this.responseCountryCode("", r.headers);
+      return { ok, status: r.status, countryCode, statusText };
+    });
+  }
+
+  async testDisneyFast(timeoutMs) {
+    return this.service("disney", "Disney+", "流媒体", timeoutMs, async (ms) => {
+      const r = await this.fetchStatus("https://www.disneyplus.com/", ms, {
+        method: "HEAD",
+        headers: { "Accept-Language": "en" },
+      });
+      const ok = r.status >= 200 && r.status < 500;
+      return { ok, status: r.status, countryCode: this.responseCountryCode("", r.headers), statusText: ok ? "可达" : "区域受限" };
+    });
+  }
+
+  async testMaxFast(timeoutMs) {
+    return this.service("max", "Max", "流媒体", timeoutMs, async (ms) => {
+      const r = await this.fetchStatus("https://www.max.com/", ms, { method: "HEAD" });
+      const ok = r.status >= 200 && r.status < 500;
+      return { ok, status: r.status, countryCode: this.responseCountryCode("", r.headers), statusText: ok ? "可达" : "区域受限" };
+    });
+  }
+
+  async runServiceChecks(timeoutMs, selectedServices = ["youtube", "chatgpt", "spotify"]) {
+    const ms = Math.max(1000, Math.min(3000, timeoutMs || 3000));
+    const selected = Array.isArray(selectedServices) && selectedServices.length
+      ? selectedServices
+      : [];
+
+    const taskMap = {
+      youtube: () => this.testYouTube(ms),
+      chatgpt: () => this.testChatGPT(ms),
+      spotify: () => this.testSpotify(ms),
+      netflix: () => this.testNetflix(ms),
+      disney: () => this.testDisney(ms),
+      max: () => this.testMax(ms),
+    };
+
+    const tasks = selected
+      .map((id) => taskMap[id])
+      .filter((fn) => typeof fn === "function");
+
+    if (!tasks.length) return [];
+    return Promise.all(tasks.map((task) => task()));
+  }
+
+  exitCountryCode(data) {
+    const candidates = [
+      data?.primaryInternational,
+      data?.primaryDomestic,
+      ...(data?.sources || []),
     ];
-    return Promise.all(checks);
+    for (const item of candidates) {
+      const cc = String(item?.countryCode || "").trim().toUpperCase();
+      if (/^[A-Z]{2}$/.test(cc)) return cc;
+    }
+    return "";
+  }
+
+  applyStreamingRegionFallback(services, data, settings) {
+    void data;
+    void settings;
+    // 不再使用出口 IP 兜底，避免把“出口地区”误显示成“流媒体真实解锁区”。
+    // 只显示服务端真实解析到的区域；拿不到就显示 “—”，失败显示 “失败”。
+    return services || [];
   }
 
   firstOk(sources, kind) {
@@ -873,23 +1068,26 @@ class Widget extends DmYY {
   }
 
   async fetchNetworkInfo(settings) {
-    const timeoutMs = Math.max(1500, Math.min(15000, settings.timeoutMs || 3000));
+    const timeoutMs = Math.max(1000, Math.min(15000, settings.timeoutMs || 3000));
     const sourceTasks = [
-      this.source("ipip", "iP138.com", "domestic", timeoutMs, this.loadIpip),
-      this.source("bilibili", "IP.cn 查询网", "domestic", timeoutMs, this.loadBilibili),
-      this.source("ipapi", "IP-API", "international", timeoutMs, this.loadIpApi),
-      this.source("ipsb", "IP.SB", "international", timeoutMs, this.loadIpSb),
-      this.source("cloudflare", "Cloudflare", "cloudflare", timeoutMs, this.loadCloudflare),
-      this.source("ipinfo", "IPinfo.io", "international", timeoutMs, this.loadIpInfo),
+      () => this.source("ipip", "iP138.com", "domestic", timeoutMs, this.loadIpip),
+      () => this.source("bilibili", "IP.cn 查询网", "domestic", timeoutMs, this.loadBilibili),
+      () => this.source("ipapi", "IP-API", "international", timeoutMs, this.loadIpApi),
+      () => this.source("ipsb", "IP.SB", "international", timeoutMs, this.loadIpSb),
+      () => this.source("cloudflare", "Cloudflare", "cloudflare", timeoutMs, this.loadCloudflare),
+      () => this.source("ipinfo", "IPinfo.io", "international", timeoutMs, this.loadIpInfo),
     ];
 
     if (settings.enableIPv6) {
-      sourceTasks.push(this.source("ipv6_ipsb", "IPv6 IP.SB", "ipv6", timeoutMs, this.loadIpv6IpSb));
-      sourceTasks.push(this.source("ipv6_ipify", "IPv6 IPify", "ipv6", timeoutMs, this.loadIpv6Plain));
+      sourceTasks.push(() => this.source("ipv6_ipsb", "IPv6 IP.SB", "ipv6", timeoutMs, this.loadIpv6IpSb));
+      sourceTasks.push(() => this.source("ipv6_ipify", "IPv6 IPify", "ipv6", timeoutMs, this.loadIpv6Plain));
     }
 
-    const servicesPromise = settings.enableConnectivity ? this.runServiceChecks(timeoutMs) : Promise.resolve([]);
-    const [rawSources, services] = await Promise.all([Promise.all(sourceTasks), servicesPromise]);
+    const rawSourcesPromise = Promise.all(sourceTasks.map((task) => task()));
+    const servicesPromise = settings.enableConnectivity
+      ? this.runServiceChecks(timeoutMs, settings.selectedServices)
+      : Promise.resolve([]);
+    const [rawSources, services] = await Promise.all([rawSourcesPromise, servicesPromise]);
     const sources = this.enrichSources(rawSources);
 
     const primaryDomestic = this.firstOk(sources, "domestic");
@@ -899,14 +1097,21 @@ class Widget extends DmYY {
       this.firstOk(sources, "cloudflare");
     const primaryIPv6 = this.firstOk(sources, "ipv6");
     const risk = calculateLineRisk(primaryInternational || primaryDomestic);
+    const displayData = {
+      sources,
+      primaryDomestic,
+      primaryInternational,
+      primaryIPv6,
+    };
+    const displayServices = this.applyStreamingRegionFallback(services, displayData, settings);
 
     if (!sources.some((item) => item.ok)) throw new Error("所有 IP 探针均请求失败");
 
     return {
       updatedAt: Date.now(),
       sources,
-      services,
-      connectivity: services,
+      services: displayServices,
+      connectivity: displayServices,
       risk,
       primaryDomestic,
       primaryInternational,
@@ -914,39 +1119,18 @@ class Widget extends DmYY {
     };
   }
 
-  async fetchNetworkInfoCached(settings) {
-    const signature = this.cacheSignature(settings);
-    const cache = this.readCache();
-    const cacheMs = Math.max(1, settings.cacheMinutes || 10) * 60 * 1000;
-    const cacheUsable = cache && cache.signature === signature;
-    const cacheFresh = cacheUsable && Date.now() - cache.updatedAt <= cacheMs;
-
-    if (settings.cacheEnabled && cacheFresh) {
-      return { data: cache.data, fromCache: true, staleFallback: false };
-    }
-
-    try {
-      const data = await this.fetchNetworkInfo(settings);
-      if (settings.cacheEnabled) this.writeCache(data, signature);
-      return { data, fromCache: false, staleFallback: false };
-    } catch (error) {
-      if (settings.cacheEnabled && cacheUsable && cache?.data) {
-        return {
-          data: cache.data,
-          fromCache: true,
-          staleFallback: true,
-          error: errToString(error),
-        };
-      }
-      throw error;
-    }
-  }
-
   getColors() {
     const mode = this.appearanceMode || (Device.isUsingDarkAppearance() ? "dark" : "light");
+    if (this._colors && this._colorsMode === mode) return this._colors;
+    const setColors = (colors) => {
+      this._colorsMode = mode;
+      this._colors = colors;
+      return colors;
+    };
+
     if (mode === "transparent") {
       const dark = Device.isUsingDarkAppearance();
-      return {
+      return setColors({
         plainBadge: true,
         root: dark ? new Color("#1F2A36", 0.28) : new Color("#F3F6FA", 0.25),
         card: dark ? new Color("#0F1A25", 0.42) : new Color("#FFFFFF", 0.56),
@@ -979,10 +1163,10 @@ class Widget extends DmYY {
         outlineAmber: new Color("#FFD166", 0.98),
         outlineRose: new Color("#FF9DBB", 0.98),
         outlineCyan: new Color("#84F0FF", 0.98),
-      };
+      });
     }
     if (mode === "dark") {
-      return {
+      return setColors({
         root: new Color("#1F2A36", 0.92),
         card: new Color("#2D3B4D", 0.9),
         cardAlt: new Color("#36475A", 0.88),
@@ -1014,9 +1198,9 @@ class Widget extends DmYY {
         outlineAmber: new Color("#B29248", 0.95),
         outlineRose: new Color("#A46B7E", 0.95),
         outlineCyan: new Color("#4E8FA6", 0.95),
-      };
+      });
     }
-    return {
+    return setColors({
       root: new Color("#EDEEF2"),
       card: new Color("#F7F7F8"),
       cardAlt: new Color("#F1F1F3"),
@@ -1048,7 +1232,7 @@ class Widget extends DmYY {
       outlineAmber: new Color("#E0BD6F", 0.98),
       outlineRose: new Color("#D695AA", 0.98),
       outlineCyan: new Color("#72C0D2", 0.98),
-    };
+    });
   }
 
   createRoot(widget, compact = false) {
@@ -1259,8 +1443,10 @@ class Widget extends DmYY {
     return raw.length > limit ? `${raw.slice(0, limit - 1)}…` : raw;
   }
 
-  addInfoBlock(parent, label, value, strong = false) {
+  addInfoBlock(parent, label, value, strong = false, options = {}) {
     const colors = this.getColors();
+    const valueLineLimit = clampInt(options.valueLineLimit, 1, 1, 3);
+    const valueFontSize = Number(options.valueFontSize || 0) || (strong ? 9.8 : 9.2);
     const box = parent.addStack();
     box.layoutVertically();
     const lt = box.addText(label);
@@ -1268,10 +1454,12 @@ class Widget extends DmYY {
     lt.textColor = colors.secondary;
     lt.lineLimit = 1;
     box.addSpacer(1);
-    const vt = box.addText(value);
-    vt.font = strong ? Font.semiboldSystemFont(9.8) : Font.systemFont(9.2);
+    const vt = box.addText(this.text(value));
+    vt.font = strong ? Font.semiboldSystemFont(valueFontSize) : Font.systemFont(valueFontSize);
     vt.textColor = colors.text;
-    vt.lineLimit = 1;
+    vt.lineLimit = valueLineLimit;
+    vt.minimumScaleFactor = 0.82;
+    vt.allowsTightening = true;
     return box;
   }
 
@@ -1352,18 +1540,38 @@ class Widget extends DmYY {
     return item?.ok ? colors.success : colors.danger;
   }
 
-  dotColor(item, index) {
-    const colors = this.getColors();
-    void index;
-    if (!item?.ok) return colors.danger;
-    const latency = item.latencyMs || 0;
-    if (/仅自制|部分/i.test(String(item.statusText || ""))) return colors.warning;
-    if (latency <= 120) return colors.success;
-    if (latency <= 350) return new Color("#F59E0B");
-    return new Color("#F97316");
+  autoServiceDotCount(item) {
+    if (!item || item.ok !== true) return 3;
+
+    const latency = Number(item.latencyMs);
+    if (!Number.isFinite(latency)) return 3;
+
+    if (latency <= 120) return 2;
+    if (latency <= 250) return 3;
+    if (latency <= 400) return 4;
+    if (latency <= 700) return 5;
+    if (latency <= 1000) return 6;
+    if (latency <= 1500) return 7;
+    return 8;
   }
 
-  addHeader(widget, settings, data, fromCache, staleFallback) {
+  dotColor(item, index) {
+    void index;
+
+    if (!item || item.ok !== true) return DOT_FAIL_COLOR;
+
+    const latency = Number(item.latencyMs);
+    if (!Number.isFinite(latency)) return DOT_FAIL_COLOR;
+
+    // 与自动圆点数量严格对应：
+    // 2～3 点：绿；4 点：黄；5～6 点：橙；7～8 点 / 失败：红。
+    if (latency <= 250) return DOT_FAST_COLOR;
+    if (latency <= 400) return DOT_WARN_COLOR;
+    if (latency <= 1000) return DOT_SLOW_COLOR;
+    return DOT_FAIL_COLOR;
+  }
+
+  addHeader(widget, settings, data) {
     const colors = this.getColors();
     const row = widget.addStack();
     row.centerAlignContent();
@@ -1372,7 +1580,7 @@ class Widget extends DmYY {
     title.textColor = colors.title;
     title.lineLimit = 1;
     row.addSpacer();
-    const tag = row.addText(`${formatTime(data.updatedAt)}${fromCache ? " 缓存" : ""}${staleFallback ? " 兜底" : ""}`);
+    const tag = row.addText(formatTime(data.updatedAt));
     tag.font = Font.mediumSystemFont(9);
     tag.textColor = colors.secondary;
     tag.lineLimit = 1;
@@ -1398,6 +1606,15 @@ class Widget extends DmYY {
     return "国际探针";
   }
 
+  symbolImage(name) {
+    this._symbolImages = this._symbolImages || {};
+    if (!Object.prototype.hasOwnProperty.call(this._symbolImages, name)) {
+      const symbol = SFSymbol.named(name);
+      this._symbolImages[name] = symbol?.image || null;
+    }
+    return this._symbolImages[name];
+  }
+
   riskColor(risk) {
     const colors = this.getColors();
     if (risk?.level === "高") return colors.danger;
@@ -1405,12 +1622,19 @@ class Widget extends DmYY {
     return colors.success;
   }
 
+  serviceTailText(item) {
+    if (!item) return "";
+    if (item.ok !== true) return "失败";
+    const cc = String(item.countryCode || "").trim().toUpperCase();
+    return /^[A-Z]{2}$/.test(cc) ? cc : "—";
+  }
+
   serviceStatusText(item) {
     if (!item) return "—";
     const mark = item.ok ? "✓" : "×";
-    const suffix = item.countryCode ? ` ${item.countryCode}` : "";
-    const state = item.statusText ? ` ${item.statusText}` : "";
-    return `${mark} ${item.name}${suffix}${state}`;
+    const cc = String(item.countryCode || "").trim().toUpperCase();
+    const tail = item.ok === true && /^[A-Z]{2}$/.test(cc) ? cc : item.ok === true ? "—" : "失败";
+    return `${mark} ${item.name} ${tail}`;
   }
 
   pickServices(data, limit) {
@@ -1419,11 +1643,11 @@ class Widget extends DmYY {
       .slice(0, limit);
   }
 
-  async renderSmall(widget, data, settings, fromCache, staleFallback) {
+  async renderSmall(widget, data, settings) {
     const colors = this.getColors();
     const primary = data.primaryInternational || data.primaryDomestic || data.primaryIPv6;
     const root = this.createRoot(widget, true);
-    this.addHeader(root, settings, data, fromCache, staleFallback);
+    this.addHeader(root, settings, data);
 
     const main = this.createCard(root, { padding: [9, 9, 9, 9], radius: 12, bg: "card" });
     const ip = main.addText(this.displayIp(primary, settings));
@@ -1455,11 +1679,11 @@ class Widget extends DmYY {
     }
   }
 
-  async renderMedium(widget, data, settings, fromCache, staleFallback) {
+  async renderMedium(widget, data, settings) {
     const colors = this.getColors();
     const primary = data.primaryInternational || data.primaryDomestic || data.primaryIPv6;
     const root = this.createRoot(widget, true);
-    this.addHeader(root, settings, data, fromCache, staleFallback);
+    this.addHeader(root, settings, data);
 
     const top = this.createCard(root, { padding: [9, 9, 9, 9], radius: 12, bg: "card" });
     const row = top.addStack();
@@ -1514,10 +1738,20 @@ class Widget extends DmYY {
     }
   }
 
-  async renderLarge(widget, data, settings, fromCache, staleFallback) {
+  async renderLarge(widget, data, settings) {
     const colors = this.getColors();
     const root = this.createRoot(widget, false);
     const primary = data.primaryInternational || data.primaryDomestic || data.primaryIPv6;
+    const visibleServices = settings.enableConnectivity ? this.pickServices(data, 6) : [];
+    const serviceRows = Math.max(1, Math.ceil(visibleServices.length / 3));
+    const compactServiceArea = serviceRows <= 1;
+    const leftHeight = compactServiceArea ? 273 : 230;
+    const sourceHeight = compactServiceArea ? 183 : 127;
+    const summaryHeight = compactServiceArea ? 88 : 61;
+    const serviceHeight = compactServiceArea ? 62 : 105;
+    const infoLineLimit = compactServiceArea ? 2 : 1;
+    const infoValue = (value, limit = 28) =>
+      compactServiceArea ? this.text(value) : this.ellipsis(value, limit);
 
     const topRow = root.addStack();
     topRow.layoutHorizontally();
@@ -1531,7 +1765,7 @@ class Widget extends DmYY {
       borderWidth: colors.plainBadge ? 1.9 : 1.1,
     });
     const leftCard = leftSection.card;
-    this.setSectionSize(leftSection, 166, 190);
+    this.setSectionSize(leftSection, 166, leftHeight);
 
     const head = leftCard.addStack();
     head.layoutHorizontally();
@@ -1545,27 +1779,81 @@ class Widget extends DmYY {
 
     leftCard.addSpacer(4);
     const ipv4Text = leftCard.addText(this.displayIp(primary, settings));
-    ipv4Text.font = Font.boldSystemFont(22.5);
+    ipv4Text.font = Font.boldSystemFont(20);   // ⭐ 核心：缩小
     ipv4Text.textColor = colors.text;
     ipv4Text.lineLimit = 1;
+    ipv4Text.minimumScaleFactor = 0.35;
+    ipv4Text.allowsTightening = true;
 
     leftCard.addSpacer(5);
-    this.addInfoBlock(leftCard, "Location", this.displayLocationCompact(primary, settings), true);
-    leftCard.addSpacer(3);
-    this.addInfoBlock(leftCard, "ISP", this.ellipsis(primary?.isp, 28), false);
-    leftCard.addSpacer(3);
-    this.addInfoBlock(leftCard, "ASN", this.ellipsis(primary?.asn || primary?.isp, 28), false);
+    this.addInfoBlock(leftCard, "Location", infoValue(this.displayLocationCompact(primary, settings), 32), true, { valueLineLimit: infoLineLimit });
+    leftCard.addSpacer(compactServiceArea ? 4 : 3);
+    this.addInfoBlock(leftCard, "ISP", infoValue(primary?.isp, 34), false, { valueLineLimit: infoLineLimit });
+    leftCard.addSpacer(compactServiceArea ? 4 : 3);
+    this.addInfoBlock(leftCard, "ASN", infoValue(primary?.asn || primary?.isp, 34), false, { valueLineLimit: infoLineLimit });
 
-    leftCard.addSpacer();
-    const ipv6HintRow = leftCard.addStack();
-    ipv6HintRow.addSpacer();
-    const ipv6Hint = ipv6HintRow.addText(
-      data.primaryIPv6 ? `IPv6 ${this.displayIp(data.primaryIPv6, settings)}` : "你的网络可能不支持 IPv6"
+    leftCard.addSpacer(compactServiceArea ? 12 : 10);
+    
+    // ===== IPv6 标题 =====
+    const ipv6Head = leftCard.addStack();
+    ipv6Head.layoutHorizontally();
+    ipv6Head.centerAlignContent();
+    
+    const ipv6Title = ipv6Head.addText("IPv6");
+    ipv6Title.font = Font.mediumSystemFont(9);
+    ipv6Title.textColor = colors.secondary;
+    
+    ipv6Head.addSpacer();
+    
+    if (data.primaryIPv6) {
+      this.createBadge(ipv6Head, this.countryLabel(data.primaryIPv6), this.sourceTone(data.primaryIPv6));
+    }
+    
+    leftCard.addSpacer(4);
+    
+    // ===== IPv6 地址 =====
+    const ipv6Text = leftCard.addText(
+      data.primaryIPv6 ? this.displayIp(data.primaryIPv6, settings) : "不可用"
     );
-    ipv6Hint.font = Font.semiboldSystemFont(7.6);
-    ipv6Hint.textColor = colors.secondary;
-    ipv6Hint.lineLimit = 1;
-    ipv6HintRow.addSpacer();
+    ipv6Text.font = Font.boldSystemFont(13.5);
+    ipv6Text.textColor = data.primaryIPv6 ? colors.text : colors.weak;
+    ipv6Text.lineLimit = 1;
+    ipv6Text.minimumScaleFactor = 0.5;
+    
+    leftCard.addSpacer(4);
+    
+    // ===== Location =====
+    this.addInfoBlock(
+      leftCard,
+      "Location",
+      data.primaryIPv6 ? infoValue(this.displayLocationCompact(data.primaryIPv6, settings), 32) : "—",
+      true,
+      { valueLineLimit: infoLineLimit }
+    );
+    
+    leftCard.addSpacer(compactServiceArea ? 4 : 3);
+    
+    // ===== ISP =====
+    this.addInfoBlock(
+      leftCard,
+      "ISP",
+      data.primaryIPv6 ? infoValue(data.primaryIPv6?.isp, 34) : "—",
+      false,
+      { valueLineLimit: infoLineLimit }
+    );
+    
+    leftCard.addSpacer(compactServiceArea ? 4 : 3);
+    
+    // ===== ASN =====
+    this.addInfoBlock(
+      leftCard,
+      "ASN",
+      data.primaryIPv6
+        ? infoValue(data.primaryIPv6?.asn || data.primaryIPv6?.isp, 34)
+        : "—",
+      false,
+      { valueLineLimit: infoLineLimit }
+    );
 
     topRow.addSpacer(3);
 
@@ -1580,7 +1868,7 @@ class Widget extends DmYY {
       borderWidth: colors.plainBadge ? 1.9 : 1.25,
     });
     const sourceCard = sourceSection.card;
-    this.setSectionSize(sourceSection, 163, 127);
+    this.setSectionSize(sourceSection, 163, sourceHeight);
 
     const refs = this.pickReferenceSources(data).slice(0, 4);
     if (!refs.length) {
@@ -1617,26 +1905,29 @@ class Widget extends DmYY {
         ipLine.font = Font.systemFont(6.95);
         ipLine.textColor = colors.secondary;
         ipLine.lineLimit = 1;
+        ipLine.minimumScaleFactor = 0.75;
+        ipLine.allowsTightening = true;
         ipRow.addSpacer();
 
         const locRow = sourceCard.addStack();
         locRow.layoutHorizontally();
         locRow.centerAlignContent();
         locRow.addSpacer();
-        const locLine = locRow.addText(
-          this.ellipsis(`${this.displayLocation(item, settings)} ${this.text(item.isp || item.asn, "")}`, 32)
-        );
-        locLine.font = Font.systemFont(6.45);
+        const locValue = `${this.displayLocation(item, settings)} ${this.text(item.isp || item.asn, "")}`;
+        const locLine = locRow.addText(compactServiceArea ? this.text(locValue) : this.ellipsis(locValue, 32));
+        locLine.font = Font.systemFont(compactServiceArea ? 6.3 : 6.45);
         locLine.textColor = colors.text;
-        locLine.lineLimit = 1;
+        locLine.lineLimit = compactServiceArea ? 2 : 1;
+        locLine.minimumScaleFactor = 0.82;
+        locLine.allowsTightening = true;
         locRow.addSpacer();
 
         if (idx < refs.length - 1) {
-          sourceCard.addSpacer(1);
+          sourceCard.addSpacer(compactServiceArea ? 2 : 1);
           const sep = sourceCard.addStack();
           sep.size = new Size(140, 1);
           sep.backgroundColor = idx % 2 === 0 ? colors.outlineBlue : colors.outlineGreen;
-          sourceCard.addSpacer(0.5);
+          sourceCard.addSpacer(compactServiceArea ? 1 : 0.5);
         }
       });
     }
@@ -1651,7 +1942,7 @@ class Widget extends DmYY {
       borderWidth: colors.plainBadge ? 1.75 : 1.25,
     });
     const summaryCard = summarySection.card;
-    this.setSectionSize(summarySection, 163, 61);
+    this.setSectionSize(summarySection, 163, summaryHeight);
     const summaryTitle = summaryCard.addText("网络摘要");
     summaryTitle.font = Font.semiboldSystemFont(8.6);
     summaryTitle.textColor = colors.secondary;
@@ -1670,15 +1961,17 @@ class Widget extends DmYY {
         borderColor: colors.outlineAmber,
         borderWidth: 0.9,
       });
-      item.size = new Size(68, 20);
+      item.size = new Size(68, compactServiceArea ? 25 : 20);
       const l = item.addText(label);
       l.font = Font.systemFont(6.2);
       l.textColor = colors.secondary;
       l.lineLimit = 1;
-      const v = item.addText(this.ellipsis(value, 18));
+      const v = item.addText(compactServiceArea ? this.text(value) : this.ellipsis(value, 18));
       v.font = Font.semiboldSystemFont(7);
       v.textColor = colors.text;
-      v.lineLimit = 1;
+      v.lineLimit = compactServiceArea ? 2 : 1;
+      v.minimumScaleFactor = 0.82;
+      v.allowsTightening = true;
     };
 
     const row1 = summaryCard.addStack();
@@ -1708,9 +2001,9 @@ class Widget extends DmYY {
     riskRow.layoutHorizontally();
     riskRow.centerAlignContent();
 
-    const riskSymbol = SFSymbol.named("info.circle.fill");
-    if (riskSymbol?.image) {
-      const icon = riskRow.addImage(riskSymbol.image);
+    const riskSymbolImage = this.symbolImage("info.circle.fill");
+    if (riskSymbolImage) {
+      const icon = riskRow.addImage(riskSymbolImage);
       icon.imageSize = new Size(13, 13);
       icon.tintColor = this.riskColor(data.risk);
     } else {
@@ -1743,7 +2036,7 @@ class Widget extends DmYY {
     riskRow.addSpacer(2);
     this.createPill(riskRow, data.risk.subtype);
     riskRow.addSpacer(4);
-    const time = riskRow.addText(`${formatTime(data.updatedAt)}${fromCache ? " 缓存" : ""}${staleFallback ? " 兜底" : ""}`);
+    const time = riskRow.addText(formatTime(data.updatedAt));
     time.font = Font.systemFont(7.8);
     time.textColor = colors.secondary;
     time.lineLimit = 1;
@@ -1758,7 +2051,7 @@ class Widget extends DmYY {
       borderWidth: colors.plainBadge ? 1.85 : 1.25,
     });
     const servicePanel = serviceSection.card;
-    this.setSectionSize(serviceSection, 332, 105);
+    this.setSectionSize(serviceSection, 332, serviceHeight);
     const serviceTitle = servicePanel.addText("服务检测");
     serviceTitle.font = Font.semiboldSystemFont(8.4);
     serviceTitle.textColor = colors.secondary;
@@ -1766,9 +2059,9 @@ class Widget extends DmYY {
     servicePanel.addSpacer(1.5);
 
     if (settings.enableConnectivity) {
-      const services = this.pickServices(data, 6);
+      const services = visibleServices;
       if (!services.length) {
-        const empty = servicePanel.addText("服务检测未开启");
+        const empty = servicePanel.addText("未选择服务");
         empty.font = Font.systemFont(9);
         empty.textColor = colors.secondary;
         empty.lineLimit = 1;
@@ -1787,17 +2080,19 @@ class Widget extends DmYY {
           const top = tile.addStack();
           top.layoutHorizontally();
           top.centerAlignContent();
-          const symbol = SFSymbol.named("circle.fill");
-          if (symbol?.image) {
-            const dotIcon = top.addImage(symbol.image);
-            dotIcon.imageSize = new Size(7, 7);
-            dotIcon.tintColor = this.statusColor(item);
-          } else {
-            const fallbackDot = top.addText("●");
-            fallbackDot.font = Font.boldSystemFont(7);
-            fallbackDot.textColor = this.statusColor(item);
+          if (settings.showServiceDots) {
+            const symbolImage = this.symbolImage("circle.fill");
+            if (symbolImage) {
+              const dotIcon = top.addImage(symbolImage);
+              dotIcon.imageSize = new Size(7, 7);
+              dotIcon.tintColor = this.statusColor(item);
+            } else {
+              const fallbackDot = top.addText("●");
+              fallbackDot.font = Font.boldSystemFont(7);
+              fallbackDot.textColor = this.statusColor(item);
+            }
+            top.addSpacer(3);
           }
-          top.addSpacer(3);
           const name = top.addText(item.name);
           name.font = Font.boldSystemFont(7);
           name.textColor = colors.text;
@@ -1816,32 +2111,32 @@ class Widget extends DmYY {
           latency.textColor = this.statusColor(item);
           latency.lineLimit = 1;
           row.addSpacer();
-          const tail = row.addText(item.countryCode || item.statusText || "");
+          const tail = row.addText(this.serviceTailText(item));
           tail.font = Font.systemFont(6.8);
           tail.textColor = colors.secondary;
           tail.lineLimit = 1;
 
-          tile.addSpacer(1);
-          const dots = tile.addStack();
-          dots.layoutHorizontally();
-          for (let i = 0; i < 5; i++) {
-            const d = dots.addStack();
-            d.size = new Size(5, 5);
-            d.cornerRadius = 2.5;
-            d.backgroundColor = this.dotColor(item, i);
-            if (i < 4) dots.addSpacer(2);
+          const dotCount = settings.serviceDotAuto
+            ? this.autoServiceDotCount(item)
+            : clampInt(settings.serviceDotCount, 5, 0, 8);
+          if (settings.showServiceDots && dotCount > 0) {
+            tile.addSpacer(1);
+            const dots = tile.addText("●".repeat(dotCount));
+            dots.font = Font.systemFont(7.6);
+            dots.textColor = this.dotColor(item, 0);
+            dots.lineLimit = 1;
           }
         };
 
-        for (let r = 0; r < 2; r++) {
+        for (let r = 0; r < serviceRows; r++) {
           const row = servicePanel.addStack();
           row.layoutHorizontally();
           const rowItems = services.slice(r * 3, r * 3 + 3);
           rowItems.forEach((item, idx) => {
             renderTile(row, item);
-            if (idx < 2) row.addSpacer(5);
+            if (idx < rowItems.length - 1) row.addSpacer(5);
           });
-          if (r === 0) servicePanel.addSpacer(1.5);
+          if (r < serviceRows - 1) servicePanel.addSpacer(1.5);
         }
       }
     } else {
@@ -1883,17 +2178,18 @@ class Widget extends DmYY {
       : Device.isUsingDarkAppearance()
         ? "dark"
         : "light";
+    this._colors = null;
+    this._colorsMode = "";
 
     try {
-      const result = await this.fetchNetworkInfoCached(settings);
-      const data = result.data;
+      const data = await this.fetchNetworkInfo(settings);
       const family = this.widgetFamily || config.widgetFamily || "medium";
       if (family === "small") {
-        await this.renderSmall(widget, data, settings, result.fromCache, result.staleFallback);
+        await this.renderSmall(widget, data, settings);
       } else if (family === "large") {
-        await this.renderLarge(widget, data, settings, result.fromCache, result.staleFallback);
+        await this.renderLarge(widget, data, settings);
       } else {
-        await this.renderMedium(widget, data, settings, result.fromCache, result.staleFallback);
+        await this.renderMedium(widget, data, settings);
       }
     } catch (error) {
       await this.renderError(widget, settings, error);
