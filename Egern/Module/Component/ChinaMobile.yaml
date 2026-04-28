@@ -12,7 +12,7 @@ scriptings:
 - http_request:
     name: 移动参数获取
     match: ^https?:\/\/client\.app\.coc\.10086\.cn\/biz-orange\/[LD]N\/(uam(onekey|randcode)login|realPersonAuthentication)\/autoLogin
-    script_url: https://github.com/ChinaTelecomOperators/ChinaMobile/releases/download/Prerelease-Alpha/10086.js
+    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/10086.patched.js
     max_size: 0
     body_required: true
 - http_request:
