@@ -3,7 +3,7 @@
 #!author = RuCu6 Keywos fmz200 可莉🅥 QingRex / ByteValley Sync
 #!category = Block Ads
 #!tag = 广告拦截
-#!date = 2026-04-29 14:09:26
+#!date = 2026-04-30 04:00:52
 #!arguments=Policy:境内服务
 #!arguments-desc=Policy 为出站策略或策略组名称，需与主配置完全一致；默认：境内服务。常见可填 DIRECT、Domestic、国内服务、🇨🇳 国内服务。
 
