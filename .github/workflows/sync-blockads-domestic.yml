@@ -43,7 +43,8 @@ jobs:
 
           # 仅替换规则中的策略字段 DIRECT，保留 REJECT、参数与注释不变。
           # Policy 由 Surge 模块参数传入，默认值为「境内服务」。
-          body = re.sub(r",DIRECT(?=,|$)", f",{policy}", body)
+          # 覆盖两种情况：,DIRECT,extended-matching 与行尾 ,DIRECT。
+          body = re.sub(r",DIRECT(?=,|\r?\n|$)", f",{policy}", body)
 
           now = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
           body = body.replace(
