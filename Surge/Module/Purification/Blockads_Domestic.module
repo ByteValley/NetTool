@@ -3,7 +3,7 @@
 #!author = RuCu6 Keywos fmz200 可莉🅥 QingRex / ByteValley Sync
 #!category = Block Ads
 #!tag = 广告拦截
-#!date = 2026-04-29 13:55:42
+#!date = 2026-04-29 14:06:14
 #!arguments=Policy:境内服务
 #!arguments-desc=Policy 为出站策略或策略组名称，需与主配置完全一致；默认：境内服务。常见可填 DIRECT、Domestic、国内服务、🇨🇳 国内服务。
 
@@ -17,7 +17,7 @@
 [Rule]
 # ======= 0 ======= #
 # 12306
-DOMAIN,ad.12306.cn,DIRECT
+DOMAIN,ad.12306.cn,{{{Policy}}}
 
 # ======= A ======= #
 # 阿里云盘
@@ -221,7 +221,7 @@ IP-CIDR6,2402:4e00:1200:ed00:0:9089:6dac:96b6/128,REJECT,no-resolve,pre-matching
 
 # ======= other ======= #
 DOMAIN-KEYWORD,adstrategy,REJECT,pre-matching,extended-matching
-AND,((DOMAIN-KEYWORD,tnc),(OR,((DOMAIN-SUFFIX,capcutapi.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,isnssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,bytedance.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,sgsnssdk.com)))),DIRECT
+AND,((DOMAIN-KEYWORD,tnc),(OR,((DOMAIN-SUFFIX,capcutapi.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,isnssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,bytedance.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,sgsnssdk.com)))),{{{Policy}}}
 AND,((DOMAIN-KEYWORD,-ad-),(DOMAIN-SUFFIX,byteimg.com)),REJECT,pre-matching,extended-matching
 AND,((DOMAIN-KEYWORD,ads),(DOMAIN-KEYWORD,-normal.zijieapi.com)),REJECT,pre-matching,extended-matching
 DOMAIN,lf-ad-ies.bytecdn.cn,REJECT,pre-matching,extended-matching
