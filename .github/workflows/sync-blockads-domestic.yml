@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "30 18 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/sync-blockads-domestic.yml"
 
 permissions:
   contents: write
