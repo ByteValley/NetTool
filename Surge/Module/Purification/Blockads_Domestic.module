@@ -1,0 +1,10 @@
+#!name = Block ads | 软件去广告合集模块 | 境内服务版
+#!desc = 自动同步上游 thNylHx/Tools Blockads，并将 DIRECT 策略改为「境内服务」。首次运行 GitHub Actions 后会生成完整规则。
+#!author = RuCu6 Keywos fmz200 可莉🅥 QingRex / ByteValley Sync
+#!category = Block Ads
+#!tag = 广告拦截
+#!date = 2026-04-29
+
+[Rule]
+# 此文件由 .github/workflows/sync-blockads-domestic.yml 自动生成。
+# 如果这里仍只有占位内容，请到 GitHub Actions 手动运行 Sync Blockads Domestic。
