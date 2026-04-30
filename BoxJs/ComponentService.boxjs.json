@@ -51,14 +51,6 @@
       ],
       "settings": [
         {
-          "id": "@ComponentService.ChinaBroadnet.Settings.Session",
-          "name": "广电 Session",
-          "type": "text",
-          "val": "",
-          "placeholder": "建议通过脚本自动抓取，无需手动填写",
-          "desc": "来自 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 请求头 Session。"
-        },
-        {
           "id": "@ComponentService.ChinaBroadnet.Settings.Access",
           "name": "广电 Access",
           "type": "text",
