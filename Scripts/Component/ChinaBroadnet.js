@@ -12,7 +12,6 @@
  * - 进入首页 / 套餐 / 余量页面，触发 qryUserInfo 接口
  *
  * 模块分类 · 写入字段
- * - Session：请求头 Session，可选；缺失时写入 Access 作为旧版组件兼容值
  * - Access：请求头 access / Access，必需
  * - BodyData：请求体 JSON 中的 data 字段，必需
  * ===================================================================== */
@@ -25,17 +24,16 @@ else done()
 
 function capture() {
   const headers = $request.headers || {}
-  const session = String(getHeader(headers, "Session") || "").trim()
   const access = String(getHeader(headers, "access") || "").trim()
   const bodyData = String(parseBodyData($request.body) || "").trim()
 
-  log(`抓取结果 | Session=${session ? "Y" : "N/可选"} | Access=${access ? "Y" : "N"} | data=${bodyData ? "Y" : "N"}`)
+  log(`抓取结果 | Access=${access ? "Y" : "N"} | data=${bodyData ? "Y" : "N"}`)
 
   if (!access || !bodyData) {
     notify(
       "中国广电",
       "未检测到完整凭证",
-      `Access=${access ? "Y" : "N"} data=${bodyData ? "Y" : "N"} Session=${session ? "Y" : "N/可选"}`,
+      `Access=${access ? "Y" : "N"} data=${bodyData ? "Y" : "N"}`,
     )
     done()
     return
@@ -45,26 +43,17 @@ function capture() {
   if (!root.ChinaBroadnet) root.ChinaBroadnet = {}
   if (!root.ChinaBroadnet.Settings) root.ChinaBroadnet.Settings = {}
 
-  const sessionForStore = session || access
-  root.ChinaBroadnet.Settings.Session = sessionForStore
+  delete root.ChinaBroadnet.Settings.Session
+  delete root.ChinaBroadnet.Settings.SessionOptional
   root.ChinaBroadnet.Settings.Access = access
   root.ChinaBroadnet.Settings.BodyData = bodyData
   root.ChinaBroadnet.Settings.UpdatedAt = new Date().toISOString()
-  root.ChinaBroadnet.Settings.SessionOptional = !session
 
   const ok = writeRoot(root)
   if (ok) {
-    notify(
-      "中国广电",
-      "凭证写入成功",
-      `Access=Y data=Y Session=${session ? "Y" : "N/兼容写入"}`,
-    )
+    notify("中国广电", "凭证写入成功", "Access=Y data=Y")
   } else {
-    notify(
-      "中国广电",
-      "凭证写入失败",
-      "请检查持久化存储或 BoxJS 配置",
-    )
+    notify("中国广电", "凭证写入失败", "请检查持久化存储或 BoxJS 配置")
   }
 
   done()
