@@ -1,17 +1,21 @@
-/*
-获取方式：
-1. 启用本模块/插件/重写，并打开 MITM：wx.10099.com.cn
-2. 打开【中国广电 10099】微信小程序
-3. 进入套餐/余量相关页面，触发 qryUserInfo 接口
-4. 脚本会自动写入 BoxJS：
-   ComponentService.ChinaBroadnet.Settings.Session
-   ComponentService.ChinaBroadnet.Settings.Access
-   ComponentService.ChinaBroadnet.Settings.BodyData
-
-===================
-【MITM】
-hostname = wx.10099.com.cn
-*/
+/* =====================================================================
+ * 中国广电组件服务
+ *
+ * 模块分类 · 用途说明
+ * - 抓取中国广电 10099 微信小程序 qryUserInfo 接口凭证
+ * - 写入 BoxJS：ComponentService.ChinaBroadnet.Settings
+ * - 供 Scripting / 小组件读取 Access 与 BodyData 使用
+ *
+ * 模块分类 · 抓取方式
+ * - 启用模块/插件/重写并开启 MITM：wx.10099.com.cn
+ * - 打开「中国广电 10099」微信小程序
+ * - 进入首页 / 套餐 / 余量页面，触发 qryUserInfo 接口
+ *
+ * 模块分类 · 写入字段
+ * - Session：请求头 Session，可选
+ * - Access：请求头 access / Access，必需
+ * - BodyData：请求体 JSON 中的 data 字段，必需
+ * ===================================================================== */
 
 const API_NAME = "ComponentService.ChinaBroadnet"
 const ROOT_KEY = "#ComponentService"
@@ -19,67 +23,109 @@ const ROOT_KEY = "#ComponentService"
 if (typeof $request !== "undefined") capture()
 else done()
 
+function capture() {
+  const headers = $request.headers || {}
+  const session = String(getHeader(headers, "Session") || "").trim()
+  const access = String(getHeader(headers, "access") || "").trim()
+  const bodyData = String(parseBodyData($request.body) || "").trim()
+
+  log(`抓取结果 | Session=${session ? "Y" : "N/可选"} | Access=${access ? "Y" : "N"} | data=${bodyData ? "Y" : "N"}`)
+
+  if (!access || !bodyData) {
+    notify(
+      "中国广电",
+      "未检测到完整凭证",
+      `Access=${access ? "Y" : "N"} data=${bodyData ? "Y" : "N"} Session=${session ? "Y" : "N/可选"}`,
+    )
+    done()
+    return
+  }
+
+  const root = readRoot()
+  if (!root.ChinaBroadnet) root.ChinaBroadnet = {}
+  if (!root.ChinaBroadnet.Settings) root.ChinaBroadnet.Settings = {}
+
+  root.ChinaBroadnet.Settings.Session = session
+  root.ChinaBroadnet.Settings.Access = access
+  root.ChinaBroadnet.Settings.BodyData = bodyData
+  root.ChinaBroadnet.Settings.UpdatedAt = new Date().toISOString()
+
+  const ok = writeRoot(root)
+  if (ok) {
+    notify(
+      "中国广电",
+      "凭证写入成功",
+      `Access=Y data=Y Session=${session ? "Y" : "N/可选"}`,
+    )
+  } else {
+    notify(
+      "中国广电",
+      "凭证写入失败",
+      "请检查持久化存储或 BoxJS 配置",
+    )
+  }
+
+  done()
+}
+
 function getHeader(headers, name) {
-  const lower = String(name).toLowerCase()
+  const target = String(name || "").toLowerCase()
   for (const key of Object.keys(headers || {})) {
-    if (String(key).toLowerCase() === lower) return headers[key]
+    if (String(key).toLowerCase() === target) return headers[key]
   }
   return ""
-}
-
-function readRoot() {
-  try {
-    const raw = read(ROOT_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeRoot(root) {
-  write(JSON.stringify(root), ROOT_KEY)
 }
 
 function parseBodyData(body) {
   if (!body) return ""
   if (typeof body === "object") return String(body.data || "")
 
-  const text = String(body)
+  const text = String(body || "")
+
   try {
     const json = JSON.parse(text)
     return String(json?.data || "")
   } catch { }
 
-  const match = text.match(/"data"\s*:\s*"([^"]+)"/)
-  return match ? match[1] : ""
-}
+  try {
+    const decoded = decodeURIComponent(text)
+    const json = JSON.parse(decoded)
+    return String(json?.data || "")
+  } catch { }
 
-function capture() {
-  const headers = $request.headers || {}
-  const session = String(getHeader(headers, "Session") || "").trim()
-  const access = String(getHeader(headers, "Access") || "").trim()
-  const bodyData = parseBodyData($request.body).trim()
+  const jsonMatch = text.match(/"data"\s*:\s*"([^"]+)"/)
+  if (jsonMatch) return jsonMatch[1]
 
-  if (session && access && bodyData) {
-    const root = readRoot()
-    if (!root.ChinaBroadnet) root.ChinaBroadnet = {}
-    if (!root.ChinaBroadnet.Settings) root.ChinaBroadnet.Settings = {}
-
-    root.ChinaBroadnet.Settings.Session = session
-    root.ChinaBroadnet.Settings.Access = access
-    root.ChinaBroadnet.Settings.BodyData = bodyData
-
-    writeRoot(root)
-    notify("中国广电", "凭证写入成功", "ComponentService.ChinaBroadnet.Settings")
-  } else {
-    notify(
-      "中国广电",
-      "未检测到完整凭证",
-      `Session=${session ? "Y" : "N"} Access=${access ? "Y" : "N"} data=${bodyData ? "Y" : "N"}`,
-    )
+  const formMatch = text.match(/(?:^|&)data=([^&]+)/)
+  if (formMatch) {
+    try {
+      return decodeURIComponent(formMatch[1])
+    } catch {
+      return formMatch[1]
+    }
   }
 
-  done()
+  return ""
+}
+
+function readRoot() {
+  try {
+    const raw = read(ROOT_KEY)
+    if (!raw) return {}
+    return typeof raw === "string" ? JSON.parse(raw) : raw
+  } catch (e) {
+    log(`读取 BoxJS 根配置失败：${err(e)}`)
+    return {}
+  }
+}
+
+function writeRoot(root) {
+  try {
+    return write(JSON.stringify(root), ROOT_KEY)
+  } catch (e) {
+    log(`写入 BoxJS 根配置失败：${err(e)}`)
+    return false
+  }
 }
 
 function read(key) {
@@ -97,7 +143,15 @@ function write(value, key) {
 function notify(title, subtitle, message) {
   if (typeof $notify !== "undefined") return $notify(title, subtitle, message)
   if (typeof $notification !== "undefined") return $notification.post(title, subtitle, message)
-  console.log(`${title} ${subtitle} ${message}`)
+  console.log(`${title} | ${subtitle} | ${message}`)
+}
+
+function log(message) {
+  console.log(`[${API_NAME}] ${message}`)
+}
+
+function err(e) {
+  return e?.message || String(e)
 }
 
 function done(value = {}) {
