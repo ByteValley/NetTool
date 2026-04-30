@@ -1,7 +1,7 @@
 name: |-
   中国广电组件服务
 desc: |-
-  获取中国广电 10099 微信小程序 Session / Access / data，并写入 BoxJS ComponentService.ChinaBroadnet.Settings。
+  获取中国广电 10099 微信小程序 Access / data，Session 可选，并写入 BoxJS ComponentService.ChinaBroadnet.Settings。
 author: |-
   ByteValley
 icon: |-
@@ -14,7 +14,7 @@ http:
     - "wx.10099.com.cn"
 
   script:
-    - match: ^https:\/\/wx\.10099\.com\.cn\/contact-web\/api\/busi\/qryUserInfo
+    - match: ^https:\/\/wx\.10099\.com\.cn\/contact-web\/api\/busi\/qryUserInfo(?:\?.*)?$
       name: "china_broadnet_capture"
       type: request
       require-body: true
