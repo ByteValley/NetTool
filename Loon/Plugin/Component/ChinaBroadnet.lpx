@@ -1,11 +1,11 @@
 #!name=中国广电组件服务
-#!desc=获取中国广电 10099 微信小程序 Session / Access / data
+#!desc=获取中国广电 10099 微信小程序 Access / data，Session 可选
 #!author=ByteValley
 #!tag=组件服务
 #!icon=https://m.10099.com.cn/gwecdq/qiuti20230807.png
 
 [Script]
-http-request ^https:\/\/wx\.10099\.com\.cn\/contact-web\/api\/busi\/qryUserInfo script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaBroadnet.js, requires-body=true, tag=广电组件
+http-request ^https:\/\/wx\.10099\.com\.cn\/contact-web\/api\/busi\/qryUserInfo(?:\?.*)?$ script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaBroadnet.js, requires-body=true, tag=广电组件
 
 [MITM]
 hostname = wx.10099.com.cn
