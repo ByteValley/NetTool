@@ -30,7 +30,6 @@ export const BROADNET_LOGO_CACHE_KEY = `${SETTINGS_KEY}:cache:logo`
 // Settings
 // =======================
 export type ChinaBroadnetSettings = UiSwitchSource & {
-  session: string
   access: string
   bodyData: string
 
@@ -54,7 +53,6 @@ export const defaultChinaBroadnetSettings: ChinaBroadnetSettings = {
     smallMiniBarUseTotalFlow: true,
   }),
 
-  session: "",
   access: "",
   bodyData: "",
 
@@ -116,7 +114,7 @@ function mergeSettings(raw: any, defaults: ChinaBroadnetSettings): ChinaBroadnet
     typeof merged.cacheScopeKey === "string" ? merged.cacheScopeKey : defaults.cacheScopeKey
   merged.forceRefreshOnce = !!merged.forceRefreshOnce
 
-  merged.session = typeof merged.session === "string" ? merged.session : defaults.session
+  delete merged.session
   merged.access = typeof merged.access === "string" ? merged.access : defaults.access
   merged.bodyData = typeof merged.bodyData === "string" ? merged.bodyData : defaults.bodyData
   merged.enableBoxJs = typeof merged.enableBoxJs === "boolean" ? merged.enableBoxJs : defaults.enableBoxJs
@@ -141,7 +139,9 @@ export function loadChinaBroadnetSettings(): ChinaBroadnetSettings {
 }
 
 export function saveChinaBroadnetSettings(settings: ChinaBroadnetSettings) {
-  safeSetAny(SETTINGS_KEY, settings)
+  const next: any = { ...settings }
+  delete next.session
+  safeSetAny(SETTINGS_KEY, next)
 }
 
 export { resolveRefreshInterval } from "./shared/carrier/ui"
