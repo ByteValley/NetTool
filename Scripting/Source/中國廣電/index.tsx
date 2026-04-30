@@ -7,7 +7,7 @@
  * - settings.ts 负责 merge + normalize；UI 层只做“确定值收敛”
  *
  * 模块分类 · 目标
- * - 广电 10099：配置 Session / Access / 请求体 data
+ * - 广电 10099：配置 Access / 请求体 data（Session 可选）
  * - 渲染配置：复用联通组件 UI
  * - 缓存策略：CacheSection（deferPersist=true）
  * ===================================================================== */
@@ -45,13 +45,15 @@ import { formatDuration } from "./shared/utils/time"
 
 declare const Dialog: any
 
-const VERSION = "1.0.0"
-const BUILD_DATE = "2026-04-25"
+const VERSION = "1.0.1"
+const BUILD_DATE = "2026-05-01"
 
 const BROADNET_BOXJS_SUB_URL =
   "http://boxjs.com/#/sub/add/https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/ComponentService.boxjs.json"
 const BROADNET_MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Component/ChinaBroadnet.module"
+const BROADNET_EGERN_MODULE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Module/Component/ChinaBroadnet.module"
 const BROADNET_LOON_PLUGIN_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/Component/ChinaBroadnet.lpx"
 const BROADNET_QX_REWRITE_URL =
@@ -62,6 +64,7 @@ const BROADNET_STASH_OVERRIDE_URL =
 const links: ModuleLinks = {
   boxjsSubUrl: BROADNET_BOXJS_SUB_URL,
   surgeModuleUrl: BROADNET_MODULE_URL,
+  egernModuleUrl: BROADNET_EGERN_MODULE_URL,
   loonPluginUrl: BROADNET_LOON_PLUGIN_URL,
   qxRewriteUrl: BROADNET_QX_REWRITE_URL,
   extras: [
@@ -167,7 +170,7 @@ function SettingsView() {
       smallCardStyle,
       smallMiniBarUseTotalFlow: !!smallMiniBarUseTotalFlow,
 
-      cacheScopeKey: `${String(session ?? "").trim()}|${String(access ?? "").trim()}`,
+      cacheScopeKey: `${String(access ?? "").trim()}`,
       cache: cacheDraft,
     }
 
@@ -213,7 +216,7 @@ function SettingsView() {
         <ModuleSection
           footerLines={[
             "使用前建议按顺序完成：",
-            "1）在 BoxJS 中订阅配置（用于保存 Session / Access / data）",
+            "1）在 BoxJS 中订阅配置（用于保存 Access / data，Session 可选）",
             "2）安装中国广电组件服务模块/插件/重写到支持的客户端",
             "3）打开中国广电 10099 微信小程序并进入套餐/余量页面触发抓取",
           ]}
@@ -239,11 +242,11 @@ function SettingsView() {
           header={<Text font="body" fontWeight="semibold">登录凭证</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              可由 BoxJs 自动读取；也可以从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中手动复制 Session、Access 和请求体 data。
+              可由 BoxJs 自动读取；也可以从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中手动复制 Access 和请求体 data，Session 可留空。
             </Text>
           }
         >
-          <TextField title="Session" value={session} prompt="请求头 Session" onChanged={setSession} />
+          <TextField title="Session（可选）" value={session} prompt="请求头 Session，可留空" onChanged={setSession} />
           <TextField title="Access" value={access} prompt="请求头 Access" onChanged={setAccess} />
           <TextField title="data" value={bodyData} prompt="请求体 data（Base64 整段）" onChanged={setBodyData} />
         </Section>
