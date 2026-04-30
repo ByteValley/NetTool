@@ -7,7 +7,7 @@
  * - settings.ts 负责 merge + normalize；UI 层只做“确定值收敛”
  *
  * 模块分类 · 目标
- * - 广电 10099：配置 Access / 请求体 data（Session 可选）
+ * - 广电 10099：配置 Access / 请求体 data
  * - 渲染配置：复用联通组件 UI
  * - 缓存策略：CacheSection（deferPersist=true）
  * ===================================================================== */
@@ -45,7 +45,7 @@ import { formatDuration } from "./shared/utils/time"
 
 declare const Dialog: any
 
-const VERSION = "1.0.1"
+const VERSION = "1.0.2"
 const BUILD_DATE = "2026-05-01"
 
 const BROADNET_BOXJS_SUB_URL =
@@ -122,7 +122,6 @@ function SettingsView() {
     typeof initial.enableBoxJs === "boolean" ? initial.enableBoxJs : !!defaultChinaBroadnetSettings.enableBoxJs
   const initialBoxJsUrl = String(initial.boxJsUrl ?? defaultChinaBroadnetSettings.boxJsUrl ?? "").trim()
 
-  const [session, setSession] = useState<string>(String(initial.session ?? ""))
   const [access, setAccess] = useState<string>(String(initial.access ?? ""))
   const [bodyData, setBodyData] = useState<string>(String(initial.bodyData ?? ""))
   const [refreshInterval, setRefreshInterval] = useState<number>(initialRefreshInterval)
@@ -153,7 +152,6 @@ function SettingsView() {
     const next: ChinaBroadnetSettings = {
       ...initial,
 
-      session: String(session ?? "").trim(),
       access: String(access ?? "").trim(),
       bodyData: String(bodyData ?? "").trim(),
       refreshInterval:
@@ -216,7 +214,7 @@ function SettingsView() {
         <ModuleSection
           footerLines={[
             "使用前建议按顺序完成：",
-            "1）在 BoxJS 中订阅配置（用于保存 Access / data，Session 可选）",
+            "1）在 BoxJS 中订阅配置（用于保存 Access / data）",
             "2）安装中国广电组件服务模块/插件/重写到支持的客户端",
             "3）打开中国广电 10099 微信小程序并进入套餐/余量页面触发抓取",
           ]}
@@ -242,11 +240,10 @@ function SettingsView() {
           header={<Text font="body" fontWeight="semibold">登录凭证</Text>}
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              可由 BoxJs 自动读取；也可以从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中手动复制 Access 和请求体 data，Session 可留空。
+              可由 BoxJs 自动读取；也可以从 10099 微信小程序请求 wx.10099.com.cn/contact-web/api/busi/qryUserInfo 中手动复制 Access 和请求体 data。
             </Text>
           }
         >
-          <TextField title="Session（可选）" value={session} prompt="请求头 Session，可留空" onChanged={setSession} />
           <TextField title="Access" value={access} prompt="请求头 Access" onChanged={setAccess} />
           <TextField title="data" value={bodyData} prompt="请求体 data（Base64 整段）" onChanged={setBodyData} />
         </Section>
