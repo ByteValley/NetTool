@@ -117,9 +117,8 @@ function computeTtlMs(cache: NormalizedCache, refreshIntervalMinutes: number): n
 
 function boundKeyFromSettings(settings: ChinaBroadnetSettings, credentials?: BroadnetCredentials): string {
   const k = String(settings.cacheScopeKey || "").trim()
-  const session = String(credentials?.session ?? settings.session ?? "").trim()
   const access = String(credentials?.access ?? settings.access ?? "").trim()
-  return k ? k : `${SETTINGS_KEY}:${session}:${access}`
+  return k ? k : `${SETTINGS_KEY}:${access}`
 }
 
 function readBroadnetCache(
@@ -173,7 +172,6 @@ function presentMessage(message: string, reloadPolicy: WidgetReloadPolicy) {
 }
 
 type BroadnetCredentials = {
-  session: string
   access: string
   bodyData: string
 }
@@ -208,13 +206,12 @@ async function fetchCredentialsFromBoxJs(boxJsUrl: string): Promise<BroadnetCred
     }
 
     const settings = root?.ChinaBroadnet?.Settings
-    const session = String(settings?.Session || "").trim()
     const access = String(settings?.Access || "").trim()
     const bodyData = String(settings?.BodyData || "").trim()
 
-    if (session && access && bodyData) {
+    if (access && bodyData) {
       console.log("✅ 凭证 | BoxJS 命中")
-      return { session, access, bodyData }
+      return { access, bodyData }
     }
 
     console.warn("⚠️ 凭证 | BoxJS 未找到完整 ChinaBroadnet.Settings")
@@ -263,15 +260,33 @@ function parseBroadnetData(json: BroadnetApiResponse): CarrierData | null {
 
   const feeBalance = ud.finBalance ?? (ud.fee != null ? fen2yuan(ud.fee) : "--")
 
-  const flowAllKb = Number(ud.flowAll ?? 0)
-  const flowUsedKb = Number(ud.flowUserd ?? 0)
-  const flowLeftKb = Number(ud.flow ?? Math.max(0, flowAllKb - flowUsedKb))
-  const flowTotalMB = kbToMB(flowAllKb)
-  const flowUsedMB = kbToMB(flowAllKb > 0 ? Math.max(0, flowAllKb - flowLeftKb) : flowUsedKb)
+  const flowAllKbRaw = Number(ud.flowAll ?? 0)
+  const flowUsedKbRaw = Number(ud.flowUserd ?? 0)
+  const flowLeftKbRaw = Number(ud.flow ?? Math.max(0, flowAllKbRaw - flowUsedKbRaw))
+  const flowLeftMb = kbToMB(Number.isFinite(flowLeftKbRaw) ? flowLeftKbRaw : 0)
 
-  const voiceAll = Number(ud.voiceAll ?? 0)
-  const voiceUsed = Number(ud.voiceUsed ?? 0)
-  const voiceLeft = Number(ud.voice ?? Math.max(0, voiceAll - voiceUsed))
+  let flowTotalMB = kbToMB(Number.isFinite(flowAllKbRaw) ? flowAllKbRaw : 0)
+  let flowUsedMB = kbToMB(Number.isFinite(flowUsedKbRaw) ? flowUsedKbRaw : 0)
+
+  if (flowTotalMB <= 0 && flowLeftMb > 0) {
+    flowTotalMB = flowLeftMb
+    flowUsedMB = 0
+  } else if (flowTotalMB > 0) {
+    flowUsedMB = Math.max(0, flowTotalMB - flowLeftMb)
+  }
+
+  const voiceAllRaw = Number(ud.voiceAll ?? 0)
+  const voiceUsedRaw = Number(ud.voiceUsed ?? 0)
+  const voiceLeftRaw = Number(ud.voice ?? Math.max(0, voiceAllRaw - voiceUsedRaw))
+
+  let voiceTotal = Number.isFinite(voiceAllRaw) ? voiceAllRaw : 0
+  let voiceUsed = Number.isFinite(voiceUsedRaw) ? voiceUsedRaw : 0
+  const voiceLeft = Number.isFinite(voiceLeftRaw) ? voiceLeftRaw : 0
+
+  if (voiceTotal <= 0 && voiceLeft > 0) {
+    voiceTotal = voiceLeft
+    voiceUsed = 0
+  }
 
   return {
     fee: {
@@ -281,15 +296,15 @@ function parseBroadnetData(json: BroadnetApiResponse): CarrierData | null {
     },
     voice: {
       title: "剩余语音",
-      balance: String(Number.isFinite(voiceLeft) ? voiceLeft : 0),
+      balance: String(voiceLeft),
       unit: "分钟",
-      used: Number.isFinite(voiceUsed) ? voiceUsed : Math.max(0, voiceAll - voiceLeft),
-      total: Number.isFinite(voiceAll) ? voiceAll : 0,
+      used: voiceUsed,
+      total: voiceTotal,
     },
     flow: {
       title: ud.packName ? `${ud.packName}流量` : "通用流量",
-      balance: String(flowLeftKb),
-      unit: "KB",
+      balance: String(flowLeftMb),
+      unit: "MB",
       used: flowUsedMB,
       total: flowTotalMB,
     },
@@ -298,17 +313,16 @@ function parseBroadnetData(json: BroadnetApiResponse): CarrierData | null {
 }
 
 async function fetchBroadnetData(credentials: BroadnetCredentials): Promise<CarrierData | null> {
-  const session = String(credentials.session || "").trim()
   const access = String(credentials.access || "").trim()
   const bodyData = String(credentials.bodyData || "").trim()
 
-  if (!session || !access || !bodyData) return null
+  if (!access || !bodyData) return null
 
   try {
     console.log(`🌐 请求 | 广电：POST ${API_URL}`)
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { ...COMMON_HEADERS, Session: session, Access: access },
+      headers: { ...COMMON_HEADERS, access },
       body: JSON.stringify({ data: bodyData }),
     })
 
@@ -350,7 +364,6 @@ async function render() {
   const enableBoxJs = !!settings.enableBoxJs
   const boxJsUrl = String(settings.boxJsUrl ?? "").trim()
   let credentials: BroadnetCredentials = {
-    session: String(settings.session || "").trim(),
     access: String(settings.access || "").trim(),
     bodyData: String(settings.bodyData || "").trim(),
   }
@@ -362,13 +375,13 @@ async function render() {
       console.log("✅ 凭证 | source=BoxJS")
     } else {
       console.warn("⚠️ 凭证 | BoxJS 失败，回退手动设置")
-      console.log(`✅ 凭证 | source=${credentials.session && credentials.access && credentials.bodyData ? "Settings" : "None"}`)
+      console.log(`✅ 凭证 | source=${credentials.access && credentials.bodyData ? "Settings" : "None"}`)
     }
   } else {
-    console.log(`✅ 凭证 | source=${credentials.session && credentials.access && credentials.bodyData ? "Settings" : "None"}`)
+    console.log(`✅ 凭证 | source=${credentials.access && credentials.bodyData ? "Settings" : "None"}`)
   }
 
-  const hasCredentials = !!(credentials.session && credentials.access && credentials.bodyData)
+  const hasCredentials = !!(credentials.access && credentials.bodyData)
 
   console.log(`🚀 组件启动 | carrier=CBN | refresh=${refreshInterval}m`)
   console.log(
@@ -459,7 +472,7 @@ async function render() {
   }
 
   if (!hasCredentials) {
-    presentMessage("请先在主应用中设置广电 Session、Access 和 data。", reloadPolicy)
+    presentMessage("请先在主应用中设置广电 Access 和 data。", reloadPolicy)
     return
   }
 
