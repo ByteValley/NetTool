@@ -17,6 +17,7 @@ export type ModuleLinks = {
 
   // 资源 URL
   surgeModuleUrl: string
+  egernModuleUrl?: string
   loonPluginUrl: string
   qxRewriteUrl: string
 
@@ -46,7 +47,8 @@ export function createModuleHandles(meta: ModuleMeta, links: ModuleLinks) {
 
   const handleInstallToEgern = async () => {
     const name = enc(meta.egernName)
-    await open(`egern:/modules/new?name=${name}&url=${enc(links.surgeModuleUrl)}`)
+    const url = links.egernModuleUrl || links.surgeModuleUrl
+    await open(`egern:/modules/new?name=${name}&url=${enc(url)}`)
   }
 
   const handleInstallToLoon = async () => {
