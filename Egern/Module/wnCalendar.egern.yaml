@@ -37,8 +37,8 @@ env_schema:
 
   QUOTE_FALLBACK:
     name: "每日一句失败回退"
-    description: "接口失败或关闭时的小组件标题"
-    default_value: "📅 今日黄历"
+    description: "留空时接口失败会自动使用内置每日一句"
+    default_value: ""
 
   ICON_STYLE:
     name: "宜忌图标风格"
@@ -87,16 +87,11 @@ env_schema:
     description: "默认蓝灰色 #475569"
     default_value: "#475569"
 
-  DATE:
-    name: "测试日期"
-    description: "正常使用请留空；测试可填 2026-05-11"
-    default_value: ""
-
 scriptings:
   - schedule:
       name: "今日黄历"
-      cron: "0 7,10 * * *"
-      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js"
+      cron: "0 9 * * *"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js?v=20260511-quote2"
       update_interval: 86400
       timeout: 120
       env:
@@ -110,7 +105,7 @@ scriptings:
 
   - generic:
       name: "今日黄历小组件"
-      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js?v=20260511-quote2"
       update_interval: 86400
       timeout: 120
       env:
@@ -122,7 +117,7 @@ scriptings:
         QUOTE_CATEGORIES: "d,i,k"
         QUOTE_MAX_LENGTH: "18"
         QUOTE_SHOW_SOURCE: "false"
-        QUOTE_FALLBACK: "📅 今日黄历"
+        QUOTE_FALLBACK: ""
         LIGHT_BACKGROUND: "#FFFFFF"
         DARK_BACKGROUND: "#475569"
 
@@ -138,6 +133,6 @@ widgets:
       QUOTE_CATEGORIES: "d,i,k"
       QUOTE_MAX_LENGTH: "18"
       QUOTE_SHOW_SOURCE: "false"
-      QUOTE_FALLBACK: "📅 今日黄历"
+      QUOTE_FALLBACK: ""
       LIGHT_BACKGROUND: "#FFFFFF"
       DARK_BACKGROUND: "#475569"
