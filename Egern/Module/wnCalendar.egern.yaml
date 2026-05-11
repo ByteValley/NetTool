@@ -1,12 +1,43 @@
 name: "今日黄历"
-description: "显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。浅色白底，深色蓝灰底。"
+description: "显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。小组件顶部支持每日一句；浅色白底，深色蓝灰底。"
 author: "zqzess / ByteEden"
 icon: "calendar"
 
 env_schema:
   TITLE:
-    name: "标题"
-    description: "通知和小组件显示标题"
+    name: "通知标题"
+    description: "定时通知标题；小组件每日一句关闭或接口失败时也会回退到这里"
+    default_value: "📅 今日黄历"
+
+  QUOTE_ENABLE:
+    name: "启用每日一句"
+    description: "仅用于小组件顶部标题；定时通知仍使用通知标题"
+    default_value: "true"
+    options:
+      - "true"
+      - "false"
+
+  QUOTE_CATEGORIES:
+    name: "每日一句分类"
+    description: "一言分类，多个用英文逗号分隔；默认 d,i,k"
+    default_value: "d,i,k"
+
+  QUOTE_MAX_LENGTH:
+    name: "每日一句最大长度"
+    description: "默认 18，避免小组件顶部过长"
+    default_value: "18"
+
+  QUOTE_SHOW_SOURCE:
+    name: "显示每日一句出处"
+    description: "开启后标题显示为 句子｜出处，可能较长"
+    default_value: "false"
+    options:
+      - "true"
+      - "false"
+
+  QUOTE_FALLBACK:
+    name: "每日一句失败回退"
+    description: "接口失败或关闭时的小组件标题"
     default_value: "📅 今日黄历"
 
   ICON_STYLE:
@@ -73,6 +104,7 @@ scriptings:
         MAX_COUNTDOWN_PER_LINE: "4"
         COUNTDOWN_MONTHS: "18"
         ENABLE_CACHE: "true"
+        QUOTE_ENABLE: "false"
         LIGHT_BACKGROUND: "#FFFFFF"
         DARK_BACKGROUND: "#475569"
 
@@ -86,6 +118,11 @@ scriptings:
         MAX_COUNTDOWN_PER_LINE: "4"
         COUNTDOWN_MONTHS: "18"
         ENABLE_CACHE: "true"
+        QUOTE_ENABLE: "true"
+        QUOTE_CATEGORIES: "d,i,k"
+        QUOTE_MAX_LENGTH: "18"
+        QUOTE_SHOW_SOURCE: "false"
+        QUOTE_FALLBACK: "📅 今日黄历"
         LIGHT_BACKGROUND: "#FFFFFF"
         DARK_BACKGROUND: "#475569"
 
@@ -97,5 +134,10 @@ widgets:
       MAX_COUNTDOWN_PER_LINE: "4"
       COUNTDOWN_MONTHS: "18"
       ENABLE_CACHE: "true"
+      QUOTE_ENABLE: "true"
+      QUOTE_CATEGORIES: "d,i,k"
+      QUOTE_MAX_LENGTH: "18"
+      QUOTE_SHOW_SOURCE: "false"
+      QUOTE_FALLBACK: "📅 今日黄历"
       LIGHT_BACKGROUND: "#FFFFFF"
       DARK_BACKGROUND: "#475569"
