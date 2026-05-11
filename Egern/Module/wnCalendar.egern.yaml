@@ -1,5 +1,5 @@
 name: "今日黄历"
-description: "显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。"
+description: "显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。浅色白底，深色蓝灰底。"
 author: "zqzess / ByteEden"
 icon: "calendar"
 
@@ -46,15 +46,15 @@ env_schema:
       - "true"
       - "false"
 
-  BACKGROUND_START:
-    name: "小组件渐变起始色"
-    description: "十六进制颜色，例如 #5B5FEF"
-    default_value: "#5B5FEF"
+  LIGHT_BACKGROUND:
+    name: "浅色模式背景色"
+    description: "默认白色 #FFFFFF"
+    default_value: "#FFFFFF"
 
-  BACKGROUND_END:
-    name: "小组件渐变结束色"
-    description: "十六进制颜色，例如 #7C3AED"
-    default_value: "#7C3AED"
+  DARK_BACKGROUND:
+    name: "深色模式背景色"
+    description: "默认蓝灰色 #475569"
+    default_value: "#475569"
 
   DATE:
     name: "测试日期"
@@ -73,6 +73,8 @@ scriptings:
         MAX_COUNTDOWN_PER_LINE: "4"
         COUNTDOWN_MONTHS: "18"
         ENABLE_CACHE: "true"
+        LIGHT_BACKGROUND: "#FFFFFF"
+        DARK_BACKGROUND: "#475569"
 
   - generic:
       name: "今日黄历小组件"
@@ -84,6 +86,8 @@ scriptings:
         MAX_COUNTDOWN_PER_LINE: "4"
         COUNTDOWN_MONTHS: "18"
         ENABLE_CACHE: "true"
+        LIGHT_BACKGROUND: "#FFFFFF"
+        DARK_BACKGROUND: "#475569"
 
 widgets:
   - name: "今日黄历"
@@ -93,3 +97,5 @@ widgets:
       MAX_COUNTDOWN_PER_LINE: "4"
       COUNTDOWN_MONTHS: "18"
       ENABLE_CACHE: "true"
+      LIGHT_BACKGROUND: "#FFFFFF"
+      DARK_BACKGROUND: "#475569"
