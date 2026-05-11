@@ -5,6 +5,7 @@
  * - 支持 Egern Schedule 定时通知
  * - 支持 Egern Generic Widget 小组件
  * - 小组件顶部支持每日一句，默认接口为一言 Hitokoto
+ * - 接口失败时使用内置每日一句兜底，避免继续显示“今日黄历”
  * - 显示今日黄历、干支、宜忌
  * - 最后空一行，分四行显示倒计时：传统节假日、二十四节气、民俗节日、国际节日
  *
@@ -28,6 +29,40 @@ const ICON_PRESETS = {
   check: { suit: '✅', avoid: '❎' },
   mixed: { suit: '✅', avoid: '❌' }
 };
+
+const LOCAL_QUOTES = [
+  '山高月小，水落石出',
+  '心有山海，静而无边',
+  '万事从容，日日自新',
+  '花开有期，来日方长',
+  '风来疏竹，雁渡寒潭',
+  '但行好事，莫问前程',
+  '岁月不居，时节如流',
+  '知不足而奋进，望远山而前行',
+  '一念既起，万水千山',
+  '清风徐来，水波不兴',
+  '日拱一卒，功不唐捐',
+  '人间有味是清欢',
+  '云程发轫，万里可期',
+  '心若向阳，无畏悲伤',
+  '星河滚烫，人间理想',
+  '长风破浪，会有时',
+  '山河远阔，人间烟火',
+  '静水流深，沧笙踏歌',
+  '凡是过往，皆为序章',
+  '不驰于空想，不骛于虚声',
+  '浅予深深，长乐未央',
+  '往事清零，万事顺意',
+  '心之所向，素履以往',
+  '春风有信，花开有期',
+  '一岁一礼，一寸欢喜',
+  '念念不忘，必有回响',
+  '山不让尘，川不辞盈',
+  '生有热烈，藏与俗常',
+  '保持热爱，奔赴山海',
+  '所遇皆良善，所行化坦途',
+  '慢慢来，比较快'
+];
 
 const MONTH_MEMORY_CACHE = new Map();
 
@@ -79,7 +114,7 @@ function getConfig(ctx) {
     quoteCategories: clean(env.QUOTE_CATEGORIES) || 'd,i,k',
     quoteMaxLength: readInt(env.QUOTE_MAX_LENGTH, 18, 6, 60),
     quoteTimeoutMs: readInt(env.QUOTE_TIMEOUT_MS, DEFAULT_QUOTE_TIMEOUT_MS, 2000, 30000),
-    quoteFallback: clean(env.QUOTE_FALLBACK) || clean(env.TITLE || env.title) || DEFAULT_TITLE,
+    quoteFallback: clean(env.QUOTE_FALLBACK),
     lightBackground: clean(env.LIGHT_BACKGROUND) || '#FFFFFF',
     darkBackground: clean(env.DARK_BACKGROUND) || '#475569',
     lightTitleColor: clean(env.LIGHT_TITLE_COLOR) || '#111827',
@@ -245,7 +280,7 @@ function setCachedCountdowns(ctx, dateInfo, config, countdowns) {
 async function getDailyQuoteTitle(ctx, dateInfo, config) {
   if (!config.quoteEnable) return config.title;
 
-  const cacheKey = ['wnCalendar.quote', dateInfo.dateKey, config.quoteCategories, config.quoteMaxLength, config.quoteShowSource ? 'source' : 'plain'].join('.');
+  const cacheKey = ['wnCalendar.quote', dateInfo.dateKey, config.quoteCategories, config.quoteMaxLength, config.quoteShowSource ? 'source' : 'plain', 'v2'].join('.');
   const cached = storageGet(ctx, cacheKey);
   if (cached) return cached;
 
@@ -259,7 +294,14 @@ async function getDailyQuoteTitle(ctx, dateInfo, config) {
     console.log(`每日一句获取失败：${e && e.message ? e.message : String(e)}`);
   }
 
-  return config.quoteFallback || config.title;
+  const fallback = config.quoteFallback && config.quoteFallback !== config.title ? config.quoteFallback : getLocalDailyQuote(dateInfo);
+  storageSet(ctx, cacheKey, fallback);
+  return fallback || config.title;
+}
+
+function getLocalDailyQuote(dateInfo) {
+  const idx = Number(dateInfo.dateKey) % LOCAL_QUOTES.length;
+  return LOCAL_QUOTES[idx] || '春风有信，花开有期';
 }
 
 async function fetchHitokotoQuote(ctx, config) {
