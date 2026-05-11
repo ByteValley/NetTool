@@ -4,6 +4,7 @@
  * 功能：
  * - 支持 Egern Schedule 定时通知
  * - 支持 Egern Generic Widget 小组件
+ * - 小组件顶部支持每日一句，默认接口为一言 Hitokoto
  * - 显示今日黄历、干支、宜忌
  * - 最后空一行，分四行显示倒计时：传统节假日、二十四节气、民俗节日、国际节日
  *
@@ -12,12 +13,13 @@
  */
 
 const DEFAULT_TITLE = '📅 今日黄历';
+const HITOKOTO_API = 'https://v1.hitokoto.cn/';
 const API_BASE = 'https://raw.githubusercontent.com/zqzess/openApiData/main/calendar/';
 const PROXY_BASE = 'https://mirror.ghproxy.com/';
-
 const DEFAULT_MAX_COUNTDOWN_PER_LINE = 4;
 const DEFAULT_COUNTDOWN_MONTHS = 18;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const DEFAULT_QUOTE_TIMEOUT_MS = 5000;
 const BLANK_LINE = '　';
 const DAY_MS = 86400000;
 
@@ -44,7 +46,8 @@ export default async function(ctx) {
     const countdowns = cached || await buildCountdowns(ctx, todayDate, config);
     if (!cached) setCachedCountdowns(ctx, todayInfo, config, countdowns);
 
-    const payload = buildPayload(todayAlmanac, todayInfo, countdowns, config);
+    const quoteTitle = ctx.widgetFamily ? await getDailyQuoteTitle(ctx, todayInfo, config) : config.title;
+    const payload = buildPayload(todayAlmanac, todayInfo, countdowns, config, quoteTitle);
 
     if (ctx.widgetFamily) return buildWidget(ctx, payload, config);
 
@@ -71,6 +74,12 @@ function getConfig(ctx) {
     countdownMonths: readInt(env.COUNTDOWN_MONTHS, DEFAULT_COUNTDOWN_MONTHS, 3, 36),
     requestTimeoutMs: readInt(env.REQUEST_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS, 3000, 60000),
     enableCache: readBool(env.ENABLE_CACHE, true),
+    quoteEnable: readBool(env.QUOTE_ENABLE, true),
+    quoteShowSource: readBool(env.QUOTE_SHOW_SOURCE, false),
+    quoteCategories: clean(env.QUOTE_CATEGORIES) || 'd,i,k',
+    quoteMaxLength: readInt(env.QUOTE_MAX_LENGTH, 18, 6, 60),
+    quoteTimeoutMs: readInt(env.QUOTE_TIMEOUT_MS, DEFAULT_QUOTE_TIMEOUT_MS, 2000, 30000),
+    quoteFallback: clean(env.QUOTE_FALLBACK) || clean(env.TITLE || env.title) || DEFAULT_TITLE,
     lightBackground: clean(env.LIGHT_BACKGROUND) || '#FFFFFF',
     darkBackground: clean(env.DARK_BACKGROUND) || '#475569',
     lightTitleColor: clean(env.LIGHT_TITLE_COLOR) || '#111827',
@@ -100,10 +109,10 @@ function readBool(value, fallback) {
 
 function getTargetDate(ctx) {
   const env = ctx && ctx.env ? ctx.env : {};
-  const input = clean(env.DATE || env.date);
-  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(input)) {
-    const [year, month, day] = input.split(/[-/]/).map(Number);
-    return new Date(year, month - 1, day);
+  const input = clean(env.DATE || env.date).replaceAll('-', '/');
+  const parts = input.split('/').map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite) && parts[0] > 1900) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
   }
   return new Date();
 }
@@ -203,14 +212,24 @@ function sameNum(a, b) {
   return Number(a) === Number(b);
 }
 
+function storageGet(ctx, key) {
+  if (!ctx.storage || !ctx.storage.get) return null;
+  try { return ctx.storage.get(key); } catch { return null; }
+}
+
+function storageSet(ctx, key, value) {
+  if (!ctx.storage || !ctx.storage.set) return;
+  try { ctx.storage.set(key, value); } catch {}
+}
+
 function getCountdownCacheKey(dateInfo, config) {
   return ['wnCalendar.countdowns', dateInfo.dateKey, config.countdownMonths, config.maxCountdownPerLine].join('.');
 }
 
 function getCachedCountdowns(ctx, dateInfo, config) {
-  if (!config.enableCache || !ctx.storage || !ctx.storage.get) return null;
+  if (!config.enableCache) return null;
   try {
-    const raw = ctx.storage.get(getCountdownCacheKey(dateInfo, config));
+    const raw = storageGet(ctx, getCountdownCacheKey(dateInfo, config));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && Array.isArray(parsed.traditional) && Array.isArray(parsed.solarTerm) && Array.isArray(parsed.folk) && Array.isArray(parsed.international)) return parsed;
@@ -219,13 +238,55 @@ function getCachedCountdowns(ctx, dateInfo, config) {
 }
 
 function setCachedCountdowns(ctx, dateInfo, config, countdowns) {
-  if (!config.enableCache || !ctx.storage || !ctx.storage.set) return;
-  try {
-    ctx.storage.set(getCountdownCacheKey(dateInfo, config), JSON.stringify(countdowns));
-  } catch {}
+  if (!config.enableCache) return;
+  storageSet(ctx, getCountdownCacheKey(dateInfo, config), JSON.stringify(countdowns));
 }
 
-function buildPayload(item, dateInfo, countdowns, config) {
+async function getDailyQuoteTitle(ctx, dateInfo, config) {
+  if (!config.quoteEnable) return config.title;
+
+  const cacheKey = ['wnCalendar.quote', dateInfo.dateKey, config.quoteCategories, config.quoteMaxLength, config.quoteShowSource ? 'source' : 'plain'].join('.');
+  const cached = storageGet(ctx, cacheKey);
+  if (cached) return cached;
+
+  try {
+    const quote = await fetchHitokotoQuote(ctx, config);
+    if (quote) {
+      storageSet(ctx, cacheKey, quote);
+      return quote;
+    }
+  } catch (e) {
+    console.log(`每日一句获取失败：${e && e.message ? e.message : String(e)}`);
+  }
+
+  return config.quoteFallback || config.title;
+}
+
+async function fetchHitokotoQuote(ctx, config) {
+  const categories = clean(config.quoteCategories).split(',').map(item => clean(item)).filter(Boolean);
+  const categoryQuery = (categories.length ? categories : ['d', 'i', 'k']).map(item => `c=${encodeURIComponent(item)}`).join('&');
+  const url = `${HITOKOTO_API}?${categoryQuery}&max_length=${config.quoteMaxLength}&encode=json`;
+  const resp = await ctx.http.get(url, {
+    timeout: config.quoteTimeoutMs,
+    headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 Egern wnCalendar' }
+  });
+  const status = resp && (resp.status || resp.statusCode);
+  if (!resp || status < 200 || status >= 300) throw new Error(`HTTP ${status || '无响应'}`);
+
+  const text = await readResponseText(resp);
+  const json = JSON.parse(text);
+  let quote = clean(json.hitokoto);
+  if (!quote) return '';
+
+  if (config.quoteShowSource) {
+    const source = clean(json.from_who) || clean(json.from);
+    if (source) quote = `${quote}｜${source}`;
+  }
+
+  return quote;
+}
+
+function buildPayload(item, dateInfo, countdowns, config, quoteTitle) {
   const lunarDate = `${clean(item.lMonth)}月${clean(item.lDate)}`;
   const subtitle = `${dateInfo.dateText} ${lunarDate}`;
   const gzText = [item.gzYear ? `${item.gzYear}年` : '', item.gzMonth ? `${item.gzMonth}月` : '', item.gzDate ? `${item.gzDate}日` : ''].filter(Boolean).join(' ');
@@ -248,11 +309,11 @@ function buildPayload(item, dateInfo, countdowns, config) {
     ...countdowns.international.slice(0, 1)
   ]);
 
-  return { title: config.title, subtitle, content, inline };
+  return { title: config.title, widgetTitle: quoteTitle || config.title, subtitle, content, inline };
 }
 
 function clean(value) {
-  return String(value || '').replace(/\s+/g, ' ').trim();
+  return String(value || '').replaceAll('\n', ' ').replaceAll('\r', ' ').replaceAll('\t', ' ').trim();
 }
 
 function unique(list) {
@@ -390,7 +451,10 @@ function addLunarFestivals(traditional, folk, item) {
 }
 
 function normalizeLunarMonth(value) {
-  return clean(value).replace(/^闰/, '').replace(/月$/, '');
+  let month = clean(value);
+  if (month.startsWith('闰')) month = month.slice(1);
+  if (month.endsWith('月')) month = month.slice(0, -1);
+  return month;
 }
 
 function isDarkMode(ctx) {
@@ -421,11 +485,11 @@ function buildWidget(ctx, payload, config) {
   const palette = getPalette(ctx, config);
 
   if (family === 'accessoryInline') {
-    return { type: 'widget', children: [{ type: 'text', text: `${payload.title} ${payload.inline}`, font: { size: 'caption1', weight: 'semibold' }, textColor: palette.titleColor, maxLines: 1, minScale: 0.7 }] };
+    return { type: 'widget', children: [{ type: 'text', text: `${payload.widgetTitle} ${payload.inline}`, font: { size: 'caption1', weight: 'semibold' }, textColor: palette.titleColor, maxLines: 1, minScale: 0.7 }] };
   }
 
   if (family === 'accessoryCircular') {
-    return { type: 'widget', padding: 4, children: [{ type: 'text', text: payload.inline.split('｜')[0] || payload.title, font: { size: 'caption2', weight: 'bold' }, textColor: palette.titleColor, textAlign: 'center', maxLines: 2, minScale: 0.55 }] };
+    return { type: 'widget', padding: 4, children: [{ type: 'text', text: payload.inline.split('｜')[0] || payload.widgetTitle, font: { size: 'caption2', weight: 'bold' }, textColor: palette.titleColor, textAlign: 'center', maxLines: 2, minScale: 0.55 }] };
   }
 
   if (family === 'accessoryRectangular') {
@@ -434,7 +498,7 @@ function buildWidget(ctx, payload, config) {
       padding: 8,
       gap: 3,
       children: [
-        { type: 'text', text: payload.title, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor, maxLines: 1 },
+        { type: 'text', text: payload.widgetTitle, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor, maxLines: 1, minScale: 0.72 },
         { type: 'text', text: payload.subtitle, font: { size: 'caption1', weight: 'medium' }, textColor: palette.subtitleColor, maxLines: 1 },
         { type: 'text', text: payload.inline, font: { size: 'caption2' }, textColor: palette.bodyColor, maxLines: 2, minScale: 0.7 }
       ]
@@ -455,7 +519,7 @@ function buildWidget(ctx, payload, config) {
     gap: 6,
     backgroundColor: palette.background,
     children: [
-      { type: 'text', text: payload.title, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor, maxLines: 1 },
+      { type: 'text', text: payload.widgetTitle, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor, maxLines: 1, minScale: 0.72 },
       { type: 'text', text: payload.subtitle, font: { size: 'caption1', weight: 'medium' }, textColor: palette.subtitleColor, maxLines: 1 },
       { type: 'text', text: body, font: { size: isSmall ? 11 : 13, weight: 'regular' }, textColor: palette.bodyColor, maxLines: isSmall ? 7 : 12, minScale: 0.62 }
     ]
