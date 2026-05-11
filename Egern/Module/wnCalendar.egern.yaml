@@ -1,0 +1,95 @@
+name: "今日黄历"
+description: "显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。"
+author: "zqzess / ByteEden"
+icon: "calendar"
+
+env_schema:
+  TITLE:
+    name: "标题"
+    description: "通知和小组件显示标题"
+    default_value: "📅 今日黄历"
+
+  ICON_STYLE:
+    name: "宜忌图标风格"
+    description: "circle = ⭕️宜/❌忌；check = ✅宜/❎忌；mixed = ✅宜/❌忌"
+    default_value: "circle"
+    options:
+      - "circle"
+      - "check"
+      - "mixed"
+
+  ICON_SUIT:
+    name: "自定义宜图标"
+    description: "留空则跟随 ICON_STYLE，例如 ⭕️ 或 ✅"
+    default_value: ""
+
+  ICON_AVOID:
+    name: "自定义忌图标"
+    description: "留空则跟随 ICON_STYLE，例如 ❌ 或 ❎"
+    default_value: ""
+
+  MAX_COUNTDOWN_PER_LINE:
+    name: "每行倒计时数量"
+    description: "每一类最多显示几个倒计时，默认 4"
+    default_value: "4"
+
+  COUNTDOWN_MONTHS:
+    name: "向后扫描月份"
+    description: "用于查找未来节日，默认 18 个月"
+    default_value: "18"
+
+  ENABLE_CACHE:
+    name: "启用当天缓存"
+    description: "减少小组件重复刷新时的网络请求"
+    default_value: "true"
+    options:
+      - "true"
+      - "false"
+
+  BACKGROUND_START:
+    name: "小组件渐变起始色"
+    description: "十六进制颜色，例如 #5B5FEF"
+    default_value: "#5B5FEF"
+
+  BACKGROUND_END:
+    name: "小组件渐变结束色"
+    description: "十六进制颜色，例如 #7C3AED"
+    default_value: "#7C3AED"
+
+  DATE:
+    name: "测试日期"
+    description: "正常使用请留空；测试可填 2026-05-11"
+    default_value: ""
+
+scriptings:
+  - schedule:
+      name: "今日黄历"
+      cron: "0 7,10 * * *"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js"
+      update_interval: 86400
+      timeout: 120
+      env:
+        ICON_STYLE: "circle"
+        MAX_COUNTDOWN_PER_LINE: "4"
+        COUNTDOWN_MONTHS: "18"
+        ENABLE_CACHE: "true"
+
+  - generic:
+      name: "今日黄历小组件"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js"
+      update_interval: 86400
+      timeout: 120
+      env:
+        ICON_STYLE: "circle"
+        MAX_COUNTDOWN_PER_LINE: "4"
+        COUNTDOWN_MONTHS: "18"
+        ENABLE_CACHE: "true"
+
+widgets:
+  - name: "今日黄历"
+    script_name: "今日黄历小组件"
+    env:
+      ICON_STYLE: "circle"
+      MAX_COUNTDOWN_PER_LINE: "4"
+      COUNTDOWN_MONTHS: "18"
+      ENABLE_CACHE: "true"
