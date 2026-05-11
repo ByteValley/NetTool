@@ -8,148 +8,103 @@
  * - 最后空一行，分四行显示倒计时：传统节假日、二十四节气、民俗节日、国际节日
  *
  * 默认图标：⭕️宜 / ❌忌
- *
- * Env 参数：
- * - TITLE: 标题，默认 📅 今日黄历
- * - ICON_STYLE: circle / check / mixed
- * - ICON_SUIT: 自定义宜图标
- * - ICON_AVOID: 自定义忌图标
- * - MAX_COUNTDOWN_PER_LINE: 每行倒计时数量，默认 4
- * - COUNTDOWN_MONTHS: 向后扫描月份，默认 18
- * - ENABLE_CACHE: 是否启用当天缓存，默认 true
- * - DATE: 测试日期，例如 2026-05-11
+ * 默认卡片：浅色模式白底，深色模式蓝灰底
  */
 
 const DEFAULT_TITLE = '📅 今日黄历';
-
 const API_BASE = 'https://raw.githubusercontent.com/zqzess/openApiData/main/calendar/';
 const PROXY_BASE = 'https://mirror.ghproxy.com/';
 
 const DEFAULT_MAX_COUNTDOWN_PER_LINE = 4;
 const DEFAULT_COUNTDOWN_MONTHS = 18;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const BLANK_LINE = '　';
+const DAY_MS = 86400000;
 
 const ICON_PRESETS = {
-  circle: {
-    suit: '⭕️',
-    avoid: '❌'
-  },
-  check: {
-    suit: '✅',
-    avoid: '❎'
-  },
-  mixed: {
-    suit: '✅',
-    avoid: '❌'
-  }
+  circle: { suit: '⭕️', avoid: '❌' },
+  check: { suit: '✅', avoid: '❎' },
+  mixed: { suit: '✅', avoid: '❌' }
 };
 
-const DEFAULT_ICON_STYLE = 'circle';
 const MONTH_MEMORY_CACHE = new Map();
 
 export default async function(ctx) {
   const config = getConfig(ctx);
 
   try {
-    const targetDate = getTargetDate(ctx);
-    const dateInfo = getDateInfo(targetDate);
+    const todayDate = getTargetDate(ctx);
+    const todayInfo = getDateInfo(todayDate);
+    const monthData = await fetchCalendarData(ctx, todayInfo, config);
+    const todayAlmanac = findDateItem(monthData, todayInfo);
 
-    const currentMonthData = await fetchCalendarData(ctx, dateInfo, config);
-    const today = findToday(currentMonthData, dateInfo);
+    if (!todayAlmanac) throw new Error(`未找到 ${todayInfo.dateText} 的黄历数据`);
 
-    if (!today) {
-      throw new Error(`未找到 ${dateInfo.dateText} 的黄历数据`);
-    }
+    const cached = getCachedCountdowns(ctx, todayInfo, config);
+    const countdowns = cached || await buildCountdowns(ctx, todayDate, config);
+    if (!cached) setCachedCountdowns(ctx, todayInfo, config, countdowns);
 
-    const cached = getCachedCountdowns(ctx, dateInfo, config);
-    const countdowns = cached || await buildCountdowns(ctx, targetDate, config);
+    const payload = buildPayload(todayAlmanac, todayInfo, countdowns, config);
 
-    if (!cached) {
-      setCachedCountdowns(ctx, dateInfo, config, countdowns);
-    }
+    if (ctx.widgetFamily) return buildWidget(ctx, payload, config);
 
-    const payload = buildPayload(today, dateInfo, countdowns, config);
-
-    if (ctx.widgetFamily) {
-      return buildWidget(ctx, payload, config);
-    }
-
-    ctx.notify({
-      title: payload.title,
-      subtitle: payload.subtitle,
-      body: payload.content,
-      sound: true
-    });
-
+    ctx.notify({ title: payload.title, subtitle: payload.subtitle, body: payload.content, sound: true });
     console.log(`\n${payload.subtitle}\n${payload.content}`);
   } catch (e) {
     const message = `错误：${e && e.message ? e.message : String(e)}`;
-
-    if (ctx.widgetFamily) {
-      return buildErrorWidget(message, config);
-    }
-
-    ctx.notify({
-      title: config.title,
-      body: message,
-      sound: true
-    });
-
+    if (ctx.widgetFamily) return buildErrorWidget(ctx, message, config);
+    ctx.notify({ title: config.title, body: message, sound: true });
     console.log(message);
   }
 }
 
-/* 配置读取 */
-
 function getConfig(ctx) {
   const env = ctx && ctx.env ? ctx.env : {};
-  const iconStyle = clean(env.ICON_STYLE || env.iconStyle || DEFAULT_ICON_STYLE);
-  const iconPreset = ICON_PRESETS[iconStyle] || ICON_PRESETS[DEFAULT_ICON_STYLE];
+  const iconStyle = clean(env.ICON_STYLE || env.iconStyle || 'circle');
+  const preset = ICON_PRESETS[iconStyle] || ICON_PRESETS.circle;
 
   return {
     title: clean(env.TITLE || env.title) || DEFAULT_TITLE,
-    iconStyle,
-    iconSuit: clean(env.ICON_SUIT || env.suitIcon) || iconPreset.suit,
-    iconAvoid: clean(env.ICON_AVOID || env.avoidIcon) || iconPreset.avoid,
+    iconSuit: clean(env.ICON_SUIT || env.suitIcon) || preset.suit,
+    iconAvoid: clean(env.ICON_AVOID || env.avoidIcon) || preset.avoid,
     maxCountdownPerLine: readInt(env.MAX_COUNTDOWN_PER_LINE, DEFAULT_MAX_COUNTDOWN_PER_LINE, 1, 12),
     countdownMonths: readInt(env.COUNTDOWN_MONTHS, DEFAULT_COUNTDOWN_MONTHS, 3, 36),
     requestTimeoutMs: readInt(env.REQUEST_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS, 3000, 60000),
     enableCache: readBool(env.ENABLE_CACHE, true),
-    backgroundStart: clean(env.BACKGROUND_START) || '#5B5FEF',
-    backgroundEnd: clean(env.BACKGROUND_END) || '#7C3AED'
+    lightBackground: clean(env.LIGHT_BACKGROUND) || '#FFFFFF',
+    darkBackground: clean(env.DARK_BACKGROUND) || '#475569',
+    lightTitleColor: clean(env.LIGHT_TITLE_COLOR) || '#111827',
+    darkTitleColor: clean(env.DARK_TITLE_COLOR) || '#FFFFFF',
+    lightSubtitleColor: clean(env.LIGHT_SUBTITLE_COLOR) || '#6B7280',
+    darkSubtitleColor: clean(env.DARK_SUBTITLE_COLOR) || '#E5E7EB',
+    lightBodyColor: clean(env.LIGHT_BODY_COLOR) || '#111827',
+    darkBodyColor: clean(env.DARK_BODY_COLOR) || '#F8FAFC',
+    lightErrorColor: clean(env.LIGHT_ERROR_COLOR) || '#DC2626',
+    darkErrorColor: clean(env.DARK_ERROR_COLOR) || '#FCA5A5'
   };
 }
 
 function readInt(value, fallback, min, max) {
   const num = Number(value);
-
   if (!Number.isFinite(num)) return fallback;
-
   return Math.min(Math.max(Math.floor(num), min), max);
 }
 
 function readBool(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;
-
   const text = String(value).trim().toLowerCase();
-
   if (['1', 'true', 'yes', 'on'].includes(text)) return true;
   if (['0', 'false', 'no', 'off'].includes(text)) return false;
-
   return fallback;
 }
-
-/* 日期处理 */
 
 function getTargetDate(ctx) {
   const env = ctx && ctx.env ? ctx.env : {};
   const input = clean(env.DATE || env.date);
-
   if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(input)) {
     const [year, month, day] = input.split(/[-/]/).map(Number);
     return new Date(year, month - 1, day);
   }
-
   return new Date();
 }
 
@@ -157,7 +112,6 @@ function getDateInfo(date) {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const day = date.getDate();
-
   return {
     year,
     month,
@@ -183,24 +137,15 @@ function addMonths(date, offset) {
 }
 
 function diffDays(fromDate, toDate) {
-  const from = startOfDay(fromDate).getTime();
-  const to = startOfDay(toDate).getTime();
-
-  return Math.round((to - from) / 86400000);
+  return Math.round((startOfDay(toDate).getTime() - startOfDay(fromDate).getTime()) / DAY_MS);
 }
-
-/* 数据请求 */
 
 async function fetchCalendarData(ctx, dateInfo, config) {
   const cacheKey = dateInfo.filePath;
-
-  if (MONTH_MEMORY_CACHE.has(cacheKey)) {
-    return MONTH_MEMORY_CACHE.get(cacheKey);
-  }
+  if (MONTH_MEMORY_CACHE.has(cacheKey)) return MONTH_MEMORY_CACHE.get(cacheKey);
 
   const filePath = dateInfo.filePath;
   const encodedPath = encodeURIComponent(filePath);
-
   const urls = [
     `${API_BASE}${filePath}`,
     `${API_BASE}${encodedPath}`,
@@ -214,26 +159,17 @@ async function fetchCalendarData(ctx, dateInfo, config) {
     try {
       const resp = await ctx.http.get(url, {
         timeout: config.requestTimeoutMs,
-        headers: {
-          Accept: '*/*',
-          'User-Agent': 'Mozilla/5.0 Egern wnCalendar'
-        }
+        headers: { Accept: '*/*', 'User-Agent': 'Mozilla/5.0 Egern wnCalendar' }
       });
-
       const status = resp && (resp.status || resp.statusCode);
-
-      if (!resp || status < 200 || status >= 300) {
-        throw new Error(`HTTP ${status || '无响应'}`);
-      }
+      if (!resp || status < 200 || status >= 300) throw new Error(`HTTP ${status || '无响应'}`);
 
       const text = await readResponseText(resp);
       const json = JSON.parse(text);
-
       if (json && Array.isArray(json.data)) {
         MONTH_MEMORY_CACHE.set(cacheKey, json);
         return json;
       }
-
       throw new Error('数据结构异常');
     } catch (e) {
       lastError = e;
@@ -244,108 +180,61 @@ async function fetchCalendarData(ctx, dateInfo, config) {
 }
 
 async function readResponseText(resp) {
-  if (typeof resp.text === 'function') {
-    return await resp.text();
-  }
-
-  if (typeof resp.body === 'string') {
-    return resp.body;
-  }
-
-  if (resp.body !== undefined && resp.body !== null) {
-    return String(resp.body);
-  }
-
-  if (typeof resp.json === 'function') {
-    return JSON.stringify(await resp.json());
-  }
-
+  if (typeof resp.text === 'function') return await resp.text();
+  if (typeof resp.body === 'string') return resp.body;
+  if (resp.body !== undefined && resp.body !== null) return String(resp.body);
+  if (typeof resp.json === 'function') return JSON.stringify(await resp.json());
   return '';
 }
 
 function flattenAlmanac(json) {
   const list = [];
-
   for (const block of json.data || []) {
-    if (Array.isArray(block.almanac)) {
-      list.push(...block.almanac);
-    }
+    if (Array.isArray(block.almanac)) list.push(...block.almanac);
   }
-
   return list;
 }
 
-function findToday(json, dateInfo) {
-  return flattenAlmanac(json).find(item => {
-    return sameNum(item.year, dateInfo.year)
-      && sameNum(item.month, dateInfo.month)
-      && sameNum(item.day, dateInfo.day);
-  });
+function findDateItem(json, dateInfo) {
+  return flattenAlmanac(json).find(item => sameNum(item.year, dateInfo.year) && sameNum(item.month, dateInfo.month) && sameNum(item.day, dateInfo.day));
 }
 
 function sameNum(a, b) {
   return Number(a) === Number(b);
 }
 
-/* 缓存 */
-
 function getCountdownCacheKey(dateInfo, config) {
-  return [
-    'wnCalendar.countdowns',
-    dateInfo.dateKey,
-    config.countdownMonths,
-    config.maxCountdownPerLine
-  ].join('.');
+  return ['wnCalendar.countdowns', dateInfo.dateKey, config.countdownMonths, config.maxCountdownPerLine].join('.');
 }
 
 function getCachedCountdowns(ctx, dateInfo, config) {
   if (!config.enableCache || !ctx.storage || !ctx.storage.get) return null;
-
   try {
     const raw = ctx.storage.get(getCountdownCacheKey(dateInfo, config));
     if (!raw) return null;
-
     const parsed = JSON.parse(raw);
-
-    if (
-      parsed
-      && Array.isArray(parsed.traditional)
-      && Array.isArray(parsed.solarTerm)
-      && Array.isArray(parsed.folk)
-      && Array.isArray(parsed.international)
-    ) {
-      return parsed;
-    }
+    if (parsed && Array.isArray(parsed.traditional) && Array.isArray(parsed.solarTerm) && Array.isArray(parsed.folk) && Array.isArray(parsed.international)) return parsed;
   } catch {}
-
   return null;
 }
 
 function setCachedCountdowns(ctx, dateInfo, config, countdowns) {
   if (!config.enableCache || !ctx.storage || !ctx.storage.set) return;
-
   try {
     ctx.storage.set(getCountdownCacheKey(dateInfo, config), JSON.stringify(countdowns));
   } catch {}
 }
 
-/* 内容生成 */
-
 function buildPayload(item, dateInfo, countdowns, config) {
   const lunarDate = `${clean(item.lMonth)}月${clean(item.lDate)}`;
   const subtitle = `${dateInfo.dateText} ${lunarDate}`;
-
-  const gzText = [
-    item.gzYear ? `${item.gzYear}年` : '',
-    item.gzMonth ? `${item.gzMonth}月` : '',
-    item.gzDate ? `${item.gzDate}日` : ''
-  ].filter(Boolean).join(' ');
+  const gzText = [item.gzYear ? `${item.gzYear}年` : '', item.gzMonth ? `${item.gzMonth}月` : '', item.gzDate ? `${item.gzDate}日` : ''].filter(Boolean).join(' ');
 
   const content = [
     `干支纪法：${gzText || '无'}`,
     `${config.iconAvoid}忌：${clean(item.avoid) || '无'}`,
     `${config.iconSuit}宜：${clean(item.suit) || '无'}`,
-    '',
+    BLANK_LINE,
     `传统节假日：${formatCountdownLine(countdowns.traditional)}`,
     `二十四节气：${formatCountdownLine(countdowns.solarTerm)}`,
     `民俗节日：${formatCountdownLine(countdowns.folk)}`,
@@ -359,12 +248,7 @@ function buildPayload(item, dateInfo, countdowns, config) {
     ...countdowns.international.slice(0, 1)
   ]);
 
-  return {
-    title: config.title,
-    subtitle,
-    content,
-    inline
-  };
+  return { title: config.title, subtitle, content, inline };
 }
 
 function clean(value) {
@@ -375,15 +259,12 @@ function unique(list) {
   return [...new Set(list.filter(Boolean))];
 }
 
-/* 倒计时核心 */
-
 async function buildCountdowns(ctx, todayDate, config) {
   const allItems = [];
 
   for (let i = 0; i < config.countdownMonths; i++) {
     const monthDate = addMonths(todayDate, i);
     const monthInfo = getDateInfo(monthDate);
-
     try {
       const json = await fetchCalendarData(ctx, monthInfo, config);
       allItems.push(...flattenAlmanac(json));
@@ -392,17 +273,11 @@ async function buildCountdowns(ctx, todayDate, config) {
     }
   }
 
-  const result = {
-    traditional: [],
-    solarTerm: [],
-    folk: [],
-    international: []
-  };
+  const result = { traditional: [], solarTerm: [], folk: [], international: [] };
 
   for (const item of allItems) {
     const itemDate = new Date(Number(item.year), Number(item.month) - 1, Number(item.day));
     const days = diffDays(todayDate, itemDate);
-
     if (days < 0) continue;
 
     const dateText = `${itemDate.getFullYear()}/${itemDate.getMonth() + 1}/${itemDate.getDate()}`;
@@ -414,142 +289,57 @@ async function buildCountdowns(ctx, todayDate, config) {
     addCountdownItems(result.international, classified.international, dateText, days);
   }
 
-  result.traditional = normalizeCountdowns(result.traditional, config.maxCountdownPerLine);
-  result.solarTerm = normalizeCountdowns(result.solarTerm, config.maxCountdownPerLine);
-  result.folk = normalizeCountdowns(result.folk, config.maxCountdownPerLine);
-  result.international = normalizeCountdowns(result.international, config.maxCountdownPerLine);
+  for (const key of Object.keys(result)) {
+    result[key] = normalizeCountdowns(result[key], config.maxCountdownPerLine);
+  }
 
   return result;
 }
 
 function addCountdownItems(target, names, dateText, days) {
-  for (const name of names) {
-    target.push({
-      name,
-      dateText,
-      days
-    });
-  }
+  for (const name of names) target.push({ name, dateText, days });
 }
 
 function normalizeCountdowns(list, maxCount) {
   const map = new Map();
-
   for (const item of list) {
     if (!item.name) continue;
-
     const old = map.get(item.name);
-
-    if (!old || item.days < old.days) {
-      map.set(item.name, item);
-    }
+    if (!old || item.days < old.days) map.set(item.name, item);
   }
-
-  return [...map.values()]
-    .sort((a, b) => a.days - b.days)
-    .slice(0, maxCount);
+  return [...map.values()].sort((a, b) => a.days - b.days).slice(0, maxCount);
 }
 
 function formatCountdownLine(list) {
   if (!list || !list.length) return '无';
-
-  return list.map(item => {
-    if (item.days === 0) return `${item.name}今天`;
-    return `${item.name}${item.days}天`;
-  }).join('｜');
+  return list.map(item => item.days === 0 ? `${item.name}今天` : `${item.name}${item.days}天`).join('｜');
 }
 
-/* 节日分类 */
-
 function classifyFestivalItem(item, dateObj) {
-  const text = [
-    item.desc,
-    item.term,
-    item.value,
-    item.festival,
-    item.lFestival,
-    item.sFestival,
-    item.holiday
-  ].map(clean).filter(Boolean).join(' ');
-
+  const text = [item.desc, item.term, item.value, item.festival, item.lFestival, item.sFestival, item.holiday].map(clean).filter(Boolean).join(' ');
   const traditional = [];
   const solarTerm = [];
   const folk = [];
   const international = [];
 
-  addMatches(traditional, text, [
-    '元旦',
-    '春节',
-    '除夕',
-    '清明节',
-    '劳动节',
-    '端午节',
-    '中秋节',
-    '国庆节'
-  ]);
-
-  addMatches(folk, text, [
-    '元宵节',
-    '龙抬头',
-    '社日节',
-    '寒食节',
-    '上巳节',
-    '七夕节',
-    '中元节',
-    '重阳节',
-    '下元节',
-    '腊八节',
-    '小年',
-    '冬至'
-  ]);
-
-  addMatches(international, text, [
-    '情人节',
-    '妇女节',
-    '愚人节',
-    '世界地球日',
-    '母亲节',
-    '护士节',
-    '儿童节',
-    '父亲节',
-    '教师节',
-    '万圣夜',
-    '万圣节',
-    '感恩节',
-    '平安夜',
-    '圣诞节'
-  ]);
+  addMatches(traditional, text, ['元旦', '春节', '除夕', '清明节', '劳动节', '端午节', '中秋节', '国庆节']);
+  addMatches(folk, text, ['元宵节', '龙抬头', '社日节', '寒食节', '上巳节', '七夕节', '中元节', '重阳节', '下元节', '腊八节', '小年', '冬至']);
+  addMatches(international, text, ['情人节', '妇女节', '愚人节', '世界地球日', '母亲节', '护士节', '儿童节', '父亲节', '教师节', '万圣夜', '万圣节', '感恩节', '平安夜', '圣诞节']);
 
   const term = clean(item.term);
-
-  if (term) {
-    solarTerm.push(term);
-  }
-
-  if (term === '清明') {
-    traditional.push('清明节');
-  }
-
-  if (term === '冬至') {
-    folk.push('冬至');
-  }
+  if (term) solarTerm.push(term);
+  if (term === '清明') traditional.push('清明节');
+  if (term === '冬至') folk.push('冬至');
 
   addGregorianFestivals(traditional, international, dateObj);
   addLunarFestivals(traditional, folk, item);
 
-  return {
-    traditional: unique(traditional),
-    solarTerm: unique(solarTerm),
-    folk: unique(folk),
-    international: unique(international)
-  };
+  return { traditional: unique(traditional), solarTerm: unique(solarTerm), folk: unique(folk), international: unique(international) };
 }
 
 function addMatches(target, text, names) {
   for (const name of names) {
-    if (text.includes(name)) {
-      target.push(name);
-    }
+    if (text.includes(name)) target.push(name);
   }
 }
 
@@ -600,46 +390,42 @@ function addLunarFestivals(traditional, folk, item) {
 }
 
 function normalizeLunarMonth(value) {
-  return clean(value)
-    .replace(/^闰/, '')
-    .replace(/月$/, '');
+  return clean(value).replace(/^闰/, '').replace(/月$/, '');
 }
 
-/* 小组件 */
+function isDarkMode(ctx) {
+  if (!ctx) return false;
+  if (typeof ctx.isDarkMode === 'boolean') return ctx.isDarkMode;
+  if (typeof ctx.darkMode === 'boolean') return ctx.darkMode;
+
+  const candidates = [ctx.colorScheme, ctx.appearance, ctx.theme, ctx.userInterfaceStyle, ctx.displayMode];
+  for (const item of candidates) {
+    if (typeof item === 'string' && item.toLowerCase().includes('dark')) return true;
+  }
+  return false;
+}
+
+function getPalette(ctx, config) {
+  const dark = isDarkMode(ctx);
+  return {
+    background: dark ? config.darkBackground : config.lightBackground,
+    titleColor: dark ? config.darkTitleColor : config.lightTitleColor,
+    subtitleColor: dark ? config.darkSubtitleColor : config.lightSubtitleColor,
+    bodyColor: dark ? config.darkBodyColor : config.lightBodyColor,
+    errorColor: dark ? config.darkErrorColor : config.lightErrorColor
+  };
+}
 
 function buildWidget(ctx, payload, config) {
   const family = ctx.widgetFamily;
+  const palette = getPalette(ctx, config);
 
   if (family === 'accessoryInline') {
-    return {
-      type: 'widget',
-      children: [
-        {
-          type: 'text',
-          text: `${payload.title} ${payload.inline}`,
-          font: { size: 'caption1', weight: 'semibold' },
-          maxLines: 1,
-          minScale: 0.7
-        }
-      ]
-    };
+    return { type: 'widget', children: [{ type: 'text', text: `${payload.title} ${payload.inline}`, font: { size: 'caption1', weight: 'semibold' }, textColor: palette.titleColor, maxLines: 1, minScale: 0.7 }] };
   }
 
   if (family === 'accessoryCircular') {
-    return {
-      type: 'widget',
-      padding: 4,
-      children: [
-        {
-          type: 'text',
-          text: payload.inline.split('｜')[0] || payload.title,
-          font: { size: 'caption2', weight: 'bold' },
-          textAlign: 'center',
-          maxLines: 2,
-          minScale: 0.55
-        }
-      ]
-    };
+    return { type: 'widget', padding: 4, children: [{ type: 'text', text: payload.inline.split('｜')[0] || payload.title, font: { size: 'caption2', weight: 'bold' }, textColor: palette.titleColor, textAlign: 'center', maxLines: 2, minScale: 0.55 }] };
   }
 
   if (family === 'accessoryRectangular') {
@@ -648,100 +434,44 @@ function buildWidget(ctx, payload, config) {
       padding: 8,
       gap: 3,
       children: [
-        {
-          type: 'text',
-          text: payload.title,
-          font: { size: 'headline', weight: 'bold' },
-          maxLines: 1
-        },
-        {
-          type: 'text',
-          text: payload.subtitle,
-          font: { size: 'caption1', weight: 'medium' },
-          maxLines: 1
-        },
-        {
-          type: 'text',
-          text: payload.inline,
-          font: { size: 'caption2' },
-          maxLines: 2,
-          minScale: 0.7
-        }
+        { type: 'text', text: payload.title, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor, maxLines: 1 },
+        { type: 'text', text: payload.subtitle, font: { size: 'caption1', weight: 'medium' }, textColor: palette.subtitleColor, maxLines: 1 },
+        { type: 'text', text: payload.inline, font: { size: 'caption2' }, textColor: palette.bodyColor, maxLines: 2, minScale: 0.7 }
       ]
     };
   }
 
   const isSmall = family === 'systemSmall';
   const isMedium = family === 'systemMedium';
-
+  const lines = payload.content.split('\n');
   let body = payload.content;
 
-  if (isSmall) {
-    body = payload.content.split('\n').filter(Boolean).slice(0, 6).join('\n');
-  }
-
-  if (isMedium) {
-    body = payload.content.split('\n').filter(Boolean).slice(0, 7).join('\n');
-  }
+  if (isSmall) body = lines.slice(0, 6).join('\n');
+  if (isMedium) body = lines.slice(0, 8).join('\n');
 
   return {
     type: 'widget',
     padding: 14,
     gap: 6,
-    backgroundGradient: {
-      type: 'linear',
-      colors: [config.backgroundStart, config.backgroundEnd],
-      startPoint: { x: 0, y: 0 },
-      endPoint: { x: 1, y: 1 }
-    },
+    backgroundColor: palette.background,
     children: [
-      {
-        type: 'text',
-        text: payload.title,
-        font: { size: 'headline', weight: 'bold' },
-        textColor: '#FFFFFF',
-        maxLines: 1
-      },
-      {
-        type: 'text',
-        text: payload.subtitle,
-        font: { size: 'caption1', weight: 'medium' },
-        textColor: '#FFFFFFDD',
-        maxLines: 1
-      },
-      {
-        type: 'text',
-        text: body,
-        font: { size: isSmall ? 11 : 13, weight: 'regular' },
-        textColor: '#FFFFFF',
-        maxLines: isSmall ? 7 : 12,
-        minScale: 0.62
-      }
+      { type: 'text', text: payload.title, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor, maxLines: 1 },
+      { type: 'text', text: payload.subtitle, font: { size: 'caption1', weight: 'medium' }, textColor: palette.subtitleColor, maxLines: 1 },
+      { type: 'text', text: body, font: { size: isSmall ? 11 : 13, weight: 'regular' }, textColor: palette.bodyColor, maxLines: isSmall ? 7 : 12, minScale: 0.62 }
     ]
   };
 }
 
-function buildErrorWidget(message, config) {
+function buildErrorWidget(ctx, message, config) {
+  const palette = getPalette(ctx, config);
   return {
     type: 'widget',
     padding: 14,
     gap: 6,
-    backgroundColor: '#1F2937',
+    backgroundColor: palette.background,
     children: [
-      {
-        type: 'text',
-        text: config.title || DEFAULT_TITLE,
-        font: { size: 'headline', weight: 'bold' },
-        textColor: '#FFFFFF'
-      },
-      {
-        type: 'text',
-        text: message,
-        font: { size: 'caption1' },
-        textColor: '#FFB4B4',
-        maxLines: 6,
-        minScale: 0.7
-      }
+      { type: 'text', text: config.title || DEFAULT_TITLE, font: { size: 'headline', weight: 'bold' }, textColor: palette.titleColor },
+      { type: 'text', text: message, font: { size: 'caption1' }, textColor: palette.errorColor, maxLines: 6, minScale: 0.7 }
     ]
   };
 }
