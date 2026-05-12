@@ -1,31 +1,138 @@
-name: 今日黄历
-description: 面板顶部可选展示「今日黄历详情」（干支纪法+宜忌），下方四行节日倒数：法定节假日 | 二十四节气 | 传统民俗 | 国际洋节；支持外链标题/祝词库；法定与民俗正日06:00后单次祝词提醒；脚本无参数调用时自动通过系统通知播报今日黄历详情。
-compat_arguments:
-  TITLES_URL: ''
-  BLESS_URL: ''
-  SHOW_ALMANAC: 'true'
-  GAP_LINES: '1'
-compat_arguments_desc: |-
-  参数：TITLES_URL 标题库外链(JSON数组, 支持 {lunar} {solar} {next})；BLESS_URL 祝词库外链(JSON对象, 键=节日名, 值=祝词)；SHOW_ALMANAC 是否在顶部附加今日黄历详情(true/false)；GAP_LINES 节日行与行之间的空行数(0=无空行,1=一行,2=两行…)
-  外链 JSON 示例：
-  TITLES_URL: ["摸鱼使我快乐～","{lunar}","{solar}","下一站：{next}"]
-  BLESS_URL: {"春节":"愿新岁顺遂无虞，家人皆安！","中秋节":"人月两团圆，心上皆明朗。","腊八节":"粥香暖岁末。"}
-  传参示例(argument): TITLES_URL=https://example.com/titles.json&BLESS_URL=https%3A%2F%2Fexample.com%2Fbless.json&SHOW_ALMANAC=true&GAP_LINES=1
-author: ByteValley
-dns: {}
+name: "今日黄历"
+description: "显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。小组件顶部支持每日一句；浅色白底，深色蓝灰底。"
+author: "zqzess / ByteEden"
+icon: "calendar"
+
+env_schema:
+  TITLE:
+    name: "通知标题"
+    description: "定时通知标题；小组件每日一句关闭或接口失败时也会回退到这里"
+    default_value: "📅 今日黄历"
+
+  QUOTE_ENABLE:
+    name: "启用每日一句"
+    description: "仅用于小组件顶部标题；定时通知仍使用通知标题"
+    default_value: "true"
+    options:
+      - "true"
+      - "false"
+
+  QUOTE_CATEGORIES:
+    name: "每日一句分类"
+    description: "一言分类，多个用英文逗号分隔；默认 d,i,k"
+    default_value: "d,i,k"
+
+  QUOTE_MAX_LENGTH:
+    name: "每日一句最大长度"
+    description: "默认 18，避免小组件顶部过长"
+    default_value: "18"
+
+  QUOTE_SHOW_SOURCE:
+    name: "显示每日一句出处"
+    description: "开启后标题显示为 句子｜出处，可能较长"
+    default_value: "false"
+    options:
+      - "true"
+      - "false"
+
+  QUOTE_FALLBACK:
+    name: "每日一句失败回退"
+    description: "留空时接口失败会自动使用内置每日一句"
+    default_value: ""
+
+  ICON_STYLE:
+    name: "宜忌图标风格"
+    description: "circle = ⭕️宜/❌忌；check = ✅宜/❎忌；mixed = ✅宜/❌忌"
+    default_value: "circle"
+    options:
+      - "circle"
+      - "check"
+      - "mixed"
+
+  ICON_SUIT:
+    name: "自定义宜图标"
+    description: "留空则跟随 ICON_STYLE，例如 ⭕️ 或 ✅"
+    default_value: ""
+
+  ICON_AVOID:
+    name: "自定义忌图标"
+    description: "留空则跟随 ICON_STYLE，例如 ❌ 或 ❎"
+    default_value: ""
+
+  MAX_COUNTDOWN_PER_LINE:
+    name: "每行倒计时数量"
+    description: "每一类最多显示几个倒计时，默认 4"
+    default_value: "4"
+
+  COUNTDOWN_MONTHS:
+    name: "向后扫描月份"
+    description: "用于查找未来节日，默认 18 个月"
+    default_value: "18"
+
+  ENABLE_CACHE:
+    name: "启用当天缓存"
+    description: "减少小组件重复刷新时的网络请求"
+    default_value: "true"
+    options:
+      - "true"
+      - "false"
+
+  LIGHT_BACKGROUND:
+    name: "浅色模式背景色"
+    description: "默认白色 #FFFFFF"
+    default_value: "#FFFFFF"
+
+  DARK_BACKGROUND:
+    name: "深色模式背景色"
+    description: "默认蓝灰色 #475569"
+    default_value: "#475569"
+
 scriptings:
-- generic:
-    name: 今日黄历·面板
-    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/today_almanac.js
-    arguments:
-      _compat.$argument: TITLES_URL=&BLESS_URL=&SHOW_ALMANAC=true&GAP_LINES=0
-    timeout: 60
-- schedule:
-    name: 今日黄历·播报
-    cron: 0 9 * * *
-    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Panel/today_almanac.js
-    timeout: 20
-panels:
-- name: 今日黄历
-  script_name: 今日黄历·面板
-  update_interval: 1800
+  - schedule:
+      name: "今日黄历"
+      cron: "0 9 * * *"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js?v=20260511-quote2"
+      update_interval: 86400
+      timeout: 120
+      env:
+        ICON_STYLE: "circle"
+        MAX_COUNTDOWN_PER_LINE: "4"
+        COUNTDOWN_MONTHS: "18"
+        ENABLE_CACHE: "true"
+        QUOTE_ENABLE: "false"
+        LIGHT_BACKGROUND: "#FFFFFF"
+        DARK_BACKGROUND: "#475569"
+
+  - generic:
+      name: "今日黄历小组件"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js?v=20260511-quote2"
+      update_interval: 86400
+      timeout: 120
+      env:
+        ICON_STYLE: "circle"
+        MAX_COUNTDOWN_PER_LINE: "4"
+        COUNTDOWN_MONTHS: "18"
+        ENABLE_CACHE: "true"
+        QUOTE_ENABLE: "true"
+        QUOTE_CATEGORIES: "d,i,k"
+        QUOTE_MAX_LENGTH: "18"
+        QUOTE_SHOW_SOURCE: "false"
+        QUOTE_FALLBACK: ""
+        LIGHT_BACKGROUND: "#FFFFFF"
+        DARK_BACKGROUND: "#475569"
+
+widgets:
+  - name: "今日黄历"
+    script_name: "今日黄历小组件"
+    env:
+      ICON_STYLE: "circle"
+      MAX_COUNTDOWN_PER_LINE: "4"
+      COUNTDOWN_MONTHS: "18"
+      ENABLE_CACHE: "true"
+      QUOTE_ENABLE: "true"
+      QUOTE_CATEGORIES: "d,i,k"
+      QUOTE_MAX_LENGTH: "18"
+      QUOTE_SHOW_SOURCE: "false"
+      QUOTE_FALLBACK: ""
+      LIGHT_BACKGROUND: "#FFFFFF"
+      DARK_BACKGROUND: "#475569"
