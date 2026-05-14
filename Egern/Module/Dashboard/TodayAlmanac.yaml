@@ -91,7 +91,7 @@ scriptings:
   - schedule:
       name: "今日黄历"
       cron: "0 9 * * *"
-      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js?v=20260511-quote2"
+      script_url: "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Script/wnCalendar.egern.js"
       update_interval: 86400
       timeout: 120
       env:
