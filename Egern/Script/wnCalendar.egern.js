@@ -30,6 +30,13 @@ const ICON_PRESETS = {
   mixed: { suit: '✅', avoid: '❌' }
 };
 
+const SOLAR_TERMS = [
+  '小寒', '大寒', '立春', '雨水', '惊蛰', '春分',
+  '清明', '谷雨', '立夏', '小满', '芒种', '夏至',
+  '小暑', '大暑', '立秋', '处暑', '白露', '秋分',
+  '寒露', '霜降', '立冬', '小雪', '大雪', '冬至'
+];
+
 const LOCAL_QUOTES = [
   '山高月小，水落石出',
   '心有山海，静而无边',
@@ -429,10 +436,11 @@ function classifyFestivalItem(item, dateObj) {
   addMatches(folk, text, ['元宵节', '龙抬头', '社日节', '寒食节', '上巳节', '七夕节', '中元节', '重阳节', '下元节', '腊八节', '小年', '冬至']);
   addMatches(international, text, ['情人节', '妇女节', '愚人节', '世界地球日', '母亲节', '护士节', '儿童节', '父亲节', '教师节', '万圣夜', '万圣节', '感恩节', '平安夜', '圣诞节']);
 
-  const term = clean(item.term);
-  if (term) solarTerm.push(term);
-  if (term === '清明') traditional.push('清明节');
-  if (term === '冬至') folk.push('冬至');
+  const matchedTerms = getMatches(clean(item.term), SOLAR_TERMS);
+  solarTerm.push(...matchedTerms);
+
+  if (matchedTerms.includes('清明')) traditional.push('清明节');
+  if (matchedTerms.includes('冬至')) folk.push('冬至');
 
   addGregorianFestivals(traditional, international, dateObj);
   addLunarFestivals(traditional, folk, item);
@@ -440,10 +448,16 @@ function classifyFestivalItem(item, dateObj) {
   return { traditional: unique(traditional), solarTerm: unique(solarTerm), folk: unique(folk), international: unique(international) };
 }
 
-function addMatches(target, text, names) {
+function getMatches(text, names) {
+  const result = [];
   for (const name of names) {
-    if (text.includes(name)) target.push(name);
+    if (text.includes(name)) result.push(name);
   }
+  return result;
+}
+
+function addMatches(target, text, names) {
+  target.push(...getMatches(text, names));
 }
 
 function addGregorianFestivals(traditional, international, dateObj) {
