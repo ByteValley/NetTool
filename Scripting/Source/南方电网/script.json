@@ -1,0 +1,42 @@
+{
+  "description": "南方电网用电小组件，支持 BoxJs 自动读取 x-auth-token 与手动填写 Token。",
+  "localizedNames": {
+    "en": "China Southern Power Grid",
+    "zh": "南方电网",
+    "de": "",
+    "it": "",
+    "fr": "",
+    "ru": "",
+    "ja": "",
+    "es": "",
+    "pt": ""
+  },
+  "runInApp": false,
+  "localizedDescriptions": {
+    "ja": "",
+    "ru": "",
+    "pt": "",
+    "es": "",
+    "de": "",
+    "en": "China Southern Power Grid electricity widget.",
+    "it": "",
+    "zh": "南方电网用电小组件，支持余额、本月用电、最近日用电与缓存。",
+    "fr": ""
+  },
+  "version": "1.0.0",
+  "remoteResource": {
+    "autoUpdateInterval": 600,
+    "hash": "e7510cb833cefd69778f379652300c0f",
+    "url": "https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripting/Release/南方电网.scripting"
+  },
+  "color": "rgba(54, 207, 201, 1)",
+  "intentInputTypes": [],
+  "author": {
+    "homepage": null,
+    "name": "ByteValley",
+    "email": null
+  },
+  "contributors": [],
+  "name": "南方电网",
+  "icon": "bolt.circle"
+}
