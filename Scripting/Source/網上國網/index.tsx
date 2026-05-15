@@ -51,6 +51,9 @@ const BOXJS_SUB_URL =
 const MODULE_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Component/WSGW.module"
 
+const EGERN_MODULE_URL =
+  "https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Module/Component/WSGW.module"
+
 const LOON_PLUGIN_URL =
   "https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/Component/WSGW.lpx"
 
@@ -71,7 +74,7 @@ async function installSurgeModule() {
 
 async function installEgernModule() {
   const name = encodeURIComponent("网上国网组件服务")
-  const egernUrl = `egern:/modules/new?name=${name}&url=${encodeURIComponent(MODULE_URL)}`
+  const egernUrl = `egern:/modules/new?name=${name}&url=${encodeURIComponent(EGERN_MODULE_URL)}`
   await Safari.openURL(egernUrl)
 }
 

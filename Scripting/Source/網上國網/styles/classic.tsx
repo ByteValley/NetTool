@@ -207,11 +207,13 @@ function SmallStepProgress({
   settings: SGCCSettings
 }) {
   const { oneLevelPq, twoLevelPq } = settings
-  const tier3MaxCap = twoLevelPq + twoLevelPq - oneLevelPq
+  const one = Math.max(1, Number(oneLevelPq) || 2160)
+  const two = Math.max(one + 1, Number(twoLevelPq) || 4800)
+  const tier3MaxCap = Math.max(two + 1, two + two - one)
 
-  const p1 = Math.min(totalYearPq, oneLevelPq) / oneLevelPq
-  const p2 = totalYearPq > oneLevelPq ? Math.min(totalYearPq / twoLevelPq, 1) : 0
-  const p3 = totalYearPq > twoLevelPq ? Math.min(totalYearPq / tier3MaxCap, 1) : 0
+  const p1 = Math.min(totalYearPq, one) / one
+  const p2 = totalYearPq > one ? Math.min(totalYearPq / two, 1) : 0
+  const p3 = totalYearPq > two ? Math.min(totalYearPq / tier3MaxCap, 1) : 0
 
   const barWidth = 115
   const gap = 2
@@ -251,8 +253,10 @@ function MediumStepProgress({
   lastUpdateTime: number
 }) {
   const { oneLevelPq, twoLevelPq } = settings
-  const level = totalYearPq > twoLevelPq ? 3 : totalYearPq > oneLevelPq ? 2 : 1
-  const max = [oneLevelPq, twoLevelPq, twoLevelPq + twoLevelPq - oneLevelPq][level - 1]
+  const one = Math.max(1, Number(oneLevelPq) || 2160)
+  const two = Math.max(one + 1, Number(twoLevelPq) || 4800)
+  const level = totalYearPq > two ? 3 : totalYearPq > one ? 2 : 1
+  const max = [one, two, Math.max(two + 1, two + two - one)][level - 1]
   let percent = totalYearPq / max
   if (percent > 1) percent = 1
 
@@ -390,8 +394,7 @@ function WidgetView({ displayData, barData, settings, logoPath }: any) {
             frame={{ width: rpt(86), maxHeight: Infinity }}
           />
           <VStack frame={{ width: rpt(86), maxHeight: Infinity }} padding={{ horizontal: rpt(4), vertical: 0 }} alignment="leading" spacing={0}>
-            {/* @ts-ignore */}
-            <Image filePath={logoPath} frame={{ width: rpt(24), height: rpt(24) }} cornerRadius={rpt(12) as any} resizable />
+            <Logo />
             <Spacer minLength={rpt(12)} />
             <Text font={rpt(10)} foregroundStyle={C.textSecondary}>
               {!hasArrear ? "剩余电费" : "待缴电费"}

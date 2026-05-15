@@ -6,7 +6,7 @@
  * @author 小白脸｜𝐎𝐍𝐙𝟑𝐕｜ByteValley
  *
  * 修复说明：
- * - 参考 Yuheng0101/X 重构版 95598 服务模式
+ * - 参考 dompling/Script/wsgw 数据接口脚本
  * - 组件入口仍保持 api.wsgw-rewrite.com/electricity/bill/all
  * - 返回结构继续兼容 dompling/Scriptable 小组件
  * - 自动兼容 ByteValley ComponentService 配置与旧版 95598_* BoxJs Key
@@ -15,7 +15,7 @@
 const SCRIPT_NAME = "网上国网";
 const NAMESPACE = "ONZ3V";
 const ROOT_KEY = "ComponentService";
-const UPSTREAM_SCRIPT = "https://raw.githubusercontent.com/Yuheng0101/X/main/Tasks/95598/95598.js";
+const UPSTREAM_SCRIPT = "https://raw.githubusercontent.com/dompling/Script/master/wsgw/index.js";
 const BOXJS_SUB_URL = "http://boxjs.com/#/sub/add/https%3A%2F%2Fraw.githubusercontent.com%2FByteValley%2FNetTool%2Fmain%2FBoxJs%2FComponentService.boxjs.json";
 
 const getEnv = () =>
@@ -151,7 +151,7 @@ function migrateComponentServiceToLegacyBoxJs() {
   const notifyType = settings.notifyType || "all";
   const recentElcFee = settings.recentElcFee ?? settings.showRecentUsage ?? "0";
 
-  // Yuheng0101/X 重构版沿用旧版 BoxJs Key，这里把组件配置同步过去。
+  // 上游脚本沿用旧版 BoxJs Key，这里把组件配置同步过去。
   const mappings = {
     "95598_username": phoneNum,
     "95598_password": password,

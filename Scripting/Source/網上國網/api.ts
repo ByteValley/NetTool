@@ -103,7 +103,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
 // 网络请求（fetch 必须双参）
 // =======================
 const API_URL_HTTP =
-  "http://api.wsgw-rewrite.com/electricity/bill/all?monthElecQuantity=1&dayElecQuantity31=1&stepElecQuantity=1&eleBill=1"
+  "http://api.wsgw-rewrite.com/electricity/bill/all?eleBill=1&dayElecQuantity=1&dayElecQuantity31=1&monthElecQuantity=1&lastYearElecQuantity=1&stepElecQuantity=1"
 
 async function fetchJson(url: string): Promise<any | null> {
   console.log(`🌐 WSGW 请求：GET ${url}`)
@@ -117,6 +117,12 @@ async function fetchJson(url: string): Promise<any | null> {
     return null
   }
   const json = await resp.json()
+  if (Array.isArray(json)) return json
+  if (Array.isArray(json?.data)) return json.data
+  if (json && json.ok === false) {
+    console.warn(`❌ WSGW 接口返回错误：${json.error || json.message || "unknown error"}`)
+    return null
+  }
   return json ?? null
 }
 
@@ -479,9 +485,11 @@ export async function getAccountData(forceRefresh = false): Promise<any> {
   return {
     eleBill: { sumMoney: "0.00" },
     arrearsOfFees: false,
+    dayElecQuantity: { sevenEleList: [] },
     stepElecQuantity: [],
     monthElecQuantity: { dataInfo: {}, mothEleList: [] },
     dayElecQuantity31: { sevenEleList: [] },
+    lastYearElecQuantity: { dataInfo: {}, mothEleList: [] },
     lastUpdateTime: updatedAt,
     __cacheMeta: cacheMeta,
   }
@@ -490,16 +498,62 @@ export async function getAccountData(forceRefresh = false): Promise<any> {
 // =======================
 // 业务逻辑处理（保持原样）
 // =======================
+function firstDefined(...values: any[]) {
+  for (const v of values) {
+    if (v !== undefined && v !== null && v !== "") return v
+  }
+  return undefined
+}
+
+function toNumber(v: any, fallback = 0): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function toDisplayNumber(v: any, fallback = "0") {
+  const picked = firstDefined(v, fallback)
+  const n = Number(picked)
+  return Number.isFinite(n) ? String(picked) : fallback
+}
+
+function getMonthlyList(data: any): any[] {
+  const list = data?.monthElecQuantity?.mothEleList
+  return Array.isArray(list) ? list : []
+}
+
+function getDailyList(data: any): any[] {
+  const list31 = data?.dayElecQuantity31?.sevenEleList
+  if (Array.isArray(list31) && list31.length > 0) return list31
+  const list7 = data?.dayElecQuantity?.sevenEleList
+  return Array.isArray(list7) ? list7 : []
+}
+
+function pickMonthlyUsage(item: any): number {
+  return toNumber(firstDefined(item?.monthEleNum, item?.eleNum, item?.usage, item?.pq, item?.power))
+}
+
+function pickMonthlyCost(item: any): number {
+  return toNumber(firstDefined(item?.monthEleCost, item?.cost, item?.eleCost, item?.totalAmount, item?.fee))
+}
+
+function pickDailyUsage(item: any): number {
+  return toNumber(firstDefined(item?.dayElePq, item?.dayEleNum, item?.eleNum, item?.usage, item?.pq, item?.power))
+}
+
+function pickDayLabel(item: any): string {
+  return String(firstDefined(item?.day, item?.date, item?.dataDate, item?.time, ""))
+}
+
 export function processBarChartData(data: any, settings: SGCCSettings): BarData[] {
   const { oneLevelPq, twoLevelPq, barCount, dimension } = settings
 
   const monthlyData: { yearTotal: number; monthElec: number; level: number }[] = []
   let yearTotal = 0
 
-  const mothEleList = data.monthElecQuantity?.mothEleList || []
+  const mothEleList = getMonthlyList(data)
 
-  for (const { monthEleNum } of mothEleList) {
-    const n = Number(monthEleNum || 0)
+  for (const item of mothEleList) {
+    const n = pickMonthlyUsage(item)
     yearTotal += n
     const level = yearTotal > twoLevelPq ? 3 : yearTotal > oneLevelPq ? 2 : 1
     monthlyData.push({ yearTotal, monthElec: n, level })
@@ -510,57 +564,69 @@ export function processBarChartData(data: any, settings: SGCCSettings): BarData[
   if (dimension === "monthly") {
     barData = monthlyData.map(({ monthElec, level }) => ({ value: monthElec, level }))
   } else {
-    const sevenEleList = data.dayElecQuantity31?.sevenEleList || []
+    const sevenEleList = getDailyList(data)
     const currentYear = new Date().getFullYear()
 
-    for (const { day, dayElePq } of sevenEleList) {
-      if (dayElePq && !isNaN(Number(dayElePq))) {
+    for (const item of sevenEleList) {
+      const dayElePq = pickDailyUsage(item)
+      if (Number.isFinite(dayElePq) && dayElePq > 0) {
+        const day = pickDayLabel(item)
         const match = String(day).match(/^(\d{4})\D?(\d{2})/)
+        let level = 1
+
         if (match) {
           const year = Number(match[1])
           const month = Number(match[2])
-          let level = 1
-
           if (currentYear === year) {
             const safeIndex = Math.max(0, Math.min(monthlyData.length - 1, month - 1))
             level = monthlyData[safeIndex]?.level || 1
           }
-
-          barData.unshift({ value: Number(dayElePq), level, label: day })
         }
+
+        barData.unshift({ value: dayElePq, level, label: day })
       }
     }
   }
 
-  return barData.slice(-Number(barCount) || 7)
+  const limit = Math.max(1, Number(barCount) || 7)
+  return barData.slice(-limit)
 }
 
 export function extractDisplayData(data: any) {
-  const balance = data.eleBill?.sumMoney || "0.00"
+  const sumMoney = toNumber(data.eleBill?.sumMoney)
+  const historyOwe = toNumber(data.eleBill?.historyOwe)
   const hasArrear = !!data.arrearsOfFees
+  const balance = hasArrear
+    ? toDisplayNumber(firstDefined(historyOwe > 0 ? historyOwe : undefined, sumMoney < 0 ? Math.abs(sumMoney) : undefined, data.eleBill?.sumMoney), "0.00")
+    : toDisplayNumber(data.eleBill?.sumMoney, "0.00")
 
   let lastBill = "0.00"
   let lastUsage = "0"
 
-  if (data.monthElecQuantity?.mothEleList?.length > 0) {
-    const list = data.monthElecQuantity.mothEleList
-    const last = list[list.length - 1]
+  const monthList = getMonthlyList(data)
+  if (monthList.length > 0) {
+    const last = [...monthList].reverse().find((item) => pickMonthlyUsage(item) > 0 || pickMonthlyCost(item) > 0) || monthList[monthList.length - 1]
     if (last) {
-      lastBill = last.monthEleCost || last.cost || last.eleCost || "0.00"
-      lastUsage = last.monthEleNum || last.eleNum || last.usage || "0"
+      lastBill = toDisplayNumber(firstDefined(last.monthEleCost, last.cost, last.eleCost, last.totalAmount, last.fee), "0.00")
+      lastUsage = toDisplayNumber(firstDefined(last.monthEleNum, last.eleNum, last.usage, last.pq, last.power), "0")
     }
   } else if (data.stepElecQuantity?.[0]?.electricParticulars) {
     const p = data.stepElecQuantity[0].electricParticulars
-    lastBill = p.totalAmount || "0.00"
-    lastUsage = p.totalPq || "0"
+    lastBill = toDisplayNumber(p.totalAmount, "0.00")
+    lastUsage = toDisplayNumber(p.totalPq, "0")
   }
 
-  const yearBill = data.monthElecQuantity?.dataInfo?.totalEleCost || "0"
-  const yearUsage = data.monthElecQuantity?.dataInfo?.totalEleNum || "0"
+  const computedYearBill = monthList.reduce((sum, item) => sum + pickMonthlyCost(item), 0)
+  const computedYearUsage = monthList.reduce((sum, item) => sum + pickMonthlyUsage(item), 0)
+  const yearBill = toDisplayNumber(firstDefined(data.monthElecQuantity?.dataInfo?.totalEleCost, data.monthElecQuantity?.dataInfo?.totalCost, computedYearBill), "0")
+  const yearUsage = toDisplayNumber(firstDefined(data.monthElecQuantity?.dataInfo?.totalEleNum, data.monthElecQuantity?.dataInfo?.totalPq, computedYearUsage), "0")
 
   let totalYearPq = 0
   if (data.stepElecQuantity?.[0]?.electricParticulars) {
     totalYearPq = Number(data.stepElecQuantity[0].electricParticulars.totalYearPq || 0)
+  }
+  if (!Number.isFinite(totalYearPq) || totalYearPq <= 0) {
+    totalYearPq = toNumber(firstDefined(data.monthElecQuantity?.dataInfo?.totalEleNum, computedYearUsage), 0)
   }
 
   return {
