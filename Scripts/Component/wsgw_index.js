@@ -120,9 +120,17 @@ const notify = (title, subtitle, body, openUrl) => {
   }
 };
 
+function truncateForLog(text, max = 1200) {
+  text = String(text || "");
+  return text.length <= max ? text : `${text.slice(0, max)}...`;
+}
+
 const httpGet = async (url) => {
   if (isQuanX()) {
     const resp = await $task.fetch({ url, method: "GET" });
+    if (!/^2\d\d$/.test(String(resp.statusCode || resp.status || ""))) {
+      throw new Error(`GET ${url} failed: status=${resp.statusCode || resp.status || "unknown"} body=${truncateForLog(resp.body)}`);
+    }
     return resp.body;
   }
 
@@ -134,7 +142,9 @@ const httpGet = async (url) => {
   return await new Promise((resolve, reject) => {
     $httpClient.get({ url }, (err, resp, body) => {
       if (err) reject(err);
-      else resolve(body);
+      else if (!/^2\d\d$/.test(String(resp?.status || resp?.statusCode || ""))) {
+        reject(new Error(`GET ${url} failed: status=${resp?.status || resp?.statusCode || "unknown"} body=${truncateForLog(body)}`));
+      } else resolve(body);
     });
   });
 };
@@ -191,7 +201,9 @@ function migrateComponentServiceToLegacyBoxJs() {
     return done(isQuanX() ? resp : { response: resp });
   }
 
+  console.log(`🌐 ${SCRIPT_NAME} 正在加载上游脚本: ${UPSTREAM_SCRIPT}`);
   const code = await httpGet(UPSTREAM_SCRIPT);
+  console.log(`✅ ${SCRIPT_NAME} 上游脚本加载完成: ${String(code || "").length} bytes`);
   if (!code || code.length < 1024) throw new Error("上游脚本加载失败");
 
   // 直接执行上游服务模式脚本，由其接管登录校验、验证码、数据查询与 $done 返回。

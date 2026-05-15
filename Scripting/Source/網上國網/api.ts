@@ -104,32 +104,56 @@ function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
 // =======================
 const API_URL_HTTP =
   "http://api.wsgw-rewrite.com/electricity/bill/all?eleBill=1&dayElecQuantity=1&dayElecQuantity31=1&monthElecQuantity=1&lastYearElecQuantity=1&stepElecQuantity=1"
+const API_TIMEOUT_MS = 65 * 1000
+
+function truncateForLog(text: string, max = 1200) {
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}...`
+}
 
 async function fetchJson(url: string): Promise<any | null> {
   console.log(`🌐 WSGW 请求：GET ${url}`)
   const resp = await fetch(url, {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+      "X-WSGW-Widget": "ByteValley-Scripting",
+    },
   })
   if (!resp) return null
+  const status = Number((resp as any).status || 0)
+  let text = ""
+  try {
+    text = String(await resp.text())
+  } catch (e) {
+    console.warn("⚠️ WSGW 响应体读取失败：", String(e))
+  }
+
   if (!resp.ok) {
-    console.warn(`❌ WSGW 响应失败：status=${(resp as any).status}`)
+    console.warn(`❌ WSGW 响应失败：status=${status} body=${truncateForLog(text || "<empty>")}`)
     return null
   }
-  const json = await resp.json()
+
+  let json: any = null
+  try {
+    json = text ? JSON.parse(text) : null
+  } catch (e) {
+    console.warn(`❌ WSGW JSON 解析失败：${String(e)} body=${truncateForLog(text || "<empty>")}`)
+    return null
+  }
+
   if (Array.isArray(json)) return json
   if (Array.isArray(json?.data)) return json.data
   if (json && json.ok === false) {
-    console.warn(`❌ WSGW 接口返回错误：${json.error || json.message || "unknown error"}`)
+    console.warn(`❌ WSGW 接口返回错误：${json.error || json.message || "unknown error"} body=${truncateForLog(text)}`)
     return null
   }
   return json ?? null
 }
 
 async function fetchSGCCAllFromNetwork(): Promise<any | null> {
-  const TIMEOUT_MS = 4500
   try {
-    const data = await withTimeout(fetchJson(API_URL_HTTP), TIMEOUT_MS, "WSGW(http)")
+    const data = await withTimeout(fetchJson(API_URL_HTTP), API_TIMEOUT_MS, "WSGW(http)")
     if (data) return data
   } catch (e) {
     console.warn("⚠️ WSGW http 请求失败/超时：", String(e))
