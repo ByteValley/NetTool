@@ -42,8 +42,8 @@ import { formatDuration } from "./shared/utils/time"
 declare const Safari: any
 declare const Dialog: any
 
-const VERSION = "1.0.0"
-const BUILD_DATE = "2025-12-12"
+const VERSION = "1.0.1"
+const BUILD_DATE = "2026-05-15"
 
 const BOXJS_SUB_URL =
   "http://boxjs.com/#/sub/add/https://raw.githubusercontent.com/ByteValley/NetTool/main/BoxJs/ComponentService.boxjs.json"
@@ -393,8 +393,8 @@ function App(_props: AppProps) {
   return <SettingsView />
 }
 
-const FUNCTION_NOTICE_ID = "boxjs-kv-v2"
-const NOTICE_TAG = "2025-12-13"
+const FUNCTION_NOTICE_ID = "sgcc-service-bridge-v1"
+const NOTICE_TAG = "2026-05-15"
 
 async function main() {
   try {
@@ -402,13 +402,13 @@ async function main() {
       scopeKey: SETTINGS_KEY,
       noticeId: FUNCTION_NOTICE_ID,
       tag: NOTICE_TAG,
-      title: "BoxJs 配置变更提醒",
+      title: "网上国网服务更新提醒",
       message:
-        "本次更新调整 BoxJs 键值对。\n\n" +
-        "请重写添加：\n" +
+        "本次更新修复登录校验问题，并将组件服务桥接到新版 95598 接口逻辑。\n\n" +
+        "请重新添加或更新：\n" +
         "• BoxJs 订阅\n" +
-        "• BoxJs 重写 / 插件 / 模块\n\n" +
-        "否则可能读取不到 Token。",
+        "• Surge/Egern 模块 或 Loon/QX 重写\n\n" +
+        "如果仍提示登录失效，请清理 bizrt / 95598_bizrt 缓存后重新刷新组件。",
     })
 
     const fullscreen = readFullscreenPrefForRun()
