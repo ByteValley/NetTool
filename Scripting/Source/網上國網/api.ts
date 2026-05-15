@@ -105,10 +105,15 @@ function withTimeout<T>(p: Promise<T>, ms: number, tag: string): Promise<T> {
 const API_URL_HTTP =
   "http://api.wsgw-rewrite.com/electricity/bill/all?eleBill=1&dayElecQuantity=1&dayElecQuantity31=1&monthElecQuantity=1&lastYearElecQuantity=1&stepElecQuantity=1"
 const API_TIMEOUT_MS = 65 * 1000
+let lastNetworkError = ""
 
 function truncateForLog(text: string, max = 1200) {
   if (text.length <= max) return text
   return `${text.slice(0, max)}...`
+}
+
+function setNetworkError(message: string) {
+  lastNetworkError = truncateForLog(String(message || "unknown error"), 400)
 }
 
 async function fetchJson(url: string): Promise<any | null> {
@@ -126,11 +131,15 @@ async function fetchJson(url: string): Promise<any | null> {
   try {
     text = String(await resp.text())
   } catch (e) {
-    console.warn("⚠️ WSGW 响应体读取失败：", String(e))
+    const message = `响应体读取失败：${String(e)}`
+    setNetworkError(message)
+    console.warn("⚠️ WSGW", message)
   }
 
   if (!resp.ok) {
-    console.warn(`❌ WSGW 响应失败：status=${status} body=${truncateForLog(text || "<empty>")}`)
+    const message = `响应失败：status=${status} body=${truncateForLog(text || "<empty>")}`
+    setNetworkError(message)
+    console.warn(`❌ WSGW ${message}`)
     return null
   }
 
@@ -138,14 +147,19 @@ async function fetchJson(url: string): Promise<any | null> {
   try {
     json = text ? JSON.parse(text) : null
   } catch (e) {
-    console.warn(`❌ WSGW JSON 解析失败：${String(e)} body=${truncateForLog(text || "<empty>")}`)
+    const body = truncateForLog(text || "<empty>")
+    const message = text ? body : `JSON 解析失败：${String(e)} body=${body}`
+    setNetworkError(message)
+    console.warn(`❌ WSGW JSON 解析失败：${String(e)} body=${body}`)
     return null
   }
 
   if (Array.isArray(json)) return json
   if (Array.isArray(json?.data)) return json.data
   if (json && json.ok === false) {
-    console.warn(`❌ WSGW 接口返回错误：${json.error || json.message || "unknown error"} body=${truncateForLog(text)}`)
+    const message = json.error || json.message || "unknown error"
+    setNetworkError(message)
+    console.warn(`❌ WSGW 接口返回错误：${message} body=${truncateForLog(text)}`)
     return null
   }
   return json ?? null
@@ -153,9 +167,11 @@ async function fetchJson(url: string): Promise<any | null> {
 
 async function fetchSGCCAllFromNetwork(): Promise<any | null> {
   try {
+    lastNetworkError = ""
     const data = await withTimeout(fetchJson(API_URL_HTTP), API_TIMEOUT_MS, "WSGW(http)")
     if (data) return data
   } catch (e) {
+    setNetworkError(String(e))
     console.warn("⚠️ WSGW http 请求失败/超时：", String(e))
   }
   return null
@@ -276,6 +292,7 @@ export async function getElectricityData(
         maxStaleMinutes: toMin(maxStaleMs),
         forceRefresh,
         decision: fresh ? "cache_disabled -> network_ok" : "cache_disabled -> network_fail",
+        networkError: fresh ? undefined : lastNetworkError,
       },
     }
   }
@@ -366,6 +383,7 @@ export async function getElectricityData(
         maxStaleMinutes: toMin(maxStaleMs),
         forceRefresh,
         decision: "network_only -> network_fail",
+        networkError: lastNetworkError,
       },
     }
   }
@@ -464,6 +482,7 @@ export async function getElectricityData(
       cacheAgeMinutes: cacheAgeMin,
       forceRefresh,
       decision: "auto -> network_fail -> no_cache",
+      networkError: lastNetworkError,
     },
   }
 }
@@ -516,6 +535,7 @@ export async function getAccountData(forceRefresh = false): Promise<any> {
     lastYearElecQuantity: { dataInfo: {}, mothEleList: [] },
     lastUpdateTime: updatedAt,
     __cacheMeta: cacheMeta,
+    __errorMessage: cacheMeta.networkError || "",
   }
 }
 

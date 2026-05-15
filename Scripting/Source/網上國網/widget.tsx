@@ -51,6 +51,23 @@ function clampRefreshMinutes(v: any) {
   return Math.max(60, Math.floor(n))
 }
 
+function renderError(message: string, reloadPolicy: WidgetReloadPolicy) {
+  Widget.present(
+    <VStack padding={12} alignment="leading" spacing={6}>
+      <Text font={14} fontWeight="semibold" foregroundStyle={"#D0580D" as any}>
+        网上国网取数失败
+      </Text>
+      <Text font={11} foregroundStyle={"#666666" as any} lineLimit={4}>
+        {message || "接口未返回可用数据"}
+      </Text>
+      <Text font={10} foregroundStyle={"#999999" as any}>
+        请检查 BoxJs 账号密码或稍后再试
+      </Text>
+    </VStack>,
+    reloadPolicy,
+  )
+}
+
 async function render() {
   try {
     const settings = getSettings()
@@ -70,6 +87,11 @@ async function render() {
 
     if (rawData?.__cacheMeta) {
       console.log("🧠 WSGW Cache meta:", JSON.stringify(rawData.__cacheMeta))
+    }
+
+    if (rawData?.__errorMessage && rawData?.__cacheMeta?.mode === "none") {
+      renderError(String(rawData.__errorMessage), reloadPolicy)
+      return
     }
 
     const now = new Date()
