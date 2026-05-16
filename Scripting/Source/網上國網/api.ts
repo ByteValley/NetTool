@@ -117,13 +117,21 @@ function setNetworkError(message: string) {
 }
 
 async function fetchJson(url: string): Promise<any | null> {
+  const settings = getSettings()
+  const phoneNum = String((settings as any).phoneNum || "").trim()
+  const password = String((settings as any).password || "")
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "X-WSGW-Widget": "ByteValley-Scripting",
+  }
+  if (phoneNum) headers["X-WSGW-Username"] = encodeURIComponent(phoneNum)
+  if (password) headers["X-WSGW-Password"] = encodeURIComponent(password)
+
   console.log(`🌐 WSGW 请求：GET ${url}`)
+  console.log(`🔐 WSGW 凭据来源：${phoneNum && password ? "组件设置页" : "BoxJs/服务脚本兜底"}`)
   const resp = await fetch(url, {
     method: "GET",
-    headers: {
-      Accept: "application/json",
-      "X-WSGW-Widget": "ByteValley-Scripting",
-    },
+    headers,
   })
   if (!resp) return null
   const status = Number((resp as any).status || 0)

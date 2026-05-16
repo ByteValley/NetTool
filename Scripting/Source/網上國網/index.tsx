@@ -42,7 +42,7 @@ import { formatDuration } from "./shared/utils/time"
 declare const Safari: any
 declare const Dialog: any
 
-const VERSION = "1.0.1"
+const VERSION = "1.0.2"
 const BUILD_DATE = "2026-05-15"
 
 const BOXJS_SUB_URL =
@@ -99,6 +99,8 @@ function SettingsView() {
 
   const initial = loadSGCCSettings()
 
+  const [phoneNum, setPhoneNum] = useState(String((initial as any).phoneNum ?? ""))
+  const [password, setPassword] = useState(String((initial as any).password ?? ""))
   const [accountIndex, setAccountIndex] = useState(String(initial.accountIndex ?? 0))
 
   const [widgetStyle, setWidgetStyle] = useState<SGCCWidgetStyleKey>(
@@ -145,6 +147,8 @@ function SettingsView() {
 
   const handleSave = () => {
     const next: SGCCSettings = {
+      phoneNum: phoneNum.trim(),
+      password,
       accountIndex: parseInt(accountIndex, 10) || 0,
       dimension,
       barCount: Number(barCount) || defaultSGCCSettings.barCount,
@@ -176,6 +180,8 @@ function SettingsView() {
     if (!confirmed) return
 
     setAccountIndex(String(defaultSGCCSettings.accountIndex))
+    setPhoneNum(defaultSGCCSettings.phoneNum)
+    setPassword(defaultSGCCSettings.password)
     setWidgetStyle((defaultSGCCSettings.widgetStyle ?? "classic") as SGCCWidgetStyleKey)
     setDimension(defaultSGCCSettings.dimension)
     setBarCount(defaultSGCCSettings.barCount)
@@ -218,9 +224,9 @@ function SettingsView() {
         <ModuleSection
           footerLines={[
             "建议顺序：",
-            "1）添加 BoxJs 订阅并按订阅说明配置账号密码；",
-            "2）安装 Surge/Egern 模块 或 Loon 插件（按工具选择其一）；",
-            "3）回到桌面添加组件查看数据。",
+            "1）先在下方填写网上国网账号密码；",
+            "2）安装 Surge/Egern 模块 或 Loon 插件 或 Quantumult X 重写（按工具选择其一）；",
+            "3）BoxJs 现在只是兜底方案，不再强制使用。",
           ]}
           collapsible
           collapseStorageKey={MODULE_SECTION_COLLAPSED_KEY}
@@ -240,10 +246,24 @@ function SettingsView() {
           }
           footer={
             <Text font="caption2" foregroundStyle="secondaryLabel">
-              绑定多个户号时：0 为第一个，1 为第二个，以此类推。
+              优先使用这里填写的网上国网账号密码；未填写时才回退到 BoxJs。绑定多个户号时：0 为第一个，1 为第二个。
             </Text>
           }
         >
+          <HStack alignment="center">
+            <Text>手机号</Text>
+            <Spacer />
+            <Button title="清空" action={() => setPhoneNum("")} />
+          </HStack>
+          <TextField title="" value={phoneNum} prompt="网上国网登录手机号" keyboardType="numberPad" onChanged={setPhoneNum} />
+
+          <HStack alignment="center">
+            <Text>密码</Text>
+            <Spacer />
+            <Button title="清空" action={() => setPassword("")} />
+          </HStack>
+          <TextField title="" value={password} prompt="网上国网登录密码" onChanged={setPassword} />
+
           <HStack alignment="center">
             <Text>户号索引</Text>
             <Spacer />

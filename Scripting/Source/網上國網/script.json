@@ -23,7 +23,7 @@
     "zh" : "",
     "fr" : ""
   },
-  "version" : "1.0.0",
+  "version" : "1.0.2",
   "remoteResource" : {
     "autoUpdateInterval" : 600,
     "hash" : "5b9f987f8eae2663adbbd64c2837a589",

@@ -27,6 +27,8 @@ export const SGCC_BARCOUNT_OPTIONS = [
 export type SGCCDimension = "daily" | "monthly"
 
 export type SGCCSettings = {
+  phoneNum: string
+  password: string
   accountIndex: number
   dimension: SGCCDimension
   barCount: number
@@ -40,6 +42,8 @@ export type SGCCSettings = {
 }
 
 export const defaultSGCCSettings: SGCCSettings = {
+  phoneNum: "",
+  password: "",
   accountIndex: 0,
   dimension: "daily",
   barCount: 7,
@@ -149,6 +153,8 @@ export function loadSGCCSettings(): SGCCSettings {
   merged.oneLevelPq = clampNumber(merged.oneLevelPq, defaultSGCCSettings.oneLevelPq, 0)
   merged.twoLevelPq = clampNumber(merged.twoLevelPq, defaultSGCCSettings.twoLevelPq, 0)
   merged.refreshInterval = clampNumber(merged.refreshInterval, defaultSGCCSettings.refreshInterval, 0)
+  merged.phoneNum = typeof (merged as any).phoneNum === "string" ? (merged as any).phoneNum : ""
+  merged.password = typeof (merged as any).password === "string" ? (merged as any).password : ""
 
   merged.dimension = merged.dimension === "monthly" ? "monthly" : "daily"
   merged.widgetStyle = (merged.widgetStyle || defaultSGCCSettings.widgetStyle) as SGCCWidgetStyleKey

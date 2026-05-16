@@ -149,17 +149,33 @@ const httpGet = async (url) => {
   });
 };
 
+function requestHeader(name) {
+  const headers = typeof $request !== "undefined" && $request.headers ? $request.headers : {};
+  const lower = name.toLowerCase();
+  const raw = headers[name] ?? headers[lower] ?? headers[name.toUpperCase()];
+  if (raw === undefined || raw === null) return "";
+  try {
+    return decodeURIComponent(String(raw));
+  } catch {
+    return String(raw);
+  }
+}
+
 function migrateComponentServiceToLegacyBoxJs() {
   const root = safeJsonParse(store.get(ROOT_KEY), {});
   const sgcc = root && root.SGCC ? root.SGCC : {};
   const settings = sgcc.Settings || {};
   const caches = sgcc.Caches || {};
 
-  const phoneNum = settings.phoneNum || settings.username || settings.account || "";
-  const password = settings.password || "";
+  const headerPhoneNum = requestHeader("X-WSGW-Username");
+  const headerPassword = requestHeader("X-WSGW-Password");
+  const phoneNum = headerPhoneNum || settings.phoneNum || settings.username || settings.account || "";
+  const password = headerPassword || settings.password || "";
   const logDebug = settings.logDebug ?? settings.debug ?? "false";
   const notifyType = settings.notifyType || "all";
   const recentElcFee = settings.recentElcFee ?? settings.showRecentUsage ?? "0";
+
+  console.log(`🔐 ${SCRIPT_NAME} 凭据来源: ${headerPhoneNum && headerPassword ? "组件设置页请求头" : "BoxJs/旧 Key"}`);
 
   // 上游脚本沿用旧版 BoxJs Key，这里把组件配置同步过去。
   const mappings = {
@@ -192,7 +208,7 @@ function migrateComponentServiceToLegacyBoxJs() {
   const { phoneNum, password } = migrateComponentServiceToLegacyBoxJs();
 
   if (!phoneNum || !password) {
-    notify(SCRIPT_NAME, "请先配置账号密码", "请在 BoxJs 的 ComponentService / SGCC 中填写 phoneNum/password。", BOXJS_SUB_URL);
+    notify(SCRIPT_NAME, "请先配置账号密码", "请在组件设置页填写账号密码；或在 BoxJs 的 ComponentService / SGCC 中填写 phoneNum/password。", BOXJS_SUB_URL);
     const resp = {
       status: isQuanX() ? "HTTP/1.1 200" : 200,
       headers: { "content-type": "application/json;charset=utf8" },
