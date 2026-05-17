@@ -1,0 +1,564 @@
+/*
+ * 今日黄历 - Surge 版
+ *
+ * 功能：
+ * - 支持 Surge Cron 定时通知
+ * - 支持 Surge Panel 面板
+ * - 面板顶部支持每日一句，默认接口为一言 Hitokoto
+ * - 接口失败时使用内置每日一句兜底
+ * - 显示今日黄历、干支、宜忌
+ * - 最后空一行，分四行显示倒计时：传统节假日、二十四节气、民俗节日、国际节日
+ *
+ * 默认图标：⭕️宜 / ❌忌
+ */
+
+const DEFAULT_TITLE = '📅 今日黄历';
+const HITOKOTO_API = 'https://v1.hitokoto.cn/';
+const API_BASE = 'https://raw.githubusercontent.com/zqzess/openApiData/main/calendar/';
+const PROXY_BASE = 'https://mirror.ghproxy.com/';
+const DEFAULT_MAX_COUNTDOWN_PER_LINE = 4;
+const DEFAULT_COUNTDOWN_MONTHS = 18;
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const DEFAULT_QUOTE_TIMEOUT_MS = 5000;
+const BLANK_LINE = '　';
+const DAY_MS = 86400000;
+
+const ICON_PRESETS = {
+  circle: { suit: '⭕️', avoid: '❌' },
+  check: { suit: '✅', avoid: '❎' },
+  mixed: { suit: '✅', avoid: '❌' }
+};
+
+const SOLAR_TERMS = [
+  '小寒', '大寒', '立春', '雨水', '惊蛰', '春分',
+  '清明', '谷雨', '立夏', '小满', '芒种', '夏至',
+  '小暑', '大暑', '立秋', '处暑', '白露', '秋分',
+  '寒露', '霜降', '立冬', '小雪', '大雪', '冬至'
+];
+
+const LOCAL_QUOTES = [
+  '山高月小，水落石出',
+  '心有山海，静而无边',
+  '万事从容，日日自新',
+  '花开有期，来日方长',
+  '风来疏竹，雁渡寒潭',
+  '但行好事，莫问前程',
+  '岁月不居，时节如流',
+  '知不足而奋进，望远山而前行',
+  '一念既起，万水千山',
+  '清风徐来，水波不兴',
+  '日拱一卒，功不唐捐',
+  '人间有味是清欢',
+  '云程发轫，万里可期',
+  '心若向阳，无畏悲伤',
+  '星河滚烫，人间理想',
+  '长风破浪，会有时',
+  '山河远阔，人间烟火',
+  '静水流深，沧笙踏歌',
+  '凡是过往，皆为序章',
+  '不驰于空想，不骛于虚声',
+  '浅予深深，长乐未央',
+  '往事清零，万事顺意',
+  '心之所向，素履以往',
+  '春风有信，花开有期',
+  '一岁一礼，一寸欢喜',
+  '念念不忘，必有回响',
+  '山不让尘，川不辞盈',
+  '生有热烈，藏与俗常',
+  '保持热爱，奔赴山海',
+  '所遇皆良善，所行化坦途',
+  '慢慢来，比较快'
+];
+
+const MONTH_MEMORY_CACHE = new Map();
+
+!(async function main() {
+  const config = getConfig();
+
+  try {
+    const todayDate = getTargetDate(config);
+    const todayInfo = getDateInfo(todayDate);
+    const monthData = await fetchCalendarData(todayInfo, config);
+    const todayAlmanac = findDateItem(monthData, todayInfo);
+
+    if (!todayAlmanac) throw new Error(`未找到 ${todayInfo.dateText} 的黄历数据`);
+
+    const cached = getCachedCountdowns(todayInfo, config);
+    const countdowns = cached || await buildCountdowns(todayDate, config);
+    if (!cached) setCachedCountdowns(todayInfo, config, countdowns);
+
+    const quoteTitle = config.runMode === 'panel' ? await getDailyQuoteTitle(todayInfo, config) : config.title;
+    const payload = buildPayload(todayAlmanac, todayInfo, countdowns, config, quoteTitle);
+
+    if (config.runMode === 'notify') {
+      $notification.post(payload.title, payload.subtitle, payload.content);
+      console.log(`\n${payload.subtitle}\n${payload.content}`);
+      $done();
+      return;
+    }
+
+    $done({
+      title: payload.panelTitle,
+      content: `${payload.subtitle}\n${payload.content}`,
+      icon: 'calendar',
+      'icon-color': '#475569'
+    });
+  } catch (e) {
+    const message = `错误：${e && e.message ? e.message : String(e)}`;
+    console.log(message);
+
+    if (config.runMode === 'notify') {
+      $notification.post(config.title, '', message);
+      $done();
+      return;
+    }
+
+    $done({
+      title: config.title,
+      content: message,
+      icon: 'calendar.badge.exclamationmark',
+      'icon-color': '#DC2626'
+    });
+  }
+})();
+
+function getConfig() {
+  const env = parseArgument();
+  const iconStyle = clean(env.ICON_STYLE || env.iconStyle || 'circle');
+  const preset = ICON_PRESETS[iconStyle] || ICON_PRESETS.circle;
+
+  return {
+    runMode: clean(env.RUN_MODE || env.runMode) || 'panel',
+    title: clean(env.TITLE || env.title) || DEFAULT_TITLE,
+    iconSuit: clean(env.ICON_SUIT || env.suitIcon) || preset.suit,
+    iconAvoid: clean(env.ICON_AVOID || env.avoidIcon) || preset.avoid,
+    maxCountdownPerLine: readInt(env.MAX_COUNTDOWN_PER_LINE, DEFAULT_MAX_COUNTDOWN_PER_LINE, 1, 12),
+    countdownMonths: readInt(env.COUNTDOWN_MONTHS, DEFAULT_COUNTDOWN_MONTHS, 3, 36),
+    requestTimeoutMs: readInt(env.REQUEST_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS, 3000, 60000),
+    enableCache: readBool(env.ENABLE_CACHE, true),
+    quoteEnable: readBool(env.QUOTE_ENABLE, true),
+    quoteShowSource: readBool(env.QUOTE_SHOW_SOURCE, false),
+    quoteCategories: clean(env.QUOTE_CATEGORIES) || 'd,i,k',
+    quoteMaxLength: readInt(env.QUOTE_MAX_LENGTH, 18, 6, 60),
+    quoteTimeoutMs: readInt(env.QUOTE_TIMEOUT_MS, DEFAULT_QUOTE_TIMEOUT_MS, 2000, 30000),
+    quoteFallback: clean(env.QUOTE_FALLBACK),
+    date: clean(env.DATE || env.date)
+  };
+}
+
+function parseArgument() {
+  const result = {};
+  const raw = typeof $argument === 'string' ? $argument : '';
+  if (!raw) return result;
+
+  raw.split(/[&;]/).forEach(pair => {
+    const index = pair.indexOf('=');
+    if (index < 0) return;
+    const key = pair.slice(0, index).trim();
+    const value = pair.slice(index + 1).trim();
+    if (!key) return;
+    result[safeDecode(key)] = safeDecode(value);
+  });
+
+  return result;
+}
+
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, '%20'));
+  } catch {
+    return value;
+  }
+}
+
+function readInt(value, fallback, min, max) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(Math.max(Math.floor(num), min), max);
+}
+
+function readBool(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const text = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  return fallback;
+}
+
+function getTargetDate(config) {
+  const input = clean(config.date).replace(/-/g, '/');
+  const parts = input.split('/').map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite) && parts[0] > 1900) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date();
+}
+
+function getDateInfo(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+
+  return {
+    year,
+    month,
+    day,
+    month2: pad(month),
+    day2: pad(day),
+    dateText: `${year}/${month}/${day}`,
+    dateKey: `${year}${pad(month)}${pad(day)}`,
+    filePath: `${year}/${year}${pad(month)}.json`
+  };
+}
+
+function pad(num) {
+  return String(num).padStart(2, '0');
+}
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addMonths(date, offset) {
+  return new Date(date.getFullYear(), date.getMonth() + offset, 1);
+}
+
+function diffDays(fromDate, toDate) {
+  return Math.round((startOfDay(toDate).getTime() - startOfDay(fromDate).getTime()) / DAY_MS);
+}
+
+async function fetchCalendarData(dateInfo, config) {
+  const cacheKey = dateInfo.filePath;
+  if (MONTH_MEMORY_CACHE.has(cacheKey)) return MONTH_MEMORY_CACHE.get(cacheKey);
+
+  const filePath = dateInfo.filePath;
+  const encodedPath = encodeURIComponent(filePath);
+  const urls = [
+    `${API_BASE}${filePath}`,
+    `${API_BASE}${encodedPath}`,
+    `${PROXY_BASE}${API_BASE}${filePath}`,
+    `${PROXY_BASE}${API_BASE}${encodedPath}`
+  ];
+
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const text = await httpGetText(url, config.requestTimeoutMs, '*/*');
+      const json = JSON.parse(text);
+      if (json && Array.isArray(json.data)) {
+        MONTH_MEMORY_CACHE.set(cacheKey, json);
+        return json;
+      }
+      throw new Error('数据结构异常');
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  throw new Error(`黄历数据请求失败：${lastError && lastError.message ? lastError.message : String(lastError)}`);
+}
+
+function httpGetText(url, timeout, accept) {
+  return new Promise((resolve, reject) => {
+    $httpClient.get({
+      url,
+      timeout,
+      headers: {
+        Accept: accept || '*/*',
+        'User-Agent': 'Mozilla/5.0 Surge TodayAlmanac'
+      }
+    }, (error, response, data) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      const status = response && (response.status || response.statusCode);
+      if (status && (status < 200 || status >= 300)) {
+        reject(new Error(`HTTP ${status}`));
+        return;
+      }
+
+      resolve(data || response && response.body || '');
+    });
+  });
+}
+
+function flattenAlmanac(json) {
+  const list = [];
+  for (const block of json.data || []) {
+    if (Array.isArray(block.almanac)) list.push(...block.almanac);
+  }
+  return list;
+}
+
+function findDateItem(json, dateInfo) {
+  return flattenAlmanac(json).find(item => sameNum(item.year, dateInfo.year) && sameNum(item.month, dateInfo.month) && sameNum(item.day, dateInfo.day));
+}
+
+function sameNum(a, b) {
+  return Number(a) === Number(b);
+}
+
+function storageGet(key) {
+  try {
+    return $persistentStore.read(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    $persistentStore.write(value, key);
+  } catch {}
+}
+
+function getCountdownCacheKey(dateInfo, config) {
+  return ['TodayAlmanac.countdowns', dateInfo.dateKey, config.countdownMonths, config.maxCountdownPerLine].join('.');
+}
+
+function getCachedCountdowns(dateInfo, config) {
+  if (!config.enableCache) return null;
+
+  try {
+    const raw = storageGet(getCountdownCacheKey(dateInfo, config));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.traditional) && Array.isArray(parsed.solarTerm) && Array.isArray(parsed.folk) && Array.isArray(parsed.international)) return parsed;
+  } catch {}
+
+  return null;
+}
+
+function setCachedCountdowns(dateInfo, config, countdowns) {
+  if (!config.enableCache) return;
+  storageSet(getCountdownCacheKey(dateInfo, config), JSON.stringify(countdowns));
+}
+
+async function getDailyQuoteTitle(dateInfo, config) {
+  if (!config.quoteEnable) return config.title;
+
+  const cacheKey = ['TodayAlmanac.quote', dateInfo.dateKey, config.quoteCategories, config.quoteMaxLength, config.quoteShowSource ? 'source' : 'plain', 'v2'].join('.');
+  const cached = storageGet(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const quote = await fetchHitokotoQuote(config);
+    if (quote) {
+      storageSet(cacheKey, quote);
+      return quote;
+    }
+  } catch (e) {
+    console.log(`每日一句获取失败：${e && e.message ? e.message : String(e)}`);
+  }
+
+  const fallback = config.quoteFallback && config.quoteFallback !== config.title ? config.quoteFallback : getLocalDailyQuote(dateInfo);
+  storageSet(cacheKey, fallback);
+  return fallback || config.title;
+}
+
+function getLocalDailyQuote(dateInfo) {
+  const idx = Number(dateInfo.dateKey) % LOCAL_QUOTES.length;
+  return LOCAL_QUOTES[idx] || '春风有信，花开有期';
+}
+
+async function fetchHitokotoQuote(config) {
+  const categories = clean(config.quoteCategories).split(',').map(item => clean(item)).filter(Boolean);
+  const categoryQuery = (categories.length ? categories : ['d', 'i', 'k']).map(item => `c=${encodeURIComponent(item)}`).join('&');
+  const url = `${HITOKOTO_API}?${categoryQuery}&max_length=${config.quoteMaxLength}&encode=json`;
+  const text = await httpGetText(url, config.quoteTimeoutMs, 'application/json');
+  const json = JSON.parse(text);
+  let quote = clean(json.hitokoto);
+  if (!quote) return '';
+
+  if (config.quoteShowSource) {
+    const source = clean(json.from_who) || clean(json.from);
+    if (source) quote = `${quote}｜${source}`;
+  }
+
+  return quote;
+}
+
+function buildPayload(item, dateInfo, countdowns, config, quoteTitle) {
+  const lunarDate = `${clean(item.lMonth)}月${clean(item.lDate)}`;
+  const subtitle = `${dateInfo.dateText} ${lunarDate}`;
+  const gzText = [item.gzYear ? `${item.gzYear}年` : '', item.gzMonth ? `${item.gzMonth}月` : '', item.gzDate ? `${item.gzDate}日` : ''].filter(Boolean).join(' ');
+
+  const content = [
+    `干支纪法：${gzText || '无'}`,
+    `${config.iconAvoid}忌：${clean(item.avoid) || '无'}`,
+    `${config.iconSuit}宜：${clean(item.suit) || '无'}`,
+    BLANK_LINE,
+    `传统节假日：${formatCountdownLine(countdowns.traditional)}`,
+    `二十四节气：${formatCountdownLine(countdowns.solarTerm)}`,
+    `民俗节日：${formatCountdownLine(countdowns.folk)}`,
+    `国际节日：${formatCountdownLine(countdowns.international)}`
+  ].join('\n');
+
+  return {
+    title: config.title,
+    panelTitle: quoteTitle || config.title,
+    subtitle,
+    content
+  };
+}
+
+function clean(value) {
+  return String(value || '').replace(/\n/g, ' ').replace(/\r/g, ' ').replace(/\t/g, ' ').trim();
+}
+
+function unique(list) {
+  return [...new Set(list.filter(Boolean))];
+}
+
+async function buildCountdowns(todayDate, config) {
+  const allItems = [];
+
+  for (let i = 0; i < config.countdownMonths; i++) {
+    const monthDate = addMonths(todayDate, i);
+    const monthInfo = getDateInfo(monthDate);
+
+    try {
+      const json = await fetchCalendarData(monthInfo, config);
+      allItems.push(...flattenAlmanac(json));
+    } catch (e) {
+      console.log(`跳过 ${monthInfo.year}-${monthInfo.month2}：${e && e.message ? e.message : String(e)}`);
+    }
+  }
+
+  const result = { traditional: [], solarTerm: [], folk: [], international: [] };
+
+  for (const item of allItems) {
+    const itemDate = new Date(Number(item.year), Number(item.month) - 1, Number(item.day));
+    const days = diffDays(todayDate, itemDate);
+    if (days < 0) continue;
+
+    const dateText = `${itemDate.getFullYear()}/${itemDate.getMonth() + 1}/${itemDate.getDate()}`;
+    const classified = classifyFestivalItem(item, itemDate);
+
+    addCountdownItems(result.traditional, classified.traditional, dateText, days);
+    addCountdownItems(result.solarTerm, classified.solarTerm, dateText, days);
+    addCountdownItems(result.folk, classified.folk, dateText, days);
+    addCountdownItems(result.international, classified.international, dateText, days);
+  }
+
+  for (const key of Object.keys(result)) {
+    result[key] = normalizeCountdowns(result[key], config.maxCountdownPerLine);
+  }
+
+  return result;
+}
+
+function addCountdownItems(target, names, dateText, days) {
+  for (const name of names) target.push({ name, dateText, days });
+}
+
+function normalizeCountdowns(list, maxCount) {
+  const map = new Map();
+  for (const item of list) {
+    if (!item.name) continue;
+    const old = map.get(item.name);
+    if (!old || item.days < old.days) map.set(item.name, item);
+  }
+  return [...map.values()].sort((a, b) => a.days - b.days).slice(0, maxCount);
+}
+
+function formatCountdownLine(list) {
+  if (!list || !list.length) return '无';
+  return list.map(item => item.days === 0 ? `${item.name}今天` : `${item.name}${item.days}天`).join('｜');
+}
+
+function classifyFestivalItem(item, dateObj) {
+  const text = [item.desc, item.term, item.value, item.festival, item.lFestival, item.sFestival, item.holiday].map(clean).filter(Boolean).join(' ');
+  const traditional = [];
+  const solarTerm = [];
+  const folk = [];
+  const international = [];
+
+  addMatches(traditional, text, ['元旦', '春节', '除夕', '清明节', '劳动节', '端午节', '中秋节', '国庆节']);
+  addMatches(folk, text, ['元宵节', '龙抬头', '社日节', '寒食节', '上巳节', '七夕节', '中元节', '重阳节', '下元节', '腊八节', '小年', '冬至']);
+  addMatches(international, text, ['情人节', '妇女节', '愚人节', '世界地球日', '母亲节', '护士节', '儿童节', '父亲节', '教师节', '万圣夜', '万圣节', '感恩节', '平安夜', '圣诞节']);
+
+  const matchedTerms = getMatches(clean(item.term), SOLAR_TERMS);
+  solarTerm.push(...matchedTerms);
+
+  if (matchedTerms.includes('清明')) traditional.push('清明节');
+  if (matchedTerms.includes('冬至')) folk.push('冬至');
+
+  addGregorianFestivals(traditional, international, dateObj);
+  addLunarFestivals(traditional, folk, item);
+
+  return {
+    traditional: unique(traditional),
+    solarTerm: unique(solarTerm),
+    folk: unique(folk),
+    international: unique(international)
+  };
+}
+
+function getMatches(text, names) {
+  const result = [];
+  for (const name of names) {
+    if (text.includes(name)) result.push(name);
+  }
+  return result;
+}
+
+function addMatches(target, text, names) {
+  target.push(...getMatches(text, names));
+}
+
+function addGregorianFestivals(traditional, international, dateObj) {
+  const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate();
+
+  if (month === 1 && day === 1) traditional.push('元旦');
+  if (month === 5 && day === 1) traditional.push('劳动节');
+  if (month === 10 && day === 1) traditional.push('国庆节');
+
+  if (month === 2 && day === 14) international.push('情人节');
+  if (month === 3 && day === 8) international.push('妇女节');
+  if (month === 4 && day === 1) international.push('愚人节');
+  if (month === 4 && day === 22) international.push('世界地球日');
+  if (month === 5 && isNthWeekday(dateObj, 0, 2)) international.push('母亲节');
+  if (month === 5 && day === 12) international.push('护士节');
+  if (month === 6 && day === 1) international.push('儿童节');
+  if (month === 6 && isNthWeekday(dateObj, 0, 3)) international.push('父亲节');
+  if (month === 9 && day === 10) international.push('教师节');
+  if (month === 10 && day === 31) international.push('万圣夜');
+  if (month === 11 && isNthWeekday(dateObj, 4, 4)) international.push('感恩节');
+  if (month === 12 && day === 24) international.push('平安夜');
+  if (month === 12 && day === 25) international.push('圣诞节');
+}
+
+function isNthWeekday(dateObj, weekday, nth) {
+  return dateObj.getDay() === weekday && Math.ceil(dateObj.getDate() / 7) === nth;
+}
+
+function addLunarFestivals(traditional, folk, item) {
+  const lunarMonth = normalizeLunarMonth(item.lMonth);
+  const lunarDate = clean(item.lDate);
+
+  if (lunarMonth === '正' && lunarDate === '初一') traditional.push('春节');
+  if (lunarMonth === '正' && lunarDate === '十五') folk.push('元宵节');
+  if (lunarMonth === '二' && lunarDate === '初二') folk.push('龙抬头');
+  if (lunarMonth === '三' && lunarDate === '初三') folk.push('上巳节');
+  if (lunarMonth === '五' && lunarDate === '初五') traditional.push('端午节');
+  if (lunarMonth === '七' && lunarDate === '初七') folk.push('七夕节');
+  if (lunarMonth === '七' && lunarDate === '十五') folk.push('中元节');
+  if (lunarMonth === '八' && lunarDate === '十五') traditional.push('中秋节');
+  if (lunarMonth === '九' && lunarDate === '初九') folk.push('重阳节');
+  if ((lunarMonth === '十' || lunarMonth === '冬') && lunarDate === '十五') folk.push('下元节');
+  if ((lunarMonth === '十二' || lunarMonth === '腊') && lunarDate === '初八') folk.push('腊八节');
+  if ((lunarMonth === '十二' || lunarMonth === '腊') && (lunarDate === '廿三' || lunarDate === '廿四')) folk.push('小年');
+  if ((lunarMonth === '十二' || lunarMonth === '腊') && lunarDate === '三十') traditional.push('除夕');
+}
+
+function normalizeLunarMonth(value) {
+  let month = clean(value);
+  if (month.startsWith('闰')) month = month.slice(1);
+  if (month.endsWith('月')) month = month.slice(0, -1);
+  return month;
+}
