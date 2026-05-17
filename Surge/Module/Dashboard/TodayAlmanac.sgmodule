@@ -1,6 +1,7 @@
 #!name=今日黄历
 #!desc=显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。面板顶部支持每日一句。
 #!author=zqzess / ByteEden
+#!category=功能看板
 #!icon=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Calendar.png
 
 [Script]
