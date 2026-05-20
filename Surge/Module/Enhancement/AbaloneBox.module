@@ -2,17 +2,39 @@
 #!desc=鲍鱼盒子增强，解锁会员功能
 #!category=功能增强
 #!author=ByteValley
-#!version=2026-03-01R1
-#!arguments=token:bearer 47516c8088984f2c4f1788be51216289
+#!version=2026-05-20R1
+#!arguments=token:bearer 47516c8088984f2c4f1788be51216289, policy:境内服务
+
+[Rule]
+# 鲍鱼盒子 - 接口域名走指定策略
+DOMAIN,w1c2.ooat88.com,{{{policy}}}
+DOMAIN,tu.dfgfdg.win,{{{policy}}}
+DOMAIN,vkfqb.ojyrz.com,{{{policy}}}
+DOMAIN,yubaoyu.oss-cn-shenzhen.aliyuncs.com,{{{policy}}}
+DOMAIN,siajksslwiso.anningsh.com,{{{policy}}}
+DOMAIN,88.gbvdfe.com,{{{policy}}}
+DOMAIN,vdop.fqoas.com,{{{policy}}}
+DOMAIN,ica.ooat88.com,{{{policy}}}
+DOMAIN-SUFFIX,artrg.cn,{{{policy}}}
+DOMAIN-SUFFIX,h8h4h.com,{{{policy}}}
+DOMAIN-KEYWORD,byapi.,{{{policy}}}
+IP-CIDR,211.154.21.150/32,{{{policy}}},no-resolve
+IP-CIDR,42.157.129.25/32,{{{policy}}},no-resolve
+IP-CIDR,211.99.98.63/32,{{{policy}}},no-resolve
+IP-CIDR,111.180.204.11/32,{{{policy}}},no-resolve
+IP-CIDR,103.44.236.131/32,{{{policy}}},no-resolve
+IP-CIDR,103.44.236.0/24,{{{policy}}},no-resolve
+IP-CIDR,103.39.222.0/24,{{{policy}}},no-resolve
+IP-CIDR,211.99.98.0/24,{{{policy}}},no-resolve
 
 [Map Local]
-# 屏蔽上报逻辑
+# 鲍鱼盒子 - 屏蔽上报逻辑
 ^https?://siajksslwiso\.anningsh\.com/report data-type=text data=" " status-code=200
 
 [Script]
-# 注入逻辑
+# 鲍鱼盒子 - 注入会员逻辑
 鲍鱼盒子 = type=http-request, pattern=^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/abaloneBox_injector.js, argument=token={{{token}}}, requires-body=false, timeout=60
 
 [MITM]
-# 解密 IP 地址
+# 鲍鱼盒子 - 解密域名
 hostname = %APPEND% 211.154.21.150, w1c2.ooat88.com, tu.dfgfdg.win, 103.44.236.*, *.artrg.cn, vkfqb.ojyrz.com, byapi.*.com, 211.99.98.*, 103.39.222.*, yubaoyu.oss-cn-shenzhen.aliyuncs.com, *api.h8h4h.com, 42.157.129.25, siajksslwiso.anningsh.com, 211.99.98.63, 111.180.204.11, 88.gbvdfe.com, vdop.fqoas.com, ica.ooat88.com, 103.44.236.131:8001
