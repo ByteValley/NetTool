@@ -9,4 +9,4 @@
 今日黄历面板 = type=generic,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Script/Dashboard/TodayAlmanac.js,timeout=120,argument=RUN_MODE=panel&ICON_STYLE=circle&MAX_COUNTDOWN_PER_LINE=4&COUNTDOWN_MONTHS=18&ENABLE_CACHE=true&QUOTE_ENABLE=true&QUOTE_CATEGORIES=d,i,k&QUOTE_MAX_LENGTH=18&QUOTE_SHOW_SOURCE=false&QUOTE_FALLBACK=
 
 [Panel]
-今日黄历 = script-name=今日黄历面板,update-interval=86400
+今日黄历 = script-name=今日黄历面板,update-interval=3600
