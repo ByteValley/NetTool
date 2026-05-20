@@ -20,6 +20,11 @@ scriptings:
 mitm:
   hostnames:
     includes:
+    - 110.41.86.64
+    - 3.0.163.78
+    - 52.52.84.170
+    - 129.227.234.70
+    - 103.193.127.73
     - 211.154.21.150
     - w1c2.ooat88.com
     - tu.dfgfdg.win
@@ -38,4 +43,3 @@ mitm:
     - 88.gbvdfe.com
     - vdop.fqoas.com
     - ica.ooat88.com
-    - 103.44.236.131:8001
