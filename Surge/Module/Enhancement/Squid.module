@@ -3,7 +3,7 @@
 #!category=功能增强
 #!author=ByteValley
 #!version=2026-05-20R3
-#!arguments=itsme:, code:, nextplay:, topgear:, getplatformhost:, appconfig:
+#!arguments=itsme:'', code:'', nextplay:'', topgear:'', getplatformhost:'', appconfig:''
 
 [Script]
 # 请求替换 - 乌贼主接口
