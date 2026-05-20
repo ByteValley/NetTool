@@ -1,11 +1,7 @@
 /**
  * 乌贼增强 (Surge 适配版)
- * 逻辑：脚本内置 itsme / code，并按接口替换加密请求体
+ * 逻辑：优先使用模块参数，其次使用脚本内置配置
  * 注意：fuck_u 需与登录态成套使用
- *
- * 使用方式：
- * 1. 不建议在公开仓库填写真实 itsme / code / fuck_u
- * 2. 如需自用，请复制到私有仓库或本地脚本后填写 CONFIG
  */
 (function () {
   if (typeof $response !== 'undefined') {
@@ -23,6 +19,16 @@
       appconfig: ''
     }
   };
+
+  var args = parseArgs(typeof $argument === 'string' ? $argument : '');
+
+  CONFIG.itsme = args.itsme || CONFIG.itsme;
+  CONFIG.code = args.code || CONFIG.code;
+
+  CONFIG.body.nextplay = args.nextplay || CONFIG.body.nextplay;
+  CONFIG.body.topgear = args.topgear || CONFIG.body.topgear;
+  CONFIG.body.getplatformhost = args.getplatformhost || CONFIG.body.getplatformhost;
+  CONFIG.body.appconfig = args.appconfig || CONFIG.body.appconfig;
 
   var url = ($request && $request.url) ? $request.url : '';
   var headers = ($request && $request.headers) ? { ...$request.headers } : {};
@@ -62,6 +68,24 @@
     headers: headers,
     body: body
   });
+
+  function parseArgs(str) {
+    var obj = {};
+
+    str.split('&').forEach(function (item) {
+      var index = item.indexOf('=');
+      if (index === -1) return;
+
+      var key = item.slice(0, index).trim();
+      var value = item.slice(index + 1).trim();
+
+      if (key) {
+        obj[key] = decodeURIComponent(value);
+      }
+    });
+
+    return obj;
+  }
 
   function setHeader(headers, name, value) {
     var oldKey = Object.keys(headers).find(function (k) {
