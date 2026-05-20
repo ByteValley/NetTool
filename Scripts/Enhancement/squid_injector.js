@@ -1,15 +1,11 @@
 /**
  * 乌贼增强 (Surge 适配版)
- * 逻辑：注入 itsme / code，并按接口替换加密请求体
+ * 逻辑：脚本内置 itsme / code，并按接口替换加密请求体
  * 注意：fuck_u 需与登录态成套使用
  *
- * 传参：
- * itsme=xxxx
- * code=xxxx
- * nextplay=xxxx
- * topgear=xxxx
- * getplatformhost=xxxx
- * appconfig=xxxx
+ * 使用方式：
+ * 1. 不建议在公开仓库填写真实 itsme / code / fuck_u
+ * 2. 如需自用，请复制到私有仓库或本地脚本后填写 CONFIG
  */
 (function () {
   if (typeof $response !== 'undefined') {
@@ -17,28 +13,38 @@
     return;
   }
 
-  var url = ($request && $request.url) ? $request.url : '';
-  try { console.log('[squid][hit] ' + url); } catch (e) {}
+  var CONFIG = {
+    itsme: '',
+    code: '',
+    body: {
+      nextplay: '',
+      topgear: '',
+      getplatformhost: '',
+      appconfig: ''
+    }
+  };
 
-  var args = parseArgs(typeof $argument === 'string' ? $argument : '');
+  var url = ($request && $request.url) ? $request.url : '';
   var headers = ($request && $request.headers) ? { ...$request.headers } : {};
   var body = ($request && $request.body) ? $request.body : '';
 
-  if (args.itsme) {
-    setHeader(headers, 'itsme', args.itsme);
+  try { console.log('[squid][hit] ' + url); } catch (e) {}
+
+  if (CONFIG.itsme) {
+    setHeader(headers, 'itsme', CONFIG.itsme);
   }
 
-  if (args.code) {
-    setHeader(headers, 'code', args.code);
+  if (CONFIG.code) {
+    setHeader(headers, 'code', CONFIG.code);
   }
 
   setHeader(headers, 'content-type', 'application/json');
 
   var bodyMap = {
-    '/APl/Live/NextPlay': args.nextplay,
-    '/APl/Live/TopGear': args.topgear,
-    '/APl/Live/GetPlatformHost': args.getplatformhost,
-    '/APl/App/Config': args.appconfig
+    '/APl/Live/NextPlay': CONFIG.body.nextplay,
+    '/APl/Live/TopGear': CONFIG.body.topgear,
+    '/APl/Live/GetPlatformHost': CONFIG.body.getplatformhost,
+    '/APl/App/Config': CONFIG.body.appconfig
   };
 
   for (var path in bodyMap) {
@@ -47,10 +53,7 @@
         fuck_u: bodyMap[path]
       });
 
-      try {
-        console.log('[squid][body] replaced -> ' + path);
-      } catch (e) {}
-
+      try { console.log('[squid][body] replaced -> ' + path); } catch (e) {}
       break;
     }
   }
@@ -59,24 +62,6 @@
     headers: headers,
     body: body
   });
-
-  function parseArgs(str) {
-    var obj = {};
-
-    str.split('&').forEach(function (item) {
-      var index = item.indexOf('=');
-      if (index === -1) return;
-
-      var key = item.slice(0, index).trim();
-      var value = item.slice(index + 1).trim();
-
-      if (key) {
-        obj[key] = decodeURIComponent(value);
-      }
-    });
-
-    return obj;
-  }
 
   function setHeader(headers, name, value) {
     var oldKey = Object.keys(headers).find(function (k) {
