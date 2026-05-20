@@ -1,0 +1,14 @@
+#!name=乌贼
+#!desc=乌贼增强，自用请求头与加密请求体成套替换
+#!category=功能增强
+#!author=ByteValley
+#!version=2026-05-20R1
+#!arguments=itsme:, code:, nextplay:, topgear:, getplatformhost:, appconfig:
+
+[Script]
+# 请求替换 - 乌贼主接口
+乌贼 = type=http-request, pattern=^https?:\/\/s30s\.booking\.gxggzx\.com\/APl\/(Live|App|User)\/, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/squid_injector.js, argument=itsme={{{itsme}}}&code={{{code}}}&nextplay={{{nextplay}}}&topgear={{{topgear}}}&getplatformhost={{{getplatformhost}}}&appconfig={{{appconfig}}}, requires-body=true, timeout=60
+
+[MITM]
+# 主接口域名
+hostname = %APPEND% s30s.booking.gxggzx.com
