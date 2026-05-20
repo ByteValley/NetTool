@@ -1,0 +1,20 @@
+#!name=鲍鱼盒子
+#!desc=鲍鱼盒子增强，解锁会员功能
+#!author=ByteValley
+#!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1087.png
+#!tag=功能增强
+#!version=2026-03-01R1
+
+[Argument]
+token=input,bearer 47516c8088984f2c4f1788be51216289,tag=token, desc=token
+
+[Rewrite]
+# 屏蔽上报逻辑
+^https?://siajksslwiso\.anningsh\.com/report mock-response-body data-type=text data=" " status-code=200
+
+[Script]
+# 注入逻辑
+http-request ^https?:\/\/.*\/api\/(video\/report_item|live\/room\/detail|video\/related|video\/detail|socialposts_info|my\/profile) script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/abaloneBox_injector.js, timeout=60, tag=鲍鱼盒子, argument=token={token}
+
+[MITM]
+hostname = 211.154.21.150, w1c2.ooat88.com, tu.dfgfdg.win, 103.44.236.*, *.artrg.cn, vkfqb.ojyrz.com, byapi.*.com, 211.99.98.*, 103.39.222.*, yubaoyu.oss-cn-shenzhen.aliyuncs.com, *api.h8h4h.com, 42.157.129.25, siajksslwiso.anningsh.com, 211.99.98.63, 111.180.204.11, 88.gbvdfe.com, vdop.fqoas.com, ica.ooat88.com, 103.44.236.131
