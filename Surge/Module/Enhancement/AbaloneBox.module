@@ -3,39 +3,7 @@
 #!category=功能增强
 #!author=ByteValley
 #!version=2026-05-20R4
-#!arguments=token:bearer 47516c8088984f2c4f1788be51216289, policy:境内服务
-
-[Rule]
-# 鲍鱼盒子 - 接口域名走指定策略
-DOMAIN,w1c2.ooat88.com,{{{policy}}}
-DOMAIN,tu.dfgfdg.win,{{{policy}}}
-DOMAIN,vkfqb.ojyrz.com,{{{policy}}}
-DOMAIN,yubaoyu.oss-cn-shenzhen.aliyuncs.com,{{{policy}}}
-DOMAIN,siajksslwiso.anningsh.com,{{{policy}}}
-DOMAIN,88.gbvdfe.com,{{{policy}}}
-DOMAIN,vdop.fqoas.com,{{{policy}}}
-DOMAIN,ica.ooat88.com,{{{policy}}}
-DOMAIN,ap.agora.io,{{{policy}}}
-DOMAIN,ap-tds-tls-asia.rtesvc.com,{{{policy}}}
-DOMAIN,ap-tls-asia.rtesvc.com,{{{policy}}}
-DOMAIN,drn23kgaout572x6dztd.huichisb.com,{{{policy}}}
-DOMAIN,568.mxtth.com,{{{policy}}}
-DOMAIN,static.demoyf.top,{{{policy}}}
-DOMAIN-SUFFIX,artrg.cn,{{{policy}}}
-DOMAIN-SUFFIX,h8h4h.com,{{{policy}}}
-DOMAIN-KEYWORD,byapi.,{{{policy}}}
-IP-CIDR,52.54.85.111/32,{{{policy}}},no-resolve
-IP-CIDR,13.250.89.184/32,{{{policy}}},no-resolve
-IP-CIDR,45.40.48.19/32,{{{policy}}},no-resolve
-IP-CIDR,129.227.69.10/32,{{{policy}}},no-resolve
-IP-CIDR,211.154.21.150/32,{{{policy}}},no-resolve
-IP-CIDR,42.157.129.25/32,{{{policy}}},no-resolve
-IP-CIDR,211.99.98.63/32,{{{policy}}},no-resolve
-IP-CIDR,111.180.204.11/32,{{{policy}}},no-resolve
-IP-CIDR,103.44.236.131/32,{{{policy}}},no-resolve
-IP-CIDR,103.44.236.0/24,{{{policy}}},no-resolve
-IP-CIDR,103.39.222.0/24,{{{policy}}},no-resolve
-IP-CIDR,211.99.98.0/24,{{{policy}}},no-resolve
+#!arguments=token:bearer 47516c8088984f2c4f1788be51216289
 
 [Map Local]
 # 鲍鱼盒子 - 屏蔽上报逻辑
