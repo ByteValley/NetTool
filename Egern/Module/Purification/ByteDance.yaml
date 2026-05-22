@@ -6,9 +6,6 @@ author: ByteValley
 icon: https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 dns: {}
 rules:
-- host_keyword:
-    match: sinfonline
-    policy: REJECT-DROP
 - domain:
     match: ad.zijieapi.com
     policy: REJECT
@@ -33,6 +30,218 @@ rules:
     - domain_keyword:
         match: normal-lf
     policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: zijieapi.com
+    - domain_keyword:
+        match: abtest
+    policy: REJECT
+- domain:
+    match: abtest3-misc.zijieapi.com
+    policy: REJECT-DROP
+- domain:
+    match: abtest3-misc-lf.zijieapi.com
+    policy: REJECT-DROP
+- domain:
+    match: tnc0-alisc1.zijieapi.com
+    policy: REJECT-DROP
+- domain:
+    match: praisewindow-sinfonlinea.ugsdk.cn
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: snssdk.com
+    - domain_keyword:
+        match: vas-lf
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: snssdk.com
+    - domain_keyword:
+        match: open_ad
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: snssdk.com
+    - domain_keyword:
+        match: mon
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.snssdk\.com\/api\/(launch|startup)\/(open_ad|ad)\b
+    policy: REJECT-DROP
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.(toutiao|snssdk)\.com\/api\/ad\/.*
+    policy: REJECT
+- domain:
+    match: frontier-aweme.snssdk.com
+    policy: REJECT
+- domain_suffix:
+    match: pangolin.snssdk.com
+    policy: REJECT
+- domain:
+    match: ad.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: ads.toutiao.com
+    policy: REJECT
+- domain_suffix:
+    match: adbyte.bytedance.com
+    policy: REJECT
+- url_regex:
+    match: ^https?:\/\/[^\/]+\.toutiaoapi\.com\/api\/(launch|startup)\/(open_ad|ad)\b
+    policy: REJECT-DROP
+- domain_suffix:
+    match: log.toutiao.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: toutiaocloud.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: va.toutiao.com
+    policy: REJECT-DROP
+- domain:
+    match: mon11-misc-lq.toutiaoapi.com
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: toutiaoapi.com
+    - domain_keyword:
+        match: misc-lq
+    policy: REJECT-DROP
+- domain_suffix:
+    match: partner.toutiao.com
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: misc-lf
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: misc-lq
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: normal-lf
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: normal-lq
+    policy: REJECT
+- domain:
+    match: api3-normal-lf.fqnovel.com
+    policy: REJECT-DROP
+- domain:
+    match: api5-normal-lq.fqnovel.com
+    policy: REJECT-DROP
+- domain:
+    match: mon11-misc-lq.fqnovel.com
+    policy: REJECT-DROP
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovel.com
+    - domain_keyword:
+        match: frontier100
+    policy: REJECT-DROP
+- domain_keyword:
+    match: pangolin-sdk-toutiao
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: fqnovelpic.com
+    - domain_keyword:
+        match: ad-sign
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: douyin.com
+    - domain_keyword:
+        match: open-lf
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: douyin.com
+    - domain_keyword:
+        match: open-lq
+    policy: REJECT
+- domain:
+    match: webcast5-open-lf.douyin.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: webcastcdn-tos.douyinstatic.com
+    policy: REJECT
+- domain_suffix:
+    match: webcastcdn-tos-sign.douyinstatic.com
+    policy: REJECT
+- domain_suffix:
+    match: webcast-sourcecdn-tos.bytegecko.com
+    policy: REJECT
+- domain_suffix:
+    match: webcast-gr-sourcecdn-tos.bytegecko.com
+    policy: REJECT
+- domain_suffix:
+    match: webcast.douyinpic.com
+    policy: REJECT
+- and:
+    match:
+    - domain_suffix:
+        match: bytedcdn.com
+    - domain_keyword:
+        match: reward-video
+    policy: REJECT
+- domain_suffix:
+    match: log.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: rtlog.snssdk.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: data.bytedance.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: ibytedapm.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: syzagk.com
+    policy: REJECT
+- domain:
+    match: api.dler.io
+    policy: REJECT
+- domain:
+    match: jr-ad.ctrip.com
+    policy: REJECT-DROP
+- domain:
+    match: tracking.ad-survey.com
+    policy: REJECT-DROP
+- domain_suffix:
+    match: bdurl.net
+    policy: REJECT
+- domain_suffix:
+    match: zjurl.cn
+    policy: REJECT
+- domain:
+    match: tr.byteurl.cn
+    policy: REJECT
 mitm:
   hostnames:
     includes:
