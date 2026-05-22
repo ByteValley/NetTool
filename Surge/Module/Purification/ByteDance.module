@@ -3,11 +3,11 @@
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
 #!author=ByteValley
-#!version=2026-05-22R2
+#!version=2026-05-22R3
 
 [Rule]
-# 模块分类 · 开屏广告（SNI 精准拦截）
-HOST-KEYWORD,sinfonline,REJECT-DROP
+# 模块分类 · 开屏广告（番茄 sinfonline）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,sinfonline)),REJECT-DROP,extended-matching
 
 # 模块分类 · 直连放行（业务音频 · 兼容层）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务,extended-matching
