@@ -6,71 +6,47 @@
 #!system=iOS,iPadOS,macOS
 #!loon_version=3.2.0
 #!category=功能净化
-#!version=2026-05-22R2
+#!version=2026-05-22R3
 
 [Rule]
-# =====================================================================
-# 模块分类 · 直连放行（业务音频 · 兼容层）
-# =====================================================================
+# 业务音频直连
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务,extended-matching
 
-# =====================================================================
-# 模块分类 · 开屏广告（番茄 sinfonline）
-# =====================================================================
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,-sinfonline)),REJECT
+# 开屏广告 SNI 拦截
+HOST-KEYWORD,sinfonline,REJECT
 
-# =====================================================================
-# 模块分类 · 横幅广告（SDK 下标位）
-# =====================================================================
+# SDK 横幅广告
 AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonline)),REJECT
 DOMAIN-SUFFIX,ugsdk.cn,REJECT
 
-# =====================================================================
-# 模块分类 · 短链 / 跳转追踪（落地页与归因）
-# =====================================================================
+# 短链跳转追踪
 DOMAIN-SUFFIX,bdurl.net,REJECT
 DOMAIN-SUFFIX,zjurl.cn,REJECT
 DOMAIN-SUFFIX,byteurl.cn,REJECT
 
-# =====================================================================
-# 模块分类 · 章节视频广告（推流源拦截）
-# =====================================================================
+# 章节视频广告
 URL-REGEX,^https?:\/\/[a-z0-9-]+\.douyincdn\.com\/stage\/stream-[^?]+\.(flv|m3u8|mp4)(\?|$),REJECT
 
-# =====================================================================
-# 模块分类 · 上游调度拦截
-# =====================================================================
+# 上游调度拦截
 AND,((OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,frontier-aweme))),(DOMAIN-SUFFIX,snssdk.com)),REJECT
 
-# =====================================================================
-# 模块分类 · 开放平台入口
-# =====================================================================
+# 开放平台入口
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,-open)),REJECT
 
-# =====================================================================
-# 模块分类 · 广告线路标签总闸
-# =====================================================================
+# 广告线路标签总闸
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT
 
-# =====================================================================
-# 模块分类 · 番茄小说短剧（TOS 推流视频）
-# =====================================================================
+# TOS 推流视频
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,-tos)),REJECT
 
-# =====================================================================
-# 模块分类 · 激励 / 推广视频广告（reward 关键字）
-# =====================================================================
+# reward 激励视频
 DOMAIN-KEYWORD,-reward-,REJECT
 
-# =====================================================================
-# 模块分类 · 激励 / 推广短剧（投放入口域名）
-# =====================================================================
+# 激励投放入口
 DOMAIN,ad.zijieapi.com,REJECT
 
-# =====================================================================
-# 模块分类 · LuckyCat 任务体系
-# =====================================================================
+# LuckyCat 任务体系
 URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v1\/task\/pendant_list,REJECT
 URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v1\/task\/meal_v2\/page,REJECT
 URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v2\/resource\/resource_plan,REJECT
