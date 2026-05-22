@@ -1,0 +1,11 @@
+#!name=应用安装
+#!desc=App Store 低版本应用安装、已购下架应用安装
+#!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1016.png
+
+[Script]
+http-request https://apple-api.com script-path=https://raw.githubusercontent.com/githubdulong/Script/master/AppleStoreAPI.js, requires-body=true, timeout=30, tag=应用接口
+
+http-request https:\/\/xiaobai\.app script-path=https://raw.githubusercontent.com/githubdulong/Script/master/installapp.js, tag=应用安装
+
+[MITM]
+hostname = apple-api.com, xiaobai.app
