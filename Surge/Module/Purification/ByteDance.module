@@ -20,6 +20,8 @@ AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEY
 # 模块分类 · 直连放行（兼容层 B · 内嵌写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),境内服务
 
+# 模块分类 · 开屏广告（番茄 sinfonline）
+AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended-matching
 
 # =====================================================================
 # 模块分类 · 横幅广告（SDK 下标位 · 兼容层）
