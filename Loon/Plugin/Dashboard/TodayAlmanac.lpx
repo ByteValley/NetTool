@@ -1,0 +1,8 @@
+#!name=今日黄历
+#!desc=显示今日黄历、宜忌、干支，并提供传统节假日、二十四节气、民俗节日、国际节日倒计时。面板顶部支持每日一句。
+#!author=zqzess / ByteEden
+#!icon=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Calendar.png
+#!tag=功能看板
+
+[Script]
+cron "0 9 * * *" script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Script/Dashboard/TodayAlmanac.js, timeout=120, tag=今日黄历通知, argument=RUN_MODE=notify&ICON_STYLE=circle&MAX_COUNTDOWN_PER_LINE=4&COUNTDOWN_MONTHS=18&ENABLE_CACHE=true&QUOTE_ENABLE=false
