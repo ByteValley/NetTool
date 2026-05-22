@@ -20,8 +20,19 @@ AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEY
 # 模块分类 · 直连放行（兼容层 B · 内嵌写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),境内服务
 
-# 模块分类 · 开屏广告（番茄 sinfonline）
+# =====================================================================
+# 模块分类 · 开屏广告（番茄 sinfonline · 兼容层）
+# 说明：
+# · 番茄小说 sinfonline 线路常用于开屏广告素材与调度
+# · 不影响章节正文、书城接口与短剧播放
+# · 双写法用于适配不同 AND + extended-matching 解析路径
+# =====================================================================
+
+# 模块分类 · 开屏广告（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended-matching
+
+# 模块分类 · 开屏广告（兼容层 B · 内嵌写法）
+AND,((DOMAIN-SUFFIX,fqnovel.com,extended-matching),(DOMAIN-KEYWORD,-sinfonline,extended-matching)),REJECT-DROP
 
 # =====================================================================
 # 模块分类 · 横幅广告（SDK 下标位 · 兼容层）
