@@ -3,183 +3,44 @@
 #!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/DragonRead.png
 #!category=功能净化
 #!author=ByteValley
-#!version=2026-01-02R1
+#!version=2026-05-22R2
 
 [Rule]
-# =====================================================================
+# 模块分类 · 开屏广告（SNI 精准拦截）
+HOST-KEYWORD,sinfonline,REJECT-DROP
+
 # 模块分类 · 直连放行（业务音频 · 兼容层）
-# 说明：
-# · 汽水音乐部分音频流量需直连
-# · 通过 -luna 线路标签识别
-# · 不同内核对 extended-matching 触发路径不同，需双写法并存
-# =====================================================================
-
-# 模块分类 · 直连放行（兼容层 A · 标准写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,douyinvod.com))),(DOMAIN-KEYWORD,-luna)),境内服务,extended-matching
-
-# 模块分类 · 直连放行（兼容层 B · 内嵌写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.com,extended-matching))),(DOMAIN-KEYWORD,-luna,extended-matching)),境内服务
 
-
-# =====================================================================
 # 模块分类 · 横幅广告（SDK 下标位 · 兼容层）
-# 说明：
-# · ug-sdk 下标横幅与浮层广告
-# · 不影响核心业务流程
-# · 双写法用于适配不同 AND/OR + extended-matching 解析路径
-# =====================================================================
-
-# 模块分类 · 横幅广告（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,ugsdk.cn),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended-matching
-
-# 模块分类 · 横幅广告（兼容层 B · 内嵌写法）
 AND,((DOMAIN-SUFFIX,ugsdk.cn,extended-matching),(DOMAIN-KEYWORD,-sinfonline,extended-matching)),REJECT-DROP
-
-
-# 模块分类 · 横幅广告（域名兜底）
 DOMAIN-SUFFIX,ugsdk.cn,REJECT-DROP,extended-matching
 
-
-# =====================================================================
-# 模块分类 · 短链 / 跳转追踪（落地页与归因）
-# 说明：
-# · bdurl / zjurl / byteurl 多用于广告跳转与归因
-# · 不影响站内核心功能
-# · 域名规则稳定，无需兼容层
-# =====================================================================
 DOMAIN-SUFFIX,bdurl.net,REJECT-DROP,extended-matching
 DOMAIN-SUFFIX,zjurl.cn,REJECT-DROP,extended-matching
 DOMAIN-SUFFIX,byteurl.cn,REJECT-DROP,extended-matching
 
-
-# =====================================================================
-# 模块分类 · 章节短剧广告（vegslb 域名兜底）
-# 说明：
-# · vegslb 为章节短剧广告常见负载均衡入口
-# · 子域高度随机，采用后缀兜底更稳定
-# · 若你需要更强拦截可取消注释；若需保留短剧播放建议保持关闭
-# =====================================================================
 # DOMAIN-SUFFIX,vegslb.com,REJECT-DROP,extended-matching
 
-
-# =====================================================================
-# 模块分类 · 章节视频广告（推流源拦截 · 推荐）
-# 说明：
-# · 命中 douyincdn 的 stage 推流视频
-# · 覆盖 flv / m3u8 / mp4 三种载体
-# · 不影响章节正文与书城接口
-# =====================================================================
 URL-REGEX,^https?:\/\/[a-z0-9-]+\.douyincdn\.com\/stage\/stream-[^?]+\.(flv|m3u8|mp4)(\?|$),REJECT-DROP,extended-matching
 
-
-# =====================================================================
-# 模块分类 · 章节视频广告（上游调度拦截 · 兼容层）
-# 说明：
-# · frontier-aweme / -bjlgy 常见于视频调度线路
-# · 属于上游调度拦截，命中高但风险较大
-# · 不同内核对 OR + KEYWORD 的解析差异较大，需双写法并存
-# =====================================================================
-
-# 模块分类 · 上游调度拦截（兼容层 A · 标准写法）
 AND,((OR,((DOMAIN-KEYWORD,-bjlgy),(DOMAIN-KEYWORD,frontier-aweme))),(DOMAIN-SUFFIX,snssdk.com)),REJECT-DROP,extended-matching
-
-# 模块分类 · 上游调度拦截（兼容层 B · 内嵌写法）
 AND,((OR,((DOMAIN-KEYWORD,-bjlgy,extended-matching),(DOMAIN-KEYWORD,frontier-aweme,extended-matching))),(DOMAIN-SUFFIX,snssdk.com,extended-matching)),REJECT-DROP
 
-
-# =====================================================================
-# 模块分类 · 章节视频广告（开放平台入口 · 兼容层）
-# 说明：
-# · -open 线路常用于抖音开放能力调度
-# · 可能影响分享 / 授权 / 拉起功能
-# · 双写法用于适配不同内核的 extended-matching 行为
-# =====================================================================
-
-# 模块分类 · 开放平台入口（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,-open)),REJECT-DROP,extended-matching
-
-# 模块分类 · 开放平台入口（兼容层 B · 内嵌写法）
 AND,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-KEYWORD,-open,extended-matching)),REJECT-DROP
 
-
-# =====================================================================
-# 模块分类 · 广告线路标签总闸（-lf / -lq / -hl · 兼容层）
-# 说明：
-# · 字节系常见广告 / 激励 / 前贴片线路标签
-# · 不同内核 / 版本对 AND/OR + extended-matching 的解析路径差异显著
-# · 实测：部分版本需「标准写法 + 内嵌写法」并存才可稳定命中
-# · 并存属于兼容性冗余，并非重复规则
-# =====================================================================
-
-# 模块分类 · 广告线路标签总闸（兜底直拦 · 单关键字）
-# DOMAIN-KEYWORD,-lq,REJECT-DROP,extended-matching
-
-# 模块分类 · 广告线路标签总闸（兼容层 A · 标准写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-SUFFIX,zijieapi.com),(DOMAIN-SUFFIX,snssdk.com),(DOMAIN-SUFFIX,toutiaoapi.com),(DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-SUFFIX,fqnovelvod.com))),(OR,((DOMAIN-KEYWORD,-lf),(DOMAIN-KEYWORD,-lq),(DOMAIN-KEYWORD,-hl)))),REJECT-DROP,extended-matching
-
-# 模块分类 · 广告线路标签总闸（兼容层 B · 内嵌写法）
 AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,zijieapi.com,extended-matching),(DOMAIN-SUFFIX,snssdk.com,extended-matching),(DOMAIN-SUFFIX,toutiaoapi.com,extended-matching),(DOMAIN-SUFFIX,fqnovel.com,extended-matching),(DOMAIN-SUFFIX,fqnovelvod.com,extended-matching))),(OR,((DOMAIN-KEYWORD,-lf,extended-matching),(DOMAIN-KEYWORD,-lq,extended-matching),(DOMAIN-KEYWORD,-hl,extended-matching)))),REJECT-DROP
 
-
-# =====================================================================
-# 模块分类 · 番茄小说短剧（TOS 推流视频 · 兼容层）
-# 说明：
-# · 命中 bytegecko TOS 视频源
-# · 仅拦推流，不影响信息流接口
-# · 不同内核对 TOS 域名 + KEYWORD 的解析存在差异
-# =====================================================================
-
-# 模块分类 · TOS 推流视频（兼容层 A · 标准写法）
 AND,((DOMAIN-SUFFIX,bytegecko.com),(DOMAIN-KEYWORD,-tos)),REJECT-DROP,extended-matching
-
-# 模块分类 · TOS 推流视频（兼容层 B · 内嵌写法）
 AND,((DOMAIN-SUFFIX,bytegecko.com,extended-matching),(DOMAIN-KEYWORD,-tos,extended-matching)),REJECT-DROP
 
-
-# =====================================================================
-# 模块分类 · 激励 / 推广视频广告（reward 关键字）
-# 说明：
-# · reward 常用于字节系激励视频 / 推广视频命名
-# · 多见于章节插入的视频广告、看视频得奖励等场景
-# · 命中视频分发 CDN 或投放链路命名关键字
-# · 副作用较低，通常不影响正常短剧播放
-# =====================================================================
 DOMAIN-KEYWORD,-reward-,REJECT-DROP,extended-matching
-
-
-# =====================================================================
-# 模块分类 · 激励 / 推广短剧（投放入口域名）
-# 说明：
-# · ad.zijieapi.com 常用于激励广告请求入口与投放调度
-# · 与 inspire 接口搭配可减少“转圈 + 跳秒”的无效播放尝试
-# · 副作用：可能影响金币/激励任务的领取与展示
-# =====================================================================
 DOMAIN,ad.zijieapi.com,REJECT-DROP,extended-matching
 
-
-# =====================================================================
-# 模块分类 · 激励 / 推广短剧（激励广告入口 · inspire）
-# 说明：
-# · ad.zijieapi.com 的 inspire 为激励广告入口（看视频得奖励/推广短剧常用）
-# · 拦截后可减少“转圈 + 跳秒”的无效播放尝试
-# · 副作用：可能影响金币/激励任务的领取与展示
-# =====================================================================
-# URL-REGEX,^https?:\/\/ad\.zijieapi\.com\/api\/ad\/v1\/inspire\/,REJECT-DROP
-
-
-# =====================================================================
-# 模块分类 · 激励 / 推广短剧（LuckyCat 任务体系）
-# 说明：
-# · luckycat 相关接口常用于任务挂件、奖励页与投放资源计划
-# · 目标：阻断章节内推广短剧/激励视频的上游触发
-# · 副作用：会影响任务挂件、奖励页、部分福利入口（但更能彻底消除转圈）
-# =====================================================================
-
-# 模块分类 · LuckyCat 任务挂件（pendant_list）
 URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v1\/task\/pendant_list,REJECT-DROP
-
-# 模块分类 · LuckyCat 任务页面（meal_v2）
 URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v1\/task\/meal_v2\/page,REJECT-DROP
-
-# 模块分类 · LuckyCat 资源计划（resource_plan）
 URL-REGEX,^https?:\/\/api\d+-normal-[^\/]+\.fqnovel\.com\/luckycat\/novel\/v2\/resource\/resource_plan,REJECT-DROP
