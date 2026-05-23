@@ -29,10 +29,10 @@ AND,((OR,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-SUFFIX,douyinvod.
 # =====================================================================
 
 # 模块分类 · 开屏广告（兼容层 A · 标准写法）
-AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended-matching
+# AND,((DOMAIN-SUFFIX,fqnovel.com),(DOMAIN-KEYWORD,-sinfonline)),REJECT-DROP,extended-matching
 
 # 模块分类 · 开屏广告（兼容层 B · 内嵌写法）
-AND,((DOMAIN-SUFFIX,fqnovel.com,extended-matching),(DOMAIN-KEYWORD,-sinfonline,extended-matching)),REJECT-DROP
+# AND,((DOMAIN-SUFFIX,fqnovel.com,extended-matching),(DOMAIN-KEYWORD,-sinfonline,extended-matching)),REJECT-DROP
 
 # =====================================================================
 # 模块分类 · 横幅广告（SDK 下标位 · 兼容层）
