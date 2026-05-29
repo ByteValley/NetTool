@@ -109,10 +109,10 @@ AND,((OR,((DOMAIN-KEYWORD,-bjlgy,extended-matching),(DOMAIN-KEYWORD,frontier-awe
 # =====================================================================
 
 # 模块分类 · 开放平台入口（兼容层 A · 标准写法）
-AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,-open)),REJECT-DROP,extended-matching
+AND,((DOMAIN-SUFFIX,douyin.com),(DOMAIN-KEYWORD,-open-lf)),REJECT-DROP,extended-matching
 
 # 模块分类 · 开放平台入口（兼容层 B · 内嵌写法）
-AND,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-KEYWORD,-open,extended-matching)),REJECT-DROP
+AND,((DOMAIN-SUFFIX,douyin.com,extended-matching),(DOMAIN-KEYWORD,-open-lf,extended-matching)),REJECT-DROP
 
 
 # =====================================================================
