@@ -5,7 +5,9 @@
 #!tag=功能增强
 
 [Script]
-http-response https:\/\/(api|api-cs)\.intsig\.net\/purchase\/cs\/query_property\? script-path=https://raw.githubusercontent.com/NobyDa/Script/master/Surge/JS/CamScanner.js, requires-body=true, tag=扫描全能王
+http-response ^https:\/\/(api|api-cs)\.intsig\.net\/purchase\/cs\/query_property\? script-path=https://raw.githubusercontent.com/NobyDa/Script/master/Surge/JS/CamScanner.js, requires-body=true, timeout=60, tag=CamScanner
+
+http-response https:\/\/(api|api-cs)\.intsig\.net\/purchase\/cs\/query_property\? script-path=https://raw.githubusercontent.com/NobyDa/Script/master/Surge/JS/CamScanner.js, requires-body=true, tag=CamScanner
 
 [MITM]
 hostname = ap*.intsig.net
