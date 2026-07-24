@@ -28,6 +28,8 @@ export type UiSettings = {
   smallCardStyle: SmallCardStyle
   smallMiniBarUseTotalFlow: boolean
   includeDirectionalInTotal: boolean
+  transparentWidgetStyle: boolean
+  colorfulLineBorder: boolean
 }
 
 /**
@@ -45,6 +47,8 @@ const DEFAULT_UI: UiSettings = {
   smallCardStyle: "CompactList",
   smallMiniBarUseTotalFlow: false,
   includeDirectionalInTotal: true,
+  transparentWidgetStyle: false,
+  colorfulLineBorder: false,
 }
 
 const VALID_SMALL_STYLE_SET = new Set<string>([
@@ -69,6 +73,9 @@ export function pickUiSettings(src?: UiSwitchSource): UiSettings {
       typeof s.smallMiniBarUseTotalFlow === "boolean" ? s.smallMiniBarUseTotalFlow : DEFAULT_UI.smallMiniBarUseTotalFlow,
     includeDirectionalInTotal:
       typeof s.includeDirectionalInTotal === "boolean" ? s.includeDirectionalInTotal : DEFAULT_UI.includeDirectionalInTotal,
+    transparentWidgetStyle:
+      typeof s.transparentWidgetStyle === "boolean" ? s.transparentWidgetStyle : DEFAULT_UI.transparentWidgetStyle,
+    colorfulLineBorder: typeof s.colorfulLineBorder === "boolean" ? s.colorfulLineBorder : DEFAULT_UI.colorfulLineBorder,
   }
 }
 
