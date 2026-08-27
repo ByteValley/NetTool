@@ -84,9 +84,7 @@ export default async function(ctx) {
 
     if (!todayAlmanac) throw new Error(`未找到 ${todayInfo.dateText} 的黄历数据`);
 
-    const cached = getCachedCountdowns(ctx, todayInfo, config);
-    const countdowns = cached || await buildCountdowns(ctx, todayDate, config);
-    if (!cached) setCachedCountdowns(ctx, todayInfo, config, countdowns);
+    const countdowns = await buildCountdowns(ctx, todayDate, config);
 
     const quoteTitle = ctx.widgetFamily ? await getDailyQuoteTitle(ctx, todayInfo, config) : config.title;
     const payload = buildPayload(todayAlmanac, todayInfo, countdowns, config, quoteTitle);
@@ -115,7 +113,6 @@ function getConfig(ctx) {
     maxCountdownPerLine: readInt(env.MAX_COUNTDOWN_PER_LINE, DEFAULT_MAX_COUNTDOWN_PER_LINE, 1, 12),
     countdownMonths: readInt(env.COUNTDOWN_MONTHS, DEFAULT_COUNTDOWN_MONTHS, 3, 36),
     requestTimeoutMs: readInt(env.REQUEST_TIMEOUT_MS, DEFAULT_REQUEST_TIMEOUT_MS, 3000, 60000),
-    enableCache: readBool(env.ENABLE_CACHE, true),
     quoteEnable: readBool(env.QUOTE_ENABLE, true),
     quoteShowSource: readBool(env.QUOTE_SHOW_SOURCE, false),
     quoteCategories: clean(env.QUOTE_CATEGORIES) || 'd,i,k',
@@ -254,55 +251,17 @@ function sameNum(a, b) {
   return Number(a) === Number(b);
 }
 
-function storageGet(ctx, key) {
-  if (!ctx.storage || !ctx.storage.get) return null;
-  try { return ctx.storage.get(key); } catch { return null; }
-}
-
-function storageSet(ctx, key, value) {
-  if (!ctx.storage || !ctx.storage.set) return;
-  try { ctx.storage.set(key, value); } catch {}
-}
-
-function getCountdownCacheKey(dateInfo, config) {
-  return ['wnCalendar.countdowns', dateInfo.dateKey, config.countdownMonths, config.maxCountdownPerLine].join('.');
-}
-
-function getCachedCountdowns(ctx, dateInfo, config) {
-  if (!config.enableCache) return null;
-  try {
-    const raw = storageGet(ctx, getCountdownCacheKey(dateInfo, config));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.traditional) && Array.isArray(parsed.solarTerm) && Array.isArray(parsed.folk) && Array.isArray(parsed.international)) return parsed;
-  } catch {}
-  return null;
-}
-
-function setCachedCountdowns(ctx, dateInfo, config, countdowns) {
-  if (!config.enableCache) return;
-  storageSet(ctx, getCountdownCacheKey(dateInfo, config), JSON.stringify(countdowns));
-}
-
 async function getDailyQuoteTitle(ctx, dateInfo, config) {
   if (!config.quoteEnable) return config.title;
 
-  const cacheKey = ['wnCalendar.quote', dateInfo.dateKey, config.quoteCategories, config.quoteMaxLength, config.quoteShowSource ? 'source' : 'plain', 'v2'].join('.');
-  const cached = storageGet(ctx, cacheKey);
-  if (cached) return cached;
-
   try {
     const quote = await fetchHitokotoQuote(ctx, config);
-    if (quote) {
-      storageSet(ctx, cacheKey, quote);
-      return quote;
-    }
+    if (quote) return quote;
   } catch (e) {
     console.log(`每日一句获取失败：${e && e.message ? e.message : String(e)}`);
   }
 
   const fallback = config.quoteFallback && config.quoteFallback !== config.title ? config.quoteFallback : getLocalDailyQuote(dateInfo);
-  storageSet(ctx, cacheKey, fallback);
   return fallback || config.title;
 }
 
