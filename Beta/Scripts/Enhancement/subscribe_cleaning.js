@@ -432,6 +432,11 @@ const COUNTRY_RULES = [
   { zh: "巴基斯坦", alias: ["Pakistan", "PAK", "PK"] }
 ];
 
+const COUNTRY_ZH_ALIASES = {
+  "印尼": ["印度尼西亚"],
+  "澳洲": ["澳大利亚"]
+};
+
 /* =========================================================
  * 需要保留的线路标签
  * ========================================================= */
@@ -473,6 +478,7 @@ function applySmartRewrite(name) {
     return compactName(n);
   }
 
+  n = stripLeadingCountryAliases(n);
   n = injectZhFromFlag(n);
   n = replaceByRules(n, CITY_RULES);
   n = replaceByRules(n, COUNTRY_RULES);
@@ -487,6 +493,39 @@ function applySmartRewrite(name) {
 
 function shouldSkipRename(name) {
   return SKIP_RENAME_PATTERNS.some(reg => reg.test(String(name || "")));
+}
+
+function stripLeadingCountryAliases(name) {
+  let s = normalizePipes(String(name || ""));
+
+  for (const rule of COUNTRY_RULES) {
+    const canonicalTarget = escapeRegExp(rule.zh);
+    const aliasTargets = (COUNTRY_ZH_ALIASES[rule.zh] || [])
+      .map(escapeRegExp)
+      .join("|");
+
+    for (const alias of rule.alias) {
+      const pattern = alias
+        .trim()
+        .split(/\s+/)
+        .map(escapeRegExp)
+        .join("[\\s_\\-+]*");
+
+      s = s.replace(
+        new RegExp(`(^|[\\s|【】()（）_\\-+])${pattern}(?=${canonicalTarget})`, "ig"),
+        "$1"
+      );
+
+      if (!aliasTargets) continue;
+
+      s = s.replace(
+        new RegExp(`(^|[\\s|【】()（）_\\-+])${pattern}\\s*(?=(?:${aliasTargets}))`, "ig"),
+        "$1"
+      );
+    }
+  }
+
+  return s;
 }
 
 function injectZhFromFlag(name) {
@@ -510,6 +549,12 @@ function inferFlagFromZhName(name) {
   const cityKeys = Object.keys(CITY_ZH_TO_FLAG).sort((a, b) => b.length - a.length);
   for (const city of cityKeys) {
     if (s.includes(city)) return CITY_ZH_TO_FLAG[city];
+  }
+
+  for (const [zh, aliases] of Object.entries(COUNTRY_ZH_ALIASES)) {
+    const flag = ZH_TO_FLAG[zh];
+    if (!flag) continue;
+    if (aliases.some(alias => s.includes(alias))) return flag;
   }
 
   const countryKeys = Object.keys(ZH_TO_FLAG).sort((a, b) => b.length - a.length);
@@ -758,7 +803,8 @@ function getAllZhNamesSorted() {
   return [...new Set([
     ...CITY_RULES.map(x => x.zh),
     ...COUNTRY_RULES.map(x => x.zh),
-    ...Object.values(FLAG_TO_ZH)
+    ...Object.values(FLAG_TO_ZH),
+    ...Object.values(COUNTRY_ZH_ALIASES).flat()
   ])].sort((a, b) => b.length - a.length);
 }
 
