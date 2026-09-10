@@ -479,6 +479,7 @@ function applySmartRewrite(name) {
   }
 
   n = stripLeadingCountryAliases(n);
+  n = normalizeCountryZhAliases(n);
   n = injectZhFromFlag(n);
   n = replaceByRules(n, CITY_RULES);
   n = replaceByRules(n, COUNTRY_RULES);
@@ -522,6 +523,18 @@ function stripLeadingCountryAliases(name) {
         new RegExp(`(^|[\\s|【】()（）_\\-+])${pattern}\\s*(?=(?:${aliasTargets}))`, "ig"),
         "$1"
       );
+    }
+  }
+
+  return s;
+}
+
+function normalizeCountryZhAliases(name) {
+  let s = normalizePipes(String(name || ""));
+
+  for (const [zh, aliases] of Object.entries(COUNTRY_ZH_ALIASES)) {
+    for (const alias of aliases) {
+      s = s.replace(new RegExp(escapeRegExp(alias), "g"), zh);
     }
   }
 
