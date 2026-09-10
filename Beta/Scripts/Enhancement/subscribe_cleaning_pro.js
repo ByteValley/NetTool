@@ -501,6 +501,7 @@ function applySmartRewrite(name, prefix, twFlagMode) {
   }
 
   n = cleanupNodeName(n);
+  n = reorderTransitTags(n);
   n = injectFlagIfMissing(n, twFlagMode);
 
   return compactName(prefix + n);
@@ -644,6 +645,84 @@ function cleanupPreferredCityDisplay(name) {
   }
 
   return s;
+}
+
+function reorderTransitTags(name) {
+  const parts = normalizePipes(String(name || ""))
+    .split("|")
+    .map(part => compactName(part))
+    .filter(Boolean);
+
+  for (let i = 0; i < parts.length - 1; i++) {
+    const transit = parseTransitHeader(parts[i]);
+    if (!transit) continue;
+
+    const node = parseTransitNode(parts[i + 1], transit.region);
+    if (!node) continue;
+
+    parts.splice(i, 2, `${transit.prefix}${formatRegionNode(transit.region, node)}`, ...transit.tags);
+    break;
+  }
+
+  return parts.join(" | ");
+}
+
+function parseTransitHeader(part) {
+  const tags = [];
+  const zhNames = getAllZhNamesSorted();
+
+  for (const token of String(part || "").split(/\s+/).reverse()) {
+    const tag = normalizeTransitTag(token);
+    if (!tag) break;
+    tags.unshift(tag);
+  }
+
+  if (!tags.length) return null;
+
+  const head = String(part || "")
+    .split(/\s+/)
+    .slice(0, -tags.length)
+    .join(" ");
+
+  for (const region of zhNames) {
+    const idx = head.lastIndexOf(region);
+    if (idx < 0) continue;
+
+    return {
+      prefix: head.slice(0, idx),
+      region,
+      tags
+    };
+  }
+
+  return null;
+}
+
+function parseTransitNode(part, region) {
+  const text = compactName(part);
+  const normalizedRegion = compactName(region);
+
+  if (text.startsWith(normalizedRegion)) {
+    return compactName(text.slice(normalizedRegion.length));
+  }
+
+  if (/^(?:\d{1,4}|[A-Z]\b)/i.test(text)) {
+    return text;
+  }
+
+  return "";
+}
+
+function normalizeTransitTag(token) {
+  const raw = String(token || "");
+  return KEEP_TAG_WORDS.find(tag => tag.toLowerCase() === raw.toLowerCase()) || "";
+}
+
+function formatRegionNode(region, node) {
+  const n = String(node || "").trim();
+  if (!n) return region;
+  if (/^(?:\d|[A-Z]\b)/i.test(n)) return `${region}${n}`;
+  return `${region} ${n}`;
 }
 
 function fixTaiwanFlag(name, mode) {
