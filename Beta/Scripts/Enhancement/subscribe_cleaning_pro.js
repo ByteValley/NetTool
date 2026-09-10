@@ -655,12 +655,21 @@ function reorderTransitTags(name) {
 
   for (let i = 0; i < parts.length - 1; i++) {
     const transit = parseTransitHeader(parts[i]);
-    if (!transit) continue;
+    if (transit) {
+      const node = parseTransitNode(parts[i + 1], transit.region);
+      if (!node) continue;
 
-    const node = parseTransitNode(parts[i + 1], transit.region);
-    if (!node) continue;
+      parts.splice(i, 2, `${transit.prefix}${formatRegionNode(transit.region, node)}`, ...transit.tags);
+      break;
+    }
 
-    parts.splice(i, 2, `${transit.prefix}${formatRegionNode(transit.region, node)}`, ...transit.tags);
+    const leadingTags = parseTransitTagsOnly(parts[i]);
+    if (!leadingTags) continue;
+
+    const regionNode = parseTransitRegionNode(parts[i + 1]);
+    if (!regionNode) continue;
+
+    parts.splice(i, 2, formatRegionNode(regionNode.region, regionNode.node), ...leadingTags);
     break;
   }
 
@@ -693,6 +702,31 @@ function parseTransitHeader(part) {
       region,
       tags
     };
+  }
+
+  return null;
+}
+
+function parseTransitTagsOnly(part) {
+  const tokens = String(part || "").split(/\s+/).filter(Boolean);
+  if (!tokens.length) return null;
+
+  const tags = tokens.map(normalizeTransitTag);
+  return tags.every(Boolean) ? tags : null;
+}
+
+function parseTransitRegionNode(part) {
+  const text = compactName(part);
+  const zhNames = getAllZhNamesSorted();
+
+  for (const region of zhNames) {
+    const normalizedRegion = compactName(region);
+    if (!text.startsWith(normalizedRegion)) continue;
+
+    const node = compactName(text.slice(normalizedRegion.length));
+    if (!node) continue;
+
+    return { region, node };
   }
 
   return null;
