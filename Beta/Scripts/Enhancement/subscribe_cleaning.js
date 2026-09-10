@@ -479,6 +479,7 @@ function applySmartRewrite(name) {
   n = cleanupAfterReplace(n);
   n = cleanupPreferredCityDisplay(n);
   n = cleanupNodeName(n);
+  n = reorderTransitTags(n);
   n = injectFlagIfMissing(n);
 
   return compactName(n);
@@ -618,6 +619,43 @@ function cleanupPreferredCityDisplay(name) {
   }
 
   return s;
+}
+
+function reorderTransitTags(name) {
+  let s = normalizePipes(String(name || ""));
+  const zhNames = getAllZhNamesSorted();
+  const tagPattern = KEEP_TAG_WORDS.map(escapeRegExp).join("|");
+
+  for (const zh of zhNames) {
+    const ezh = escapeRegExp(zh);
+    const reg = new RegExp(
+      `(^|[\\s\\S]*?\\s)(${ezh})\\s+(${tagPattern})\\s*\\|\\s*\\2\\s*([^|]+?)(\\s*\\|\\s*[\\s\\S]*)?$`,
+      "i"
+    );
+
+    s = s.replace(reg, (_, prefix, region, tag, node, rest = "") => {
+      return `${prefix}${formatRegionNode(region, node)} | ${normalizeTransitTag(tag)}${normalizeTailPipes(rest)}`;
+    });
+  }
+
+  return s;
+}
+
+function normalizeTransitTag(tag) {
+  const raw = String(tag || "");
+  return KEEP_TAG_WORDS.find(x => x.toLowerCase() === raw.toLowerCase()) || raw;
+}
+
+function formatRegionNode(region, node) {
+  const n = String(node || "").trim();
+  if (!n) return region;
+  if (/^(?:\d|[A-Z]\b)/i.test(n)) return `${region}${n}`;
+  return `${region} ${n}`;
+}
+
+function normalizeTailPipes(rest) {
+  if (!rest) return "";
+  return ` | ${String(rest).replace(/^\s*\|\s*/, "").trim()}`;
 }
 
 /* =========================================================
