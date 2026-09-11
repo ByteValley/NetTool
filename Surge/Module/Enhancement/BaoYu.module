@@ -1,0 +1,34 @@
+#!name=鲍鱼盒子
+#!desc=鲍鱼盒子增强，解锁会员
+#!category=功能增强
+
+[Rule]
+DOMAIN,w1c2.ooat88.com,DIRECT
+DOMAIN,tu.dfgfdg.win,DIRECT
+DOMAIN-SUFFIX,artrg.cn,DIRECT
+DOMAIN,vkfqb.ojyrz.com,DIRECT
+DOMAIN-WILDCARD,byapi.*.com,DIRECT
+DOMAIN,yubaoyu.oss-cn-shenzhen.aliyuncs.com,DIRECT
+DOMAIN-WILDCARD,*api.h8h4h.com,DIRECT
+DOMAIN,siajksslwiso.anningsh.com,DIRECT
+DOMAIN,88.gbvdfe.com,DIRECT
+DOMAIN,vdop.fqoas.com,DIRECT
+DOMAIN,ica.ooat88.com,DIRECT
+
+IP-CIDR,103.44.236.0/24,DIRECT,no-resolve
+IP-CIDR,211.99.98.0/24,DIRECT,no-resolve
+IP-CIDR,103.39.222.0/24,DIRECT,no-resolve
+IP-CIDR,42.157.129.25/32,DIRECT,no-resolve
+IP-CIDR,111.180.204.11/32,DIRECT,no-resolve
+IP-CIDR,211.154.21.150/32,DIRECT,no-resolve
+IP-CIDR,103.215.78.0/24,DIRECT,no-resolve
+
+[Map Local]
+^https?://siajksslwiso\.anningsh\.com/report data-type=text data=" " status-code=200
+
+[Script]
+# >鲍鱼盒子18+
+byhz = type=http-request, pattern=^https?:\/\/.+\/api\/(video\/report_item?|live\/room\/detail?|video\/related?|video\/detail|socialposts_info|my\/profile), script-path=https://raw.githubusercontent.com/WeiGiegie/666/main/byhz.js, timeout=60
+
+[MITM]
+hostname = %APPEND% w1c2.ooat88.com, tu.dfgfdg.win, 103.44.236.*, *.artrg.cn, vkfqb.ojyrz.com, byapi.*.com, 211.99.98.*, 103.39.222.*, yubaoyu.oss-cn-shenzhen.aliyuncs.com, *api.h8h4h.com, 42.157.129.25, siajksslwiso.anningsh.com, 211.99.98.63, 111.180.204.11, 88.gbvdfe.com, vdop.fqoas.com, ica.ooat88.com, 103.44.236.131:8001, 211.154.21.150:8020, 211.154.21.150, 103.215.78.*
