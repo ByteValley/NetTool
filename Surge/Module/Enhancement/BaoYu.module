@@ -1,6 +1,7 @@
 #!name=鲍鱼盒子
 #!desc=鲍鱼盒子增强，解锁会员
 #!category=功能增强
+#http://script.hub/file/_start_/https://raw.githubusercontent.com/WeiGiegie/666/main/byhz.js/_end_/byhz.sgmodule?n=鲍鱼盒子%2B鲍鱼盒子增强，解锁会员&type=qx-rewrite&target=surge-module&del=true&jqEnabled=true&category=功能增强
 
 [Rule]
 DOMAIN,w1c2.ooat88.com,DIRECT
