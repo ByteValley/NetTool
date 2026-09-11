@@ -28,10 +28,10 @@ hostname = m.client.10010.com
 */
 
 
-const APIKey = 'DataCollection.ChinaUnicom'; // 只是脚本名字，便于日志识别
+const scriptName = 'DataCollection.ChinaUnicom'; // 只是脚本名字，便于日志识别
 const ROOT_KEY = '#DataCollection';         // ✅ 持久化根 key：DataCollection
 
-$ = new API(APIKey, true);
+$ = new API(scriptName, true);
 
 if (typeof $request !== 'undefined') {
   GetCookie();
