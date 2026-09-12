@@ -2,6 +2,7 @@
 
 import { VStack, Text, Image, Spacer, ZStack, Gauge } from "scripting"
 import { RingCardTheme, timeStyle } from "../../theme"
+import { type WidgetSurfacePalette } from "../../surfaces"
 import { clamp01, percentText } from "../../utils/carrierUtils"
 
 const Empty = <Text font={1}> </Text>
@@ -16,9 +17,12 @@ export function DialRingStatCard(props: {
   valueText: string
   theme: RingCardTheme
   ratio?: number
+  surfaces?: WidgetSurfacePalette
+  transparent?: boolean
 }) {
-  const { title, valueText, theme, ratio } = props
+  const { title, valueText, theme, ratio, surfaces, transparent } = props
   const r = clamp01(ratio ?? 0)
+  const cardBg = transparent ? surfaces?.content ?? theme.bg : theme.bg
 
   return (
     <VStack
@@ -26,7 +30,7 @@ export function DialRingStatCard(props: {
       padding={{ top: 10, leading: 8, bottom: 10, trailing: 8 }}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: theme.bg,
+        style: cardBg,
         shape: { type: "rect", cornerRadius: 18, style: "continuous" },
       }}
     >
