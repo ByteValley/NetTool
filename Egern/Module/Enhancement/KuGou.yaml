@@ -4,7 +4,7 @@
 #!author=bb
 #!version=1.2.2.6
 #!homepage=https://github.com/Yu9191/Rewrite
-#!icon: https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/KuGou.png
+#!icon=https://gitlab.com/lodepuly/iconlibrary/-/raw/main/App_icon/120px/KuGou.png
 
 [Rule]
 # > (广告/弹窗)
