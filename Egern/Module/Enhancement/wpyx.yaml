@@ -1,0 +1,23 @@
+name: 王派医学
+description: '支持版本: 26.05.13'
+compat_arguments:
+  日志级别: info
+compat_arguments_desc: '日志级别: off / error / warn / info(默认) / debug / all'
+author: '@ios151'
+icon: https://raw.githubusercontent.com/Yu9191/-/main/wpyx.png
+dns: {}
+scriptings:
+- http_response:
+    name: WPYX-Response
+    match: ^https?:\/\/api-(app(-v2)?|eva)\.wangpaiyixue\.cn\/v\d+\/(common\/ac|goods\/(detail|lists|section_info)|video\/vid_token|lesson\/(details|lists)|(chapter|exam|paper|question|knowledge)\/)
+    script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/wpyx.js
+    env:
+      _compat.$argument: logLevel=info&worker=https://wpyx-unlock.lovebabyforever.workers.dev
+    timeout: 20
+    body_required: true
+mitm:
+  hostnames:
+    includes:
+    - api-app.wangpaiyixue.cn
+    - api-app-v2.wangpaiyixue.cn
+    - api-eva.wangpaiyixue.cn
