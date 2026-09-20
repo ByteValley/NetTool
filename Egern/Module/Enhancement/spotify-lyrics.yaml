@@ -1,5 +1,5 @@
-name: Spotify 歌词增强 · DualSubs 多源优选
-description: 保留 DualSubs 请求及歌词转换流程；网易云、QQ 音乐、LRCLIB 自动选源。请停用重复的 Spotify 歌词模块。
+name: Spotify 歌词增强
+description: DualSubs 多源优选，保留 DualSubs 请求及歌词转换流程；网易云、QQ 音乐、LRCLIB 自动选源。请停用重复的 Spotify 歌词模块。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 compat_arguments:
   Types: Translate,External
