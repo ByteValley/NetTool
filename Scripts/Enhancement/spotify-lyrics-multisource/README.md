@@ -13,3 +13,12 @@
 限制：不保证全曲库有词；缓存无时长时多版本区分有限；繁简体及别名可能漏匹配。平台接口可能变化。本模块不会下载音频。未改变 DualSubs 的歌曲信息获取方式。
 
 文件：External.Lyrics.MultiSource.js 为可执行完整 bundle；multisource-core.js 为新增选源源码。上游 https://github.com/DualSubs/Universal 和 https://github.com/DualSubs/Spotify。
+
+
+## v2 串行流程
+
+每次 HTTP 200 或 404 歌词响应：先运行多源选词及 DualSubs 原转换器，再把结果传入 DualSubs 翻译。无可靠外部结果时保留原词；无有效歌词时不翻译。认证/限流响应原样保留。只注册一个 JSON 和一个 Protobuf 响应处理器，不再用 subtype 决定是否多源检索。Spotify.Lyrics.Pipeline.js 打包了两个阶段，确保顺序而不依赖 Egern 多条响应规则执行次序。
+
+刷新模块和脚本缓存，日志应显示 [MultiPipeline] v2 开始：多源替换 → DualSubs 翻译。停用其他重复歌词模块。翻译仍沿用原 API 配置，本次不解决微软认证错误；翻译失败保留选中歌词。
+
+顺序/回退测试通过，真实 DualSubs 转换器与 QQ 返回数据联测通过。尚未验证设备端显示。

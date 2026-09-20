@@ -1,5 +1,5 @@
 name: Spotify 歌词增强
-description: DualSubs 多源优选，保留 DualSubs 请求及歌词转换流程；网易云、QQ 音乐、LRCLIB 自动选源。请停用重复的 Spotify 歌词模块。
+description: 网易云、QQ 音乐、LRCLIB 优选替换歌词，再交给 DualSubs 翻译；无可靠匹配时保留原词。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 compat_arguments:
   Types: Translate,External
@@ -7,7 +7,7 @@ compat_arguments:
   TargetLanguage: ZH-HANT
   Vendor: Microsoft
   LogLevel: INFO
-compat_arguments_desc: 翻译沿用 DualSubs；多源检索仅在 External 补词时执行。翻译 API 认证需自行配置。多源日志前缀为 [MultiLyrics]。
+compat_arguments_desc: 每次歌词响应先多源替换后翻译，不再按 subtype 分流。日志前缀 [MultiPipeline]。翻译 API 需有效认证。
 mitm:
   hostnames:
     - api.spotify.com
@@ -37,23 +37,12 @@ scriptings:
       arguments:
         _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
   - http_response:
-      name: DualSubs Translate JSON
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=Translate(?:&|$))'
-      script_url: https://github.com/DualSubs/Universal/releases/latest/download/Translate.response.bundle.js
+      name: MultiSource then DualSubs JSON
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=2
       body_required: true
       binary_body: false
-      timeout: 30
-      max_size: 2097152
-      update_interval: 3600
-      arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
-  - http_response:
-      name: DualSubs External JSON
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=External(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/External.Lyrics.MultiSource.js?v=1
-      body_required: true
-      binary_body: false
-      timeout: 30
+      timeout: 60
       max_size: 2097152
       update_interval: 3600
       arguments:
@@ -70,23 +59,12 @@ scriptings:
       arguments:
         _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
   - http_response:
-      name: DualSubs Translate Protobuf
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=Translate(?:&|$))'
-      script_url: https://github.com/DualSubs/Universal/releases/latest/download/Translate.response.bundle.js
+      name: MultiSource then DualSubs Protobuf
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=2
       body_required: true
       binary_body: true
-      timeout: 30
-      max_size: 2097152
-      update_interval: 3600
-      arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
-  - http_response:
-      name: DualSubs External Protobuf
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=External(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/External.Lyrics.MultiSource.js?v=1
-      body_required: true
-      binary_body: true
-      timeout: 30
+      timeout: 60
       max_size: 2097152
       update_interval: 3600
       arguments:
