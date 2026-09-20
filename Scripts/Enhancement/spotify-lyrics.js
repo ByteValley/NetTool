@@ -57,6 +57,54 @@ function metadataCache(ctx, id) {
   } catch (_) {}
   return null;
 }
+function trackMetadata(r, expected) {
+  if (!r || typeof r !== 'object') return null;
+  const uri = r.uri || r.track?.uri;
+  const id = /^spotify:track:([A-Za-z0-9]{22})$/.exec(uri || '')?.[1] || r.id;
+  if (!/^[A-Za-z0-9]{22}$/.test(id || '') || (expected && id !== expected)) return null;
+  const title = r.name || r.title || r.metadata?.title;
+  const artists = (Array.isArray(r.artists) ? r.artists : r.artists?.items || [])
+    .map(a => a.name || a.profile?.name).filter(a => typeof a === 'string' && a.trim());
+  if (!artists.length && r.metadata?.artist_name) artists.push(r.metadata.artist_name);
+  if (typeof title !== 'string' || !title.trim() || !artists.length) return null;
+  const ms = r.duration_ms || r.duration?.totalMilliseconds || (typeof r.duration === 'number' ? r.duration : 0) || Number(r.metadata?.duration);
+  return {id, title, artists, album:r.album?.name || r.albumOfTrack?.name || r.metadata?.album_title || '', duration:Number.isFinite(ms) && ms>0 ? ms/1000 : 0};
+}
+function collectMetadata(root) {
+  const found = {}, pending=[root]; let count=0;
+  while(pending.length && count++<30000) {
+    const r=pending.pop();
+    if(!r || typeof r!=='object') continue;
+    const t=trackMetadata(r);
+    if(t) found[t.id]=t;
+    for(const v of Object.values(r)) if(v && typeof v==='object') pending.push(v);
+  }
+  return found;
+}
+function embedMetadata(html,id) {
+  const tag=html.match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if(!tag) throw new Error('嵌入页缺少结构化歌曲信息');
+  const d=JSON.parse(tag[1]);
+  const t=trackMetadata(d.props?.pageProps?.state?.data?.entity,id);
+  if(!t) throw new Error('嵌入页歌曲 ID 或元数据不匹配');
+  return t;
+}
+async function publicMetadata(ctx,id) {
+  const key='spotify-embed-retry-at', until=Number(ctx.storage.getJSON(key)||0);
+  if(until>Date.now()) throw new Error('公开歌曲页冷却中，请稍后重试');
+  const r=await ctx.http.get(`https://open.spotify.com/embed/track/${id}`, {
+    headers:{Accept:'text/html'}, timeout:6000, credentials:'omit', redirect:'error'
+  });
+  if(r.status!==200) {
+    if(r.status===429) {
+      const v=r.headers?.get?.('retry-after');
+      const wait=/^\d+$/.test(v||'') ? +v*1000 : Math.max(0,Date.parse(v||'')-Date.now())||60000;
+      ctx.storage.setJSON(key,Date.now()+Math.max(1000,wait));
+    }
+    throw new Error(`open.spotify.com: HTTP ${r.status}`);
+  }
+  return embedMetadata(await r.text(),id);
+}
 async function lrclib(ctx,t) {
   const query = new URLSearchParams({track_name:t.title, artist_name:t.artists[0]});
   const rows = await json(ctx, `https://lrclib.net/api/search?${query}`);
@@ -89,10 +137,30 @@ function protobuf(data) {
   return new Uint8Array(field(1,lyrics));
 }
 export default async function(ctx) {
-  console.log('[Lyrics] v1.2 已触发');
+  console.log('[Lyrics] v1.3 已触发');
   if (!ctx?.request || !ctx?.response) {
     console.log('[Lyrics] 缺少原生 ctx 请求/响应对象，请检查 Egern 脚本 API 兼容性');
     return;
+  }
+  const requestURL=new URL(ctx.request.url);
+  if(!requestURL.pathname.startsWith('/color-lyrics/v2/track/')) {
+    if(ctx.response.status!==200) return;
+    const contentType=ctx.response.headers?.get?.('content-type') || '';
+    if(!contentType.includes('json')) return;
+    let original;
+    try {
+      original=await ctx.response.text();
+      const found=collectMetadata(JSON.parse(original));
+      const n=Object.keys(found).length;
+      if(n) {
+        const cache=ctx.storage.getJSON('spotify-metadata-v1')||{};
+        for(const [id,t] of Object.entries(found)) {delete cache[id];cache[id]=t;}
+        ctx.storage.setJSON('spotify-metadata-v1',Object.fromEntries(Object.entries(cache).slice(-200)));
+        console.log(`[Lyrics] 已采集 ${n} 首歌曲元数据`);
+      }
+    } catch(e) {console.log('[Lyrics] 元数据采集跳过：'+e.message);}
+    // Explicitly restore consumed stream, including malformed JSON.
+    return original===undefined ? undefined : {body:original};
   }
   const match = ctx.request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/);
   if (!match) {
@@ -113,20 +181,11 @@ export default async function(ctx) {
     if (!data) {
       const ownMetadata=ctx.storage.getJSON('spotify-metadata-v1')||{};
       let t=MANUAL[id] || ownMetadata[id] || metadataCache(ctx,id);
-      if (t) console.log('[Lyrics] 使用已有歌曲信息，跳过 Spotify 曲目接口');
+      if (t) console.log('[Lyrics] 使用已有歌曲信息，无需请求 Spotify 曲目接口');
       if (!t) {
-        const until=Number(ctx.storage.getJSON('spotify-metadata-retry-at')||0);
-        if (until>Date.now()) throw new Error(`Spotify 限流冷却中，还需 ${Math.ceil((until-Date.now())/1000)} 秒`);
-        const token=ctx.request.headers.get('authorization');
-        if (!token) throw new Error('没有 Spotify authorization；可在 MANUAL 填写歌曲信息');
-        // Token goes only to Spotify, never to lyrics providers; redirects prohibited.
-        let r;
-        try { r=await json(ctx,`https://api.spotify.com/v1/tracks/${id}`,{Authorization:token,Accept:'application/json'}); }
-        catch(e) {
-          if(e.status===429) ctx.storage.setJSON('spotify-metadata-retry-at',Date.now()+Math.max(1000,e.retryMs));
-          throw e;
-        }
-        t={title:r.name,artists:(r.artists||[]).map(a=>a.name),album:r.album?.name,duration:r.duration_ms/1000};
+        console.log('[Lyrics] 缓存未命中，读取 Spotify 公开嵌入页');
+        t=await publicMetadata(ctx,id);
+        console.log(`[Lyrics] 获取歌曲信息成功：${t.title} / ${t.artists.join('、')}`);
       }
       if (!t.title || !t.artists?.length) throw new Error('歌曲信息不完整');
       delete ownMetadata[id];
@@ -147,4 +206,4 @@ export default async function(ctx) {
     return {status:200,headers:{'Content-Type':isJSON?'application/json; charset=utf-8':'application/protobuf','Cache-Control':'no-store'},body:isJSON?JSON.stringify(data):protobuf(data)};
   } catch(e) { console.log(`[Lyrics] 补词失败，保留原响应: ${e.message}`); }
 }
-export {parseLRC,score,lyricData,protobuf};
+export {parseLRC,score,lyricData,protobuf,collectMetadata,embedMetadata};
