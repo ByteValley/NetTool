@@ -28,10 +28,17 @@ function httpTransport(options){return new Promise((resolve,reject)=>{$httpClien
 function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}
 function cacheRead(storage,key,ttl){try{const value=JSON.parse(storage.getItem(key)||'null');return value&&Date.now()-value.time<ttl?value.value:null}catch{return null}}
 function cacheWrite(storage,key,value){try{storage.setItem(key,JSON.stringify({time:Date.now(),value}));}catch{}}
-function songMetadata(id,transport,storage,log){
- const cached=cacheRead(storage,'SpotifyLyricsBridge.meta.'+id,30*86400000);
- if(!cached)throw Error('资料缓存未命中；等待 Spotify metadata 响应后重新播放');
- log('资料缓存命中');return cached;
+async function songMetadata(id,transport,storage,log){
+ const key='SpotifyLyricsBridge.meta.'+id,cached=cacheRead(storage,key,30*86400000)||cacheRead(storage,'MultiLyrics.v31.meta.'+id,30*86400000);if(cached){log('资料缓存命中');return cached}
+ log('资料缓存未命中，启动歌曲资料回退请求');
+ const started=Date.now();const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:3500}),3500,'歌曲资料');
+ log('歌曲资料请求结束 HTTP='+(r.statusCode??r.status)+' '+(Date.now()-started)+'ms');
+ if(Number(r.statusCode??r.status)!==200)throw Error('歌曲资料 HTTP '+(r.statusCode??r.status));
+ const match=String(r.body||'').match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+ if(!match)throw Error('歌曲页面缺少资料');const e=JSON.parse(match[1])?.props?.pageProps?.state?.data?.entity;
+ if(e?.id!==id&&e?.uri!=='spotify:track:'+id)throw Error('歌曲资料 ID 不符');
+ const track={id,track:e.name||e.title,artist:e.artists?.[0]?.name,artists:(e.artists||[]).map(a=>a.name).filter(Boolean),duration_ms:e.duration};
+ if(!track.track||!track.artist)throw Error('歌曲页面缺少歌名/歌手');cacheWrite(storage,key,track);log('资料获取 '+(Date.now()-started)+'ms');return track;
 }
 async function selectLyrics(track,transport,log){
  const started=Date.now(),budget=3000;let finished=false;
@@ -85,9 +92,9 @@ async function independentLyrics(request,response,transport=httpTransport,storag
  log('已触发 track='+id+' HTTP='+(response.status??response.statusCode));
  try{
   const status=Number(response.status??response.statusCode??200);if(![200,404].includes(status)){log('保留原响应：HTTP '+status);return response}if(!id)throw Error('无有效歌曲 ID');
-  const key='SpotifyLyricsBridge.lyrics.'+id;const cached=cacheRead(storage,key,7*86400000);
+  const key='SpotifyLyricsBridge.lyrics.'+id;const cached=cacheRead(storage,key,7*86400000)||cacheRead(storage,'MultiLyrics.v31.lyrics.'+id,7*86400000);
   if(cached?.lyrics?.lines?.length){log('歌曲：'+cached.track.track+'｜歌手：'+(cached.track.artists||[cached.track.artist]).join(' / '));log('歌词缓存命中：'+cached.lyrics.provider+'，'+cached.lyrics.lines.length+' 行，'+(Date.now()-started)+'ms');return replaceResponse(request,response,cached.lyrics)}
-  const track=await songMetadata(id,transport,storage,log);log('歌曲：'+track.track+'｜歌手：'+track.artists.join(' / ')+'｜时长：'+(track.duration_ms/1000)+'s');
+  const track=await songMetadata(id,transport,storage,log);log('歌曲：'+track.track+'｜歌手：'+(track.artists||[track.artist]).join(' / ')+'｜时长：'+(track.duration_ms/1000)+'s');
   if(cacheRead(storage,'SpotifyLyricsBridge.miss.'+id,30000)){log('30秒内刚查询无匹配，保留原词');return response}
   let selected;try{selected=await selectLyrics(track,transport,log)}catch(e){cacheWrite(storage,'SpotifyLyricsBridge.miss.'+id,true);throw e}
   const lyrics=makeLyrics(selected);cacheWrite(storage,key,{track,lyrics});log('替换成功：'+lyrics.provider+' / '+lyrics.syncType+' / '+lyrics.lines.length+' 行，总耗时 '+(Date.now()-started)+'ms');return replaceResponse(request,response,lyrics);
@@ -151,7 +158,7 @@ async function lyricsBridge(request,response,transport=httpTransport,storage={ge
   if(Number(response.statusCode??response.status)!==200)return response;
   const track=metadataTrack(request,response);
   cacheWrite(storage,'SpotifyLyricsBridge.meta.'+track.id,track);
-  log('资料已缓存 track='+track.id+' '+track.track+'｜'+track.artists.join(' / ')+' '+(Date.now()-started)+'ms');
+  log('资料已缓存 track='+track.id+' '+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+' '+(Date.now()-started)+'ms');
  }catch(e){log('资料未缓存 '+e.message+' '+(Date.now()-started)+'ms')}
  return response;
 }
