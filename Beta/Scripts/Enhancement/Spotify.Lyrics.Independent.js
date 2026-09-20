@@ -196,7 +196,7 @@ function gidToId(hex){
 }
 function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
-function shouldForceMetadata(request){const platform=metadataHeaderValue(request?.headers,'app-platform');return !platform||isIOSRequest(request)}
+function shouldForceMetadata(){return true}
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=String(url||'').match(/\/metadata\/\d+\/track\/([a-f\d]{32}|[A-Za-z\d]{22})(?:[/?]|$)/i)?.[1];if(!token)throw Error('未知 metadata 路径');return token.length===32?gidToId(token):token}
@@ -246,10 +246,10 @@ async function lyricsModule(request,response,transport=httpTransport,storage={ge
   }
   cacheWrite(storage,'MultiLyrics.v32.meta.'+track.id,track);
   log('资料已缓存：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
-  if(shouldForceMetadata(request)){
-   try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('iOS metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log('iOS metadata 已有 has_lyrics=true')}
-   catch(e){log('iOS metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
-  } else log('Mac metadata 只缓存资料，不改 has_lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
+  if(shouldForceMetadata()){
+   try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
+   catch(e){log('metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
+  }
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
 }
