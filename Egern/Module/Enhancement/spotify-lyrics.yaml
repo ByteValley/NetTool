@@ -1,37 +1,26 @@
-name: Spotify 歌词增强
-description: 网易云、QQ 音乐、LRCLIB 优选替换歌词，再交给 DualSubs 翻译；无可靠匹配时保留原词。
+name: Spotify 多源歌词 v3.1
+description: 独立补词，无翻译。网易云、QQ、LRCLIB 并发检索，支持简繁匹配和歌词缓存。日志显示歌名、歌手、来源与耗时。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
-compat_arguments:
-  Translate: true
-  SourceLanguage: AUTO
-  TargetLanguage: ZH-HANT
-  Vendor: Microsoft
-  LogLevel: INFO
-compat_arguments_desc: 独立多源补词，无需 DualSubs 歌曲缓存或请求脚本。Translate=false 可关闭后续翻译。日志前缀 [MultiLyrics] v3。
 mitm:
   hostnames:
     - spclient.wg.spotify.com
     - '*-spclient.spotify.com'
 scriptings:
   - http_response:
-      name: MultiSource then DualSubs JSON
+      name: Spotify 多源歌词 v3.1 JSON
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=3.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=3.1
       body_required: true
       binary_body: false
-      timeout: 60
+      timeout: 10
       max_size: 2097152
       update_interval: 3600
-      arguments:
-        _compat.$argument: 'Translate={{{Translate}}}&Types=Translate&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
   - http_response:
-      name: MultiSource then DualSubs Protobuf
+      name: Spotify 多源歌词 v3.1 Protobuf
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=3.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=3.1
       body_required: true
       binary_body: true
-      timeout: 60
+      timeout: 10
       max_size: 2097152
       update_interval: 3600
-      arguments:
-        _compat.$argument: 'Translate={{{Translate}}}&Types=Translate&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'

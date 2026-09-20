@@ -1,9 +1,11 @@
-# 独立多源歌词 v3.0
+# Spotify 独立多源歌词 v3.1
 
-Spotify.Lyrics.Independent.js 是独立的 Egern 响应脚本，不读取 DualSubs 配置或缓存，不调用 Spotify Web API。歌曲资料来自 Spotify 公开嵌入页，按歌曲 ID 校验并写入独立缓存。并发检索网易云、QQ 音乐、LRCLIB，按歌名、歌手、时长、专辑和时间轴质量选择歌词。OpenCC 字符数据用于简繁匹配，不改动实际歌词。
+主模块只加载 Spotify.Lyrics.Independent.js，无 DualSubs、翻译请求或 Spotify Web API 依赖。保留 Pipeline.js 为旧 URL 兼容入口，其内容与独立脚本一致；旧模块仍需刷新以去除早期 DualSubs 请求规则。
 
-Spotify.Lyrics.Pipeline.js 将独立补词引擎与后续 DualSubs 翻译串行打包，避免依赖多个响应规则执行顺序。主模块只注册两个响应处理器，不再加载 DualSubs 请求脚本或歌曲缓存脚本。Translate=false 可关闭翻译。独立脚本单独部署无需 DualSubs。
+公开嵌入页提供歌曲资料，ID 校验后缓存30天。网易云/QQ 使用简体搜索词，各源匹配都做 Unicode、简繁规范化，歌词本身不做简繁转换。LRCLIB 保留原始搜索词。简繁字符映射不保证处理所有艺名/别名。
 
-支持 JSON 和 Protobuf。无匹配或请求失败保留原响应；成功时改为 HTTP 200。逐字歌词目前转换为逐行时间轴。翻译认证故障不属于补词引擎。公开页面与各歌词接口可能不可用，无法保证所有歌曲有歌词。
+三个源并发，第一份可靠同步歌词返回后等待200ms比较已返回候选，不再被最慢源阻塞；检索总预算3秒，歌曲资料预算3.5秒。为降低延迟，不能保证选中尚未返回的更好结果。成功歌词缓存7天，无匹配30秒冷却。新歌仍需联网，已有缓存直接返回。
 
-OpenCC 字符表许可见 OpenCC-LICENSE；DualSubs 翻译代码保留原 Apache-2.0 许可。
+日志显示版本、track ID、歌名、全部歌手、搜索词、各源耗时、缓存命中和替换结果。资料接口失败时只能记录 track ID。JSON/Protobuf 成功替换为200，无匹配保留原响应。逐字歌词当前输出逐行时间轴。
+
+OpenCC 字符表许可见 OpenCC-LICENSE。
