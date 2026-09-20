@@ -1,5 +1,6 @@
-name: Spotify 多源补词 v1.3（测试版）
+name: Spotify 多源补词
 description: LRCLIB + 网易云；仅处理歌词接口 404；需要 Egern 原生 ctx 脚本 API
+icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
   hostnames:
     - spclient.wg.spotify.com
@@ -10,15 +11,14 @@ scriptings:
   - http_response:
       name: Spotify Metadata Collector
       match: '^https://(?:api-partner\.spotify\.com/pathfinder/v[12]/query|api\.spotify\.com/v1/(?:tracks|me/player)(?:[/?]|$)|(?:spclient\.wg\.spotify\.com|[\w-]+\.spclient\.spotify\.com)/(?:connect-state|track-playback|metadata)/)'
-      script_url: spotify-lyrics.js
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/spotify-lyrics.js
       body_required: true
       timeout: 5
       max_size: 2097152
   - http_response:
       name: Spotify Lyrics Fallback
       match: '^https://(?:spclient\.wg\.spotify\.com|[\w-]+\.spclient\.spotify\.com)/color-lyrics/v2/track/'
-      # 改成导入 Egern 后脚本的实际本地路径，或你自行托管的 HTTPS 原始文件地址。
-      script_url: spotify-lyrics.js
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/spotify-lyrics.js
       body_required: true
       binary_body: true
       timeout: 25
