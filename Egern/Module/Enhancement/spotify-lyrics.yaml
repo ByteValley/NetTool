@@ -8,8 +8,7 @@ scriptings:
   - http_response:
       name: Spotify Lyrics Fallback
       match: '^https://(?:spclient\.wg\.spotify\.com|[\w-]+\.spclient\.spotify\.com)/color-lyrics/v2/track/'
-      # 改成导入 Egern 后脚本的实际本地路径，或你自行托管的 HTTPS 原始文件地址。
-      script_url: spotify-lyrics.js
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/spotify-lyrics.js
       body_required: true
       binary_body: true
       timeout: 25
