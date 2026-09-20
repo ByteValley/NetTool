@@ -1,25 +1,93 @@
-name: Spotify 多源补词
-description: LRCLIB + 网易云；仅处理歌词接口 404；需要 Egern 原生 ctx 脚本 API
+name: Spotify 歌词增强 · DualSubs 多源优选
+description: 保留 DualSubs 请求及歌词转换流程；网易云、QQ 音乐、LRCLIB 自动选源。请停用重复的 Spotify 歌词模块。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
+compat_arguments:
+  Types: Translate,External
+  SourceLanguage: AUTO
+  TargetLanguage: ZH-HANT
+  Vendor: Microsoft
+  LogLevel: INFO
+compat_arguments_desc: 翻译沿用 DualSubs；多源检索仅在 External 补词时执行。翻译 API 认证需自行配置。多源日志前缀为 [MultiLyrics]。
 mitm:
   hostnames:
-    - spclient.wg.spotify.com
-    - '*.spclient.spotify.com'
-    - api-partner.spotify.com
     - api.spotify.com
+    - spclient.wg.spotify.com
+    - '*-spclient.spotify.com'
 scriptings:
   - http_response:
-      name: Spotify Metadata Collector
-      match: '^https://(?:api-partner\.spotify\.com/pathfinder/v[12]/query|api\.spotify\.com/v1/(?:tracks|me/player)(?:[/?]|$)|(?:spclient\.wg\.spotify\.com|[\w-]+\.spclient\.spotify\.com)/(?:connect-state|track-playback|metadata)/)'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/spotify-lyrics.js
+      name: DualSubs Track Cache
+      match: '^https?://api\.spotify\.com/v1/tracks\?'
+      script_url: https://github.com/DualSubs/Spotify/releases/download/v1.9.12/response.bundle.js
       body_required: true
-      timeout: 5
+      binary_body: false
+      timeout: 30
       max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+  - http_request:
+      name: DualSubs Request JSON
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
+      script_url: https://github.com/DualSubs/Spotify/releases/download/v1.9.12/request.bundle.js
+      body_required: true
+      binary_body: false
+      timeout: 30
+      max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
   - http_response:
-      name: Spotify Lyrics Fallback
-      match: '^https://(?:spclient\.wg\.spotify\.com|[\w-]+\.spclient\.spotify\.com)/color-lyrics/v2/track/'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/spotify-lyrics.js
+      name: DualSubs Translate JSON
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=Translate(?:&|$))'
+      script_url: https://github.com/DualSubs/Universal/releases/latest/download/Translate.response.bundle.js
+      body_required: true
+      binary_body: false
+      timeout: 30
+      max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+  - http_response:
+      name: DualSubs External JSON
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=External(?:&|$))'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/External.Lyrics.MultiSource.js?v=1
+      body_required: true
+      binary_body: false
+      timeout: 30
+      max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+  - http_request:
+      name: DualSubs Request Protobuf
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
+      script_url: https://github.com/DualSubs/Spotify/releases/download/v1.9.12/request.bundle.js
       body_required: true
       binary_body: true
-      timeout: 25
+      timeout: 30
       max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+  - http_response:
+      name: DualSubs Translate Protobuf
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=Translate(?:&|$))'
+      script_url: https://github.com/DualSubs/Universal/releases/latest/download/Translate.response.bundle.js
+      body_required: true
+      binary_body: true
+      timeout: 30
+      max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+  - http_response:
+      name: DualSubs External Protobuf
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))(?=[^#]*[?&]subtype=External(?:&|$))'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/External.Lyrics.MultiSource.js?v=1
+      body_required: true
+      binary_body: true
+      timeout: 30
+      max_size: 2097152
+      update_interval: 3600
+      arguments:
+        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
