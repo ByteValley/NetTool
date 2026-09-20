@@ -235,7 +235,8 @@ async function lyricsModule(request,response,transport=httpTransport,storage={ge
  if(!/\/metadata\/\d+\/track\//.test(request.url))return independentLyrics(request,response,transport,storage,output);
  const started=Date.now(),rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7),log=s=>output('[MultiLyrics '+rid+'] '+s);
  try{
-  log('metadata 响应 HTTP='+(response.statusCode??response.status));
+  const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
+  if(method!=='GET'){log('非 GET 请求，原样放行');return response}
   if(Number(response.statusCode??response.status??200)!==200)return response;
   let track;
   try{track=metadataTrack(request,response)}catch(e){
