@@ -37,8 +37,25 @@ function lyricData(c, synced, plain) {
 }
 async function json(ctx, url, headers = {}) {
   const r = await ctx.http.get(url, {headers, timeout:4500, credentials:'omit', redirect:'error'});
-  if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
+  if (r.status !== 200) {
+    const e = new Error(`${new URL(url).hostname}: HTTP ${r.status}`);
+    e.status = r.status;
+    const retry = r.headers?.get?.('retry-after');
+    e.retryMs = /^\d+$/.test(retry || '') ? Number(retry)*1000 : Math.max(0, Date.parse(retry || '')-Date.now()) || 60000;
+    throw e;
+  }
   return r.json();
+}
+function metadataCache(ctx, id) {
+  try {
+    let d=ctx.storage.getJSON('DualSubs');
+    if (typeof d==='string') d=JSON.parse(d);
+    let rows=d?.Spotify?.Caches?.Metadatas?.Tracks;
+    if (typeof rows==='string') rows=JSON.parse(rows);
+    const r=Array.isArray(rows)?rows.find(x=>x[0]===id)?.[1]:rows?.[id];
+    if (r?.track && r?.artist) return {title:r.track,artists:[r.artist],album:r.album,duration:0};
+  } catch (_) {}
+  return null;
 }
 async function lrclib(ctx,t) {
   const query = new URLSearchParams({track_name:t.title, artist_name:t.artists[0]});
@@ -72,7 +89,7 @@ function protobuf(data) {
   return new Uint8Array(field(1,lyrics));
 }
 export default async function(ctx) {
-  console.log('[Lyrics] v1.1 已触发');
+  console.log('[Lyrics] v1.2 已触发');
   if (!ctx?.request || !ctx?.response) {
     console.log('[Lyrics] 缺少原生 ctx 请求/响应对象，请检查 Egern 脚本 API 兼容性');
     return;
@@ -94,15 +111,27 @@ export default async function(ctx) {
     const cache=ctx.storage.getJSON(key)||{};
     let data=cache[id]?.expires>Date.now()?cache[id].data:null;
     if (!data) {
-      let t=MANUAL[id];
+      const ownMetadata=ctx.storage.getJSON('spotify-metadata-v1')||{};
+      let t=MANUAL[id] || ownMetadata[id] || metadataCache(ctx,id);
+      if (t) console.log('[Lyrics] 使用已有歌曲信息，跳过 Spotify 曲目接口');
       if (!t) {
+        const until=Number(ctx.storage.getJSON('spotify-metadata-retry-at')||0);
+        if (until>Date.now()) throw new Error(`Spotify 限流冷却中，还需 ${Math.ceil((until-Date.now())/1000)} 秒`);
         const token=ctx.request.headers.get('authorization');
         if (!token) throw new Error('没有 Spotify authorization；可在 MANUAL 填写歌曲信息');
         // Token goes only to Spotify, never to lyrics providers; redirects prohibited.
-        const r=await json(ctx,`https://api.spotify.com/v1/tracks/${id}`,{Authorization:token,Accept:'application/json'});
+        let r;
+        try { r=await json(ctx,`https://api.spotify.com/v1/tracks/${id}`,{Authorization:token,Accept:'application/json'}); }
+        catch(e) {
+          if(e.status===429) ctx.storage.setJSON('spotify-metadata-retry-at',Date.now()+Math.max(1000,e.retryMs));
+          throw e;
+        }
         t={title:r.name,artists:(r.artists||[]).map(a=>a.name),album:r.album?.name,duration:r.duration_ms/1000};
       }
       if (!t.title || !t.artists?.length) throw new Error('歌曲信息不完整');
+      delete ownMetadata[id];
+      ownMetadata[id]=t;
+      ctx.storage.setJSON('spotify-metadata-v1',Object.fromEntries(Object.entries(ownMetadata).slice(-200)));
       const results=await Promise.allSettled([lrclib(ctx,t),netease(ctx,t)]);
       const found=[];
       results.forEach((r,i)=>{ if(r.status==='fulfilled'&&r.value) found.push(r.value); else console.log(`[Lyrics] ${['LRCLIB','NetEase'][i]}: ${r.status==='rejected'?r.reason.message:'没有匹配歌词'}`); });
