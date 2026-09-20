@@ -1,5 +1,5 @@
-name: Spotify 歌词桥
-description: 缓存 Spotify metadata，补词时并发检索网易云、QQ 与 LRCLIB。支持简繁匹配、歌词缓存及请求级耗时日志。
+name: Spotify 多源歌词
+description: 独立补词，无翻译、无缓存。QQ音乐优先，其次网易云音乐、LRCLIB。支持简繁匹配，保留歌名、歌手、来源及请求耗时日志。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
   hostnames:
@@ -7,7 +7,7 @@ mitm:
     - '*-spclient.spotify.com'
 scriptings:
   - http_response:
-      name: Spotify 歌词桥 JSON
+      name: Spotify 多源歌词 JSON
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
       body_required: true
@@ -16,20 +16,11 @@ scriptings:
       max_size: 2097152
       update_interval: 3600
   - http_response:
-      name: Spotify 歌词桥 Protobuf
+      name: Spotify 多源歌词 Protobuf
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
       body_required: true
       binary_body: true
       timeout: 10
-      max_size: 2097152
-      update_interval: 3600
-  - http_response:
-      name: Spotify 歌曲资料缓存
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
-      body_required: true
-      binary_body: true
-      timeout: 3
       max_size: 2097152
       update_interval: 3600
