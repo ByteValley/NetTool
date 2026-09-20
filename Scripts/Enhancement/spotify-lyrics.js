@@ -72,10 +72,23 @@ function protobuf(data) {
   return new Uint8Array(field(1,lyrics));
 }
 export default async function(ctx) {
+  console.log('[Lyrics] v1.1 已触发');
+  if (!ctx?.request || !ctx?.response) {
+    console.log('[Lyrics] 缺少原生 ctx 请求/响应对象，请检查 Egern 脚本 API 兼容性');
+    return;
+  }
   const match = ctx.request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/);
-  if (!match || !ctx.response) return;
+  if (!match) {
+    console.log('[Lyrics] 跳过：URL 中未识别到 22 位歌曲 ID');
+    return;
+  }
+  console.log(`[Lyrics] track=${match[1]}, HTTP=${ctx.response.status}`);
   // Preserve successful official lyrics and auth/rate-limit/server failures.
-  if (ctx.response.status !== 404) return;
+  if (ctx.response.status !== 404) {
+    console.log('[Lyrics] 跳过：本版仅补 HTTP 404；200 响应（包括空歌词）也保留原样');
+    return;
+  }
+  console.log('[Lyrics] 命中 404，开始检查缓存和外部歌词');
   const id=match[1], key='spotify-lyrics-v1';
   try {
     const cache=ctx.storage.getJSON(key)||{};
