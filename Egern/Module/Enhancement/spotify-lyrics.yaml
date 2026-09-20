@@ -7,18 +7,18 @@ mitm:
     - '*-spclient.spotify.com'
 scriptings:
   - http_response:
-      name: Spotify 多源歌词 v3.1 JSON
+      name: Spotify 多源歌词 JSON
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=3.1
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
       body_required: true
       binary_body: false
       timeout: 10
       max_size: 2097152
       update_interval: 3600
   - http_response:
-      name: Spotify 多源歌词 v3.1 Protobuf
+      name: Spotify 多源歌词 Protobuf
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=3.1
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
       body_required: true
       binary_body: true
       timeout: 10
