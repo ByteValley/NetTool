@@ -1,4 +1,4 @@
-name: Spotify 多源歌词 v3.1
+name: Spotify 多源歌词
 description: 独立补词，无翻译。网易云、QQ、LRCLIB 并发检索，支持简繁匹配和歌词缓存。日志显示歌名、歌手、来源与耗时。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
