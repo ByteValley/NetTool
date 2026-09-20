@@ -2,70 +2,36 @@ name: Spotify 歌词增强
 description: 网易云、QQ 音乐、LRCLIB 优选替换歌词，再交给 DualSubs 翻译；无可靠匹配时保留原词。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 compat_arguments:
-  Types: Translate,External
+  Translate: true
   SourceLanguage: AUTO
   TargetLanguage: ZH-HANT
   Vendor: Microsoft
   LogLevel: INFO
-compat_arguments_desc: 每次歌词响应先多源替换后翻译，不再按 subtype 分流。日志前缀 [MultiPipeline]。翻译 API 需有效认证。
+compat_arguments_desc: 独立多源补词，无需 DualSubs 歌曲缓存或请求脚本。Translate=false 可关闭后续翻译。日志前缀 [MultiLyrics] v3。
 mitm:
   hostnames:
-    - api.spotify.com
     - spclient.wg.spotify.com
     - '*-spclient.spotify.com'
 scriptings:
   - http_response:
-      name: DualSubs Track Cache
-      match: '^https?://api\.spotify\.com/v1/tracks\?'
-      script_url: https://github.com/DualSubs/Spotify/releases/download/v1.9.12/response.bundle.js
-      body_required: true
-      binary_body: false
-      timeout: 30
-      max_size: 2097152
-      update_interval: 3600
-      arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
-  - http_request:
-      name: DualSubs Request JSON
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
-      script_url: https://github.com/DualSubs/Spotify/releases/download/v1.9.12/request.bundle.js
-      body_required: true
-      binary_body: false
-      timeout: 30
-      max_size: 2097152
-      update_interval: 3600
-      arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
-  - http_response:
       name: MultiSource then DualSubs JSON
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=2.2
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=3.0
       body_required: true
       binary_body: false
       timeout: 60
       max_size: 2097152
       update_interval: 3600
       arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
-  - http_request:
-      name: DualSubs Request Protobuf
-      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
-      script_url: https://github.com/DualSubs/Spotify/releases/download/v1.9.12/request.bundle.js
-      body_required: true
-      binary_body: true
-      timeout: 30
-      max_size: 2097152
-      update_interval: 3600
-      arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+        _compat.$argument: 'Translate={{{Translate}}}&Types=Translate&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
   - http_response:
       name: MultiSource then DualSubs Protobuf
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=2.2
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Pipeline.js?v=3.0
       body_required: true
       binary_body: true
       timeout: 60
       max_size: 2097152
       update_interval: 3600
       arguments:
-        _compat.$argument: 'Types={{{Types}}}&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
+        _compat.$argument: 'Translate={{{Translate}}}&Types=Translate&Languages[0]={{{SourceLanguage}}}&Languages[1]={{{TargetLanguage}}}&Vendor={{{Vendor}}}&LrcVendor=NeteaseMusic&LogLevel={{{LogLevel}}}'
