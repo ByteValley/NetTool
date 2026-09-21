@@ -32,15 +32,8 @@ function encodeIndependentLyrics(lyrics){
 const normalizeName=s=>Array.from(String(s||'').normalize('NFKC'),c=>simplified[c]||c).join('');
 const identity=s=>normalizeName(s).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
-function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}
-function cacheRead(storage,key,ttl){try{const value=JSON.parse(storage.getItem(key)||'null');return value&&Date.now()-value.time<ttl?value.value:null}catch{return null}}
-function cacheWrite(storage,key,value){try{storage.setItem(key,JSON.stringify({time:Date.now(),value}));}catch{}}
-const lyricsInFlight=Object.create(null),pendingTtl=12000;
-function lyricsCache(storage,id){const value=cacheRead(storage,'MultiLyrics.v33.lyrics.'+id,7*86400000);return value?.selected?.lyric||value?.selected?.klyric||value?.selected?.plain?value:null}
-function pendingKey(id){return 'MultiLyrics.v33.pending.'+id}
-function clearPending(storage,id){cacheWrite(storage,pendingKey(id),null)}
-async function waitForLyricsCache(storage,id,waitMs){const until=Date.now()+waitMs;while(Date.now()<until){const value=lyricsCache(storage,id);if(value)return value;await new Promise(resolve=>setTimeout(resolve,100));}return lyricsCache(storage,id)}
-const metadataInFlight={};
+function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；只对同一时刻的并发请求做内存去重。
+const lyricsInFlight=Object.create(null),metadataInFlight=Object.create(null),metadataTriggerByPlatform=Object.create(null);
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -53,11 +46,8 @@ async function fetchEmbedMetadata(id,transport,log){
  if(!track.track||!track.artist)throw Error('歌曲页面缺少歌名/歌手');
  log('资料获取 '+track.track+'｜'+track.artists.join(' / ')+' '+(Date.now()-started)+'ms');
  return track;
-}
-async function songMetadata(id,transport,storage,log){
- const cached=cacheRead(storage,'MultiLyrics.v33.meta.'+id,30*86400000);if(cached){log('资料缓存命中：'+cached.track+'｜'+(cached.artists||[cached.artist]).join(' / '));return cached}
- if(metadataInFlight[id]){log('等待同歌资料请求完成');return metadataInFlight[id]}
- const work=(async()=>{const track=await fetchEmbedMetadata(id,transport,log);cacheWrite(storage,'MultiLyrics.v33.meta.'+id,track);return track})();
+}async function songMetadata(id,transport,log){
+ if(metadataInFlight[id]){log('等待同歌资料请求完成');return metadataInFlight[id]} const work=(async()=>fetchEmbedMetadata(id,transport,log))();
  metadataInFlight[id]=work;try{return await work}finally{delete metadataInFlight[id]}
 }
 async function selectLyrics(track,transport,log){
@@ -116,7 +106,8 @@ async function selectLyrics(track,transport,log){
   function complete(expired=false){
    if(finished)return;
    if(!expired&&completeFlags.some(done=>!done))return;
-   const rows=results.flat().filter(Boolean).sort((a,b)=>b.matchScore-a.matchScore||b.qualityScore-a.qualityScore||String(a.source).localeCompare(String(b.source)));
+   const sourcePriority={QQMusic:0,NeteaseMusic:1,LRCLIB:2};
+   const rows=results.flat().filter(Boolean).sort((a,b)=>(sourcePriority[a.source]??99)-(sourcePriority[b.source]??99)||b.matchScore-a.matchScore||b.qualityScore-a.qualityScore);
    if(rows.length){finished=true;clearTimeout(limit);const best=rows[0];log('选用 '+best.source+'，检索 '+(Date.now()-started)+'ms'+(best.translation?'，含中文翻译':'')+(best.romanization?'，含发音歌词':''));resolve(best);return}
    finished=true;clearTimeout(limit);reject(Error('各源无可靠匹配或超时'));
   }
@@ -189,21 +180,9 @@ function replaceResponse(request,response,lyrics){
  // Egern/Surge response scripts use `status`; keeping the upstream
  // `statusCode` field from a 404 response can make the client retain the
  // failure even though the body was replaced.
- return {status:200,headers,body};
+ return {...response,status:200,statusCode:200,headers,body};
 }
-async function lyricsForTrack(id,track,transport,storage,log){
- const cached=lyricsCache(storage,id);if(cached){log('歌词缓存命中：'+cached.selected.source+'，保留辅助歌词资料');return cached}
- if(lyricsInFlight[id]){log('等待同歌请求完成');return lyricsInFlight[id]}
- if(cacheRead(storage,pendingKey(id),pendingTtl)){log('检测到同歌请求，等待缓存');const waited=await waitForLyricsCache(storage,id,5000);if(waited)return waited;throw Error('同歌请求未完成，保留原词')}
- cacheWrite(storage,pendingKey(id),{started:Date.now()});
- const work=(async()=>{try{
-  if(cacheRead(storage,'MultiLyrics.v33.miss.'+id,30000))throw Error('30秒内刚查询无匹配，保留原词');
-  let selected;try{selected=await selectLyrics(track,transport,log)}catch(e){cacheWrite(storage,'MultiLyrics.v33.miss.'+id,true);throw e}
-  const value={track,selected};cacheWrite(storage,'MultiLyrics.v33.lyrics.'+id,value);return value;
- }finally{clearPending(storage,id)}})();
- lyricsInFlight[id]=work;try{return await work}finally{delete lyricsInFlight[id]}
-}
-async function independentLyrics(request,response,transport=httpTransport,storage={getItem:k=>$persistentStore.read(k),setItem:(k,v)=>$persistentStore.write(v,k)},output=console.log){
+async function lyricsForTrack(id,track,transport,log){ if(lyricsInFlight[id]){log('等待同歌请求完成');return lyricsInFlight[id]} const work=(async()=>{const selected=await selectLyrics(track,transport,log);return {track,selected}})(); lyricsInFlight[id]=work;try{return await work}finally{delete lyricsInFlight[id]}}async function independentLyrics(request,response,transport=httpTransport,output=console.log){
  const started=Date.now(),id=request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1],rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
  const log=s=>output('[MultiLyrics '+rid+'] '+s),method=String(request.method||'GET').toUpperCase();
  log('已触发 method='+method+' track='+id+' HTTP='+(response.status??response.statusCode)+' format='+responseFormat(request,response)+' platform='+header(request.headers,'app-platform'));
@@ -211,11 +190,11 @@ async function independentLyrics(request,response,transport=httpTransport,storag
  if(method!=='GET'){log('原样放行 '+method+'，不获取歌曲资料或歌词');return response}
  try{
   const status=Number(response.status??response.statusCode??200);if(![200,404].includes(status)){log('保留原响应：HTTP '+status);return response}if(!id)throw Error('无有效歌曲 ID');
-  const track=await songMetadata(id,transport,storage,log);log('歌曲：'+track.track+'｜歌手：'+(track.artists||[track.artist]).join(' / ')+'｜时长：'+(track.duration_ms/1000)+'s');
-  const cached=await lyricsForTrack(id,track,transport,storage,log),format=responseFormat(request,response),lyrics=makeLyrics(cached.selected,request,format),result=replaceResponse(request,response,lyrics);
+  const track=await songMetadata(id,transport,log);log('歌曲：'+track.track+'｜歌手：'+(track.artists||[track.artist]).join(' / ')+'｜时长：'+(track.duration_ms/1000)+'s');
+  const resolved=await lyricsForTrack(id,track,transport,log),format=responseFormat(request,response),lyrics=makeLyrics(resolved.selected,request,format),rewritten=replaceResponse(request,response,lyrics);
   log('替换成功：'+lyrics.provider+' / '+lyrics.syncType+' / '+lyrics.lines.length+' 行'+(lyrics.alternatives.length?'，含 '+lyrics.alternatives.length+' 组辅助歌词':'')+'，总耗时 '+(Date.now()-started)+'ms');
-  log('返回格式='+responseFormat(request,response)+' Content-Encoding='+(header(result.headers,'content-encoding')||'未设置')+' CORS='+(header(result.headers,'access-control-allow-origin')||'原响应未提供'));
-  return result;
+  log('返回格式='+responseFormat(request,response)+' Content-Encoding='+(header(rewritten.headers,'content-encoding')||'未设置')+' CORS='+(header(rewritten.headers,'access-control-allow-origin')||'原响应未提供'));
+  return rewritten;
  }catch(e){log('保留原响应：'+e.message+'，总耗时 '+(Date.now()-started)+'ms');return response}
 }
 
@@ -247,13 +226,13 @@ function gidToId(hex){
 }
 function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
-function shouldForceMetadata(request,id,storage){
+function shouldForceMetadata(request,id){
  const platform=String(metadataHeaderValue(request?.headers,'app-platform')||'unknown').toLowerCase();
- const key='MultiLyrics.v33.metadata-trigger.'+platform,recent=cacheRead(storage,key,4500);
+ const now=Date.now(),recent=metadataTriggerByPlatform[platform];
  // Spotify 会在切歌时并行预取队列歌曲的 metadata。每个平台 4.5 秒只放行一首，
  // 避免把整段队列都标记成“有歌词”，从而触发多首 color-lyrics 请求。
- if(recent&&recent.id!==id)return false;
- if(!recent||recent.id!==id)cacheWrite(storage,key,{id});
+ if(recent&&now-recent.time<4500&&recent.id!==id)return false;
+ if(!recent||now-recent.time>=4500||recent.id!==id)metadataTriggerByPlatform[platform]={id,time:now};
  return true;
 }
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
@@ -290,8 +269,8 @@ function metadataTrack(request,response){
  if(!json.name||!artists.length)throw Error('metadata 缺少歌名或歌手');
  return {id,track:json.name,artist:artists[0],artists,album:json.album?.name||'',duration_ms:Number(json.duration_ms??json.duration??0)};
 }
-async function lyricsModule(request,response,transport=httpTransport,storage={getItem:k=>$persistentStore.read(k),setItem:(k,v)=>$persistentStore.write(v,k)},output=console.log){
- if(!/\/metadata\/\d+\/track\//.test(request.url))return independentLyrics(request,response,transport,storage,output);
+async function lyricsModule(request,response,transport=httpTransport,output=console.log){
+ if(!/\/metadata\/\d+\/track\//.test(request.url))return independentLyrics(request,response,transport,output);
  const started=Date.now(),rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7),log=s=>output('[MultiLyrics '+rid+'] '+s);
  try{
   const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
@@ -300,12 +279,12 @@ async function lyricsModule(request,response,transport=httpTransport,storage={ge
   let track;
   try{track=metadataTrack(request,response)}catch(e){
    const id=metadataTrackId(request.url);
-   track=await songMetadata(id,transport,storage,log);
+   track=await songMetadata(id,transport,log);
    log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
   }
-  cacheWrite(storage,'MultiLyrics.v33.meta.'+track.id,track);
-  log('资料已缓存：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
-  if(shouldForceMetadata(request,track.id,storage)){
+  
+  log('资料已获取：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
+  if(shouldForceMetadata(request,track.id)){
    try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
    catch(e){log('metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
   }else log('metadata 触发节流，暂不为预取歌曲请求 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
@@ -322,6 +301,6 @@ if(typeof $request!=='undefined'&&typeof $response==='undefined'&&/\/metadata\/\
  try{$done(prepareMetadataRequest($request))}catch(e){console.log('[MultiLyrics] metadata 请求处理失败：'+e.message);$done({})}
 }
 if(typeof $request!=='undefined'&&typeof $response!=='undefined'){
- console.log('[MultiLyrics] 多源歌词已载入（QQ音乐 → 网易云音乐 → LRCLIB，带缓存与同歌去重）');
+ console.log('[MultiLyrics] 多源歌词已载入（QQ音乐 → 网易云音乐 → LRCLIB，仅同请求去重）');
  lyricsModule($request,$response).then($done).catch(e=>{console.log('[MultiLyrics] 未处理错误：'+e.message);$done($response)});
 }
