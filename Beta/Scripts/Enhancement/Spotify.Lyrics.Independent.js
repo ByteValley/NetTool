@@ -32,7 +32,7 @@ function encodeIndependentLyrics(lyrics){
 const normalizeName=s=>Array.from(String(s||'').normalize('NFKC'),c=>simplified[c]||c).join('');
 const identity=s=>normalizeName(s).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
-function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；只对同一时刻的并发请求做内存去重。const lyricsInFlight=Object.create(null),metadataInFlight=Object.create(null),metadataTriggerByTrack=Object.create(null);
+function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；只对同一时刻的并发请求做内存去重。const lyricsInFlight=Object.create(null),metadataInFlight=Object.create(null);
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -228,10 +228,8 @@ function gidToId(hex){
  while(digits.some(Boolean)){let carry=0;digits=digits.map(x=>{const n=carry*256+x;carry=n%62;return Math.floor(n/62)});out=alphabet[carry]+out}
  return out.padStart(22,'0');
 }
-function metadataHeaderValue(headers,name){return header(headers,name)}
-function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}function shouldForceMetadata(id){ const now=Date.now(),last=metadataTriggerByTrack[id]; // Different songs must not block one another. // Spotify 会并行预取队列歌曲。按平台限流会让后续歌曲拿不到 color-lyrics 请求； // 只对同一首歌做短时去重，不把不同歌曲挡在 metadata 改写之外。 if(last&&now-last<4500)return false; metadataTriggerByTrack[id]=now;
- return true;
-}
+
+
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=String(url||'').match(/\/metadata\/\d+\/track\/([a-f\d]{32}|[A-Za-z\d]{22})(?:[/?]|$)/i)?.[1];if(!token)throw Error('未知 metadata 路径');return token.length===32?gidToId(token):token}
@@ -281,10 +279,10 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
   }
   
   log('资料已获取：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
-  if(shouldForceMetadata(track.id)){
-   try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
+  
+   try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true，继续允许 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
    catch(e){log('metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
-  }else log('metadata 触发节流，暂不为预取歌曲请求 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
+  
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
 }
