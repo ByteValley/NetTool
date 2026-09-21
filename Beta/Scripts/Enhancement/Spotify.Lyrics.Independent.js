@@ -139,12 +139,6 @@ function isChineseLine(text){
  const value=String(text||'');
  return /[\u3400-\u9fff]/.test(value)&&!/[\u3040-\u30ff\uac00-\ud7af]/.test(value);
 }
-function inlineAuxiliaryLines(lines,translationLines,romanizationLines){
- return lines.map((line,index)=>{
-  const words=isChineseLine(line.words)?romanizationLines[index]:translationLines[index];
-  return words&&words!==line.words?{...line,words:String(line.words)+'\n'+String(words)}:line;
- });
-}
 function makeLyrics(selected,request,format){
  let lines=parseIndependentLrc(selected.lyric);
  if(!lines.length&&selected.klyric)lines=String(selected.klyric).split(/\r?\n/).flatMap(row=>{const m=row.match(/^\[(\d+),\d+\](.*)$/);return m?[{startTimeMs:m[1],words:m[2].replace(/\(\d+,\d+,\d+\)/g,''),syllables:[],endTimeMs:'0'}]:[]});
@@ -154,13 +148,11 @@ function makeLyrics(selected,request,format){
  lines=lines.map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
  const translationLines=alignAuxiliaryLines(lines,selected.translation,synced),romanizationLines=alignAuxiliaryLines(lines,selected.romanization,synced);
  const alternatives=[];
- // 移动端使用 Spotify 原生 alternatives 结构承载双语/发音，避免把附属行插入主时间轴。
+ // 所有平台统一使用 Spotify 原生 alternatives 承载双语/发音。
+ // 主时间轴只保留原文，避免 Mac/iPhone/iPad 同时渲染合成行和 alternatives 导致重复。
  if(translationLines.some(Boolean))alternatives.push({language:'zh',lines:translationLines});
  if(romanizationLines.some(Boolean))alternatives.push({language:'zh-Latn',lines:romanizationLines});
- // 原文和附属歌词共用一个 LyricsLine：移动端不增加重复时间轴，桌面端也不会只高亮最后一行。
- // alternatives 仍按 Spotify 原生格式保留，供 iPhone/iPad 的翻译入口使用。
- const displayLines=inlineAuxiliaryLines(lines,translationLines,romanizationLines);
- return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:0};
+ return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
 function responseFormat(request,response){
@@ -246,7 +238,6 @@ function gidToId(hex){
  return out.padStart(22,'0');
 }
 function metadataHeaderValue(headers,name){return header(headers,name)}
-function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
 function shouldForceMetadata(request,id,storage){
  const platform=String(metadataHeaderValue(request?.headers,'app-platform')||'unknown').toLowerCase();
  const key='MultiLyrics.v33.metadata-trigger.'+platform,recent=cacheRead(storage,key,4500);
