@@ -133,7 +133,12 @@ function isChineseLine(text){
  const value=String(text||'');
  return /[\u3400-\u9fff]/.test(value)&&!/[\u3040-\u30ff\uac00-\ud7af]/.test(value);
 }
-function auxiliaryLine(line,words){return {...line,startTimeMs:String(line.startTimeMs||'0'),words:String(words||''),syllables:[],endTimeMs:String(line.endTimeMs||'0'),transliteratedWords:''}}
+function auxiliaryLine(line,words){
+ const start=Math.max(0,Number(line.startTimeMs||0));
+ // Spotify 只会高亮一个当前 LyricsLine。让附属翻译行提前 1ms，当前状态落在原文行。
+ const auxiliaryStart=start>0?start-1:0;
+ return {...line,startTimeMs:String(auxiliaryStart),words:String(words||''),syllables:[],endTimeMs:String(line.endTimeMs||'0'),transliteratedWords:''}
+}
 function interleaveAuxiliaryLines(lines,translationLines,romanizationLines){
  const output=[];
  lines.forEach((line,index)=>{
@@ -148,7 +153,8 @@ function makeLyrics(selected,request,format){
  if(!lines.length&&selected.klyric)lines=String(selected.klyric).split(/\r?\n/).flatMap(row=>{const m=row.match(/^\[(\d+),\d+\](.*)$/);return m?[{startTimeMs:m[1],words:m[2].replace(/\(\d+,\d+,\d+\)/g,''),syllables:[],endTimeMs:'0'}]:[]});
  const synced=lines.length>0;if(!synced)lines=String(selected.plain||'').split(/\r?\n/).filter(x=>x.trim()).map(words=>({startTimeMs:'0',words,syllables:[],endTimeMs:'0'}));
  if(!lines.some(x=>x.words.trim()))throw Error('转换后歌词为空');
- lines=lines.map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
+ // 首句原始时间可能是 0；向后挪 1ms，避免它与首句翻译行产生同一时间戳。
+ lines=lines.map(line=>({...line,startTimeMs:String(Math.max(1,Number(line.startTimeMs||0))),transliteratedWords:line.transliteratedWords||''}));
  const translationLines=alignAuxiliaryLines(lines,selected.translation,synced),romanizationLines=alignAuxiliaryLines(lines,selected.romanization,synced);
  const alternatives=[];
  if(translationLines.some(Boolean))alternatives.push({language:'zh',lines:translationLines});
