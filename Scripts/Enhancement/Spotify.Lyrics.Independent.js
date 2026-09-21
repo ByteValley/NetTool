@@ -37,6 +37,9 @@ function httpTransport(options){return new Promise((resolve,reject)=>{$httpClien
 function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}
 const lyricsInFlight=Object.create(null);
 const metadataInFlight={};
+// 仅保留进程内的短暂预热结果，供紧随 metadata 的 color-lyrics 请求复用；
+// 不写入 Egern 持久化存储，也不跳过后续的歌词响应替换。
+const lyricsWarm=Object.create(null),lyricsWarmTtl=15000;
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -109,14 +112,17 @@ async function selectLyrics(track,transport,log){
  }
  async function lrclib(){const d=await request('https://lrclib.net/api/search?'+query({track_name:track.track,artist_name:track.artist}));return candidates((Array.isArray(d)?d:[]).filter(x=>!x.instrumental).map(x=>({...x,source:'LRCLIB',title:x.trackName,artists:[x.artistName],album:x.albumName}))).map(c=>quality(c,{lyric:c.syncedLyrics,plain:c.plainLyrics}))}
  return new Promise((resolve,reject)=>{
-  const results=[null,null,null],completeFlags=[false,false,false];const names=['QQ音乐','网易云','LRCLIB'];
+ const results=[null,null,null],completeFlags=[false,false,false];const names=['QQ音乐','网易云','LRCLIB'];
   const limit=setTimeout(()=>complete(true),budget);
   function complete(expired=false){
    if(finished)return;
-   if(!expired&&completeFlags.some(done=>!done))return;
+   const fastDone=completeFlags[0]&&completeFlags[1],allDone=completeFlags.every(done=>done),fastRows=results.slice(0,2).flat().filter(Boolean);
+   // QQ/网易云 已经给出可靠歌词时，不再等待通常较慢的 LRCLIB。
+   // 这让 iPhone 在进入播放页时能及时收到完整响应，而不是先渲染空歌词。
+   if(!expired&&!fastDone&&!allDone)return;
    const sourcePriority={QQMusic:0,NeteaseMusic:1,LRCLIB:2};
    const rows=results.flat().filter(Boolean).sort((a,b)=>(sourcePriority[a.source]??99)-(sourcePriority[b.source]??99)||b.matchScore-a.matchScore||b.qualityScore-a.qualityScore);
-   if(rows.length){
+   if(rows.length&&((fastDone&&fastRows.length)||allDone||expired)){
     finished=true;clearTimeout(limit);const best=rows[0],merged={...best},auxiliarySources=new Set();
     const sameRecording=c=>{
      const title=identity(c.title),bestTitle=identity(best.title),titleMatch=title===bestTitle||identity(baseTitle(c.title))===identity(baseTitle(best.title));
@@ -221,9 +227,14 @@ function replaceResponse(request,response,lyrics){
  return rewritten;
 }
 async function lyricsForTrack(id,track,transport,log){
+ const warm=lyricsWarm[id];
+ if(warm){
+  delete lyricsWarm[id];
+  if(warm.expires>Date.now()){log('复用 metadata 阶段的歌词预热结果');return warm.value}
+ }
  if(lyricsInFlight[id]){log('等待同歌请求完成');return lyricsInFlight[id]}
  const work=(async()=>{const selected=await selectLyrics(track,transport,log);return {track,selected}})();
- lyricsInFlight[id]=work;try{return await work}finally{delete lyricsInFlight[id]}
+ lyricsInFlight[id]=work;try{const value=await work;lyricsWarm[id]={value,expires:Date.now()+lyricsWarmTtl};return value}finally{delete lyricsInFlight[id]}
 }
 async function independentLyrics(request,response,transport=httpTransport,output=console.log){
  const started=Date.now(),id=request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1],rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
@@ -334,6 +345,12 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
    log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+trackLabel(track));
   }
   log(trackLabel(track)+'｜资料已获取｜时长：'+(track.duration_ms/1000)+'s｜耗时：'+(Date.now()-started)+'ms');
+  // iPhone 进入播放页后不会主动重试 color-lyrics。先在 metadata 阶段
+  // 预热歌词，后续歌词响应可直接复用同一首歌的进程内结果。
+  try{
+   await lyricsForTrack(metadataTrackId(request.url),track,httpTransport,s=>log(trackLabel(track)+'｜预热｜'+s));
+   log(trackLabel(track)+'｜歌词预热完成');
+  }catch(e){log(trackLabel(track)+'｜歌词预热失败：'+e.message)}
   try{const rewritten=forceMetadataHasLyrics(response,request,track);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
   catch(e){log(trackLabel(track)+'｜metadata 没有可改写响应体，已保留原响应')}
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
