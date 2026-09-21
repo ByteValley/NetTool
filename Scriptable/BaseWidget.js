@@ -491,7 +491,7 @@ class BaseWidget {
           const i = item.icon || {};
           ico = await this.loadSF2B64(i.name, i.color);
         }
-        const key = item.name || item.val;
+        const key = String(item.name || item.val).replace(/[^\w-]/g, "");
         let right = "";
         item.defaultValue = this.settings[key] || item.defaultValue || "";
         if (item.type === "input") right = item.defaultValue || "";
@@ -503,13 +503,13 @@ class BaseWidget {
         } else if (item.type === "select"){
           let opts = "";
           item.options.forEach(o=>{
-            opts += `<option value="${o}" ${item.defaultValue==o?'selected="selected"':""}>${o}</option>`
+            opts += "<option value=\"" + o + "\" " + (item.defaultValue==o?'selected="selected"':"") + ">" + o + "</option>";
           });
-          right = `<select class="form-item__input" name="${key}">${opts}</select>`;
+          right = "<select class=\"form-item__input\" name=\"" + key + "\">" + opts + "</select>";
         } else if (item.type === "switch"){
-          right = `<input class="form-item__input" name="${key}" role="switch" type="checkbox" value="true" ${("true"==item.defaultValue)?'checked="checked"':""} />`;
+          right = "<input class=\"form-item__input\" name=\"" + key + "\" role=\"switch\" type=\"checkbox\" value=\"true\" " + (("true"==item.defaultValue)?'checked="checked"':"") + " />";
         } else if (item.type){
-          right = `<input class="form-item__input" placeholder="${item.placeholder||"请输入"}" name="${key}" type="${item.type}" enterkeyhint="done" value="${item.defaultValue||""}">`;
+          right = "<input class=\"form-item__input\" placeholder=\"" + (item.placeholder||"请输入") + "\" name=\"" + key + "\" type=\"" + item.type + "\" enterkeyhint=\"done\" value=\"" + (item.defaultValue||"") + "\">";
         }
         const wrap = (item.type==="switch"||item.type==="checkbox") ? "form-item-switch" : "form-item";
         bodyHTML += `
