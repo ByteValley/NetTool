@@ -125,7 +125,7 @@ function makeLyrics(selected){
  const synced=lines.length>0;if(!synced)lines=String(selected.plain||'').split(/\r?\n/).filter(x=>x.trim()).map(words=>({startTimeMs:'0',words,syllables:[],endTimeMs:'0'}));
  if(!lines.some(x=>x.words.trim()))throw Error('转换后歌词为空');
  lines=lines.map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
- return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:false,alternatives:[],language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:'FULLSCREEN_LYRICS'};
+ return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:false,alternatives:[],language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
 function responseFormat(request,response){
@@ -144,7 +144,7 @@ function normalizeLyrics(lyrics,original){
   isRtlLanguage:typeof base.isRtlLanguage==='boolean'?base.isRtlLanguage:false,
   capStatus:typeof base.capStatus==='string'?base.capStatus:'',
   previewLines:Array.isArray(base.previewLines)?base.previewLines:[],
-  fullscreenAction:typeof base.fullscreenAction==='string'?base.fullscreenAction:'FULLSCREEN_LYRICS'
+  fullscreenAction:(typeof base.fullscreenAction==='number'||typeof base.fullscreenAction==='string')?base.fullscreenAction:0
  };
 }
 function replaceResponse(request,response,lyrics){
