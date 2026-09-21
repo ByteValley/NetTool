@@ -31,8 +31,10 @@ function encodeIndependentLyrics(lyrics){
 
 const normalizeName=s=>Array.from(String(s||'').normalize('NFKC'),c=>simplified[c]||c).join('');
 const identity=s=>normalizeName(s).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
+function trackLabel(track){const artists=track?.artists?.length?track.artists:(track?.artist?[track.artist]:[]);return '歌曲：'+(track?.track||'未知歌曲')+'｜歌手：'+(artists.join(' / ')||'未知歌手')}
+function trackLogger(log,track){const label=trackLabel(track);return s=>log(label+'｜'+s)}
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
-function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；只对同一时刻的并发请求做内存去重。const lyricsInFlight=Object.create(null),metadataInFlight=Object.create(null);
+function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值或内存缓存。
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -43,12 +45,9 @@ async function fetchEmbedMetadata(id,transport,log){
  if(e?.id!==id&&e?.uri!=='spotify:track:'+id)throw Error('歌曲资料 ID 不符');
  const track={id,track:e.name||e.title,artist:e.artists?.[0]?.name,artists:(e.artists||[]).map(a=>a.name).filter(Boolean),duration_ms:e.duration};
  if(!track.track||!track.artist)throw Error('歌曲页面缺少歌名/歌手');
- log('资料获取 '+track.track+'｜'+track.artists.join(' / ')+' '+(Date.now()-started)+'ms');
+ log('资料获取 '+trackLabel(track)+' '+(Date.now()-started)+'ms');
  return track;
-}async function songMetadata(id,transport,log){
- if(metadataInFlight[id]){log('等待同歌资料请求完成');return metadataInFlight[id]} const work=(async()=>fetchEmbedMetadata(id,transport,log))();
- metadataInFlight[id]=work;try{return await work}finally{delete metadataInFlight[id]}
-}
+}async function songMetadata(id,transport,log){return fetchEmbedMetadata(id,transport,log)}
 async function selectLyrics(track,transport,log){
  const started=Date.now(),budget=3000;let finished=false;
  const query=p=>Object.entries(p).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
@@ -64,9 +63,9 @@ async function selectLyrics(track,transport,log){
   const exact=identity(c.title)===identity(track.track);
   if(!exact&&identity(baseTitle(c.title))!==identity(baseTitle(track.track)))return reject('歌名不同');
   const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b)));
+  const duration=Number(track.duration_ms)/1000;
   // Spotify sometimes returns an English stage name while Chinese sources use the real name.
   // For unknown aliases, only allow an exact title with a close duration as a conservative fallback.
-  const duration=Number(track.duration_ms)/1000;
   if(!artistMatch&&(!exact||!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('歌手不同');
   if(!exact&&(!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('副标题匹配但时长不符或缺失');
   if(duration&&c.duration&&Math.abs(duration-c.duration)>5)return reject('时长不同');
@@ -186,20 +185,21 @@ function replaceResponse(request,response,lyrics){
  // failure even though the body was replaced.
  return {...response,status:200,statusCode:200,headers,body};
 }
-async function lyricsForTrack(id,track,transport,log){ if(lyricsInFlight[id]){log('等待同歌请求完成');return lyricsInFlight[id]} const work=(async()=>{const selected=await selectLyrics(track,transport,log);return {track,selected}})(); lyricsInFlight[id]=work;try{return await work}finally{delete lyricsInFlight[id]}}async function independentLyrics(request,response,transport=httpTransport,output=console.log){
+async function lyricsForTrack(id,track,transport,log){const selected=await selectLyrics(track,transport,log);return {track,selected}}async function independentLyrics(request,response,transport=httpTransport,output=console.log){
  const started=Date.now(),id=request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1],rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
  const log=s=>output('[MultiLyrics '+rid+'] '+s),method=String(request.method||'GET').toUpperCase();
  log('已触发 method='+method+' track='+id+' HTTP='+(response.status??response.statusCode)+' format='+responseFormat(request,response)+' platform='+header(request.headers,'app-platform'));
  // Desktop Spotify sends a CORS preflight before its GET. Never turn it into lyrics.
  if(method!=='GET'){log('原样放行 '+method+'，不获取歌曲资料或歌词');return response}
+ let track=null;
  try{
   const status=Number(response.status??response.statusCode??200);if(![200,404].includes(status)){log('保留原响应：HTTP '+status);return response}if(!id)throw Error('无有效歌曲 ID');
-  const track=await songMetadata(id,transport,log);log('歌曲：'+track.track+'｜歌手：'+(track.artists||[track.artist]).join(' / ')+'｜时长：'+(track.duration_ms/1000)+'s');
-  const resolved=await lyricsForTrack(id,track,transport,log),format=responseFormat(request,response),lyrics=makeLyrics(resolved.selected,request,format),rewritten=replaceResponse(request,response,lyrics);
-  log('替换成功：'+lyrics.provider+' / '+lyrics.syncType+' / '+lyrics.lines.length+' 行'+(lyrics.alternatives.length?'，含 '+lyrics.alternatives.length+' 组辅助歌词':'')+'，总耗时 '+(Date.now()-started)+'ms');
-  log('返回格式='+responseFormat(request,response)+' Content-Encoding='+(header(rewritten.headers,'content-encoding')||'未设置')+' CORS='+(header(rewritten.headers,'access-control-allow-origin')||'原响应未提供'));
+  track=await songMetadata(id,transport,log);const contextualLog=trackLogger(log,track);contextualLog('资料已获取｜时长：'+(track.duration_ms/1000)+'s');
+  const resolved=await lyricsForTrack(id,track,transport,contextualLog),format=responseFormat(request,response),lyrics=makeLyrics(resolved.selected,request,format),rewritten=replaceResponse(request,response,lyrics);
+  contextualLog('替换成功：'+lyrics.provider+' / '+lyrics.syncType+' / '+lyrics.lines.length+' 行'+(lyrics.alternatives.length?'，含 '+lyrics.alternatives.length+' 组辅助歌词':'')+'，总耗时 '+(Date.now()-started)+'ms');
+  contextualLog('返回格式='+responseFormat(request,response)+' Content-Encoding='+(header(rewritten.headers,'content-encoding')||'未设置')+' CORS='+(header(rewritten.headers,'access-control-allow-origin')||'原响应未提供'));
   return rewritten;
- }catch(e){log('保留原响应：'+e.message+'，总耗时 '+(Date.now()-started)+'ms');return response}
+ }catch(e){log((track?trackLabel(track):'track='+id)+'｜保留原响应：'+e.message+'，总耗时 '+(Date.now()-started)+'ms');return response}
 }
 
 // Spotify metadata Track fields: gid=1, name=2, album=3, artist=4,
@@ -228,8 +228,6 @@ function gidToId(hex){
  while(digits.some(Boolean)){let carry=0;digits=digits.map(x=>{const n=carry*256+x;carry=n%62;return Math.floor(n/62)});out=alphabet[carry]+out}
  return out.padStart(22,'0');
 }
-
-
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=String(url||'').match(/\/metadata\/\d+\/track\/([a-f\d]{32}|[A-Za-z\d]{22})(?:[/?]|$)/i)?.[1];if(!token)throw Error('未知 metadata 路径');return token.length===32?gidToId(token):token}
@@ -275,14 +273,12 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
   try{track=metadataTrack(request,response)}catch(e){
    const id=metadataTrackId(request.url);
    track=await songMetadata(id,transport,log);
-   log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
+   log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+trackLabel(track));
   }
   
-  log('资料已获取：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
-  
-   try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true，继续允许 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
-   catch(e){log('metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
-  
+  log(trackLabel(track)+'｜资料已获取｜时长：'+(track.duration_ms/1000)+'s｜耗时：'+(Date.now()-started)+'ms');
+  try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
+  catch(e){log(trackLabel(track)+'｜metadata 没有可改写响应体，已保留原响应')}
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
 }
@@ -296,6 +292,6 @@ if(typeof $request!=='undefined'&&typeof $response==='undefined'&&/\/metadata\/\
  try{$done(prepareMetadataRequest($request))}catch(e){console.log('[MultiLyrics] metadata 请求处理失败：'+e.message);$done({})}
 }
 if(typeof $request!=='undefined'&&typeof $response!=='undefined'){
- console.log('[MultiLyrics] 多源歌词已载入（QQ音乐 → 网易云音乐 → LRCLIB，仅同请求去重）');
+ console.log('[MultiLyrics] 多源歌词已载入（QQ音乐 → 网易云音乐 → LRCLIB，不使用缓存）');
  lyricsModule($request,$response).then($done).catch(e=>{console.log('[MultiLyrics] 未处理错误：'+e.message);$done($response)});
 }
