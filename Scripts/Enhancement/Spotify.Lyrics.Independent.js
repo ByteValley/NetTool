@@ -149,14 +149,33 @@ function isChineseLine(text){
  const value=String(text||'');
  return /[\u3400-\u9fff]/.test(value)&&!/[\u3040-\u30ff\uac00-\ud7af]/.test(value);
 }
-function pairedAuxiliaryLines(lines,translationLines,romanizationLines){
+function auxiliaryLineWords(line,index,translationLines,romanizationLines){
+ const words=isChineseLine(line.words)?romanizationLines[index]:translationLines[index];
+ return words&&String(words)!==String(line.words)?String(words):'';
+}
+function separateAuxiliaryLines(lines,translationLines,romanizationLines){
  const output=[];
  lines.forEach((line,index)=>{
-  const words=isChineseLine(line.words)?romanizationLines[index]:translationLines[index];
   output.push({...line,words:String(line.words)});
-  // macOS/Windows Protobuf lyrics render paired lines at one timestamp. A literal
-  // newline inside `words` is treated as one string and the auxiliary text is hidden.
-  if(words&&words!==line.words)output.push({startTimeMs:String(line.startTimeMs),words:String(words),syllables:[],endTimeMs:'0',transliteratedWords:''});
+  const words=auxiliaryLineWords(line,index,translationLines,romanizationLines);
+  if(words)output.push({startTimeMs:String(line.startTimeMs),words,syllables:[],endTimeMs:'0',transliteratedWords:''});
+ });
+ return output;
+}
+function mergedAuxiliaryLines(lines,translationLines,romanizationLines){
+ return lines.map((line,index)=>{
+  const words=auxiliaryLineWords(line,index,translationLines,romanizationLines);
+  return {...line,words:words?String(line.words)+'\n'+words:String(line.words)};
+ });
+}
+function desktopAuxiliaryLines(lines,translationLines,romanizationLines){
+ const output=[];
+ lines.forEach((line,index)=>{
+  const words=auxiliaryLineWords(line,index,translationLines,romanizationLines);
+  // Spotify desktop highlights the last line at a timestamp. Keep the auxiliary
+  // line first and the source line last so the sung original is the active line.
+  if(words)output.push({startTimeMs:String(line.startTimeMs),words,syllables:[],endTimeMs:'0',transliteratedWords:''});
+  output.push({...line,words:String(line.words)});
  });
  return output;
 }
@@ -172,9 +191,11 @@ function makeLyrics(selected,request,format){
  // 移动端使用 Spotify 原生 alternatives 结构承载双语/发音，避免把附属行插入主时间轴。
  if(translationLines.some(Boolean))alternatives.push({language:'zh',lines:translationLines});
  if(romanizationLines.some(Boolean))alternatives.push({language:'zh-Latn',lines:romanizationLines});
- // 原文和附属歌词共用一个时间戳：移动端不增加 alternatives 之外的时间轴，桌面端用成对行显示。
  // alternatives 仍按 Spotify 原生格式保留，供 iPhone/iPad 的翻译入口使用。
- const displayLines=pairedAuxiliaryLines(lines,translationLines,romanizationLines),previewLines=displayLines.slice(0,5);
+ // 桌面端最后一个同时间戳行会获得高亮，因此让原文落在最后；JSON 预览则合并为一个歌词单元，避免只显示译文。
+ const platform=String(header(request?.headers,'app-platform')||header(request?.headers,'App-Platform')||'');
+ const displayLines=/^(?:OSX|Win32_x86_64|WebPlayer)$/i.test(platform)?desktopAuxiliaryLines(lines,translationLines,romanizationLines):separateAuxiliaryLines(lines,translationLines,romanizationLines);
+ const previewLines=mergedAuxiliaryLines(lines,translationLines,romanizationLines).slice(0,5);
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
@@ -266,11 +287,11 @@ function metadataFallbackBody(request,track){
  for(const artist of artists)body.push(...metadataBytesField(4,metadataBytesField(2,metadataText(artist))));
  body.push(...metadataSIntField(7,Math.round(Number(track.duration_ms)||0)),...metadataVarintField(18,1));return new Uint8Array(body);
 }
-function metadataFallbackJson(request,track){const id=metadataTrackId(request.url),artists=[...new Set((track.artists||[track.artist]).filter(Boolean))];return JSON.stringify({id,uri:'spotify:track:'+id,name:track.track,album:{name:track.album||''},artists:artists.map(name=>({name})),duration_ms:Number(track.duration_ms)||0,has_lyrics:true})}
+function metadataFallbackJson(request,track){const token=metadataTrackToken(request.url),artists=[...new Set((track.artists||[track.artist]).filter(Boolean))];return JSON.stringify({gid:token,name:track.track,album:{name:track.album||''},artist:artists.map(name=>({name})),duration:Number(track.duration_ms)||0,media_type:'AUDIO',canonical_uri:'spotify:track:'+metadataTrackId(request.url),has_lyrics:true})}
 function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
-function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers);for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':'application/protobuf';return out}
+function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers),original=header(headers,'content-type');for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':(original&&!/json/i.test(original)?original:'application/protobuf');return out}
 function metadataRewriteResponse(response,body,headers){return {...response,status:200,statusCode:200,headers,body}}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
