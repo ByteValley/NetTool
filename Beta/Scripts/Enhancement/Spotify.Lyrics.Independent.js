@@ -124,7 +124,8 @@ function makeLyrics(selected){
  if(!lines.length&&selected.klyric)lines=String(selected.klyric).split(/\r?\n/).flatMap(row=>{const m=row.match(/^\[(\d+),\d+\](.*)$/);return m?[{startTimeMs:m[1],words:m[2].replace(/\(\d+,\d+,\d+\)/g,''),syllables:[],endTimeMs:'0'}]:[]});
  const synced=lines.length>0;if(!synced)lines=String(selected.plain||'').split(/\r?\n/).filter(x=>x.trim()).map(words=>({startTimeMs:'0',words,syllables:[],endTimeMs:'0'}));
  if(!lines.some(x=>x.words.trim()))throw Error('转换后歌词为空');
- return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives:[],language:'',fullscreenAction:0};
+ lines=lines.map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
+ return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:false,alternatives:[],language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:'FULLSCREEN_LYRICS'};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
 function responseFormat(request,response){
@@ -135,9 +136,20 @@ function responseFormat(request,response){
 }
 function responseBodyText(body){if(typeof body==='string')return body;if(body instanceof Uint8Array)return new TextDecoder().decode(body);if(body instanceof ArrayBuffer)return new TextDecoder().decode(new Uint8Array(body));return String(body||'')}
 function rewriteBodyHeaders(headers,json){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-type','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];const original=header(headers,'content-type');out['Content-Type']=json?(original&&/json/i.test(original)?original:'application/json; charset=utf-8'):(original&&!/json/i.test(original)?original:'application/protobuf');return out}
+function normalizeLyrics(lyrics,original){
+ const base=original&&typeof original==='object'?original:{};
+ const lines=(lyrics.lines||[]).map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
+ return {...base,...lyrics,lines,
+  isDenseTypeface:typeof base.isDenseTypeface==='boolean'?base.isDenseTypeface:false,
+  isRtlLanguage:typeof base.isRtlLanguage==='boolean'?base.isRtlLanguage:false,
+  capStatus:typeof base.capStatus==='string'?base.capStatus:'',
+  previewLines:Array.isArray(base.previewLines)?base.previewLines:[],
+  fullscreenAction:typeof base.fullscreenAction==='string'?base.fullscreenAction:'FULLSCREEN_LYRICS'
+ };
+}
 function replaceResponse(request,response,lyrics){
  const json=responseFormat(request,response)==='json',headers=rewriteBodyHeaders(response.headers,json);
- let body;if(json){let original={};try{original=JSON.parse(responseBodyText(response.body))||{}}catch{};body=JSON.stringify({...original,lyrics,colors:original.colors&&typeof original.colors==='object'?original.colors:{background:-8421504,text:-16777216,highlightText:-1},hasVocalRemoval:false})}else body=encodeIndependentLyrics(lyrics);
+ let body;if(json){let original={};try{original=JSON.parse(responseBodyText(response.body))||{}}catch{};body=JSON.stringify({...original,lyrics:normalizeLyrics(lyrics,original.lyrics),colors:original.colors&&typeof original.colors==='object'?original.colors:{background:-8421504,text:-16777216,highlightText:-1},hasVocalRemoval:false})}else body=encodeIndependentLyrics(lyrics);
  // Egern/Surge response scripts use `status`; keeping the upstream
  // `statusCode` field from a 404 response can make the client retain the
  // failure even though the body was replaced.
