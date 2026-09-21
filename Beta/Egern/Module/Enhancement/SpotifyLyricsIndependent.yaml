@@ -9,13 +9,13 @@ mitm:
 scriptings:
   - http_request:
       name: Spotify 多源歌词 metadata request
-      match: '^https?://(?:spclient(?:\\.wg)?|[\\w-]+-spclient)\\.spotify\\.com(?::443)?/metadata/\\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
+      match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-iphone-preload-v4
       timeout: 3
       update_interval: 3600
   - http_response:
       name: Spotify 多源歌词 JSON
-      match: '^https?://(?:spclient(?:\\.wg)?|[\\w-]+-spclient)\\.spotify\\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$))'
+      match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$))'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-iphone-preload-v4
       body_required: true
       binary_body: false
@@ -24,7 +24,7 @@ scriptings:
       update_interval: 3600
   - http_response:
       name: Spotify 多源歌词 Protobuf
-      match: '^https?://(?:spclient(?:\\.wg)?|[\\w-]+-spclient)\\.spotify\\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))'
+      match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-iphone-preload-v4
       body_required: true
       binary_body: true
@@ -33,7 +33,7 @@ scriptings:
       update_interval: 3600
   - http_response:
       name: Spotify 多源歌词 metadata
-      match: '^https?://(?:spclient(?:\\.wg)?|[\\w-]+-spclient)\\.spotify\\.com(?::443)?/metadata/\\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
+      match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-iphone-preload-v4
       body_required: false
       binary_body: true
