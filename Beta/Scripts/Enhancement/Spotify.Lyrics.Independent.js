@@ -159,8 +159,8 @@ function makeLyrics(selected,request,format){
  if(romanizationLines.some(Boolean))alternatives.push({language:'zh-Latn',lines:romanizationLines});
  // 原文和附属歌词共用一个 LyricsLine：移动端不增加重复时间轴，桌面端也不会只高亮最后一行。
  // alternatives 仍按 Spotify 原生格式保留，供 iPhone/iPad 的翻译入口使用。
- const displayLines=inlineAuxiliaryLines(lines,translationLines,romanizationLines);
- return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:0};
+ const displayLines=inlineAuxiliaryLines(lines,translationLines,romanizationLines),previewLines=displayLines.slice(0,5);
+ return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
 function responseFormat(request,response){
@@ -178,7 +178,7 @@ function normalizeLyrics(lyrics,original){
   isDenseTypeface:true,
   isRtlLanguage:typeof base.isRtlLanguage==='boolean'?base.isRtlLanguage:false,
   capStatus:typeof base.capStatus==='string'?base.capStatus:'',
-  previewLines:Array.isArray(base.previewLines)?base.previewLines:[],
+  previewLines:Array.isArray(lyrics.previewLines)?lyrics.previewLines:(Array.isArray(base.previewLines)?base.previewLines:[]),
   // Do not inherit Spotify's FULLSCREEN_LYRICS action: it hides the desktop library pane.
   fullscreenAction:0
  };
