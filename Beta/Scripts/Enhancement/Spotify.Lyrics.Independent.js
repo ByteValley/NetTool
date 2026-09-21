@@ -226,7 +226,7 @@ function replaceResponse(request,response,lyrics){
  // `statusCode` field from a 404 response can make the client retain the
  // failure even though the body was replaced.
  const rewritten={status:200,headers,body};
- if(!json)rewritten.bodyBytes=body;
+ // binary lyric payload is returned through the standard body field
  return rewritten;
 }
 async function lyricsForTrack(id,track,transport,log){
