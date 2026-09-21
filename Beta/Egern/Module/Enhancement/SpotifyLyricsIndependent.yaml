@@ -13,6 +13,12 @@ scriptings:
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Metadata.Request.js?v=20260922-preflight-v12
       timeout: 3
       update_interval: 3600
+  - http_request:
+      name: Spotify 多源歌词 CORS 预检
+      match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Preflight.Request.js?v=20260922-preflight-v13
+      timeout: 3
+      update_interval: 3600
   - http_response:
       name: Spotify 多源歌词 JSON
       match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$))'
