@@ -1,11 +1,17 @@
 name: Spotify 多源歌词
-description: 独立补词，无翻译、无缓存。QQ音乐优先，其次网易云音乐、LRCLIB。支持简繁匹配，保留歌名、歌手、来源及请求耗时日志。
+description: 独立补词；增加 Spotify metadata 触发、歌词缓存及同歌请求去重。QQ音乐优先，其次网易云音乐、LRCLIB。支持简繁匹配，保留歌名、歌手、来源及请求耗时日志。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
   hostnames:
     - spclient.wg.spotify.com
     - '*-spclient.spotify.com'
 scriptings:
+  - http_request:
+      name: Spotify 多源歌词 metadata request
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
+      timeout: 3
+      update_interval: 3600
   - http_response:
       name: Spotify 多源歌词 JSON
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
@@ -22,5 +28,14 @@ scriptings:
       body_required: true
       binary_body: true
       timeout: 10
+      max_size: 2097152
+      update_interval: 3600
+  - http_response:
+      name: Spotify 多源歌词 metadata
+      match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
+      body_required: true
+      binary_body: true
+      timeout: 3
       max_size: 2097152
       update_interval: 3600
