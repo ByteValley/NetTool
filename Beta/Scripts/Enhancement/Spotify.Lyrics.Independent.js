@@ -300,7 +300,7 @@ function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
 function metadataRewriteHeaders(headers){const out=copyHeaders(headers);for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers),original=header(headers,'content-type');for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':(original&&!/json/i.test(original)?original:'application/protobuf');return out}
-function metadataRewriteResponse(response,body,headers){return {...response,status:200,statusCode:200,headers,body,bodyBytes:body instanceof Uint8Array?body:undefined}}
+function metadataRewriteResponse(response,body,headers){  const value=body instanceof ArrayBuffer?new Uint8Array(body):body;  return {status:200,headers,body:value}; }
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
 function forceMetadataHasLyrics(response,request,track){
