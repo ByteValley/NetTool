@@ -32,8 +32,7 @@ function encodeIndependentLyrics(lyrics){
 const normalizeName=s=>Array.from(String(s||'').normalize('NFKC'),c=>simplified[c]||c).join('');
 const identity=s=>normalizeName(s).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
-function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；只对同一时刻的并发请求做内存去重。
-const lyricsInFlight=Object.create(null),metadataInFlight=Object.create(null),metadataTriggerByPlatform=Object.create(null);
+function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；只对同一时刻的并发请求做内存去重。const lyricsInFlight=Object.create(null),metadataInFlight=Object.create(null),metadataTriggerByTrack=Object.create(null);
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -54,6 +53,9 @@ async function selectLyrics(track,transport,log){
  const started=Date.now(),budget=3000;let finished=false;
  const query=p=>Object.entries(p).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
  const variants=s=>['live','remix','dj','instrumental','karaoke','acoustic','cover','现场','伴奏','钢琴','翻唱','降调','升调','加速','慢速'].filter(v=>normalizeName(s).toLowerCase().includes(v)).join(',');
+ const artistAliases={jokerxue:['薛之谦','xue zhi qian'],gem:['邓紫棋','gloria tang'],gloriatang:['邓紫棋','g.e.m.','gem'],xuezhiqian:['薛之谦','joker xue']};
+ const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity))};
+ const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const key of left)if(right.has(key))return true;return false};
  const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*-\s*(?:电视剧|电影|网剧|动画|影视).*$/,'').trim();
  const rejections={};
  function reject(reason){rejections[reason]=(rejections[reason]||0)+1;return -1}
@@ -61,12 +63,14 @@ async function selectLyrics(track,transport,log){
   if(variants(c.title)!==variants(track.track))return reject('版本不同');
   const exact=identity(c.title)===identity(track.track);
   if(!exact&&identity(baseTitle(c.title))!==identity(baseTitle(track.track)))return reject('歌名不同');
-  const artists=track.artists?.length?track.artists:[track.artist];
-  if(!c.artists.some(a=>artists.some(b=>identity(a)===identity(b)||String(a).split(/[\s（()）/]+/).some(part=>identity(part)===identity(b)))))return reject('歌手不同');
+  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b)));
+  // Spotify sometimes returns an English stage name while Chinese sources use the real name.
+  // For unknown aliases, only allow an exact title with a close duration as a conservative fallback.
   const duration=Number(track.duration_ms)/1000;
+  if(!artistMatch&&(!exact||!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('歌手不同');
   if(!exact&&(!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('副标题匹配但时长不符或缺失');
   if(duration&&c.duration&&Math.abs(duration-c.duration)>5)return reject('时长不同');
-  return 100+(exact?10:0)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
+  return 100+(exact?10:0)+(artistMatch?8:-8)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
  }
  async function request(url,body,referer){
   const remaining=budget-(Date.now()-started);if(finished||remaining<=0)throw Error('检索时间已到');
@@ -225,14 +229,7 @@ function gidToId(hex){
  return out.padStart(22,'0');
 }
 function metadataHeaderValue(headers,name){return header(headers,name)}
-function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
-function shouldForceMetadata(request,id){
- const platform=String(metadataHeaderValue(request?.headers,'app-platform')||'unknown').toLowerCase();
- const now=Date.now(),recent=metadataTriggerByPlatform[platform];
- // Spotify 会在切歌时并行预取队列歌曲的 metadata。每个平台 4.5 秒只放行一首，
- // 避免把整段队列都标记成“有歌词”，从而触发多首 color-lyrics 请求。
- if(recent&&now-recent.time<4500&&recent.id!==id)return false;
- if(!recent||now-recent.time>=4500||recent.id!==id)metadataTriggerByPlatform[platform]={id,time:now};
+function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}function shouldForceMetadata(id){ const now=Date.now(),last=metadataTriggerByTrack[id]; // Different songs must not block one another. // Spotify 会并行预取队列歌曲。按平台限流会让后续歌曲拿不到 color-lyrics 请求； // 只对同一首歌做短时去重，不把不同歌曲挡在 metadata 改写之外。 if(last&&now-last<4500)return false; metadataTriggerByTrack[id]=now;
  return true;
 }
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
@@ -284,7 +281,7 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
   }
   
   log('资料已获取：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
-  if(shouldForceMetadata(request,track.id)){
+  if(shouldForceMetadata(track.id)){
    try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
    catch(e){log('metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
   }else log('metadata 触发节流，暂不为预取歌曲请求 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
