@@ -1,5 +1,5 @@
-name: Spotify 多源歌词
-description: 独立补词；外文歌词有可用翻译时按时间戳附加中文，中文方言有可用罗马音时附加发音歌词；增加 Spotify metadata 触发、歌词缓存及同歌请求去重。QQ音乐优先，其次网易云音乐、LRCLIB。支持简繁匹配，保留歌名、歌手、来源及请求耗时日志。
+name: Spotify歌词增强
+description: 为 Spotify 补充多源歌词：优先匹配 QQ 音乐，其次网易云音乐与 LRCLIB；支持外文翻译、方言发音、简繁匹配、歌名歌手校验，以及 metadata 触发、缓存和同歌请求去重。Mac、iPhone、iPad 统一使用 Spotify 原生双语歌词，减少重复请求与重复译文。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
   hostnames:
