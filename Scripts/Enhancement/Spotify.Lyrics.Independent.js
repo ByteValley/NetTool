@@ -59,6 +59,9 @@ async function selectLyrics(track,transport,log){
  const started=Date.now(),budget=3000;let finished=false;
  const query=p=>Object.entries(p).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
  const variants=s=>['live','remix','dj','instrumental','karaoke','acoustic','cover','现场','伴奏','钢琴','翻唱','降调','升调','加速','慢速'].filter(v=>normalizeName(s).toLowerCase().includes(v)).join(',');
+ const artistAliases={jokerxue:['薛之谦','xue zhi qian'],gem:['邓紫棋','gloria tang'],gloriatang:['邓紫棋','g.e.m.','gem'],xuezhiqian:['薛之谦','joker xue']};
+ const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity))};
+ const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const key of left)if(right.has(key))return true;return false};
  const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*-\s*(?:电视剧|电影|网剧|动画|影视).*$/,'').trim();
  const rejections={};
  function reject(reason){rejections[reason]=(rejections[reason]||0)+1;return -1}
@@ -66,12 +69,12 @@ async function selectLyrics(track,transport,log){
   if(variants(c.title)!==variants(track.track))return reject('版本不同');
   const exact=identity(c.title)===identity(track.track);
   if(!exact&&identity(baseTitle(c.title))!==identity(baseTitle(track.track)))return reject('歌名不同');
-  const artists=track.artists?.length?track.artists:[track.artist];
-  if(!c.artists.some(a=>artists.some(b=>identity(a)===identity(b)||String(a).split(/[\s（()）/]+/).some(part=>identity(part)===identity(b)))))return reject('歌手不同');
+  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b)));
+  if(!artistMatch)return reject('歌手不同');
   const duration=Number(track.duration_ms)/1000;
   if(!exact&&(!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('副标题匹配但时长不符或缺失');
   if(duration&&c.duration&&Math.abs(duration-c.duration)>5)return reject('时长不同');
-  return 100+(exact?10:0)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
+  return 100+(exact?10:0)+(artistMatch?8:0)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
  }
  async function request(url,body,referer){
   const remaining=budget-(Date.now()-started);if(finished||remaining<=0)throw Error('检索时间已到');
@@ -111,7 +114,8 @@ async function selectLyrics(track,transport,log){
   function complete(expired=false){
    if(finished)return;
    if(!expired&&completeFlags.some(done=>!done))return;
-   const rows=results.flat().filter(Boolean).sort((a,b)=>b.matchScore-a.matchScore||b.qualityScore-a.qualityScore||String(a.source).localeCompare(String(b.source)));
+   const sourcePriority={QQMusic:0,NeteaseMusic:1,LRCLIB:2};
+   const rows=results.flat().filter(Boolean).sort((a,b)=>(sourcePriority[a.source]??99)-(sourcePriority[b.source]??99)||b.matchScore-a.matchScore||b.qualityScore-a.qualityScore);
    if(rows.length){finished=true;clearTimeout(limit);const best=rows[0];log('选用 '+best.source+'，检索 '+(Date.now()-started)+'ms'+(best.translation?'，含中文翻译':'')+(best.romanization?'，含发音歌词':''));resolve(best);return}
    finished=true;clearTimeout(limit);reject(Error('各源无可靠匹配或超时'));
   }
