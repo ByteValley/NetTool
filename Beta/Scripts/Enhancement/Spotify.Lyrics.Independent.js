@@ -134,11 +134,26 @@ function alignAuxiliaryLines(lines,text,synced){
  const auxiliary=parseIndependentLrc(text).filter(line=>String(line.words||'').trim());
  if(!auxiliary.length)return lines.map(()=> '');
  if(!synced)return lines.map((_,index)=>auxiliary[index]?.words?.trim()||'');
- return lines.map(line=>{
-  const start=Number(line.startTimeMs||0);let best='',distance=Infinity;
-  for(const candidate of auxiliary){const delta=Math.abs(Number(candidate.startTimeMs||0)-start);if(delta<distance){distance=delta;best=candidate.words.trim()}}
-  return distance<=2500?best:'';
- });
+ // Different providers split ad-libs differently. Use a monotonic sequence
+ // alignment instead of independent nearest-neighbour matching; otherwise an
+ // extra source line can steal the next translation and shift every later line.
+ const tolerance=2500,n=lines.length,m=auxiliary.length,better=(left,right)=>left.matches!==right.matches?left.matches>right.matches:left.cost<right.cost;
+ const dp=Array.from({length:n+1},()=>Array(m+1));
+ for(let j=0;j<=m;j++)dp[n][j]={matches:0,cost:0,action:'done'};
+ for(let i=n-1;i>=0;i--){
+  dp[i][m]={matches:0,cost:0,action:'skip-source'};
+  for(let j=m-1;j>=0;j--){
+   let best={...dp[i+1][j],action:'skip-source'};
+   const skipAux={...dp[i][j+1],action:'skip-aux'};if(better(skipAux,best))best=skipAux;
+   const distance=Math.abs(Number(lines[i].startTimeMs||0)-Number(auxiliary[j].startTimeMs||0));
+   if(distance<=tolerance){const match={matches:dp[i+1][j+1].matches+1,cost:dp[i+1][j+1].cost+distance,action:'match'};if(better(match,best))best=match}
+   dp[i][j]=best;
+  }
+ }
+ const result=lines.map(()=>''),matches=[];let i=0,j=0;
+ while(i<n&&j<m){const action=dp[i][j].action;if(action==='match'){matches.push([i,j]);i++;j++}else if(action==='skip-aux')j++;else i++}
+ for(const [lineIndex,auxiliaryIndex] of matches)result[lineIndex]=String(auxiliary[auxiliaryIndex].words||'').trim();
+ return result;
 }
 function isChineseLine(text){
  const value=String(text||'');
@@ -148,48 +163,24 @@ function auxiliaryLineWords(line,index,translationLines,romanizationLines){
  const words=isChineseLine(line.words)?romanizationLines[index]:translationLines[index];
  return words&&String(words)!==String(line.words)?String(words):'';
 }
-function separateAuxiliaryLines(lines,translationLines,romanizationLines){
- const output=[];
- lines.forEach((line,index)=>{
-  output.push({...line,words:String(line.words)});
-  const words=auxiliaryLineWords(line,index,translationLines,romanizationLines);
-  if(words)output.push({startTimeMs:String(line.startTimeMs),words,syllables:[],endTimeMs:'0',transliteratedWords:''});
- });
- return output;
-}
 function mergedAuxiliaryLines(lines,translationLines,romanizationLines){
  return lines.map((line,index)=>{
   const words=auxiliaryLineWords(line,index,translationLines,romanizationLines);
   return {...line,words:words?String(line.words)+'\n'+words:String(line.words)};
  });
 }
-function desktopAuxiliaryLines(lines,translationLines,romanizationLines){
- const output=[];
- lines.forEach((line,index)=>{
-  const words=auxiliaryLineWords(line,index,translationLines,romanizationLines);
-  // Spotify desktop highlights the last line at a timestamp. Keep the auxiliary
-  // line first and the source line last so the sung original is the active line.
-  if(words)output.push({startTimeMs:String(line.startTimeMs),words,syllables:[],endTimeMs:'0',transliteratedWords:''});
-  output.push({...line,words:String(line.words)});
- });
- return output;
-}
 function makeLyrics(selected,request,format){
  let lines=parseIndependentLrc(selected.lyric);
  if(!lines.length&&selected.klyric)lines=String(selected.klyric).split(/\r?\n/).flatMap(row=>{const m=row.match(/^\[(\d+),\d+\](.*)$/);return m?[{startTimeMs:m[1],words:m[2].replace(/\(\d+,\d+,\d+\)/g,''),syllables:[],endTimeMs:'0'}]:[]});
  const synced=lines.length>0;if(!synced)lines=String(selected.plain||'').split(/\r?\n/).filter(x=>x.trim()).map(words=>({startTimeMs:'0',words,syllables:[],endTimeMs:'0'}));
- if(!lines.some(x=>x.words.trim()))throw Error('转换后歌词为空');
+ lines=lines.filter(line=>String(line.words||'').trim());
+ if(!lines.length)throw Error('转换后歌词为空');
  // 保留 Spotify 原始时间轴。移动端对 LyricsLine 的时间字段更严格，不能为了高亮而改写原句时间。
  lines=lines.map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
  const translationLines=alignAuxiliaryLines(lines,selected.translation,synced),romanizationLines=alignAuxiliaryLines(lines,selected.romanization,synced);
- const alternatives=[];
- // 移动端使用 Spotify 原生 alternatives 结构承载双语/发音，避免把附属行插入主时间轴。
- if(translationLines.some(Boolean))alternatives.push({language:'zh',lines:translationLines});
- if(romanizationLines.some(Boolean))alternatives.push({language:'zh-Latn',lines:romanizationLines});
- // alternatives 仍按 Spotify 原生格式保留，供 iPhone/iPad 的翻译入口使用。
- // 桌面端最后一个同时间戳行会获得高亮，因此让原文落在最后；JSON 预览则合并为一个歌词单元，避免只显示译文。
- const platform=String(header(request?.headers,'app-platform')||header(request?.headers,'App-Platform')||'');
- const displayLines=/^(?:OSX|Win32_x86_64|WebPlayer)$/i.test(platform)?desktopAuxiliaryLines(lines,translationLines,romanizationLines):separateAuxiliaryLines(lines,translationLines,romanizationLines);
+ // 原文和译文/发音必须是同一个 LyricsLine：Spotify 手机预览只读取主
+ // lines，桌面端也会按一个时间单元高亮；alternatives 会让客户端只挑出译文。
+ const alternatives=[],displayLines=mergedAuxiliaryLines(lines,translationLines,romanizationLines);
  const previewLines=mergedAuxiliaryLines(lines,translationLines,romanizationLines).slice(0,5);
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
@@ -220,7 +211,9 @@ function replaceResponse(request,response,lyrics){
  // Egern/Surge response scripts use `status`; keeping the upstream
  // `statusCode` field from a 404 response can make the client retain the
  // failure even though the body was replaced.
- return {...response,status:200,statusCode:200,headers,body};
+ const rewritten={...response,status:200,statusCode:200,headers,body};
+ if(!json)rewritten.bodyBytes=body;
+ return rewritten;
 }
 async function lyricsForTrack(id,track,transport,log){const selected=await selectLyrics(track,transport,log);return {track,selected}}async function independentLyrics(request,response,transport=httpTransport,output=console.log){
  const started=Date.now(),id=request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1],rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
@@ -240,7 +233,7 @@ async function lyricsForTrack(id,track,transport,log){const selected=await selec
 }
 
 // Spotify metadata Track fields: gid=1, name=2, album=3, artist=4,
-// duration=7 (sint32), has_lyrics=18. Unknown fields are preserved.
+// duration=7 (int32 milliseconds), is_playable=8, has_lyrics=18.
 function metadataBytes(body){
  if(body instanceof Uint8Array)return body;
  if(body instanceof ArrayBuffer)return new Uint8Array(body);
@@ -248,6 +241,7 @@ function metadataBytes(body){
  if(Array.isArray(body))return Uint8Array.from(body);
  throw Error('metadata 缺少二进制响应体');
 }
+function responseBodyValue(response){return response?.bodyBytes??response?.body}
 function protobufFields(bytes){
  let p=0;const out=[];
  function vint(){let n=0,m=1;for(let i=0;i<10;i++){if(p>=bytes.length)throw Error('截断的 Protobuf');const b=bytes[p++];n+=(b&127)*m;if(!(b&128))return n;m*=128}throw Error('非法 varint')}
@@ -272,20 +266,19 @@ function metadataVarint(value){let n=Math.max(0,Math.floor(Number(value)||0)),ou
 function metadataVarintField(field,value){return [...metadataVarint(field*8),...metadataVarint(value)]}
 function metadataBytesField(field,value){const bytes=Array.from(value||[]);return [...metadataVarint(field*8+2),...metadataVarint(bytes.length),...bytes]}
 function metadataText(value){return Array.from(new TextEncoder().encode(String(value||'')))}
-function metadataSIntField(field,value){const n=Math.trunc(Number(value)||0),zigzag=n<0?(-n*2-1):n*2;return metadataVarintField(field,zigzag)}
 function metadataFallbackBody(request,track){
  const artists=[...new Set((track.artists||[track.artist]).filter(Boolean))],body=[...metadataBytesField(1,metadataGidBytes(request.url)),...metadataBytesField(2,metadataText(track.track)),...metadataBytesField(3,metadataBytesField(2,metadataText(track.album||'')))];
  for(const artist of artists)body.push(...metadataBytesField(4,metadataBytesField(2,metadataText(artist))));
- body.push(...metadataSIntField(7,Math.round(Number(track.duration_ms)||0)),...metadataVarintField(18,1));return new Uint8Array(body);
+ body.push(...metadataVarintField(7,Math.round(Number(track.duration_ms)||0)),...metadataVarintField(8,1),...metadataVarintField(18,1));return new Uint8Array(body);
 }
 function metadataFallbackJson(request,track){const token=metadataTrackToken(request.url),artists=[...new Set((track.artists||[track.artist]).filter(Boolean))];return JSON.stringify({gid:token,name:track.track,album:{name:track.album||''},artist:artists.map(name=>({name})),duration:Number(track.duration_ms)||0,media_type:'AUDIO',canonical_uri:'spotify:track:'+metadataTrackId(request.url),has_lyrics:true})}
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers),original=header(headers,'content-type');for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':(original&&!/json/i.test(original)?original:'application/protobuf');return out}
-function metadataRewriteResponse(response,body,headers){return {...response,status:200,statusCode:200,headers,body}}
+function metadataRewriteResponse(response,body,headers){return {...response,status:200,statusCode:200,headers,body,bodyBytes:body instanceof Uint8Array?body:undefined}}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
 function forceMetadataHasLyrics(response,request,track){
- const body=response.body;
+ const body=responseBodyValue(response);
  if(!metadataBodyLength(body)){const json=responseFormat(request,response)==='json';return metadataRewriteResponse(response,json?metadataFallbackJson(request,track):metadataFallbackBody(request,track),metadataResponseHeaders(response.headers,json))}
  if(typeof body==='string'){
   const json=JSON.parse(body);if(!setMetadataHasLyrics(json)&&Number(response.statusCode??response.status??200)===200)return response;return metadataRewriteResponse(response,JSON.stringify(json),metadataRewriteHeaders(response.headers));
@@ -298,7 +291,7 @@ function forceMetadataHasLyrics(response,request,track){
 }
 function metadataTrack(request,response){
  const id=metadataTrackId(request.url);
- const body=response.body;let json;
+ const body=responseBodyValue(response);let json;
  if(typeof body==='string')json=JSON.parse(body);
  else {const bytes=metadataBytes(body);let first=0;while([9,10,13,32].includes(bytes[first]))first++;
   if(bytes[first]===123)json=JSON.parse(new TextDecoder().decode(bytes));
@@ -307,7 +300,7 @@ function metadataTrack(request,response){
    const gid=one(1);if(gid){const actual=gidToId(Array.from(gid.value,x=>x.toString(16).padStart(2,'0')).join(''));if(actual!==id)throw Error('metadata GID 不符')}
    const artists=fields.filter(x=>(x.field===4||x.field===32)&&x.wire===2).map(x=>decode(protobufFields(x.value).find(y=>y.field===2))).filter(Boolean);
    const duration=one(7)?.value||0;
-   json={name:decode(one(2)),artists:artists.map(name=>({name})),duration_ms:duration%2?-(duration+1)/2:duration/2,album:{name:one(3)?decode(protobufFields(one(3).value).find(x=>x.field===2)):''}};
+   json={name:decode(one(2)),artists:artists.map(name=>({name})),duration_ms:duration,album:{name:one(3)?decode(protobufFields(one(3).value).find(x=>x.field===2)):''}};
   }
  }
  if(json.id&&json.id!==id)throw Error('metadata ID 不符');
