@@ -197,17 +197,8 @@ function makeLyrics(selected,request,format){
  const previewLines=mergedAuxiliaryLines(lines,translationLines,romanizationLines).slice(0,5);
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
-function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
-function passThroughPreflight(request,response){
- const method=String(request.method||'GET').toUpperCase();if(method!=='OPTIONS')return response;
- const headers={...(response.headers||{})},origin=header(request.headers,'origin'),requestedMethod=header(request.headers,'access-control-request-method'),requestedHeaders=header(request.headers,'access-control-request-headers');
- if(origin)headers['Access-Control-Allow-Origin']=origin;
- if(requestedMethod)headers['Access-Control-Allow-Methods']=requestedMethod+', OPTIONS';
- if(requestedHeaders)headers['Access-Control-Allow-Headers']=requestedHeaders;
- if(origin&&origin!=='*')headers['Access-Control-Allow-Credentials']='true';
- if(header(request.headers,'access-control-request-private-network'))headers['Access-Control-Allow-Private-Network']='true';
- return {...response,headers};
-}
+function headerEntries(headers){  if(!headers)return [];  if(typeof headers.entries==='function')return Array.from(headers.entries());  if(typeof headers.forEach==='function'){const out=[];headers.forEach((value,name)=>out.push([name,value]));return out}  return Object.entries(headers); } function copyHeaders(headers){const out={};for(const [name,value] of headerEntries(headers))out[name]=value;return out} function header(headers,name){  if(!headers)return '';  if(typeof headers.get==='function'){const value=headers.get(name);if(value!=null)return Array.isArray(value)?value.join(', '):String(value)}  return headerEntries(headers).find(([key])=>key.toLowerCase()===name.toLowerCase())?.[1]||'' }
+function passThroughPreflight(request,response){  const method=String(request.method||'GET').toUpperCase();if(method!=='OPTIONS')return response;  const headers=copyHeaders(response.headers),origin=header(request.headers,'origin')||header(response.headers,'access-control-allow-origin'),requestedMethod=header(request.headers,'access-control-request-method')||'GET',requestedHeaders=header(request.headers,'access-control-request-headers');  if(origin)headers['Access-Control-Allow-Origin']=origin;  headers['Access-Control-Allow-Methods']=requestedMethod+', OPTIONS';  if(requestedHeaders)headers['Access-Control-Allow-Headers']=requestedHeaders;  if(origin&&origin!=='*')headers['Access-Control-Allow-Credentials']='true';  if(header(request.headers,'access-control-request-private-network'))headers['Access-Control-Allow-Private-Network']='true';  headers['Access-Control-Max-Age']='60';  return {...response,status:200,statusCode:200,headers,body:''}; }
 function responseFormat(request,response){
  const query=request.url.match(/[?&]format=([^&#]+)/)?.[1]?.toLowerCase();
  if(query==='json')return 'json';if(query==='protobuf')return 'protobuf';
@@ -215,7 +206,7 @@ function responseFormat(request,response){
  return type.includes('json')?'json':'protobuf';
 }
 function responseBodyText(body){if(typeof body==='string')return body;if(body instanceof Uint8Array)return new TextDecoder().decode(body);if(body instanceof ArrayBuffer)return new TextDecoder().decode(new Uint8Array(body));return String(body||'')}
-function rewriteBodyHeaders(headers,json){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-type','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];const original=header(headers,'content-type');out['Content-Type']=json?(original&&/json/i.test(original)?original:'application/json; charset=utf-8'):(original&&!/json/i.test(original)?original:'application/protobuf');return out}
+function rewriteBodyHeaders(headers,json){const out=copyHeaders(headers);for(const key of Object.keys(out))if(['content-length','content-encoding','content-type','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];const original=header(headers,'content-type');out['Content-Type']=json?(original&&/json/i.test(original)?original:'application/json; charset=utf-8'):(original&&!/json/i.test(original)?original:'application/protobuf');return out}
 function normalizeLyrics(lyrics,original){
  const base=original&&typeof original==='object'?original:{};
  const lines=(lyrics.lines||[]).map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
@@ -307,7 +298,7 @@ function metadataFallbackBody(request,track){
 function metadataFallbackJson(request,track){const token=metadataTrackToken(request.url),artists=[...new Set((track.artists||[track.artist]).filter(Boolean))];return JSON.stringify({gid:token,name:track.track,album:{name:track.album||''},artist:artists.map(name=>({name})),duration:Number(track.duration_ms)||0,media_type:'AUDIO',canonical_uri:'spotify:track:'+metadataTrackId(request.url),has_lyrics:true})}
 function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
-function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
+function metadataRewriteHeaders(headers){const out=copyHeaders(headers);for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers),original=header(headers,'content-type');for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':(original&&!/json/i.test(original)?original:'application/protobuf');return out}
 function metadataRewriteResponse(response,body,headers){return {...response,status:200,statusCode:200,headers,body,bodyBytes:body instanceof Uint8Array?body:undefined}}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
@@ -372,7 +363,7 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
 function prepareMetadataRequest(request,output=console.log){
  const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url);
  if(method!=='GET'){output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，原样放行');return {}}
- const headers={...(request.headers||{})};
+ const headers=copyHeaders(request.headers);
  for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
  headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
  const url=request.url+(request.url.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料，已禁用请求缓存');return {url,headers};
