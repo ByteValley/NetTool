@@ -138,7 +138,10 @@ function rewriteBodyHeaders(headers,json){const out={...(headers||{})};for(const
 function replaceResponse(request,response,lyrics){
  const json=responseFormat(request,response)==='json',headers=rewriteBodyHeaders(response.headers,json);
  let body;if(json){let original={};try{original=JSON.parse(responseBodyText(response.body))||{}}catch{};body=JSON.stringify({...original,lyrics,colors:original.colors&&typeof original.colors==='object'?original.colors:{background:-8421504,text:-16777216,highlightText:-1},hasVocalRemoval:false})}else body=encodeIndependentLyrics(lyrics);
- return {...response,status:200,statusCode:200,headers,body};
+ // Egern/Surge response scripts use `status`; keeping the upstream
+ // `statusCode` field from a 404 response can make the client retain the
+ // failure even though the body was replaced.
+ return {status:200,headers,body};
 }
 async function lyricsForTrack(id,track,transport,storage,log){
  const cached=lyricsCache(storage,id);if(cached){log('歌词缓存命中：'+cached.lyrics.provider+'，'+cached.lyrics.lines.length+' 行');return cached}
