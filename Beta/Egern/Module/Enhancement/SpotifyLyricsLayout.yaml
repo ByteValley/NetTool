@@ -1,4 +1,4 @@
-name: Spotify 歌词布局兼容（iPad + Mac）
+name: Spotify 歌词布局
 description: 独立布局兼容层，只清除 Spotify 歌词响应里的全屏动作，不修改歌词内容；适配 iPad/iPhone 与 Mac，可和 Spotify 多源歌词模块同时启用。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
