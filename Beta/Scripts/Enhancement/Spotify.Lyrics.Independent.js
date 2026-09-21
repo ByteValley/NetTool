@@ -18,6 +18,12 @@ function encodeIndependentLyrics(lyrics){
  const int32=(field,n)=>{if(n>=0)return num(field,n);let lo=n>>>0;const b=[];for(let i=0;i<4;i++){b.push((lo&127)|128);lo>>>=7}b.push((lo&15)|240,255,255,255,255,1);return [...varint(field*8),...b]};
  const body=[...num(1,lyrics.syncType==='LINE_SYNCED'?1:0)];
  for(const line of lyrics.lines)body.push(...bytes(2,[...num(1,Number(line.startTimeMs)),...str(2,line.words)]));
+ const alternatives=lyrics.alternatives||[];
+ for(const alternative of alternatives){
+  const altBody=[...str(1,String(alternative?.language||''))];
+  for(const words of alternative?.lines||[])altBody.push(...str(2,String(words||'')));
+  if(alternative?.language&&alternative?.lines?.length)body.push(...bytes(9,altBody));
+ }
  body.push(...str(3,lyrics.provider),...str(4,lyrics.providerLyricsId),...str(5,lyrics.providerDisplayName),...num(8,1),...num(12,0));
  return new Uint8Array([...bytes(1,body),...bytes(2,[...int32(1,-8421504),...int32(2,-16777216),...int32(3,-1)]),...num(3,0)]);
 }
@@ -133,33 +139,27 @@ function isChineseLine(text){
  const value=String(text||'');
  return /[\u3400-\u9fff]/.test(value)&&!/[\u3040-\u30ff\uac00-\ud7af]/.test(value);
 }
-function auxiliaryLine(line,words){
- const start=Math.max(0,Number(line.startTimeMs||0));
- // Mac 端将附属歌词作为独立行显示；移动端走 alternatives，避免复制主时间轴。
- const auxiliaryStart=start;
- return {...line,startTimeMs:String(auxiliaryStart),words:String(words||''),syllables:[],endTimeMs:String(line.endTimeMs||'0'),transliteratedWords:''}
-}
-function interleaveAuxiliaryLines(lines,translationLines,romanizationLines){
- const output=[];
- lines.forEach((line,index)=>{
-  output.push(line);
+function inlineAuxiliaryLines(lines,translationLines,romanizationLines){
+ return lines.map((line,index)=>{
   const words=isChineseLine(line.words)?romanizationLines[index]:translationLines[index];
-  if(words&&words!==line.words)output.push(auxiliaryLine(line,words));
+  return words&&words!==line.words?{...line,words:String(line.words)+'\n'+String(words)}:line;
  });
- return output;
 }
 function makeLyrics(selected,request,format){
  let lines=parseIndependentLrc(selected.lyric);
  if(!lines.length&&selected.klyric)lines=String(selected.klyric).split(/\r?\n/).flatMap(row=>{const m=row.match(/^\[(\d+),\d+\](.*)$/);return m?[{startTimeMs:m[1],words:m[2].replace(/\(\d+,\d+,\d+\)/g,''),syllables:[],endTimeMs:'0'}]:[]});
  const synced=lines.length>0;if(!synced)lines=String(selected.plain||'').split(/\r?\n/).filter(x=>x.trim()).map(words=>({startTimeMs:'0',words,syllables:[],endTimeMs:'0'}));
  if(!lines.some(x=>x.words.trim()))throw Error('转换后歌词为空');
- // 保留 Spotify 原始时间轴，移动端不改写 LyricsLine 时间字段。
+ // 保留 Spotify 原始时间轴。移动端对 LyricsLine 的时间字段更严格，不能为了高亮而改写原句时间。
  lines=lines.map(line=>({...line,transliteratedWords:line.transliteratedWords||''}));
  const translationLines=alignAuxiliaryLines(lines,selected.translation,synced),romanizationLines=alignAuxiliaryLines(lines,selected.romanization,synced);
  const alternatives=[];
+ // 移动端使用 Spotify 原生 alternatives 结构承载双语/发音，避免把附属行插入主时间轴。
  if(translationLines.some(Boolean))alternatives.push({language:'zh',lines:translationLines});
  if(romanizationLines.some(Boolean))alternatives.push({language:'zh-Latn',lines:romanizationLines});
- const ios=isIOSRequest(request),displayLines=ios?lines:interleaveAuxiliaryLines(lines,translationLines,romanizationLines);
+ // 原文和附属歌词共用一个 LyricsLine：移动端不增加重复时间轴，桌面端也不会只高亮最后一行。
+ // alternatives 仍按 Spotify 原生格式保留，供 iPhone/iPad 的翻译入口使用。
+ const displayLines=inlineAuxiliaryLines(lines,translationLines,romanizationLines);
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines:[],fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
@@ -247,7 +247,15 @@ function gidToId(hex){
 }
 function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
-function shouldForceMetadata(){return true}
+function shouldForceMetadata(request,id,storage){
+ const platform=String(metadataHeaderValue(request?.headers,'app-platform')||'unknown').toLowerCase();
+ const key='MultiLyrics.v33.metadata-trigger.'+platform,recent=cacheRead(storage,key,4500);
+ // Spotify 会在切歌时并行预取队列歌曲的 metadata。每个平台 4.5 秒只放行一首，
+ // 避免把整段队列都标记成“有歌词”，从而触发多首 color-lyrics 请求。
+ if(recent&&recent.id!==id)return false;
+ if(!recent||recent.id!==id)cacheWrite(storage,key,{id});
+ return true;
+}
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=String(url||'').match(/\/metadata\/\d+\/track\/([a-f\d]{32}|[A-Za-z\d]{22})(?:[/?]|$)/i)?.[1];if(!token)throw Error('未知 metadata 路径');return token.length===32?gidToId(token):token}
@@ -297,10 +305,10 @@ async function lyricsModule(request,response,transport=httpTransport,storage={ge
   }
   cacheWrite(storage,'MultiLyrics.v33.meta.'+track.id,track);
   log('资料已缓存：'+track.track+'｜'+(track.artists||[track.artist]).join(' / ')+'｜'+(track.duration_ms/1000)+'s '+(Date.now()-started)+'ms');
-  if(shouldForceMetadata()){
+  if(shouldForceMetadata(request,track.id,storage)){
    try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log('metadata 已设置 has_lyrics=true，触发 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));return rewritten}log('metadata 已有 has_lyrics=true；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
    catch(e){log('metadata 没有可改写响应体，已保留原响应；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '))}
-  }
+  }else log('metadata 触发节流，暂不为预取歌曲请求 color-lyrics；歌曲：'+track.track+'｜'+(track.artists||[track.artist]).join(' / '));
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
 }
