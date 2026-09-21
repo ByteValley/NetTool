@@ -198,6 +198,16 @@ function makeLyrics(selected,request,format){
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
+function passThroughPreflight(request,response){
+ const method=String(request.method||'GET').toUpperCase();if(method!=='OPTIONS')return response;
+ const headers={...(response.headers||{})},origin=header(request.headers,'origin'),requestedMethod=header(request.headers,'access-control-request-method'),requestedHeaders=header(request.headers,'access-control-request-headers');
+ if(origin)headers['Access-Control-Allow-Origin']=origin;
+ if(requestedMethod)headers['Access-Control-Allow-Methods']=requestedMethod+', OPTIONS';
+ if(requestedHeaders)headers['Access-Control-Allow-Headers']=requestedHeaders;
+ if(origin&&origin!=='*')headers['Access-Control-Allow-Credentials']='true';
+ if(header(request.headers,'access-control-request-private-network'))headers['Access-Control-Allow-Private-Network']='true';
+ return {...response,headers};
+}
 function responseFormat(request,response){
  const query=request.url.match(/[?&]format=([^&#]+)/)?.[1]?.toLowerCase();
  if(query==='json')return 'json';if(query==='protobuf')return 'protobuf';
@@ -242,8 +252,9 @@ async function independentLyrics(request,response,transport=httpTransport,output
  const started=Date.now(),match=request.url.match(/\/color-lyrics\/v2\/track\/(?:([a-fA-F0-9]{32})|([A-Za-z0-9]{22}))(?:[/?]|$)/),rawId=match?.[1]||match?.[2],id=rawId?.length===32?gidToId(rawId):rawId,rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
  const log=s=>output('[MultiLyrics '+rid+'] '+s),method=String(request.method||'GET').toUpperCase();
  log('已触发 method='+method+' track='+id+' HTTP='+(response.status??response.statusCode)+' format='+responseFormat(request,response)+' platform='+header(request.headers,'app-platform'));
- // Desktop Spotify sends a CORS preflight before its GET. Never turn it into lyrics.
- if(method!=='GET'){log('原样放行 '+method+'，不获取歌曲资料或歌词');return response}
+ // Desktop Spotify sends a CORS preflight before its GET. Keep the preflight
+ // valid so the browser proceeds with the real request we can replace.
+ if(method!=='GET'){log(method==='OPTIONS'?'预检响应已放行，等待真实 GET':'原样放行 '+method+'，不获取歌曲资料或歌词');return passThroughPreflight(request,response)}
  try{
   const status=Number(response.status??response.statusCode??200);if(![200,404].includes(status)){log('保留原响应：HTTP '+status);return response}if(!id)throw Error('无有效歌曲 ID');
   const track=await songMetadata(id,transport,log);const contextualLog=trackLogger(log,track);contextualLog('资料已获取｜时长：'+(track.duration_ms/1000)+'s');
@@ -338,7 +349,7 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
  const started=Date.now(),rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7),log=s=>output('[MultiLyrics '+rid+'] '+s);
  try{
   const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
-  if(method!=='GET'){log('非 GET 请求，原样放行');return response}
+  if(method!=='GET'){log(method==='OPTIONS'?'预检响应已放行，等待真实 GET':'非 GET 请求，原样放行');return passThroughPreflight(request,response)}
   const status=Number(response.statusCode??response.status??200);if(status>=500){log('保留原响应：HTTP '+status);return response}
   let track;
   try{track=metadataTrack(request,response)}catch(e){
@@ -359,10 +370,12 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
  return response;
 }
 function prepareMetadataRequest(request,output=console.log){
+ const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url);
+ if(method!=='GET'){output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，原样放行');return {}}
  const headers={...(request.headers||{})};
  for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
  headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
- const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url),url=method==='GET'?request.url+(request.url.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36):request.url;output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料'+(method==='GET'?'，已禁用请求缓存':''));return {url,headers};
+ const url=request.url+(request.url.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料，已禁用请求缓存');return {url,headers};
 }
 if(typeof $request!=='undefined'&&typeof $response==='undefined'&&/\/metadata\/\d+\/track\//.test($request.url)){
  try{$done(prepareMetadataRequest($request))}catch(e){console.log('[MultiLyrics] metadata 请求处理失败：'+e.message);$done({})}
