@@ -1,5 +1,5 @@
 name: Spotify歌词增强
-description: 补充 Spotify 多源歌词，支持翻译、发音和简繁匹配。
+description: 补充 Spotify 多源歌词，支持翻译、发音和简繁匹配；QQ 音乐优先，其次网易云音乐、LRCLIB。不使用持久化缓存，每首歌都执行歌词替换。
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
 mitm:
   hostnames:
