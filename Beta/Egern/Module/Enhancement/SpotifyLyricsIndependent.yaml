@@ -9,13 +9,13 @@ scriptings:
   - http_request:
       name: Spotify 多源歌词 metadata request
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-first-load
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-metadata-and-preview
       timeout: 3
       update_interval: 3600
   - http_response:
       name: Spotify 多源歌词 JSON
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?=[^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-first-load
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-metadata-and-preview
       body_required: true
       binary_body: false
       timeout: 10
@@ -24,7 +24,7 @@ scriptings:
   - http_response:
       name: Spotify 多源歌词 Protobuf
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?![^#]*[?&]format=json(?:&|$))'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-first-load
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-metadata-and-preview
       body_required: true
       binary_body: true
       timeout: 10
@@ -33,8 +33,8 @@ scriptings:
   - http_response:
       name: Spotify 多源歌词 metadata
       match: '^https?://(?:spclient\.wg|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-first-load
-      body_required: false
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js?v=20260921-metadata-and-preview
+      body_required: true
       binary_body: true
       timeout: 8
       max_size: 2097152
