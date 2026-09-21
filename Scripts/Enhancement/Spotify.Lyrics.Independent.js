@@ -31,6 +31,8 @@ function encodeIndependentLyrics(lyrics){
 
 const normalizeName=s=>Array.from(String(s||'').normalize('NFKC'),c=>simplified[c]||c).join('');
 const identity=s=>normalizeName(s).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
+function trackLabel(track){const artists=track?.artists?.length?track.artists:(track?.artist?[track.artist]:[]);return '歌曲：'+(track?.track||'未知歌曲')+'｜歌手：'+(artists.join(' / ')||'未知歌手')}
+function trackLogger(log,track){const label=trackLabel(track);return s=>log(label+'｜'+s)}
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
 function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}
 const lyricsInFlight=Object.create(null);
