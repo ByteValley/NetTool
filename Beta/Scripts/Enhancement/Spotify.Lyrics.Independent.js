@@ -34,7 +34,7 @@ const identity=s=>normalizeName(s).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 function trackLabel(track){const artists=track?.artists?.length?track.artists:(track?.artist?[track.artist]:[]);return '歌曲：'+(track?.track||'未知歌曲')+'｜歌手：'+(artists.join(' / ')||'未知歌手')}
 function trackLogger(log,track){const label=trackLabel(track);return s=>log(label+'｜'+s)}
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
-function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值或内存缓存。
+function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}// 不使用 Egern 持久化键值；每首歌都重新获取资料并查询歌词。
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -275,7 +275,7 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
    track=await songMetadata(id,transport,log);
    log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+trackLabel(track));
   }
-  
+
   log(trackLabel(track)+'｜资料已获取｜时长：'+(track.duration_ms/1000)+'s｜耗时：'+(Date.now()-started)+'ms');
   try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
   catch(e){log(trackLabel(track)+'｜metadata 没有可改写响应体，已保留原响应')}
