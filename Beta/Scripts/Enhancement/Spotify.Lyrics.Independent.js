@@ -37,9 +37,9 @@ function httpTransport(options){return new Promise((resolve,reject)=>{$httpClien
 function deadline(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+'超时')),ms)})]).finally(()=>clearTimeout(timer));}
 const lyricsInFlight=Object.create(null);
 const metadataInFlight={};
-// 仅保留进程内的短暂预热结果，供紧随 metadata 的 color-lyrics 请求复用；
+// 仅保留进程内的短暂预热结果，供 metadata 后稍晚到达的 color-lyrics 请求复用；
 // 不写入 Egern 持久化存储，也不跳过后续的歌词响应替换。
-const lyricsWarm=Object.create(null),lyricsWarmTtl=15000;
+const lyricsWarm=Object.create(null),lyricsWarmTtl=60000;
 async function fetchEmbedMetadata(id,transport,log){
  const started=Date.now();log('歌曲资料请求开始');
  const r=await deadline(transport({url:'https://open.spotify.com/embed/track/'+id,method:'GET',headers:{Accept:'text/html'},timeout:4}),3500,'歌曲资料');
@@ -63,18 +63,20 @@ async function selectLyrics(track,transport,log){
  const query=p=>Object.entries(p).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
  const variants=s=>['live','remix','dj','instrumental','karaoke','acoustic','cover','现场','伴奏','钢琴','翻唱','降调','升调','加速','慢速'].filter(v=>normalizeName(s).toLowerCase().includes(v)).join(',');
  const artistAliases={jokerxue:['薛之谦','xue zhi qian'],gem:['邓紫棋','gloria tang'],gloriatang:['邓紫棋','g.e.m.','gem'],xuezhiqian:['薛之谦','joker xue']};
- const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity))};
- const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const key of left)if(right.has(key))return true;return false};
- const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*-\s*(?:电视剧|电影|网剧|动画|影视).*$/,'').trim();
+ const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/,&、，＋+|·・]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity).filter(Boolean))};
+ const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const l of left)for(const r of right){if(l===r)return true;if(l.length>=3&&r.length>=3&&(l.startsWith(r)||r.startsWith(l)))return true}return false};
+ const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*[-－—]\s*(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧|电影|网剧|动画|影视).*$/i,'').trim();
  const rejections={};
  function reject(reason){rejections[reason]=(rejections[reason]||0)+1;return -1}
  function score(c){
   if(variants(c.title)!==variants(track.track))return reject('版本不同');
   const exact=identity(c.title)===identity(track.track);
   if(!exact&&identity(baseTitle(c.title))!==identity(baseTitle(track.track)))return reject('歌名不同');
-  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b)));
-  if(!artistMatch)return reject('歌手不同');
-  const duration=Number(track.duration_ms)/1000;
+  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b))),duration=Number(track.duration_ms)/1000;
+  // Some QQ/Netease rows concatenate the stage name and legal name, for
+  // example `G.E.M.邓紫棋`. Keep the previous exact-title + close-duration
+  // fallback for aliases that cannot be inferred safely.
+  if(!artistMatch&&(!exact||!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('歌手不同');
   if(!exact&&(!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('副标题匹配但时长不符或缺失');
   if(duration&&c.duration&&Math.abs(duration-c.duration)>5)return reject('时长不同');
   return 100+(exact?10:0)+(artistMatch?8:0)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
@@ -237,7 +239,7 @@ async function lyricsForTrack(id,track,transport,log){
  lyricsInFlight[id]=work;try{const value=await work;lyricsWarm[id]={value,expires:Date.now()+lyricsWarmTtl};return value}finally{delete lyricsInFlight[id]}
 }
 async function independentLyrics(request,response,transport=httpTransport,output=console.log){
- const started=Date.now(),id=request.url.match(/\/color-lyrics\/v2\/track\/([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1],rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
+ const started=Date.now(),match=request.url.match(/\/color-lyrics\/v2\/track\/(?:([a-fA-F0-9]{32})|([A-Za-z0-9]{22}))(?:[/?]|$)/),rawId=match?.[1]||match?.[2],id=rawId?.length===32?gidToId(rawId):rawId,rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7);
  const log=s=>output('[MultiLyrics '+rid+'] '+s),method=String(request.method||'GET').toUpperCase();
  log('已触发 method='+method+' track='+id+' HTTP='+(response.status??response.statusCode)+' format='+responseFormat(request,response)+' platform='+header(request.headers,'app-platform'));
  // Desktop Spotify sends a CORS preflight before its GET. Never turn it into lyrics.
