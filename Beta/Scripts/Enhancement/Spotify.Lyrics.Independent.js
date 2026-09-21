@@ -133,11 +133,16 @@ function isChineseLine(text){
  const value=String(text||'');
  return /[\u3400-\u9fff]/.test(value)&&!/[\u3040-\u30ff\uac00-\ud7af]/.test(value);
 }
-function inlineAuxiliaryLines(lines,translationLines,romanizationLines){
- return lines.map((line,index)=>{
+function pairedAuxiliaryLines(lines,translationLines,romanizationLines){
+ const output=[];
+ lines.forEach((line,index)=>{
   const words=isChineseLine(line.words)?romanizationLines[index]:translationLines[index];
-  return words&&words!==line.words?{...line,words:String(line.words)+'\n'+String(words)}:line;
+  output.push({...line,words:String(line.words)});
+  // macOS/Windows Protobuf lyrics render paired lines at one timestamp. A literal
+  // newline inside `words` is treated as one string and the auxiliary text is hidden.
+  if(words&&words!==line.words)output.push({startTimeMs:String(line.startTimeMs),words:String(words),syllables:[],endTimeMs:'0',transliteratedWords:''});
  });
+ return output;
 }
 function makeLyrics(selected,request,format){
  let lines=parseIndependentLrc(selected.lyric);
@@ -151,9 +156,9 @@ function makeLyrics(selected,request,format){
  // 移动端使用 Spotify 原生 alternatives 结构承载双语/发音，避免把附属行插入主时间轴。
  if(translationLines.some(Boolean))alternatives.push({language:'zh',lines:translationLines});
  if(romanizationLines.some(Boolean))alternatives.push({language:'zh-Latn',lines:romanizationLines});
- // 原文和附属歌词共用一个 LyricsLine：移动端不增加重复时间轴，桌面端也不会只高亮最后一行。
+ // 原文和附属歌词共用一个时间戳：移动端不增加 alternatives 之外的时间轴，桌面端用成对行显示。
  // alternatives 仍按 Spotify 原生格式保留，供 iPhone/iPad 的翻译入口使用。
- const displayLines=inlineAuxiliaryLines(lines,translationLines,romanizationLines),previewLines=displayLines.slice(0,5);
+ const displayLines=pairedAuxiliaryLines(lines,translationLines,romanizationLines),previewLines=displayLines.slice(0,5);
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
 function header(headers,name){return Object.entries(headers||{}).find(([k])=>k.toLowerCase()===name.toLowerCase())?.[1]||''}
