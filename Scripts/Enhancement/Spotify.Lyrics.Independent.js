@@ -116,7 +116,18 @@ async function selectLyrics(track,transport,log){
    if(!expired&&completeFlags.some(done=>!done))return;
    const sourcePriority={QQMusic:0,NeteaseMusic:1,LRCLIB:2};
    const rows=results.flat().filter(Boolean).sort((a,b)=>(sourcePriority[a.source]??99)-(sourcePriority[b.source]??99)||b.matchScore-a.matchScore||b.qualityScore-a.qualityScore);
-   if(rows.length){finished=true;clearTimeout(limit);const best=rows[0];log('选用 '+best.source+'，检索 '+(Date.now()-started)+'ms'+(best.translation?'，含中文翻译':'')+(best.romanization?'，含发音歌词':''));resolve(best);return}
+   if(rows.length){
+    finished=true;clearTimeout(limit);const best=rows[0],merged={...best},auxiliarySources=new Set();
+    const sameRecording=c=>{
+     const title=identity(c.title),bestTitle=identity(best.title),titleMatch=title===bestTitle||identity(baseTitle(c.title))===identity(baseTitle(best.title));
+     return titleMatch&&(!best.duration||!c.duration||Math.abs(best.duration-c.duration)<=5);
+    };
+    for(const field of ['translation','romanization'])if(!merged[field]){
+     const donor=rows.slice(1).find(c=>sameRecording(c)&&c[field]);
+     if(donor){merged[field]=donor[field];auxiliarySources.add(donor.source)}
+    }
+    const sourceNote=auxiliarySources.size?'，辅助歌词来自 '+[...auxiliarySources].join(' / '):'';
+    log('选用 '+best.source+sourceNote+'，检索 '+(Date.now()-started)+'ms'+(merged.translation?'，含中文翻译':'')+(merged.romanization?'，含发音歌词':''));resolve(merged);return}
    finished=true;clearTimeout(limit);reject(Error('各源无可靠匹配或超时'));
   }
   [qq,netease,lrclib].forEach((fn,i)=>{const begin=Date.now();Promise.resolve().then(fn).then(rows=>{if(finished)return;results[i]=rows.filter(Boolean);log(names[i]+'：'+results[i].length+' 个匹配，'+(Date.now()-begin)+'ms')},e=>{if(!finished)log(names[i]+'：'+e.message+'，'+(Date.now()-begin)+'ms')}).finally(()=>{completeFlags[i]=true;complete()})});
@@ -242,21 +253,38 @@ function gidToId(hex){
  while(digits.some(Boolean)){let carry=0;digits=digits.map(x=>{const n=carry*256+x;carry=n%62;return Math.floor(n/62)});out=alphabet[carry]+out}
  return out.padStart(22,'0');
 }
+function metadataTrackToken(url){const token=String(url||'').match(/\/metadata\/\d+\/track\/([a-f\d]{32}|[A-Za-z\d]{22})(?:[/?]|$)/i)?.[1];if(!token)throw Error('未知 metadata 路径');return token}
+function metadataGidBytes(url){const token=metadataTrackToken(url);if(token.length===32)return token.match(/../g).map(x=>parseInt(x,16));let digits=[0],alphabet='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';for(const character of token){let carry=alphabet.indexOf(character);if(carry<0)throw Error('无效 Spotify 歌曲 ID');for(let i=digits.length-1;i>=0;i--){const value=digits[i]*62+carry;digits[i]=value%256;carry=Math.floor(value/256)}while(carry){digits.unshift(carry%256);carry=Math.floor(carry/256)}}return Array(16-digits.length).fill(0).concat(digits)}
+function metadataBodyLength(body){if(body==null)return 0;if(typeof body==='string')return body.length;if(body instanceof ArrayBuffer)return body.byteLength;if(ArrayBuffer.isView(body))return body.byteLength;if(Array.isArray(body))return body.length;return 1}
+function metadataVarint(value){let n=Math.max(0,Math.floor(Number(value)||0)),out=[];do{const byte=n%128;n=Math.floor(n/128);out.push(byte+(n?128:0))}while(n);return out}
+function metadataVarintField(field,value){return [...metadataVarint(field*8),...metadataVarint(value)]}
+function metadataBytesField(field,value){const bytes=Array.from(value||[]);return [...metadataVarint(field*8+2),...metadataVarint(bytes.length),...bytes]}
+function metadataText(value){return Array.from(new TextEncoder().encode(String(value||'')))}
+function metadataSIntField(field,value){const n=Math.trunc(Number(value)||0),zigzag=n<0?(-n*2-1):n*2;return metadataVarintField(field,zigzag)}
+function metadataFallbackBody(request,track){
+ const artists=[...new Set((track.artists||[track.artist]).filter(Boolean))],body=[...metadataBytesField(1,metadataGidBytes(request.url)),...metadataBytesField(2,metadataText(track.track)),...metadataBytesField(3,metadataBytesField(2,metadataText(track.album||'')))];
+ for(const artist of artists)body.push(...metadataBytesField(4,metadataBytesField(2,metadataText(artist))));
+ body.push(...metadataSIntField(7,Math.round(Number(track.duration_ms)||0)),...metadataVarintField(18,1));return new Uint8Array(body);
+}
+function metadataFallbackJson(request,track){const id=metadataTrackId(request.url),artists=[...new Set((track.artists||[track.artist]).filter(Boolean))];return JSON.stringify({id,uri:'spotify:track:'+id,name:track.track,album:{name:track.album||''},artists:artists.map(name=>({name})),duration_ms:Number(track.duration_ms)||0,has_lyrics:true})}
 function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
 function metadataRewriteHeaders(headers){const out={...(headers||{})};for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
+function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers);for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':'application/protobuf';return out}
+function metadataRewriteResponse(response,body,headers){return {...response,status:200,statusCode:200,headers,body}}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
-function metadataTrackId(url){const token=String(url||'').match(/\/metadata\/\d+\/track\/([a-f\d]{32}|[A-Za-z\d]{22})(?:[/?]|$)/i)?.[1];if(!token)throw Error('未知 metadata 路径');return token.length===32?gidToId(token):token}
-function forceMetadataHasLyrics(response){
+function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
+function forceMetadataHasLyrics(response,request,track){
  const body=response.body;
+ if(!metadataBodyLength(body)){const json=responseFormat(request,response)==='json';return metadataRewriteResponse(response,json?metadataFallbackJson(request,track):metadataFallbackBody(request,track),metadataResponseHeaders(response.headers,json))}
  if(typeof body==='string'){
-  const json=JSON.parse(body);if(!setMetadataHasLyrics(json))return response;return {...response,headers:metadataRewriteHeaders(response.headers),body:JSON.stringify(json)};
+  const json=JSON.parse(body);if(!setMetadataHasLyrics(json)&&Number(response.statusCode??response.status??200)===200)return response;return metadataRewriteResponse(response,JSON.stringify(json),metadataRewriteHeaders(response.headers));
  }
  const bytes=metadataBytes(body);let first=0;while([9,10,13,32].includes(bytes[first]))first++;
- if(bytes[first]===123){const json=JSON.parse(new TextDecoder().decode(bytes));if(!setMetadataHasLyrics(json))return response;return {...response,headers:metadataRewriteHeaders(response.headers),body:new TextEncoder().encode(JSON.stringify(json))}
+ if(bytes[first]===123){const json=JSON.parse(new TextDecoder().decode(bytes));if(!setMetadataHasLyrics(json)&&Number(response.statusCode??response.status??200)===200)return response;return metadataRewriteResponse(response,new TextEncoder().encode(JSON.stringify(json)),metadataRewriteHeaders(response.headers))
  }
- const fields=protobufFields(bytes);if(fields.some(x=>x.field===18&&x.wire===0&&Number(x.value)===1))return response;
- const out=new Uint8Array(bytes.length+3);out.set(bytes);out.set([0x90,0x01,0x01],bytes.length);return {...response,headers:metadataRewriteHeaders(response.headers),body:out};
+ const fields=protobufFields(bytes);if(fields.some(x=>x.field===18&&x.wire===0&&Number(x.value)===1)&&Number(response.statusCode??response.status??200)===200)return response;
+ const out=new Uint8Array(bytes.length+3);out.set(bytes);out.set([0x90,0x01,0x01],bytes.length);return metadataRewriteResponse(response,out,metadataRewriteHeaders(response.headers));
 }
 function metadataTrack(request,response){
  const id=metadataTrackId(request.url);
@@ -284,7 +312,7 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
  try{
   const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
   if(method!=='GET'){log('非 GET 请求，原样放行');return response}
-  if(Number(response.statusCode??response.status??200)!==200)return response;
+  const status=Number(response.statusCode??response.status??200);if(status>=500){log('保留原响应：HTTP '+status);return response}
   let track;
   try{track=metadataTrack(request,response)}catch(e){
    const id=metadataTrackId(request.url);
@@ -292,7 +320,7 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
    log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+trackLabel(track));
   }
   log(trackLabel(track)+'｜资料已获取｜时长：'+(track.duration_ms/1000)+'s｜耗时：'+(Date.now()-started)+'ms');
-  try{const rewritten=forceMetadataHasLyrics(response);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
+  try{const rewritten=forceMetadataHasLyrics(response,request,track);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
   catch(e){log(trackLabel(track)+'｜metadata 没有可改写响应体，已保留原响应')}
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
@@ -301,7 +329,7 @@ function prepareMetadataRequest(request,output=console.log){
  const headers={...(request.headers||{})};
  for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
  headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
- const id=metadataTrackId(request.url);output('[MultiLyrics] metadata 请求 track='+id+'，要求返回完整资料');return {headers};
+ const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url),url=method==='GET'?request.url+(request.url.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36):request.url;output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料'+(method==='GET'?'，已禁用请求缓存':''));return {url,headers};
 }
 if(typeof $request!=='undefined'&&typeof $response==='undefined'&&/\/metadata\/\d+\/track\//.test($request.url)){
  try{$done(prepareMetadataRequest($request))}catch(e){console.log('[MultiLyrics] metadata 请求处理失败：'+e.message);$done({})}
