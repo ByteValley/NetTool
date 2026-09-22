@@ -10,13 +10,13 @@ scriptings:
   - http_request:
       name: Spotify 多源歌词 metadata 刷新
       match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/metadata/\d+/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Metadata.Request.js?v=20260922-metadata-v15
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/eeb7a00c439032e2ce9c28a271614089adbf7ba5/Beta/Scripts/Enhancement/Spotify.Lyrics.Metadata.Request.js
       timeout: 3
       update_interval: 3600
   - http_request:
       name: Spotify 多源歌词 CORS 预检
       match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)'
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Preflight.Request.js?v=20260922-preflight-v13
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/6b482f3345af17e283ab2c150d3d82af9606c40a/Beta/Scripts/Enhancement/Spotify.Lyrics.Preflight.Request.js
       timeout: 3
       update_interval: 3600
   - http_response:
