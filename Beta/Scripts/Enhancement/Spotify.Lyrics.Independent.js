@@ -336,15 +336,19 @@ function metadataRewriteResponse(response,body,headers){
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
 function forceMetadataHasLyrics(response,request,track){
- const body=responseBodyValue(response);
- if(!metadataBodyLength(body)){const json=responseFormat(request,response)==='json';return metadataRewriteResponse(response,json?metadataFallbackJson(request,track):metadataFallbackBody(request,track),metadataResponseHeaders(response.headers,json))}
+ const status=Number(response.statusCode??response.status??200),body=responseBodyValue(response),json=responseFormat(request,response)==='json';
+ // A 4xx/5xx body is an error envelope, not Spotify track metadata. Appending
+ // field 18 to it produces a formally rewritten response that Spotify still
+ // cannot decode, so synthesize a complete metadata response from the track
+ // information already fetched from the embed page.
+ if(status<200||status>=300||!metadataBodyLength(body))return metadataRewriteResponse(response,json?metadataFallbackJson(request,track):metadataFallbackBody(request,track),metadataResponseHeaders(response.headers,json));
  if(typeof body==='string'){
-  const json=JSON.parse(body);if(!setMetadataHasLyrics(json)&&Number(response.statusCode??response.status??200)===200)return response;return metadataRewriteResponse(response,JSON.stringify(json),metadataRewriteHeaders(response.headers));
+  const parsed=JSON.parse(body);if(!setMetadataHasLyrics(parsed))return response;return metadataRewriteResponse(response,JSON.stringify(parsed),metadataResponseHeaders(response.headers,true));
  }
  const bytes=metadataBytes(body);let first=0;while([9,10,13,32].includes(bytes[first]))first++;
- if(bytes[first]===123){const json=JSON.parse(new TextDecoder().decode(bytes));if(!setMetadataHasLyrics(json)&&Number(response.statusCode??response.status??200)===200)return response;return metadataRewriteResponse(response,new TextEncoder().encode(JSON.stringify(json)),metadataRewriteHeaders(response.headers))
+ if(bytes[first]===123){const parsed=JSON.parse(new TextDecoder().decode(bytes));if(!setMetadataHasLyrics(parsed))return response;return metadataRewriteResponse(response,new TextEncoder().encode(JSON.stringify(parsed)),metadataResponseHeaders(response.headers,true))
  }
- const fields=protobufFields(bytes);if(fields.some(x=>x.field===18&&x.wire===0&&Number(x.value)===1)&&Number(response.statusCode??response.status??200)===200)return response;
+ const fields=protobufFields(bytes);if(fields.some(x=>x.field===18&&x.wire===0&&Number(x.value)===1))return response;
  const out=new Uint8Array(bytes.length+3);out.set(bytes);out.set([0x90,0x01,0x01],bytes.length);return metadataRewriteResponse(response,out,metadataRewriteHeaders(response.headers));
 }
 function metadataTrack(request,response){
@@ -424,10 +428,12 @@ export default async function(ctx){
 function prepareMetadataRequest(request,output=console.log){
  const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url);
  if(method!=='GET'){output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，原样放行');return {}}
+ const rawUrl=String(request.url);
+ if(/[?&]lyrics_nonce=[^&#]*/i.test(rawUrl)){output('[MultiLyrics] metadata 请求 method=GET track='+id+'，已有 nonce，原样放行');return {}}
  const headers=copyHeaders(request.headers);
  for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
  headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
- const url=request.url+(request.url.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料，已禁用请求缓存');return {url,headers};
+ const url=rawUrl+(rawUrl.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料，已禁用请求缓存');return {url,headers};
 }
 if(typeof $request!=='undefined'&&typeof $response==='undefined'&&/\/metadata\/\d+\/track\//.test($request.url)){
  try{$done(prepareMetadataRequest($request))}catch(e){console.log('[MultiLyrics] metadata 请求处理失败：'+e.message);$done({})}
