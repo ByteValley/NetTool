@@ -17,7 +17,7 @@ scriptings:
       name: Spotify 多源歌词 JSON
       match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$))'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/b4456bcf852b80d6e20200b2c561a69abb960dbb/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js
-      body_required: false
+      body_required: true
       binary_body: false
       timeout: 10
       max_size: 2097152
@@ -26,7 +26,7 @@ scriptings:
       name: Spotify 多源歌词 Protobuf
       match: '^https?://(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?/color-lyrics/v2/track/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))'
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/b4456bcf852b80d6e20200b2c561a69abb960dbb/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.js
-      body_required: false
+      body_required: true
       binary_body: true
       timeout: 10
       max_size: 2097152
