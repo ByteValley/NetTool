@@ -382,7 +382,11 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
  const started=Date.now(),rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7),log=s=>output('[MultiLyrics '+rid+'] '+s);
  try{
   const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
-  if(method!=='GET'){log(method==='OPTIONS'?'预检响应已放行，等待真实 GET':'非 GET 请求，原样放行');return passThroughPreflight(request,response)}
+  // This branch handles Spotify's metadata endpoint, not color-lyrics. Its
+  // OPTIONS request must remain byte-for-byte untouched; adding the
+  // color-lyrics CORS headers/body here can make Spotify stop before issuing
+  // the real metadata GET (Panama was observed in exactly that state).
+  if(method!=='GET'){log(method==='OPTIONS'?'metadata 预检原样放行，等待真实 GET':'metadata 非 GET 请求，原样放行');return response}
   const status=Number(response.statusCode??response.status??200);if(status>=500){log('保留原响应：HTTP '+status);return response}
   let track;
   try{track=metadataTrack(request,response)}catch(e){
