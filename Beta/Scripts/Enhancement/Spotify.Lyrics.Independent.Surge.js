@@ -346,8 +346,21 @@ function protobufEncode(field,wire,value){
  if(wire===1||wire===5)return Uint8Array.from([...metadataVarint(field*8+wire),...bytes]);
  return Uint8Array.from([...metadataVarint(field*8+2),...metadataVarint(bytes.length),...bytes]);
 }
-function rewriteTrackHasLyrics(bytes){
- let fields;try{fields=protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
+function protobufText(value){try{return new TextDecoder().decode(value).replace(/\0/g,'').trim()}catch{return ''}}
+function isTrackTypeUrl(value){return /(?:^|[/:])spotify\.metadata\.Track$/i.test(String(value||''))}
+function looksLikeTrack(fields){
+ const name=fields.some(field=>field.field===2&&field.wire===2&&protobufText(field.value));
+ const artist=fields.some(field=>field.field===4&&field.wire===2);
+ const album=fields.some(field=>field.field===3&&field.wire===2);
+ const duration=fields.some(field=>field.field===7&&field.wire===0);
+ const hasLyrics=fields.some(field=>field.field===18&&field.wire===0);
+ // spotify.metadata.Track uses name=2, album=3, artist=4, duration=7,
+ // has_lyrics=18. This also catches Track values whose Any type_url is not
+ // the canonical type.googleapis.com/spotify.metadata.Track.
+ return name&&(artist||(album&&duration)||hasLyrics);
+}
+function rewriteTrackHasLyrics(bytes,fields){
+ try{fields=fields||protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
  let found=false,changed=false;const parts=[];
  for(const field of fields){
   if(field.field===18&&field.wire===0){found=true;if(field.value[0]!==1){parts.push(protobufEncode(18,0,[1]));changed=true}else parts.push(field.raw)}
@@ -359,11 +372,16 @@ function rewriteTrackHasLyrics(bytes){
 function rewriteExtendedMessage(bytes){
  let fields;try{fields=protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
  const typeField=fields.find(field=>field.field===1&&field.wire===2),typeUrl=typeField?new TextDecoder().decode(typeField.value):'';
+ // Newer iPhone responses sometimes omit/rename Any.type_url. Identify the
+ // actual Track message by its stable protobuf fields before descending into
+ // arbitrary nested metadata. This is the missing path for Panama and the
+ // other tracks whose responses were logged as "未发现可补全".
+ if(looksLikeTrack(fields))return rewriteTrackHasLyrics(bytes,fields);
  let changed=false,tracks=0;const parts=[];
  for(const field of fields){
   let value=field.value;
   if(field.wire===2){
-   const child=typeUrl==='type.googleapis.com/spotify.metadata.Track'&&field.field===2?rewriteTrackHasLyrics(value):rewriteExtendedMessage(value);
+   const child=isTrackTypeUrl(typeUrl)&&field.field===2?rewriteTrackHasLyrics(value):rewriteExtendedMessage(value);
    if(child.changed){value=child.bytes;changed=true;tracks+=child.tracks;parts.push(protobufEncode(field.field,2,value));continue}
   }
   parts.push(field.raw);
