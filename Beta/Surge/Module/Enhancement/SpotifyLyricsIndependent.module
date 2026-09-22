@@ -1,5 +1,5 @@
-#!name=Spotify歌词增强 Beta (Surge)
-#!desc=Spotify 多源歌词对照版：用于在 iPhone Surge 上验证 metadata、color-lyrics 请求和脚本触发情况
+#!name=Spotify歌词增强
+#!desc=补充 Spotify 歌词。
 #!category=功能增强
 
 [Script]
