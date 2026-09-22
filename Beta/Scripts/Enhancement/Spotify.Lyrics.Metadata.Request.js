@@ -8,11 +8,11 @@ export default async function(ctx){
   const request=ctx.request||{},method=String(request.method||'GET').toUpperCase(),id=trackId(request.url);
   if(method==='OPTIONS'){
     console.log('[MultiLyrics] metadata request method=OPTIONS track='+id+'，原样放行等待真实 GET');
-    return;
+    return {};
   }
   if(method!=='GET'){
     console.log('[MultiLyrics] metadata request method='+method+' track='+id+'，原样放行');
-    return;
+    return {};
   }
   const rawUrl=String(request.url);
   // Egern can replay a request that has already been refreshed (and our
