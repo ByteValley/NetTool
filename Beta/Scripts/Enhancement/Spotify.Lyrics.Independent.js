@@ -264,6 +264,19 @@ function replaceResponse(request,response,lyrics){
  // silently discard the rewritten protobuf.
  return {status:200,headers,body};
 }
+function isContextTrackUrl(url){return /\/context-resolve\/v1\/spotify:track:[A-Za-z0-9]{22}(?:[/?]|$)/.test(String(url||''))}
+function contextTrackId(url){return String(url||'').match(/\/context-resolve\/v1\/spotify:track:([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1]||'unknown'}
+function prepareContextRequest(request,output=console.log){
+ const method=String(request.method||'GET').toUpperCase(),id=contextTrackId(request.url);
+ if(method!=='GET'){output('[MultiLyrics] context 请求 method='+method+' track='+id+'，原样放行');return {}}
+ const rawUrl=String(request.url);
+ if(/[?&]lyrics_nonce=[^&#]*/i.test(rawUrl)){output('[MultiLyrics] context 请求 track='+id+' 已有 nonce，原样放行');return {}}
+ const headers=copyHeaders(request.headers);
+ for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
+ const url=rawUrl+(rawUrl.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);
+ output('[MultiLyrics] context 请求 track='+id+'，已移除缓存校验并追加 nonce，避免 iPhone 304');
+ return {url,headers};
+}
 async function lyricsForTrack(id,track,transport,log){
  const warm=lyricsWarm[id];
  if(warm){
@@ -311,6 +324,61 @@ function protobufFields(bytes){
   else throw Error('不支持的 wire type');
   out.push({field,wire,value});
  }return out;
+}
+function protobufConcat(parts){let length=0;for(const part of parts)length+=part.length;const out=new Uint8Array(length);let offset=0;for(const part of parts){out.set(part,offset);offset+=part.length}return out}
+function protobufMessage(bytes){
+ let p=0;const out=[];
+ function vint(){let n=0,m=1;for(let i=0;i<10;i++){if(p>=bytes.length)throw Error('截断的 Protobuf');const b=bytes[p++];n+=(b&127)*m;if(!(b&128))return n;m*=128}throw Error('非法 varint')}
+ while(p<bytes.length){const start=p,tag=vint(),field=Math.floor(tag/8),wire=tag%8;if(!field)throw Error('非法字段');let value;
+  if(wire===0){const valueStart=p;vint();value=bytes.slice(valueStart,p)}
+  else if(wire===1){if(p+8>bytes.length)throw Error('截断字段');value=bytes.slice(p,p+8);p+=8}
+  else if(wire===2){const size=vint();if(!Number.isSafeInteger(size)||size<0||p+size>bytes.length)throw Error('非法字段长度');value=bytes.slice(p,p+size);p+=size}
+  else if(wire===5){if(p+4>bytes.length)throw Error('截断字段');value=bytes.slice(p,p+4);p+=4}
+  else throw Error('不支持的 wire type');
+  out.push({field,wire,value,raw:bytes.slice(start,p)});
+ }
+ return out;
+}
+function protobufEncode(field,wire,value){
+ const bytes=value instanceof Uint8Array?value:Uint8Array.from(value||[]);
+ if(wire===0)return Uint8Array.from([...metadataVarint(field*8),...bytes]);
+ if(wire===1||wire===5)return Uint8Array.from([...metadataVarint(field*8+wire),...bytes]);
+ return Uint8Array.from([...metadataVarint(field*8+2),...metadataVarint(bytes.length),...bytes]);
+}
+function rewriteTrackHasLyrics(bytes){
+ let fields;try{fields=protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
+ let found=false,changed=false;const parts=[];
+ for(const field of fields){
+  if(field.field===18&&field.wire===0){found=true;if(field.value[0]!==1){parts.push(protobufEncode(18,0,[1]));changed=true}else parts.push(field.raw)}
+  else parts.push(field.raw);
+ }
+ if(!found){parts.push(protobufEncode(18,0,[1]));changed=true}
+ return {bytes:changed?protobufConcat(parts):bytes,changed,tracks:changed?1:0};
+}
+function rewriteExtendedMessage(bytes){
+ let fields;try{fields=protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
+ const typeField=fields.find(field=>field.field===1&&field.wire===2),typeUrl=typeField?new TextDecoder().decode(typeField.value):'';
+ let changed=false,tracks=0;const parts=[];
+ for(const field of fields){
+  let value=field.value;
+  if(field.wire===2){
+   const child=typeUrl==='type.googleapis.com/spotify.metadata.Track'&&field.field===2?rewriteTrackHasLyrics(value):rewriteExtendedMessage(value);
+   if(child.changed){value=child.bytes;changed=true;tracks+=child.tracks;parts.push(protobufEncode(field.field,2,value));continue}
+  }
+  parts.push(field.raw);
+ }
+ return {bytes:changed?protobufConcat(parts):bytes,changed,tracks};
+}
+function extendedMetadataResponse(request,response,output=console.log){
+ const started=Date.now(),log=s=>output('[MultiLyrics extended-metadata] '+s),method=String(request.method||'GET').toUpperCase(),status=Number(response.status??response.statusCode??200);
+ log('已触发 method='+method+' HTTP='+status+' platform='+header(request.headers,'app-platform'));
+ if(method!=='POST'||status<200||status>=300)return response;
+ try{
+  const original=metadataBytes(responseBodyValue(response)),rewritten=rewriteExtendedMessage(original);
+  if(!rewritten.changed){log('未发现可补全的 Track，原样放行 '+original.length+' bytes，耗时 '+(Date.now()-started)+'ms');return response}
+  log('已补全 '+rewritten.tracks+' 个 Track 的 has_lyrics=true，耗时 '+(Date.now()-started)+'ms');
+  return metadataRewriteResponse(response,rewritten.bytes,metadataRewriteHeaders(response.headers));
+ }catch(error){log('改写失败：'+error.message+'，原样放行');return response}
 }
 function gidToId(hex){
  if(!/^[a-f\d]{32}$/i.test(hex))throw Error('无效 GID');
@@ -378,7 +446,10 @@ function metadataTrack(request,response){
  return {id,track:json.name,artist:artists[0],artists,album:json.album?.name||'',duration_ms:Number(json.duration_ms??json.duration??0)};
 }
 async function lyricsModule(request,response,transport=httpTransport,output=console.log){
- if(!/\/metadata\/\d+\/track\//.test(request.url))return independentLyrics(request,response,transport,output);
+ const url=String(request.url||'');
+ if(isContextTrackUrl(url))return contextResponse(request,response,output);
+ if(/\/extended-metadata\/v0\/extended-metadata(?:[/?]|$)/.test(url))return extendedMetadataResponse(request,response,output);
+ if(!/\/metadata\/\d+\/track\//.test(url))return independentLyrics(request,response,transport,output);
  const started=Date.now(),rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7),log=s=>output('[MultiLyrics '+rid+'] '+s);
  try{
   const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
@@ -407,6 +478,20 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
  return response;
 }
 
+function contextResponse(request,response,output=console.log){
+ const started=Date.now(),id=contextTrackId(request.url),log=s=>output('[MultiLyrics context '+id+'] '+s),method=String(request.method||'GET').toUpperCase(),status=Number(response.status??response.statusCode??200);
+ log('已触发 method='+method+' HTTP='+status+' platform='+header(request.headers,'app-platform'));
+ if(method!=='GET'||status<200||status>=300)return response;
+ const body=responseBodyValue(response);if(!metadataBodyLength(body)){log('没有响应体，原样放行');return response}
+ try{
+  const parsed=JSON.parse(responseBodyText(body));let changed=0;
+  const visit=value=>{if(Array.isArray(value)){value.forEach(visit);return}if(!value||typeof value!=='object')return;for(const key of Object.keys(value)){const lower=key.toLowerCase(),current=value[key];if(['has_lyrics','haslyrics','has_lyrics_available'].includes(lower)&&(current===false||current===0||current==='false')){value[key]=true;changed++}else visit(current)}};
+  visit(parsed);
+  if(!changed){log('HTTP 200，未发现 has_lyrics 字段，原样放行 '+(Date.now()-started)+'ms');return response}
+  log('已补全 '+changed+' 个 context 歌词标记');return metadataRewriteResponse(response,JSON.stringify(parsed),metadataResponseHeaders(response.headers,true));
+ }catch(error){log('JSON 改写失败：'+error.message+'，原样放行');return response}
+}
+
 // Egern on iPhone runs `script_url` files as native ES modules. Keep the
 // legacy bridge below for desktop/Surge-compatible runtimes, but expose the
 // same response pipeline through ctx so mobile does not silently skip it.
@@ -433,7 +518,13 @@ async function handleNativeResponse(ctx){
  return {status:Number(result.status??result.statusCode??upstream.status??200),headers:copyHeaders(result.headers),body:result.body};
 }
 export default async function(ctx){
- try{return await handleNativeResponse(ctx)}catch(e){console.log('[MultiLyrics] Egern 原生响应入口失败：'+e.message)}
+ try{
+  if(!ctx.response&&isContextTrackUrl(ctx.request?.url))return prepareContextRequest(ctx.request,console.log);
+  return await handleNativeResponse(ctx)
+ }catch(e){console.log('[MultiLyrics] Egern 原生入口失败：'+e.message)}
+}
+if(typeof $request!=='undefined'&&typeof $response==='undefined'&&isContextTrackUrl($request.url)){
+ try{$done(prepareContextRequest($request))}catch(e){console.log('[MultiLyrics] context 请求处理失败：'+e.message);$done({})}
 }
 function prepareMetadataRequest(request,output=console.log){
  const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url);
