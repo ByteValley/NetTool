@@ -21,7 +21,9 @@ function preflightResponse(request){
     'Access-Control-Allow-Credentials':'true',
     'Access-Control-Allow-Methods':requestedMethod+', OPTIONS',
     'Access-Control-Allow-Headers':requestedHeaders,
-    'Access-Control-Max-Age':'60',
+    // Keep Spotify from reusing a partial preflight while the matching track
+    // metadata is being refreshed and the real color-lyrics GET is retried.
+    'Access-Control-Max-Age':'0',
     'Vary':'Origin, Access-Control-Request-Method, Access-Control-Request-Headers'
   };
   if(header(request.headers,'access-control-request-private-network'))headers['Access-Control-Allow-Private-Network']='true';
