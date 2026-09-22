@@ -91,7 +91,7 @@ async function selectLyrics(track,transport,log){
   try{const r=await deadline(transport(options),remaining,'歌词源');const code=Number(r.statusCode??r.status);log('请求结束 '+endpoint+' HTTP='+code+' '+(Date.now()-begin)+'ms');if(code&&code!==200)throw Error('HTTP '+code);return JSON.parse(r.body)}catch(e){log('请求失败 '+endpoint+' '+e.message+' '+(Date.now()-begin)+'ms');throw e}
 
  }
- const candidates=(rows,limit=2)=>{for(const k of Object.keys(rejections))delete rejections[k];const good=rows.map(c=>({...c,matchScore:score(c)})).filter(c=>c.matchScore>=100).sort((a,b)=>b.matchScore-a.matchScore).slice(0,limit);log((rows[0]?.source||'搜索')+' 返回 '+rows.length+' 首，候选 '+good.length+' 首，排除原因 '+JSON.stringify(rejections));return good};
+ const candidates=rows=>{for(const k of Object.keys(rejections))delete rejections[k];const good=rows.map(c=>({...c,matchScore:score(c)})).filter(c=>c.matchScore>=100).sort((a,b)=>b.matchScore-a.matchScore).slice(0,2);log((rows[0]?.source||'搜索')+' 返回 '+rows.length+' 首，候选 '+good.length+' 首，排除原因 '+JSON.stringify(rejections));return good};
  function lyricText(value){return typeof value==='string'?value:String(value?.lyric||'')}
  function quality(c,data){
   const timed=/\[\d+:\d{2}(?:[.:]\d+)?\]/.test(data.lyric||'');const word=/^\[\d+,\d+\]/m.test(data.klyric||'');const plain=typeof data.plain==='string'&&data.plain.trim();
@@ -101,7 +101,7 @@ async function selectLyrics(track,transport,log){
   return {...data,translation,romanization,source:c.source,id:String(c.id),matchScore:c.matchScore,qualityScore:(timed||word?20:0)+(translation?4:0)+(romanization?4:0),plain:timed||word?'':data.plain};
  }
  const keyword=normalizeName(track.track+' '+track.artist);log('搜索词：'+keyword);
- async function netease(){const d=await request('https://music.163.com/api/cloudsearch/pc?'+query({s:keyword,type:1,limit:15}),null,'https://music.163.com');const cs=candidates((d.result?.songs||[]).map(x=>({source:'NeteaseMusic',id:x.id,title:x.name,artists:(x.ar||x.artists||[]).map(a=>a.name),album:(x.al||x.album)?.name,duration:(x.dt||x.duration)/1000})),5);return Promise.all(cs.map(async c=>{try{const d=await request('https://music.163.com/api/song/lyric?'+query({id:c.id,lv:-1,kv:-1,yv:-1,tv:-1,rv:-1}),null,'https://music.163.com');return quality(c,{lyric:lyricText(d.lrc),klyric:lyricText(d.yrc||d.klyric),translation:lyricText(d.ytlrc||d.tlyric),romanization:lyricText(d.romalrc||d.rlyric)})}catch{return null}}))}
+ async function netease(){const d=await request('https://music.163.com/api/cloudsearch/pc?'+query({s:keyword,type:1,limit:15}),null,'https://music.163.com');const cs=candidates((d.result?.songs||[]).map(x=>({source:'NeteaseMusic',id:x.id,title:x.name,artists:(x.ar||x.artists||[]).map(a=>a.name),album:(x.al||x.album)?.name,duration:(x.dt||x.duration)/1000})));return Promise.all(cs.map(async c=>{try{const d=await request('https://music.163.com/api/song/lyric?'+query({id:c.id,lv:-1,kv:-1,yv:-1,tv:-1,rv:-1}),null,'https://music.163.com');return quality(c,{lyric:lyricText(d.lrc),klyric:lyricText(d.yrc||d.klyric),translation:lyricText(d.ytlrc||d.tlyric),romanization:lyricText(d.romalrc||d.rlyric)})}catch{return null}}))}
  async function qq(){
   const key='music.search.SearchCgiService';let rows=[],lastError;
   for(const host of ['u.y.qq.com','c.y.qq.com']){
@@ -265,20 +265,6 @@ function replaceResponse(request,response,lyrics){
  if(!json)rewritten.bodyBytes=body;
  return rewritten;
 }
-function isContextTrackUrl(url){return /\/context-resolve\/v1\/spotify:track:[A-Za-z0-9]{22}(?:[/?]|$)/.test(String(url||''))}
-function contextTrackId(url){return String(url||'').match(/\/context-resolve\/v1\/spotify:track:([A-Za-z0-9]{22})(?:[/?]|$)/)?.[1]||'unknown'}
-function prepareContextRequest(request,output=console.log){
- const method=String(request.method||'GET').toUpperCase(),id=contextTrackId(request.url);
- if(method!=='GET'){output('[MultiLyrics] context 请求 method='+method+' track='+id+'，原样放行');return {}}
- const rawUrl=String(request.url);
- if(/[?&]lyrics_nonce=[^&#]*/i.test(rawUrl)){output('[MultiLyrics] context 请求 track='+id+' 已有 nonce，原样放行');return {}}
- const headers=copyHeaders(request.headers);
- for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
- headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
- const url=rawUrl+(rawUrl.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);
- output('[MultiLyrics] context 请求 track='+id+'，已移除缓存校验并追加 nonce，避免 iPhone 304');
- return {url,headers};
-}
 async function lyricsForTrack(id,track,transport,log){
  const warm=lyricsWarm[id];
  if(warm){
@@ -327,79 +313,6 @@ function protobufFields(bytes){
   out.push({field,wire,value});
  }return out;
 }
-function protobufConcat(parts){let length=0;for(const part of parts)length+=part.length;const out=new Uint8Array(length);let offset=0;for(const part of parts){out.set(part,offset);offset+=part.length}return out}
-function protobufMessage(bytes){
- let p=0;const out=[];
- function vint(){let n=0,m=1;for(let i=0;i<10;i++){if(p>=bytes.length)throw Error('截断的 Protobuf');const b=bytes[p++];n+=(b&127)*m;if(!(b&128))return n;m*=128}throw Error('非法 varint')}
- while(p<bytes.length){const start=p,tag=vint(),field=Math.floor(tag/8),wire=tag%8;if(!field)throw Error('非法字段');let value;
-  if(wire===0){const valueStart=p;vint();value=bytes.slice(valueStart,p)}
-  else if(wire===1){if(p+8>bytes.length)throw Error('截断字段');value=bytes.slice(p,p+8);p+=8}
-  else if(wire===2){const size=vint();if(!Number.isSafeInteger(size)||size<0||p+size>bytes.length)throw Error('非法字段长度');value=bytes.slice(p,p+size);p+=size}
-  else if(wire===5){if(p+4>bytes.length)throw Error('截断字段');value=bytes.slice(p,p+4);p+=4}
-  else throw Error('不支持的 wire type');
-  out.push({field,wire,value,raw:bytes.slice(start,p)});
- }
- return out;
-}
-function protobufEncode(field,wire,value){
- const bytes=value instanceof Uint8Array?value:Uint8Array.from(value||[]);
- if(wire===0)return Uint8Array.from([...metadataVarint(field*8),...bytes]);
- if(wire===1||wire===5)return Uint8Array.from([...metadataVarint(field*8+wire),...bytes]);
- return Uint8Array.from([...metadataVarint(field*8+2),...metadataVarint(bytes.length),...bytes]);
-}
-function protobufText(value){try{return new TextDecoder().decode(value).replace(/\0/g,'').trim()}catch{return ''}}
-function isTrackTypeUrl(value){return /(?:^|[/:])spotify\.metadata\.Track$/i.test(String(value||''))}
-function looksLikeTrack(fields){
- const name=fields.some(field=>field.field===2&&field.wire===2&&protobufText(field.value));
- const artist=fields.some(field=>field.field===4&&field.wire===2);
- const album=fields.some(field=>field.field===3&&field.wire===2);
- const duration=fields.some(field=>field.field===7&&field.wire===0);
- const hasLyrics=fields.some(field=>field.field===18&&field.wire===0);
- // spotify.metadata.Track uses name=2, album=3, artist=4, duration=7,
- // has_lyrics=18. This also catches Track values whose Any type_url is not
- // the canonical type.googleapis.com/spotify.metadata.Track.
- return name&&(artist||(album&&duration)||hasLyrics);
-}
-function rewriteTrackHasLyrics(bytes,fields){
- try{fields=fields||protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
- let found=false,changed=false;const parts=[];
- for(const field of fields){
-  if(field.field===18&&field.wire===0){found=true;if(field.value[0]!==1){parts.push(protobufEncode(18,0,[1]));changed=true}else parts.push(field.raw)}
-  else parts.push(field.raw);
- }
- if(!found){parts.push(protobufEncode(18,0,[1]));changed=true}
- return {bytes:changed?protobufConcat(parts):bytes,changed,tracks:changed?1:0};
-}
-function rewriteExtendedMessage(bytes){
- let fields;try{fields=protobufMessage(bytes)}catch{return {bytes,changed:false,tracks:0}}
- const typeField=fields.find(field=>field.field===1&&field.wire===2),typeUrl=typeField?new TextDecoder().decode(typeField.value):'';
- // Newer iPhone responses sometimes omit/rename Any.type_url. Identify the
- // actual Track message by its stable protobuf fields before descending into
- // arbitrary nested metadata. This is the missing path for Panama and the
- // other tracks whose responses were logged as "未发现可补全".
- if(looksLikeTrack(fields))return rewriteTrackHasLyrics(bytes,fields);
- let changed=false,tracks=0;const parts=[];
- for(const field of fields){
-  let value=field.value;
-  if(field.wire===2){
-   const child=isTrackTypeUrl(typeUrl)&&field.field===2?rewriteTrackHasLyrics(value):rewriteExtendedMessage(value);
-   if(child.changed){value=child.bytes;changed=true;tracks+=child.tracks;parts.push(protobufEncode(field.field,2,value));continue}
-  }
-  parts.push(field.raw);
- }
- return {bytes:changed?protobufConcat(parts):bytes,changed,tracks};
-}
-function extendedMetadataResponse(request,response,output=console.log){
- const started=Date.now(),log=s=>output('[MultiLyrics extended-metadata] '+s),method=String(request.method||'GET').toUpperCase(),status=Number(response.status??response.statusCode??200);
- log('已触发 method='+method+' HTTP='+status+' platform='+header(request.headers,'app-platform'));
- if(method!=='POST'||status<200||status>=300)return response;
- try{
-  const original=metadataBytes(responseBodyValue(response)),rewritten=rewriteExtendedMessage(original);
-  if(!rewritten.changed){log('未发现可补全的 Track，原样放行 '+original.length+' bytes，耗时 '+(Date.now()-started)+'ms');return response}
-  log('已补全 '+rewritten.tracks+' 个 Track 的 has_lyrics=true，耗时 '+(Date.now()-started)+'ms');
-  return metadataRewriteResponse(response,rewritten.bytes,metadataRewriteHeaders(response.headers));
- }catch(error){log('改写失败：'+error.message+'，原样放行');return response}
-}
 function gidToId(hex){
  if(!/^[a-f\d]{32}$/i.test(hex))throw Error('无效 GID');
  let digits=hex.match(/../g).map(x=>parseInt(x,16)),out='';const alphabet='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -431,12 +344,13 @@ function metadataRewriteResponse(response,body,headers){
 }
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
-function forceMetadataHasLyrics(response,request){
+function forceMetadataHasLyrics(response,request,track){
  const status=Number(response.statusCode??response.status??200),body=responseBodyValue(response),json=responseFormat(request,response)==='json';
- // Never replace an error/empty response with synthesized track metadata. The
- // metadata endpoint is on Spotify's playback path; an invented body can
- // make a search result look valid but leave it unable to start playback.
- if(status<200||status>=300||!metadataBodyLength(body))return response;
+ // A 4xx/5xx body is an error envelope, not Spotify track metadata. Appending
+ // field 18 to it produces a formally rewritten response that Spotify still
+ // cannot decode, so synthesize a complete metadata response from the track
+ // information already fetched from the embed page.
+ if(status<200||status>=300||!metadataBodyLength(body))return metadataRewriteResponse(response,json?metadataFallbackJson(request,track):metadataFallbackBody(request,track),metadataResponseHeaders(response.headers,json));
  if(typeof body==='string'){
   const parsed=JSON.parse(body);if(!setMetadataHasLyrics(parsed))return response;return metadataRewriteResponse(response,JSON.stringify(parsed),metadataResponseHeaders(response.headers,true));
  }
@@ -467,10 +381,7 @@ function metadataTrack(request,response){
  return {id,track:json.name,artist:artists[0],artists,album:json.album?.name||'',duration_ms:Number(json.duration_ms??json.duration??0)};
 }
 async function lyricsModule(request,response,transport=httpTransport,output=console.log){
- const url=String(request.url||'');
- if(isContextTrackUrl(url))return contextResponse(request,response,output);
- if(/\/extended-metadata\/v0\/extended-metadata(?:[/?]|$)/.test(url))return extendedMetadataResponse(request,response,output);
- if(!/\/metadata\/\d+\/track\//.test(url))return independentLyrics(request,response,transport,output);
+ if(!/\/metadata\/\d+\/track\//.test(request.url))return independentLyrics(request,response,transport,output);
  const started=Date.now(),rid=started.toString(36)+'-'+Math.random().toString(36).slice(2,7),log=s=>output('[MultiLyrics '+rid+'] '+s);
  try{
   const method=String(request.method||'GET').toUpperCase();log('metadata 响应 method='+method+' HTTP='+(response.statusCode??response.status));
@@ -479,42 +390,24 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
   // color-lyrics CORS headers/body here can make Spotify stop before issuing
   // the real metadata GET (Panama was observed in exactly that state).
   if(method!=='GET'){log(method==='OPTIONS'?'metadata 预检原样放行，等待真实 GET':'metadata 非 GET 请求，原样放行');return response}
-  const status=Number(response.statusCode??response.status??200);if(status<200||status>=300){log('保留原响应：HTTP '+status);return response}
+  const status=Number(response.statusCode??response.status??200);if(status>=500){log('保留原响应：HTTP '+status);return response}
   let track;
-  try{track=metadataTrack(request,response)}catch(e){log('metadata 响应无法读取（'+e.message+'），原样放行');return response}
+  try{track=metadataTrack(request,response)}catch(e){
+   const id=metadataTrackId(request.url);
+   track=await songMetadata(id,transport,log);
+   log('metadata 响应无法读取（'+e.message+'），已用 Spotify 页面资料：'+trackLabel(track));
+  }
   log(trackLabel(track)+'｜资料已获取｜时长：'+(track.duration_ms/1000)+'s｜耗时：'+(Date.now()-started)+'ms');
-  // Keep this branch synchronous and local. External lyric lookups belong to
-  // color-lyrics; blocking metadata here delays playback from search results.
-  try{const rewritten=forceMetadataHasLyrics(response,request);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
+  // iPhone 进入播放页后不会主动重试 color-lyrics。先在 metadata 阶段
+  // 预热歌词，后续歌词响应可直接复用同一首歌的进程内结果。
+  try{
+   await lyricsForTrack(metadataTrackId(request.url),track,transport,s=>log(trackLabel(track)+'｜预热｜'+s));
+   log(trackLabel(track)+'｜歌词预热完成');
+  }catch(e){log(trackLabel(track)+'｜歌词预热失败：'+e.message)}
+  try{const rewritten=forceMetadataHasLyrics(response,request,track);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
   catch(e){log(trackLabel(track)+'｜metadata 没有可改写响应体，已保留原响应')}
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
-}
-
-function contextResponse(request,response,output=console.log){
- const started=Date.now(),id=contextTrackId(request.url),log=s=>output('[MultiLyrics context '+id+'] '+s),method=String(request.method||'GET').toUpperCase(),status=Number(response.status??response.statusCode??200);
- log('已触发 method='+method+' HTTP='+status+' platform='+header(request.headers,'app-platform'));
- if(method!=='GET'||status<200||status>=300)return response;
- const body=responseBodyValue(response);if(!metadataBodyLength(body)){log('没有响应体，原样放行');return response}
- try{
-  const parsed=JSON.parse(responseBodyText(body));let changed=0;
-  const visit=value=>{if(Array.isArray(value)){value.forEach(visit);return}if(!value||typeof value!=='object')return;for(const key of Object.keys(value)){const lower=key.toLowerCase(),current=value[key];if(['has_lyrics','haslyrics','has_lyrics_available'].includes(lower)&&(current===false||current===0||current==='false')){value[key]=true;changed++}else visit(current)}};
-  visit(parsed);
-  if(!changed){log('HTTP 200，未发现 has_lyrics 字段，原样放行 '+(Date.now()-started)+'ms');return response}
-  log('已补全 '+changed+' 个 context 歌词标记');return metadataRewriteResponse(response,JSON.stringify(parsed),metadataResponseHeaders(response.headers,true));
- }catch(error){log('JSON 改写失败：'+error.message+'，原样放行');return response}
-}
-
-function isExtendedMetadataUrl(url){return /\/extended-metadata\/v0\/extended-metadata(?:[/?]|$)/.test(String(url||''))}
-function isColorLyricsUrl(url){return /\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[/?]|$)/.test(String(url||''))}
-function prepareUncompressedRequest(request,output=console.log,label='Spotify 请求'){
- const method=String(request.method||'GET').toUpperCase();
- if(method!=='GET'&&method!=='POST'){output('[MultiLyrics] '+label+' method='+method+'，原样放行');return {}}
- const headers=copyHeaders(request.headers);
- for(const key of Object.keys(headers))if(['if-none-match','if-modified-since','cache-control','pragma'].includes(key.toLowerCase()))delete headers[key];
- headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
- output('[MultiLyrics] '+label+' 已移除缓存校验并禁用压缩，确保脚本可读取响应体');
- return {headers};
 }
 
 function prepareMetadataRequest(request,output=console.log){
@@ -527,17 +420,8 @@ function prepareMetadataRequest(request,output=console.log){
  headers['Accept-Encoding']='identity';headers['Cache-Control']='no-cache';
  const url=rawUrl+(rawUrl.includes('?')?'&':'?')+'lyrics_nonce='+Date.now().toString(36);output('[MultiLyrics] metadata 请求 method='+method+' track='+id+'，要求返回完整资料，已禁用请求缓存');return {url,headers};
 }
-if(typeof $request!=='undefined'&&typeof $response==='undefined'&&isContextTrackUrl($request.url)){
- try{$done(prepareContextRequest($request))}catch(e){console.log('[MultiLyrics] context 请求处理失败：'+e.message);$done({})}
-}
 if(typeof $request!=='undefined'&&typeof $response==='undefined'&&/\/metadata\/\d+\/track\//.test($request.url)){
  try{$done(prepareMetadataRequest($request))}catch(e){console.log('[MultiLyrics] metadata 请求处理失败：'+e.message);$done({})}
-}
-if(typeof $request!=='undefined'&&typeof $response==='undefined'&&isExtendedMetadataUrl($request.url)){
- try{$done(prepareUncompressedRequest($request,console.log,'extended-metadata 请求'))}catch(e){console.log('[MultiLyrics] extended-metadata 请求处理失败：'+e.message);$done({})}
-}
-if(typeof $request!=='undefined'&&typeof $response==='undefined'&&isColorLyricsUrl($request.url)){
- try{$done(prepareUncompressedRequest($request,console.log,'color-lyrics 请求'))}catch(e){console.log('[MultiLyrics] color-lyrics 请求处理失败：'+e.message);$done({})}
 }
 if(typeof $request!=='undefined'&&typeof $response!=='undefined'){
  console.log('[MultiLyrics] 多源歌词已载入（QQ音乐 → 网易云音乐 → LRCLIB，不使用持久化缓存；每首歌都执行替换）');
