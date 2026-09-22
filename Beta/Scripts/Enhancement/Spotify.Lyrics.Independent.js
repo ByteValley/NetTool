@@ -65,7 +65,7 @@ async function selectLyrics(track,transport,log){
  const artistAliases={jokerxue:['薛之谦','xue zhi qian'],gem:['邓紫棋','gloria tang'],gloriatang:['邓紫棋','g.e.m.','gem'],xuezhiqian:['薛之谦','joker xue']};
  const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/,&、，＋+|·・]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity).filter(Boolean))};
  const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const l of left)for(const r of right){if(l===r)return true;if(l.length>=3&&r.length>=3&&(l.startsWith(r)||r.startsWith(l)))return true}return false};
- const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*[-－—]\s*(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧|电影|网剧|动画|影视).*$/i,'').trim();
+ const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*[-－—]\s*(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧|电影|网剧|动画|影视).*$/i,'').replace(/(?:粤语|粵語|国语|國語|普通话|普通話)(?:版|版本)?$/i,'').trim();
  const rejections={};
  function reject(reason){rejections[reason]=(rejections[reason]||0)+1;return -1}
  function score(c){
@@ -197,8 +197,35 @@ function makeLyrics(selected,request,format){
  const previewLines=mergedAuxiliaryLines(lines,translationLines,romanizationLines).slice(0,5);
  return {syncType:synced?'LINE_SYNCED':'UNSYNCED',lines:displayLines,provider:selected.source,providerLyricsId:selected.id,providerDisplayName:selected.source+' · 多源优选',syncLyricsUri:'',isDenseTypeface:true,alternatives,language:'',isRtlLanguage:false,capStatus:'',previewLines,fullscreenAction:0};
 }
-function headerEntries(headers){  if(!headers)return [];  if(typeof headers.entries==='function')return Array.from(headers.entries());  if(typeof headers.forEach==='function'){const out=[];headers.forEach((value,name)=>out.push([name,value]));return out}  return Object.entries(headers); } function copyHeaders(headers){const out={};for(const [name,value] of headerEntries(headers))out[name]=value;return out} function header(headers,name){  if(!headers)return '';  if(typeof headers.get==='function'){const value=headers.get(name);if(value!=null)return Array.isArray(value)?value.join(', '):String(value)}  return headerEntries(headers).find(([key])=>key.toLowerCase()===name.toLowerCase())?.[1]||'' }
-function passThroughPreflight(request,response){  const method=String(request.method||'GET').toUpperCase();if(method!=='OPTIONS')return response;  const origin=header(request.headers,'origin'),requestedMethod=header(request.headers,'access-control-request-method')||'GET',requestedHeaders=header(request.headers,'access-control-request-headers');  const headers=Object.create(null);for(const [name,value] of headerEntries(response.headers))headers[String(name).toLowerCase()]=value;  const setHeader=(name,value)=>{const key=name.toLowerCase();if(value)headers[key]=value;else delete headers[key]};  if(origin)setHeader('Access-Control-Allow-Origin',origin);  setHeader('Access-Control-Allow-Methods',requestedMethod+', OPTIONS');  if(requestedHeaders)setHeader('Access-Control-Allow-Headers',requestedHeaders);  if(origin&&origin!=='*')setHeader('Access-Control-Allow-Credentials','true');  if(header(request.headers,'access-control-request-private-network'))setHeader('Access-Control-Allow-Private-Network','true');  setHeader('Access-Control-Max-Age','60');  return {...response,status:200,statusCode:200,headers,body:''}; }
+function headerEntries(headers){
+ if(!headers)return [];
+ if(typeof headers.entries==='function')return Array.from(headers.entries());
+ if(typeof headers.forEach==='function'){const out=[];headers.forEach((value,name)=>out.push([name,value]));return out}
+ return Object.entries(headers);
+}
+function copyHeaders(headers){const out={};for(const [name,value] of headerEntries(headers))out[name]=value;return out}
+function header(headers,name){
+ if(!headers)return '';
+ if(typeof headers.get==='function'){const value=headers.get(name);if(value!=null)return Array.isArray(value)?value.join(', '):String(value)}
+ return headerEntries(headers).find(([key])=>key.toLowerCase()===name.toLowerCase())?.[1]||''
+}
+function passThroughPreflight(request,response){
+ const method=String(request.method||'GET').toUpperCase();if(method!=='OPTIONS')return response;
+ const origin=header(request.headers,'origin'),requestedMethod=header(request.headers,'access-control-request-method')||'GET',requestedHeaders=header(request.headers,'access-control-request-headers');
+ // Egern may expose response headers as a Headers object. Always return one
+ // plain, lower-case-keyed map so the script bridge cannot emit duplicate
+ // case-variant CORS fields and make Chromium stop before the real GET.
+ const headers=Object.create(null);
+ for(const [name,value] of headerEntries(response.headers))headers[String(name).toLowerCase()]=value;
+ const setHeader=(name,value)=>{const key=name.toLowerCase();if(value)headers[key]=value;else delete headers[key]};
+ if(origin)setHeader('Access-Control-Allow-Origin',origin);
+ setHeader('Access-Control-Allow-Methods',requestedMethod+', OPTIONS');
+ if(requestedHeaders)setHeader('Access-Control-Allow-Headers',requestedHeaders);
+ if(origin&&origin!=='*')setHeader('Access-Control-Allow-Credentials','true');
+ if(header(request.headers,'access-control-request-private-network'))setHeader('Access-Control-Allow-Private-Network','true');
+ setHeader('Access-Control-Max-Age','60');
+ return {...response,status:200,statusCode:200,headers,body:''};
+}
 function responseFormat(request,response){
  const query=request.url.match(/[?&]format=([^&#]+)/)?.[1]?.toLowerCase();
  if(query==='json')return 'json';if(query==='protobuf')return 'protobuf';
@@ -225,9 +252,11 @@ function replaceResponse(request,response,lyrics){
  // Egern/Surge response scripts use `status`; keeping the upstream
  // `statusCode` field from a 404 response can make the client retain the
  // failure even though the body was replaced.
- const rewritten={status:200,headers,body};
- // binary lyric payload is returned through the standard body field
- return rewritten;
+ // Egern's response bridge accepts the replacement in `body`; for binary
+ // responses that value is the Uint8Array itself. Do not also return the
+ // legacy `bodyBytes` field: some builds then prefer the original body and
+ // silently discard the rewritten protobuf.
+ return {status:200,headers,body};
 }
 async function lyricsForTrack(id,track,transport,log){
  const warm=lyricsWarm[id];
@@ -300,7 +329,10 @@ function metadataHeaderValue(headers,name){return header(headers,name)}
 function isIOSRequest(request){return /^(?:ios|iphone|ipad)$/i.test(metadataHeaderValue(request?.headers,'app-platform'))}
 function metadataRewriteHeaders(headers){const out=copyHeaders(headers);for(const key of Object.keys(out))if(['content-length','content-encoding','content-md5','etag','cache-control','expires','pragma','transfer-encoding','trailer'].includes(key.toLowerCase()))delete out[key];return out}
 function metadataResponseHeaders(headers,json){const out=metadataRewriteHeaders(headers),original=header(headers,'content-type');for(const key of Object.keys(out))if(key.toLowerCase()==='content-type')delete out[key];out['Content-Type']=json?'application/json; charset=utf-8':(original&&!/json/i.test(original)?original:'application/protobuf');return out}
-function metadataRewriteResponse(response,body,headers){  const value=body instanceof ArrayBuffer?new Uint8Array(body):body;  return {status:200,headers,body:value}; }
+function metadataRewriteResponse(response,body,headers){
+ const value=body instanceof ArrayBuffer?new Uint8Array(body):body;
+ return {status:200,headers,body:value};
+}
 function setMetadataHasLyrics(json){if(!json||typeof json!=='object')throw Error('metadata JSON 无法改写');const already=json.has_lyrics===true||json.hasLyrics===true;json.has_lyrics=true;if(Object.prototype.hasOwnProperty.call(json,'hasLyrics'))json.hasLyrics=true;return !already}
 function metadataTrackId(url){const token=metadataTrackToken(url);return token.length===32?gidToId(token):token}
 function forceMetadataHasLyrics(response,request,track){
@@ -352,13 +384,42 @@ async function lyricsModule(request,response,transport=httpTransport,output=cons
   // iPhone 进入播放页后不会主动重试 color-lyrics。先在 metadata 阶段
   // 预热歌词，后续歌词响应可直接复用同一首歌的进程内结果。
   try{
-   await lyricsForTrack(metadataTrackId(request.url),track,httpTransport,s=>log(trackLabel(track)+'｜预热｜'+s));
+   await lyricsForTrack(metadataTrackId(request.url),track,transport,s=>log(trackLabel(track)+'｜预热｜'+s));
    log(trackLabel(track)+'｜歌词预热完成');
   }catch(e){log(trackLabel(track)+'｜歌词预热失败：'+e.message)}
   try{const rewritten=forceMetadataHasLyrics(response,request,track);if(rewritten!==response){log(trackLabel(track)+'｜metadata 已设置 has_lyrics=true，触发 color-lyrics');return rewritten}log(trackLabel(track)+'｜metadata 已有 has_lyrics=true，继续允许 color-lyrics')}
   catch(e){log(trackLabel(track)+'｜metadata 没有可改写响应体，已保留原响应')}
  }catch(e){log('资料处理失败：'+e.message+' '+(Date.now()-started)+'ms')}
  return response;
+}
+
+// Egern on iPhone runs `script_url` files as native ES modules. Keep the
+// legacy bridge below for desktop/Surge-compatible runtimes, but expose the
+// same response pipeline through ctx so mobile does not silently skip it.
+function nativeHttpTransport(ctx,options){
+ const method=String(options.method||'GET').toUpperCase(),init={headers:options.headers||{}};
+ if(options.timeout!=null) init.timeout=Math.max(1000,Number(options.timeout)*1000);
+ if(options.body!==undefined&&options.body!==null) init.body=options.body;
+ const pending=method==='POST'?ctx.http.post(options.url,init):ctx.http.get(options.url,init);
+ return Promise.resolve(pending).then(async response=>({status:response.status,statusCode:response.status,headers:copyHeaders(response.headers),body:await response.text()}));
+}
+async function nativeResponseBody(response){
+ if(!response||typeof response.arrayBuffer!=='function')return new Uint8Array(0);
+ return new Uint8Array(await response.arrayBuffer());
+}
+async function handleNativeResponse(ctx){
+ const request=ctx.request||{},upstream=ctx.response;
+ if(!upstream)return;
+ const requestView={method:request.method,url:request.url,headers:request.headers};
+ const responseView={status:upstream.status,statusCode:upstream.status,headers:copyHeaders(upstream.headers),body:await nativeResponseBody(upstream)};
+ const result=await lyricsModule(requestView,responseView,options=>nativeHttpTransport(ctx,options),console.log);
+ // Returning nothing is Egern's native pass-through operation. Do not return
+ // the locally consumed responseView when no rewrite was needed.
+ if(result===responseView)return;
+ return {status:Number(result.status??result.statusCode??upstream.status??200),headers:copyHeaders(result.headers),body:result.body};
+}
+export default async function(ctx){
+ try{return await handleNativeResponse(ctx)}catch(e){console.log('[MultiLyrics] Egern 原生响应入口失败：'+e.message)}
 }
 function prepareMetadataRequest(request,output=console.log){
  const method=String(request.method||'GET').toUpperCase(),id=metadataTrackId(request.url);
