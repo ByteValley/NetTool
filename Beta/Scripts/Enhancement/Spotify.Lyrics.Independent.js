@@ -65,20 +65,23 @@ async function selectLyrics(track,transport,log){
  const artistAliases={jokerxue:['薛之谦','xue zhi qian'],gem:['邓紫棋','gloria tang'],gloriatang:['邓紫棋','g.e.m.','gem'],xuezhiqian:['薛之谦','joker xue']};
  const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/,&、，＋+|·・]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity).filter(Boolean))};
  const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const l of left)for(const r of right){if(l===r)return true;if(l.length>=3&&r.length>=3&&(l.startsWith(r)||r.startsWith(l)))return true}return false};
- const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*[-－—]\s*(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧|电影|网剧|动画|影视).*$/i,'').replace(/(?:粤语|粵語|国语|國語|普通话|普通話)(?:版|版本)?$/i,'').trim();
+ const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*[-－—]\s*(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧|电影|网剧|动画|影视).*$/i,'').replace(/(?:粤语|粵語|国语|國語|普通话|普通話|dj)(?:版|版本)?$/i,'').trim();
  const rejections={};
  function reject(reason){rejections[reason]=(rejections[reason]||0)+1;return -1}
  function score(c){
   if(variants(c.title)!==variants(track.track))return reject('版本不同');
-  const exact=identity(c.title)===identity(track.track);
+  const exact=identity(c.title)===identity(track.track),versionedExact=exact&&/(live|remix|dj|instrumental|karaoke|acoustic|cover|现场|伴奏|钢琴|翻唱|降调|升调|加速|慢速|粤语|粵語|国语|國語|普通话|普通話|卡点节奏|卡點節奏)/i.test(normalizeName(track.track));
   if(!exact&&identity(baseTitle(c.title))!==identity(baseTitle(track.track)))return reject('歌名不同');
-  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b))),duration=Number(track.duration_ms)/1000;
-  // Some QQ/Netease rows concatenate the stage name and legal name, for
-  // example `G.E.M.邓紫棋`. Keep the previous exact-title + close-duration
-  // fallback for aliases that cannot be inferred safely.
-  if(!artistMatch&&(!exact||!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('歌手不同');
-  if(!exact&&(!duration||!c.duration||Math.abs(duration-c.duration)>3))return reject('副标题匹配但时长不符或缺失');
-  if(duration&&c.duration&&Math.abs(duration-c.duration)>5)return reject('时长不同');
+  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b))),duration=Number(track.duration_ms)/1000,durationDelta=duration&&c.duration?Math.abs(duration-c.duration):0;
+  // An exact versioned title (DJ/粤语版/remix/etc.) is stronger than
+  // QQ/Netease artist and duration metadata. Alternate uploads frequently
+  // credit a DJ, uploader, or remix editor instead of Spotify's album artist
+  // and can also have a different cut length. Keep ordinary exact-title and
+  // base-title/subtitle matches strict to avoid selecting another artist's
+  // song with a common name.
+  if(!artistMatch&&(!exact||(!versionedExact&&(!duration||!c.duration||durationDelta>3))))return reject('歌手不同');
+  if(!exact&&(!duration||!c.duration||durationDelta>3))return reject('副标题匹配但时长不符或缺失');
+  if(!exact&&duration&&c.duration&&durationDelta>5)return reject('时长不同');
   return 100+(exact?10:0)+(artistMatch?8:0)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
  }
  async function request(url,body,referer){
@@ -223,7 +226,10 @@ function passThroughPreflight(request,response){
  if(requestedHeaders)setHeader('Access-Control-Allow-Headers',requestedHeaders);
  if(origin&&origin!=='*')setHeader('Access-Control-Allow-Credentials','true');
  if(header(request.headers,'access-control-request-private-network'))setHeader('Access-Control-Allow-Private-Network','true');
- setHeader('Access-Control-Max-Age','60');
+ // Do not let a failed/partial preflight stay cached while Spotify retries
+ // metadata for the same track. The following request must be allowed to
+ // issue the real GET so the metadata response can trigger color-lyrics.
+ setHeader('Access-Control-Max-Age','0');
  return {...response,status:200,statusCode:200,headers,body:''};
 }
 function responseFormat(request,response){
