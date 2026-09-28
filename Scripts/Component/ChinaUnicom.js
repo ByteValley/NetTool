@@ -28,10 +28,10 @@ hostname = m.client.10010.com
 */
 
 
-const APIKey = 'ComponentService.ChinaUnicom'; // 只是脚本名字，便于日志识别
+const scriptName = 'ComponentService.ChinaUnicom'; // 只是脚本名字，便于日志识别
 const ROOT_KEY = '#ComponentService';         // ✅ 持久化根 key：ComponentService
 
-$ = new API(APIKey, true);
+$ = new API(scriptName, true);
 
 if (typeof $request !== 'undefined') {
     GetCookie();
