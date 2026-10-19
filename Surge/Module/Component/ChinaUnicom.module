@@ -1,5 +1,5 @@
 #!name=中国联通组件服务
-#!desc=从 dyeTag 请求头获取包含 ecs_token 的中国联通 Cookie
+#!desc=打开中国联通 App，进入首页或刷新页面，抓取含 ecs_token 的完整 Cookie，保存至 ComponentService.ChinaUnicom.Settings.Cookie
 #!category=组件服务
 #!author=ByteValley
 
