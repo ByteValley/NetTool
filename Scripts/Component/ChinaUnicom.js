@@ -1,8 +1,8 @@
 /*
 获取方式：
 1. 打开【中国联通】官方 App
-2. 进入首页的「流量查询」页面，触发接口
-3. 脚本将自动抓取 Cookie 并写入 BoxJS 变量 ChinaUnicom_cookie
+2. 进入首页或刷新页面，触发 /tag-service/v1/tag/dyeTag 请求
+3. 脚本将从请求头抓取包含 ecs_token 的完整 Cookie，写入 BoxJS 变量 ComponentService.ChinaUnicom.Settings.Cookie
 
 ===================
 【MITM】
@@ -11,17 +11,17 @@ hostname = m.client.10010.com
 ===================
 【Surge 脚本配置】
 [Script]
-联通组件 = type=http-request,pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon,requires-body=1,max-size=0,script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/ComponentService/ChinaUnicom.js,script-update-interval=0
+联通组件 = type=http-request,pattern=^https:\/\/m\.client\.10010\.com(?::443)?\/tag-service\/v1\/tag\/dyeTag(?:\?|$),script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaUnicom.js,script-update-interval=0
 
 ===================
 【Loon 脚本配置】
 [Script]
-http-request https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon tag=联通组件, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/ComponentService/ChinaUnicom.js, timeout=60
+http-request ^https:\/\/m\.client\.10010\.com(?::443)?\/tag-service\/v1\/tag\/dyeTag(?:\?|$) tag=联通组件, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaUnicom.js, timeout=60
 
 ===================
 【Quantumult X 脚本配置】
 [rewrite_local]
-https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/ComponentService/ChinaUnicom.js
+^https:\/\/m\.client\.10010\.com(?::443)?\/tag-service\/v1\/tag\/dyeTag(?:\?|$) url script-request-header https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaUnicom.js
 
 [mitm]
 hostname = m.client.10010.com
@@ -39,11 +39,11 @@ if (typeof $request !== 'undefined') {
 
 function GetCookie() {
     const headers = $request.headers || {};
-    const cookie = headers.Cookie || headers.cookie || '';
+    const cookieKey = Object.keys(headers).find(key => key.toLowerCase() === 'cookie');
+    const cookie = cookieKey ? headers[cookieKey] : '';
 
-    $.log(headers);
-
-    if (cookie && cookie.indexOf('JSESSIONID') > -1) {
+    // 保存完整 Cookie，保留 ecs_token 及查询接口可能需要的其他字段；不记录凭据。
+    if (typeof cookie === 'string' && /(?:^|;)\s*ecs_token=[^;\s]+(?:\s*;|\s*$)/.test(cookie)) {
         let root = {};
         try {
             const raw = $.read(ROOT_KEY); // 读已有 ComponentService
@@ -72,8 +72,8 @@ function GetCookie() {
     } else {
         $.notify(
             '中国联通',
-            '未检测到 JSESSIONID',
-            '请在【首页-流量查询】界面重新触发一次'
+            '未检测到有效 ecs_token',
+            '请打开中国联通 App 首页或刷新，重新触发 dyeTag 请求'
         );
     }
 

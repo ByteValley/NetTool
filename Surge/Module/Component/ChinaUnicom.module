@@ -1,12 +1,10 @@
 #!name=中国联通组件服务
-#!desc=获取中国联通cookie
+#!desc=从 dyeTag 请求头获取包含 ecs_token 的中国联通 Cookie
 #!category=组件服务
 #!author=ByteValley
 
 [Script]
-联通组件 = type=http-request, pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaUnicom.js, requires-body=true, max-size=0, script-update-interval=0
-
-index = type=http-request, pattern=https:\/\/m\.client\.10010\.com\/(.*)\/smartwisdomCommon, script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaUnicom.js
+联通组件 = type=http-request, pattern=^https:\/\/m\.client\.10010\.com(?::443)?\/tag-service\/v1\/tag\/dyeTag(?:\?|$), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Component/ChinaUnicom.js, script-update-interval=0
 
 [MITM]
 hostname = %APPEND% m.client.10010.com
