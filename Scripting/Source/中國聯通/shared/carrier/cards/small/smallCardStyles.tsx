@@ -4,6 +4,7 @@ import { VStack, HStack, ZStack, Text, Spacer, Image } from "scripting"
 import type { SmallCardCommonProps } from "./common"
 import { ringThemes, timeStyle } from "../../theme"
 import type { RingCardTheme } from "../../theme"
+import { DEFAULT_WIDGET_SURFACES, type WidgetSurfacePalette } from "../../surfaces"
 
 // =====================================================================
 // Layout Helpers · 强制“靠左”
@@ -32,13 +33,14 @@ function Right(props: { children: any }) {
 // SmallCardSurface · 外壳统一：systemBackground + 单一圆角（防露边）
 // 关键：外层不要 center；否则内部“块”容易被居中摆放
 // =====================================================================
-function SmallCardSurface(props: { children: any }) {
-  return (
+export function SmallCardSurface(props: { children: any; surfaces?: WidgetSurfacePalette }) {
+  const surfaces = props.surfaces ?? DEFAULT_WIDGET_SURFACES
+  const body = (
     <VStack
       alignment="leading"
       padding={{ top: 6, leading: 8, bottom: 6, trailing: 8 }}
       widgetBackground={{
-        style: "systemBackground",
+        style: surfaces.outer,
         shape: { type: "rect", cornerRadius: 26, style: "continuous" },
       }}
       frame={{ minWidth: 0, maxWidth: Infinity, minHeight: 0, maxHeight: Infinity }}
@@ -52,6 +54,20 @@ function SmallCardSurface(props: { children: any }) {
       <Spacer minLength={2} />
     </VStack>
   )
+
+  if (!surfaces.border) return body
+
+  return (
+    <VStack
+      padding={{ top: 2, leading: 2, bottom: 2, trailing: 2 }}
+      widgetBackground={{
+        style: surfaces.border,
+        shape: { type: "rect", cornerRadius: 28, style: "continuous" },
+      }}
+    >
+      {body}
+    </VStack>
+  )
 }
 
 // =====================================================================
@@ -60,7 +76,9 @@ function SmallCardSurface(props: { children: any }) {
 function ContentCard(props: {
   children: any
   padding?: { top: number; leading: number; bottom: number; trailing: number }
+  surfaces?: WidgetSurfacePalette
 }) {
+  const surfaces = props.surfaces ?? DEFAULT_WIDGET_SURFACES
   const pad = props.padding ?? { top: 6, leading: 10, bottom: 6, trailing: 10 }
   return (
     <VStack
@@ -68,7 +86,7 @@ function ContentCard(props: {
       padding={pad}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.04)", dark: "rgba(255,255,255,0.06)" } as any,
+        style: surfaces.content,
         shape: { type: "rect", cornerRadius: 16, style: "continuous" },
       }}
     >
@@ -85,7 +103,9 @@ function TintPanel(props: {
   cornerRadius?: number
   padding?: { top: number; leading: number; bottom: number; trailing: number }
   spacing?: number
+  surfaces?: WidgetSurfacePalette
 }) {
+  const surfaces = props.surfaces ?? DEFAULT_WIDGET_SURFACES
   const r = props.cornerRadius ?? 16
   const pad = props.padding ?? { top: 8, leading: 10, bottom: 8, trailing: 10 }
   const sp = props.spacing ?? 6
@@ -96,7 +116,7 @@ function TintPanel(props: {
       padding={pad}
       frame={{ minWidth: 0, maxWidth: Infinity }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.03)", dark: "rgba(255,255,255,0.07)" } as any,
+        style: surfaces.panel,
         shape: { type: "rect", cornerRadius: r, style: "continuous" },
       }}
     >
@@ -147,6 +167,10 @@ function SymbolImage(props: { systemName: string; size: number; tint: any; opaci
   )
 }
 
+function useSurfacesFromProps(props: { surfaces?: WidgetSurfacePalette }) {
+  return props?.surfaces ?? DEFAULT_WIDGET_SURFACES
+}
+
 function UnitPill(props: { text: string; tint: any }) {
   return (
     <VStack
@@ -169,14 +193,15 @@ function UnitPill(props: { text: string; tint: any }) {
   )
 }
 
-function MorePill(props: { child?: any }) {
+function MorePill(props: { child?: any; surfaces?: WidgetSurfacePalette }) {
+  const surfaces = props.surfaces ?? DEFAULT_WIDGET_SURFACES
   return (
     <HStack
       alignment="center"
       spacing={0}
       frame={{ width: 44, height: 28 }}
       widgetBackground={{
-        style: { light: "rgba(0,0,0,0.10)", dark: "rgba(255,255,255,0.12)" } as any,
+        style: surfaces.chip,
         shape: { type: "capsule", style: "continuous" },
       }}
     >
@@ -340,6 +365,7 @@ export const SMALL_STYLE_OPTIONS: Array<{ key: SmallStyleKey; nameCN: string; na
 // Style · CompactList（紧凑清单）
 // =====================================================================
 export function CompactListSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
 
   const useTotal = !!props.smallMiniBarUseTotalFlow
@@ -368,7 +394,10 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
           </Text>
         </Left>
       </VStack>
-      <MorePill child={<SymbolImage systemName={p.theme.icon} size={15} tint={p.theme.tint} opacity={0.9} />} />
+      <MorePill
+        surfaces={surfaces}
+        child={<SymbolImage systemName={p.theme.icon} size={15} tint={p.theme.tint} opacity={0.9} />}
+      />
     </HStack>
   )
 
@@ -377,7 +406,7 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
   const voiceText = `${String(props.voiceValue ?? "0")}${String(props.voiceUnit ?? "") || "分钟"}`
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
         <HStack alignment="top" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
           <VStack spacing={2} alignment="leading" frame={{ minWidth: 0, maxWidth: Infinity }}>
@@ -413,7 +442,7 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
           padding={{ top: 7, leading: 10, bottom: 7, trailing: 10 }}
           spacing={showOther ? 7 : 8}
           widgetBackground={{
-            style: { light: "rgba(0,0,0,0.06)", dark: "rgba(255,255,255,0.08)" } as any,
+            style: surfaces.panel,
             shape: { type: "rect", cornerRadius: 18, style: "continuous" },
           }}
           frame={{ minWidth: 0, maxWidth: Infinity }}
@@ -431,6 +460,7 @@ export function CompactListSmallStyle(props: SmallCardCommonProps) {
 // Style · ProgressList（进度清单）
 // =====================================================================
 export function ProgressListSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
 
   const useTotal = !!props.smallMiniBarUseTotalFlow
@@ -443,7 +473,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
   const flowRatio = useTotal ? props.totalFlowRatio : props.flowRatio
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
         <HStack alignment="top" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
           <VStack spacing={2} alignment="leading" frame={{ minWidth: 0, maxWidth: Infinity }}>
@@ -479,7 +509,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
           padding={{ top: 7, leading: 10, bottom: 7, trailing: 10 }}
           spacing={showOther ? 7 : 8}
           widgetBackground={{
-            style: { light: "rgba(0,0,0,0.06)", dark: "rgba(255,255,255,0.08)" } as any,
+            style: surfaces.panel,
             shape: { type: "rect", cornerRadius: 18, style: "continuous" },
           }}
           frame={{ minWidth: 0, maxWidth: Infinity }}
@@ -519,6 +549,7 @@ export function ProgressListSmallStyle(props: SmallCardCommonProps) {
 // Style · 三条信息卡
 // =====================================================================
 export function TripleRowsSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
 
   const Row = (p: { theme: RingCardTheme; title: string; value: string; unit: string; rightLogo?: boolean }) => (
@@ -540,15 +571,15 @@ export function TripleRowsSmallStyle(props: SmallCardCommonProps) {
   )
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
-        <ContentCard>
+        <ContentCard surfaces={surfaces}>
           <Row theme={ringThemes.fee} title={props.feeTitle || "剩余话费"} value={fee.balance} unit={fee.unit || "元"} rightLogo />
         </ContentCard>
-        <ContentCard>
+        <ContentCard surfaces={surfaces}>
           <Row theme={ringThemes.flow} title={props.flowLabel || "剩余流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
         </ContentCard>
-        <ContentCard>
+        <ContentCard surfaces={surfaces}>
           <Row theme={ringThemes.voice} title={props.voiceLabel || "剩余语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
         </ContentCard>
       </VStack>
@@ -560,6 +591,7 @@ export function TripleRowsSmallStyle(props: SmallCardCommonProps) {
 // Style · 圆标信息卡
 // =====================================================================
 export function IconCellsSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
 
   const Cell = (p: { theme: RingCardTheme; title: string; value: string; unit: string; leftLogo?: boolean }) => (
@@ -590,17 +622,17 @@ export function IconCellsSmallStyle(props: SmallCardCommonProps) {
   )
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={4} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
-        <ContentCard padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
+        <ContentCard surfaces={surfaces} padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
           <Cell theme={ringThemes.fee} title={props.feeTitle || "剩余话费"} value={fee.balance} unit={fee.unit || "元"} leftLogo />
         </ContentCard>
 
-        <ContentCard padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
+        <ContentCard surfaces={surfaces} padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
           <Cell theme={ringThemes.flow} title={props.flowLabel || "剩余流量"} value={String(props.flowValue ?? "0")} unit={String(props.flowUnit ?? "")} />
         </ContentCard>
 
-        <ContentCard padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
+        <ContentCard surfaces={surfaces} padding={{ top: 5, leading: 9, bottom: 5, trailing: 9 }}>
           <Cell theme={ringThemes.voice} title={props.voiceLabel || "剩余语音"} value={String(props.voiceValue ?? "0")} unit={String(props.voiceUnit ?? "") || "分钟"} />
         </ContentCard>
       </VStack>
@@ -612,6 +644,7 @@ export function IconCellsSmallStyle(props: SmallCardCommonProps) {
 // Style · 余额主卡 + 下两块
 // =====================================================================
 export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
 
   const BLOCK_W = 80
@@ -623,7 +656,7 @@ export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
 
   const MiniBlock = (p: { theme: RingCardTheme; label: string; value: string }) => (
     <VStack frame={{ width: BLOCK_W }}>
-      <ContentCard padding={{ top: 6, leading: 6, bottom: 6, trailing: 6 }}>
+      <ContentCard surfaces={surfaces} padding={{ top: 6, leading: 6, bottom: 6, trailing: 6 }}>
         <VStack spacing={4} alignment="center" frame={{ width: BLOCK_W - 12, height: BLOCK_H }}>
           <SymbolImage systemName={p.theme.icon} size={16} tint={p.theme.tint} opacity={0.9} />
           <Text font={9} foregroundStyle={timeStyle} lineLimit={1} minScaleFactor={0.7}>
@@ -638,9 +671,9 @@ export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
   )
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={0} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
-        <ContentCard padding={{ top: 7, leading: 8, bottom: 4, trailing: 8 }}>
+        <ContentCard surfaces={surfaces} padding={{ top: 7, leading: 8, bottom: 4, trailing: 8 }}>
           <VStack frame={{ minWidth: 0, maxWidth: Infinity, height: TOP_MIN_H }} alignment="leading">
             <HStack alignment="center" spacing={8} frame={{ minWidth: 0, maxWidth: Infinity }}>
               <VStack spacing={2} alignment="leading" frame={{ minWidth: 0, maxWidth: Infinity }}>
@@ -690,6 +723,7 @@ export function BalanceFocusSmallStyle(props: SmallCardCommonProps) {
 // Style · 上余额下列表
 // =====================================================================
 export function DualListSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
   const showOther = !!(props.otherFlowLabel && String(props.otherFlowLabel).trim().length > 0)
 
@@ -701,9 +735,9 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
   const otherUnitText = String(props.otherFlowUnit ?? "GB").toUpperCase()
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
-        <ContentCard>
+        <ContentCard surfaces={surfaces}>
           <HStack alignment="top" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
             <VStack spacing={2} alignment="leading" frame={{ minWidth: 0, maxWidth: Infinity }}>
               <Left>
@@ -734,7 +768,7 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
           </HStack>
         </ContentCard>
 
-        <TintPanel spacing={showOther ? 6 : 7} cornerRadius={16}>
+        <TintPanel surfaces={surfaces} spacing={showOther ? 6 : 7} cornerRadius={16}>
           <ListRow theme={ringThemes.flow} label={props.flowLabel || "剩余流量"} valueText={flowValueText} unitText={flowUnitText} />
           {showOther ? (
             <ListRow theme={ringThemes.flowDir} label={String(props.otherFlowLabel)} valueText={otherValueText} unitText={otherUnitText} />
@@ -750,6 +784,7 @@ export function DualListSmallStyle(props: SmallCardCommonProps) {
 // Style · 双环仪表（保持原样）
 // =====================================================================
 export function DualGaugesSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
 
   const Ring = (p: { theme: RingCardTheme; title: string; value: string; unit: string }) => (
@@ -789,9 +824,9 @@ export function DualGaugesSmallStyle(props: SmallCardCommonProps) {
   )
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
-        <ContentCard>
+        <ContentCard surfaces={surfaces}>
           <HStack alignment="center" spacing={6} frame={{ minWidth: 0, maxWidth: Infinity }}>
             <Spacer />
             <LogoImage logoPath={props.logoPath} size={34} fallbackTheme={ringThemes.fee} />
@@ -837,6 +872,7 @@ export function DualGaugesSmallStyle(props: SmallCardCommonProps) {
 // Style · 文字清单
 // =====================================================================
 export function TextListSmallStyle(props: SmallCardCommonProps) {
+  const surfaces = useSurfacesFromProps(props)
   const fee = parseFeeText(props.feeText)
   const showOther = !!(props.otherFlowLabel && String(props.otherFlowLabel).trim().length > 0)
 
@@ -855,9 +891,9 @@ export function TextListSmallStyle(props: SmallCardCommonProps) {
   )
 
   return (
-    <SmallCardSurface>
+    <SmallCardSurface surfaces={surfaces}>
       <VStack spacing={10} frame={{ minWidth: 0, maxWidth: Infinity }} alignment="leading">
-        <ContentCard>
+        <ContentCard surfaces={surfaces}>
           <HStack alignment="center" spacing={8} frame={{ minWidth: 0, maxWidth: Infinity }}>
             <LogoImage logoPath={props.logoPath} size={22} fallbackTheme={ringThemes.fee} />
             <Spacer />
