@@ -16,7 +16,7 @@
 | 🇨🇳 中国联通 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaUnicom/) |
 | 🇨🇳 中国电信 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaTelecom/) |
 | 🇨🇳 中国广电 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaBroadnet/) |
-| 🎵 实时歌词（Apple Music / Spotify） | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/RealtimeLyrics/) |
+| 🎵 实时歌词（Apple Music / Spotify） | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/RealtimeLyrics/index.html) |
 > 如脚本未自动启动，请确保已安装 Scripting App  
 > App Store: https://apps.apple.com/tw/app/scripting/id6479691128
 

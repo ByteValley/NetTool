@@ -6,7 +6,7 @@ declare const btoa: (input: string) => string
 
 // Spotify now requires secure HTTPS redirect URIs for Web API OAuth apps.
 // This GitHub Pages route is intercepted by shouldAllowRequest before it loads.
-export const SPOTIFY_REDIRECT_URI = "https://bytevalley.github.io/NetTool/spotify-lyrics/callback/"
+export const SPOTIFY_REDIRECT_URI = "https://bytevalley.github.io/NetTool/spotify-lyrics/callback/index.html"
 export const SPOTIFY_SCOPES = "user-read-playback-state user-modify-playback-state"
 
 const TOKEN_KEY = "spotify.oauth.tokens"
