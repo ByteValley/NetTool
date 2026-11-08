@@ -16,6 +16,7 @@
 | 🇨🇳 中国联通 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaUnicom/) |
 | 🇨🇳 中国电信 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaTelecom/) |
 | 🇨🇳 中国广电 | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/ChinaBroadnet/) |
+| 🎵 实时歌词（Apple Music / Spotify） | [点我导入](https://bytevalley.github.io/NetTool/Scripting/Release/RealtimeLyrics/) |
 > 如脚本未自动启动，请确保已安装 Scripting App  
 > App Store: https://apps.apple.com/tw/app/scripting/id6479691128
 
@@ -47,6 +48,7 @@
 | 网上国网 | [脚本](https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripting/Release/%E7%B6%B2%E4%B8%8A%E5%9C%8B%E7%B6%B2.scripting) | - | - | - |
 | 模块元信息重写 | [脚本](https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripting/Release/%E6%A8%A1%E5%9D%97%E5%85%83%E4%BF%A1%E6%81%AF%E9%87%8D%E5%86%99.scripting) | - | - | - |
 | 模块元信息重写 Lite | [脚本](https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripting/Release/%E6%A8%A1%E5%9D%97%E5%85%83%E4%BF%A1%E6%81%AF%E9%87%8D%E5%86%99Lite.scripting) | - | - | - |
+| 实时歌词（Apple Music / Spotify） | [脚本](https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripting/Release/%E5%AE%9E%E6%97%B6%E6%AD%8C%E8%AF%8D.scripting) | [Surge 模块](https://raw.githubusercontent.com/ByteValley/NetTool/main/Surge/Module/Enhancement/SpotifyLyricsIndependent.module) / [Loon 插件](https://raw.githubusercontent.com/ByteValley/NetTool/main/Loon/Plugin/SpotifyLyricsIndependent.plugin) | [Egern 模块](https://raw.githubusercontent.com/ByteValley/NetTool/main/Egern/Module/Enhancement/SpotifyLyricsIndependent.yaml) | - |
 
 ---
 

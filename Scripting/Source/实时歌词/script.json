@@ -1,0 +1,37 @@
+{
+  "version" : "1.1.0",
+  "author" : {
+    "name" : "Waa",
+    "email" : null,
+    "homepage" : "https:\/\/github.com\/iamwaa"
+  },
+  "contributors" : [
+
+  ],
+  "color" : "rgba(191, 90, 242, 1)",
+  "description" : "获取 Apple Music 或 Spotify 当前播放歌曲，调用内置歌词 API，在实时活动与桌面小组件中显示实时歌词。",
+  "entry" : "index.tsx",
+  "iconImage" : "",
+  "localizedDescriptions" : {
+    "ru" : "",
+    "it" : "",
+    "en" : "",
+    "de" : "",
+    "fr" : "",
+    "es" : "",
+    "pt" : "",
+    "ja" : "",
+    "zh" : ""
+  },
+  "runInApp" : false,
+  "icon" : "music.note",
+  "permissions" : null,
+  "name" : "实时歌词",
+  "localizedNames" : {
+    "zh" : "实时歌词"
+  },
+  "intentInputTypes" : [
+
+  ],
+  "remoteDefinitionId" : null
+}

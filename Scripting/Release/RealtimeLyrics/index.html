@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>导入实时歌词</title>
+  <script>
+    const packageURL = "https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripting/Release/%E5%AE%9E%E6%97%B6%E6%AD%8C%E8%AF%8D.scripting";
+    const importURL = "scripting://import_scripts?urls=" + encodeURIComponent(JSON.stringify([packageURL]));
+    window.location.href = importURL;
+  </script>
+</head>
+<body>
+  <p>正在打开 Scripting 导入实时歌词脚本…</p>
+  <p><a href="scripting://import_scripts?urls=%5B%22https%3A%2F%2Fraw.githubusercontent.com%2FByteValley%2FNetTool%2Fmain%2FScripting%2FRelease%2F%25E5%25AE%259E%25E6%2597%25B6%25E6%25AD%258C%25E8%25AF%258D.scripting%22%5D">点此导入</a></p>
+</body>
+</html>
