@@ -1,22 +1,22 @@
 #!name=Spotify歌词增强
-#!desc=补充 Spotify 歌词。
+#!desc=补充 Spotify 多源歌词，支持翻译、发音与简繁匹配；QQ、酷狗、网易云、酷我、LRCLIB
 #!category=功能增强
 
 [Script]
 # Spotify metadata 请求：只追加 nonce，避免命中 Spotify 的 has_lyrics=false 缓存
-spotify-lyrics-metadata-request = type=http-request, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[\/?]|$), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Metadata.Request.js, timeout=10
+spotify-lyrics-metadata-request = type=http-request, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[\/?]|$), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261108-multi-source-v1, timeout=10
 
 # metadata JSON
-spotify-lyrics-metadata-json = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js, requires-body=true, binary-body-mode=false, max-size=2097152, timeout=10
+spotify-lyrics-metadata-json = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261108-multi-source-v1, requires-body=true, binary-body-mode=false, max-size=2097152, timeout=10
 
 # metadata Protobuf
-spotify-lyrics-metadata-protobuf = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js, requires-body=true, binary-body-mode=true, max-size=2097152, timeout=10
+spotify-lyrics-metadata-protobuf = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261108-multi-source-v1, requires-body=true, binary-body-mode=true, max-size=2097152, timeout=10
 
 # color-lyrics JSON
-spotify-lyrics-json = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js, requires-body=true, binary-body-mode=false, max-size=2097152, timeout=10
+spotify-lyrics-json = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261108-multi-source-v1, requires-body=true, binary-body-mode=false, max-size=2097152, timeout=10
 
 # color-lyrics Protobuf；OPTIONS 预检也会进入同一脚本并原样放行
-spotify-lyrics-protobuf = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js, requires-body=true, binary-body-mode=true, max-size=2097152, timeout=10
+spotify-lyrics-protobuf = type=http-response, pattern=^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)), script-path=https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261108-multi-source-v1, requires-body=true, binary-body-mode=true, max-size=2097152, timeout=10
 
 [MITM]
 hostname = %APPEND% spclient.wg.spotify.com, spclient.spotify.com, *spclient.spotify.com
