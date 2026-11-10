@@ -31,6 +31,129 @@ function encodeIndependentLyrics(lyrics){
 
 const normalizeName=s=>Array.from(String(s||'').normalize('NFKC'),c=>simplified[c]||c).join('');
 const identity=s=>normalizeName(s).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
+// Alias pairs cover common Chinese stage names and English/romanized artist names.
+const ARTIST_ALIAS_GROUPS = [
+  ['薛之谦', '薛之謙', 'Joker Xue', 'Xue Zhiqian', 'Zhiqian Xue'],
+  ['邓紫棋', '鄧紫棋', 'G.E.M.', 'Gloria Tang', 'Deng Ziqi', 'Tang Tsz-kei'],
+  ['周杰伦', '周杰倫', 'Jay Chou', 'Chou Chieh-lun'],
+  ['林俊杰', '林俊傑', 'JJ Lin', 'Lin Junjie'],
+  ['陈奕迅', '陳奕迅', 'Eason Chan'],
+  ['王菲', 'Faye Wong'],
+  ['张学友', '張學友', 'Jacky Cheung'],
+  ['刘德华', '劉德華', 'Andy Lau'],
+  ['郭富城', 'Aaron Kwok'],
+  ['张惠妹', '張惠妹', 'A-Mei', 'Amei', 'Chang Hui-mei'],
+  ['蔡依林', 'Jolin Tsai'],
+  ['孙燕姿', '孫燕姿', 'Stefanie Sun'],
+  ['张艺兴', '張藝興', 'Lay Zhang', 'Zhang Yixing'],
+  ['王嘉尔', '王嘉爾', 'Jackson Wang', 'Wang Jiaer'],
+  ['易烊千玺', '易烊千璽', 'Jackson Yee'],
+  ['张韶涵', '張韶涵', 'Angela Chang'],
+  ['周兴哲', '周興哲', 'Eric Chou'],
+  ['黄丽玲', '黃麗玲', 'A-Lin', 'Huang Li-ling'],
+  ['郑秀文', '鄭秀文', 'Sammi Cheng'],
+  ['杨千嬅', '楊千嬅', 'Miriam Yeung'],
+  ['邓丽君', '鄧麗君', 'Teresa Teng'],
+  ['梅艳芳', '梅艷芳', 'Anita Mui'],
+  ['五月天', 'Mayday'],
+  ['许嵩', '許嵩', 'Vae'],
+  ['张靓颖', '張靚穎', 'Jane Zhang'],
+  ['周深', 'Charlie Zhou', 'Zhou Shen'],
+  ['李荣浩', '李榮浩', 'Li Ronghao'],
+  ['毛不易', 'Mao Buyi'],
+  ['华晨宇', '華晨宇', 'Hua Chenyu'],
+  ['赵雷', '趙雷', 'Zhao Lei'],
+  ['朴树', '朴樹', 'Pu Shu'],
+  ['陈粒', '陳粒', 'Chen Li'],
+  ['李健', 'Li Jian'],
+  ['许巍', '許巍', 'Xu Wei'],
+  ['林宥嘉', 'Yoga Lin'],
+  ['张敬轩', '張敬軒', 'Hins Cheung'],
+  ['容祖儿', '容祖兒', 'Joey Yung'],
+  ['莫文蔚', 'Karen Mok'],
+  ['田馥甄', 'Hebe Tien'],
+  ['王力宏', 'Wang Leehom', 'Leehom Wang'],
+  ['陶喆', 'David Tao'],
+  ['梁静茹', '梁靜茹', 'Fish Leong'],
+  ['王心凌', 'Cyndi Wang'],
+  ['杨丞琳', '楊丞琳', 'Rainie Yang'],
+  ['萧亚轩', '蕭亞軒', 'Elva Hsiao'],
+  ['张信哲', '張信哲', 'Jeff Chang'],
+  ['刘若英', '劉若英', 'Rene Liu'],
+  ['蔡健雅', 'Tanya Chua'],
+  ['戴佩妮', 'Penny Tai'],
+  ['陈绮贞', '陳綺貞', 'Cheer Chen'],
+  ['林忆莲', '林憶蓮', 'Sandy Lam'],
+  ['郭静', '郭靜', 'Claire Kuo'],
+  ['徐佳莹', '徐佳瑩', 'Lala Hsu'],
+  ['Taylor Swift', '泰勒斯威夫特'],
+  ['Michael Jackson', '迈克尔杰克逊', '麥可傑克森'],
+  ['Adele', '阿黛尔', '愛黛兒'],
+  ['Ed Sheeran', '艾德希兰', '艾德·希兰'],
+  ['Justin Bieber', '贾斯汀比伯', '小贾斯汀'],
+  ['Bruno Mars', '布鲁诺马尔斯', '布魯諾·馬爾斯'],
+  ['Billie Eilish', '比莉艾利什', '怪奇比莉'],
+  ['Ariana Grande', '爱莉安娜格兰德', '亞莉安娜'],
+  ['The Weeknd', 'Abel Tesfaye'],
+  ['Lady Gaga', 'Stefani Germanotta'],
+  ['Beyoncé', 'Beyonce', '碧昂丝', '碧昂絲'],
+  ['Rihanna', '蕾哈娜'],
+  ['Katy Perry', '凯蒂佩里', '凱蒂·佩芮'],
+  ['Dua Lipa', '杜娃黎波'],
+  ['Olivia Rodrigo', '奥利维亚罗德里戈', '奧莉維亞·羅德里戈'],
+];
+const ARTIST_ALIAS_INDEX = Object.create(null);
+for (const group of ARTIST_ALIAS_GROUPS) for (const name of group) ARTIST_ALIAS_INDEX[identity(name)] = group;
+const TITLE_DECORATION_IN_BRACKETS = /^(?:(?:\d{4}\s+)?(?:official(?:\s+music)?\s+(?:video|audio|mv)|music\s+video|visuali[sz]er|lyrics?|mv|live|remix(?:ed)?|remaster(?:ed)?|instrumental|karaoke|acoustic|cover|demo|version|ver|feat(?:uring)?\.?|ft\.?|with\b|from\b|现场(?:版)?|演唱会(?:版)?|翻唱(?:版)?|完整版|无损(?:音质)?|高清(?:mv)?|纯音乐|伴奏|卡拉ok|电视剧原声|电影原声|原声带|字幕版|歌词版|加速版|慢速版))/i;
+const TITLE_PREFIX_PATTERN = /^(?:(?:official(?:\s+music)?\s+(?:video|audio|mv)|music\s+video|visuali[sz]er|mv|lyrics?|cover|remix|live|dj|现场(?:版)?|演唱会|翻唱|完整版|无损(?:音质)?|高清(?:mv)?|影视原声(?:带)?|电视剧(?:原声|主题曲)|电影(?:原声|主题曲)|网剧主题曲|动画主题曲|片尾曲|片头曲|插曲|主题曲|原声带)\s*[:：\-—|｜]+\s*)+/i;
+const TITLE_SUFFIX_PATTERN = /(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧主题曲|电影主题曲|网剧主题曲|动画主题曲|片尾曲|片头曲|插曲|主题曲|现场版|演唱会版|翻唱版|伴奏版|纯音乐|纯享版|歌词版|歌詞版|完整版|无损音质|无损|高清|修复版|重制版|加速版|慢速版)(?:版|版本)?$/i;
+const TITLE_ENGLISH_SUFFIX_PATTERN = /\s*\b(?:live|remix(?:ed)?|remaster(?:ed)?|instrumental|karaoke|acoustic|cover|demo|version|ver|official|lyrics?|visuali[sz]er|audio|hd|4k)\b(?:\s+(?:version|ver))?$/i;
+function stripTitleDecorations(value){
+ let title=normalizeName(String(value||'')).trim();
+ title=title.replace(/[\[【(（{]([^\]】)）}]*)[\]】)）}]/g,(_match,inner)=>TITLE_DECORATION_IN_BRACKETS.test(inner.trim())?' ':' '+inner+' ');
+ title=title.replace(TITLE_PREFIX_PATTERN,'');
+ title=title.replace(/\s*[-－—|｜:：]\s*(?:official(?:\s+music)?\s+(?:video|audio|mv)|music\s+video|visuali[sz]er|mv|lyrics?|cover|remix|live|dj|现场(?:版)?|演唱会|翻唱|完整版|无损(?:音质)?|高清(?:mv)?|影视原声(?:带)?|电视剧(?:原声|主题曲)|电影(?:原声|主题曲)|网剧主题曲|动画主题曲|片尾曲|片头曲|插曲|主题曲|原声带|粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|伴奏|纯音乐|纯享版|歌词版|歌詞版|加速版|慢速版).*$/i,'');
+ title=title.replace(TITLE_SUFFIX_PATTERN,'').replace(TITLE_ENGLISH_SUFFIX_PATTERN,'');
+ return title.replace(/^[《〈「『]+|[》〉」』]+$/g,'').trim();
+}
+function titleSimilarity(leftValue,rightValue){
+ const left=identity(stripTitleDecorations(leftValue)),right=identity(stripTitleDecorations(rightValue));
+ if(!left||!right)return 0;
+ if(left===right)return 1;
+ const longest=Math.max(left.length,right.length),shortest=Math.min(left.length,right.length);
+ if(shortest>=3&&(left.includes(right)||right.includes(left)))return shortest/longest;
+ let previous=Array.from({length:right.length+1},(_,index)=>index);
+ for(let i=1;i<=left.length;i++){
+  const current=[i];
+  for(let j=1;j<=right.length;j++)current[j]=Math.min(current[j-1]+1,previous[j]+1,previous[j-1]+(left[i-1]===right[j-1]?0:1));
+  previous=current;
+ }
+ return 1-previous[right.length]/longest;
+}
+function artistParts(value){
+ const raw=String(value||'').trim();
+ return [raw,...raw.split(/\s*(?:[,&\/、，＋+|·・;]|(?:feat(?:uring)?\.?)|(?:ft\.?)|(?:with))\s*/i)].filter(Boolean);
+}
+function artistVariants(value){
+ const names=artistParts(value);
+ for(const name of [...names])names.push(...(ARTIST_ALIAS_INDEX[identity(name)]||[]));
+ return new Set(names.map(identity).filter(Boolean));
+}
+function sameArtistName(leftValue,rightValue){
+ const left=artistVariants(leftValue),right=artistVariants(rightValue);
+ for(const a of left)for(const b of right)if(a===b)return true;
+ return false;
+}
+function artistSearchAlias(value){
+ const parts=artistParts(value);
+ const group=parts.map(name=>ARTIST_ALIAS_INDEX[identity(name)]).find(Boolean);
+ if(!group)return '';
+ const raw=String(value||'');
+ const preferred=/[\u3400-\u9fff]/.test(raw)
+  ? group.find(name=>/[A-Za-z]/.test(name)&&identity(name)!==identity(raw))
+  : group.find(name=>/[\u3400-\u9fff]/.test(name));
+ return preferred||'';
+}
 function trackLabel(track){const artists=track?.artists?.length?track.artists:(track?.artist?[track.artist]:[]);return '歌曲：'+(track?.track||'未知歌曲')+'｜歌手：'+(artists.join(' / ')||'未知歌手')}
 function trackLogger(log,track){const label=trackLabel(track);return s=>log(label+'｜'+s)}
 function httpTransport(options){return new Promise((resolve,reject)=>{$httpClient[options.method==='POST'?'post':'get'](options,(error,response,body)=>error?reject(Error(String(error))):resolve({...response,body}));});}
@@ -61,28 +184,17 @@ async function songMetadata(id,transport,log){
 async function selectLyrics(track,transport,log){
  const started=Date.now(),budget=4500;let finished=false;
  const query=p=>Object.entries(p).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
- const variants=s=>['live','remix','dj','instrumental','karaoke','acoustic','cover','现场','伴奏','钢琴','翻唱','降调','升调','加速','慢速'].filter(v=>normalizeName(s).toLowerCase().includes(v)).join(',');
- const artistAliases={jokerxue:['薛之谦','xue zhi qian'],gem:['邓紫棋','gloria tang'],gloriatang:['邓紫棋','g.e.m.','gem'],xuezhiqian:['薛之谦','joker xue']};
- const artistVariants=s=>{const value=String(s||''),parts=value.split(/[\s（()）/,&、，＋+|·・]+/).filter(Boolean),aliases=artistAliases[identity(value)]||[];return new Set([value,...parts,...aliases].map(identity).filter(Boolean))};
- const sameArtist=(a,b)=>{const left=artistVariants(a),right=artistVariants(b);for(const l of left)for(const r of right){if(l===r)return true;if(l.length>=3&&r.length>=3&&(l.startsWith(r)||r.startsWith(l)))return true}return false};
- const baseTitle=s=>normalizeName(s).replace(/[（(][^）)]*[）)]/g,'').replace(/\s*[-－—]\s*(?:粤语|粵語|国语|國語|普通话|普通話|中文|英文|日语|日文|韩语|韓語|方言|卡点节奏|卡點節奏|电视剧|电影|网剧|动画|影视).*$/i,'').replace(/(?:粤语|粵語|国语|國語|普通话|普通話|dj)(?:版|版本)?$/i,'').trim();
  const rejections={};
  function reject(reason){rejections[reason]=(rejections[reason]||0)+1;return -1}
  function score(c){
-  if(variants(c.title)!==variants(track.track))return reject('版本不同');
-  const exact=identity(c.title)===identity(track.track),versionedExact=exact&&/(live|remix|dj|instrumental|karaoke|acoustic|cover|现场|伴奏|钢琴|翻唱|降调|升调|加速|慢速|粤语|粵語|国语|國語|普通话|普通話|卡点节奏|卡點節奏)/i.test(normalizeName(track.track));
-  if(!exact&&identity(baseTitle(c.title))!==identity(baseTitle(track.track)))return reject('歌名不同');
-  const artists=track.artists?.length?track.artists:[track.artist],artistMatch=c.artists.some(a=>artists.some(b=>sameArtist(a,b))),duration=Number(track.duration_ms)/1000,durationDelta=duration&&c.duration?Math.abs(duration-c.duration):0;
-  // An exact versioned title (DJ/粤语版/remix/etc.) is stronger than
-  // QQ/Netease artist and duration metadata. Alternate uploads frequently
-  // credit a DJ, uploader, or remix editor instead of Spotify's album artist
-  // and can also have a different cut length. Keep ordinary exact-title and
-  // base-title/subtitle matches strict to avoid selecting another artist's
-  // song with a common name.
-  if(!artistMatch&&(!exact||(!versionedExact&&(!duration||!c.duration||durationDelta>3))))return reject('歌手不同');
-  if(!exact&&(!duration||!c.duration||durationDelta>3))return reject('副标题匹配但时长不符或缺失');
-  if(!exact&&duration&&c.duration&&durationDelta>5)return reject('时长不同');
-  return 100+(exact?10:0)+(artistMatch?8:0)+(track.album&&identity(c.album)===identity(track.album)?15:0)+(duration&&c.duration&&Math.abs(duration-c.duration)<=2?5:0);
+  const titleScore=titleSimilarity(c.title,track.track);
+  if(titleScore<0.72)return reject('歌名核心差异过大');
+  const artists=(track.artists?.length?track.artists:[track.artist]).filter(Boolean);
+  const artistMatch=Array.isArray(c.artists)&&c.artists.some(a=>artists.some(b=>sameArtistName(a,b)));
+  if(artists.length&&!artistMatch)return reject('歌手不匹配');
+  const duration=Number(track.duration_ms)/1000,durationDelta=duration&&c.duration?Math.abs(duration-c.duration):0;
+  if(!artists.length&&(!duration||!c.duration||durationDelta>3))return reject('缺少歌手信息且时长不符');
+  return 100+(artistMatch?25:0)+Math.round(titleScore*10)+(track.album&&identity(c.album)===identity(track.album)?10:0)+(duration&&c.duration&&durationDelta<=2?4:0);
  }
  async function request(url,body,referer){
   const remaining=budget-(Date.now()-started);if(finished||remaining<=0)throw Error('检索时间已到');
@@ -100,32 +212,66 @@ async function selectLyrics(track,transport,log){
   if(/^(纯音乐|此歌曲为没有填词的纯音乐)/.test(String(data.lyric||'').replace(/\[[^\]]*\]/g,'').trim()))return null;
   return {...data,translation,romanization,source:c.source,id:String(c.id),matchScore:c.matchScore,qualityScore:(timed||word?20:0)+(translation?4:0)+(romanization?4:0),plain:timed||word?'':data.plain};
  }
- const keyword=normalizeName(track.track+' '+track.artist);log('搜索词：'+keyword);
- async function netease(){const d=await request('https://music.163.com/api/cloudsearch/pc?'+query({s:keyword,type:1,limit:15}),null,'https://music.163.com');const cs=candidates((d.result?.songs||[]).map(x=>({source:'NeteaseMusic',id:x.id,title:x.name,artists:(x.ar||x.artists||[]).map(a=>a.name),album:(x.al||x.album)?.name,duration:(x.dt||x.duration)/1000})));return Promise.all(cs.map(async c=>{try{const d=await request('https://music.163.com/api/song/lyric?'+query({id:c.id,lv:-1,kv:-1,yv:-1,tv:-1,rv:-1}),null,'https://music.163.com');return quality(c,{lyric:lyricText(d.lrc),klyric:lyricText(d.yrc||d.klyric),translation:lyricText(d.ytlrc||d.tlyric),romanization:lyricText(d.romalrc||d.rlyric)})}catch{return null}}))}
- async function qq(){
-  const key='music.search.SearchCgiService';let rows=[],lastError;
-  for(const host of ['u.y.qq.com','c.y.qq.com']){
-   try{const d=await request('https://'+host+'/cgi-bin/musicu.fcg',{[key]:{module:key,method:'DoSearchForQQMusicDesktop',param:{query:keyword,num_per_page:15,page_num:1,search_type:0}}},'https://'+host);
-    for(const code of [d.code,d[key]?.code,d[key]?.data?.code])if(code!==undefined&&Number(code)!==0)throw Error('QQ 搜索业务码 '+code);
-    if(!Array.isArray(d[key]?.data?.body?.song?.list))throw Error('QQ 搜索响应缺少歌曲列表');
-    rows=d[key].data.body.song.list;log('QQ 搜索 '+host+' 返回 '+rows.length+' 首');if(rows.length)break;
-   }catch(e){lastError=e;log(e.message)}
+ const artistForSearch=track.artist||track.artists?.[0]||'';
+ const aliasArtist=artistSearchAlias(artistForSearch);
+ const keyword=normalizeName(stripTitleDecorations(track.track)+' '+artistForSearch);
+ const alternateKeyword=aliasArtist?normalizeName(stripTitleDecorations(track.track)+' '+aliasArtist):'';
+ log('搜索词：'+keyword+(alternateKeyword?'；别名回退：'+alternateKeyword:''));
+ async function sourceCandidates(searchRows,mapRows){
+  let data=await searchRows(keyword,artistForSearch);
+  let good=candidates(mapRows(data));
+  if(!good.length&&alternateKeyword&&!finished){
+   data=await searchRows(alternateKeyword,aliasArtist);
+   good=candidates(mapRows(data));
   }
-  if(!rows.length&&lastError)throw lastError;
-  const cs=candidates(rows.map(x=>({source:'QQMusic',id:x.mid,title:x.title||x.name,artists:(x.singer||[]).map(a=>a.name),album:x.album?.name,duration:x.interval})));
-  return Promise.all(cs.map(async c=>{try{log('QQ 候选：'+c.title+'｜'+c.artists.join(' / ')+'｜'+c.duration+'s');const d=await request('https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?'+query({songmid:c.id,g_tk:5381,format:'json',nobase64:1}),null,'https://lyric.music.qq.com');for(const code of [d.code,d.retcode])if(code!==undefined&&Number(code)!==0)throw Error('QQ 歌词业务码 '+code);const result=quality(c,{lyric:decodeEntities(lyricText(d.lyric)),translation:decodeEntities(lyricText(d.trans||d.tlyric)),romanization:decodeEntities(lyricText(d.roma||d.romalrc||d.rlyric))});if(!result)log('QQ 候选无可用歌词 mid='+c.id);return result}catch(e){log('QQ 候选失败 mid='+c.id+' '+e.message);return null}}))
+  return good;
+ }
+ async function netease(){
+  const cs=await sourceCandidates(
+   term=>request('https://music.163.com/api/cloudsearch/pc?'+query({s:term,type:1,limit:15}),null,'https://music.163.com'),
+   d=>(d.result?.songs||[]).map(x=>({source:'NeteaseMusic',id:x.id,title:x.name,artists:(x.ar||x.artists||[]).map(a=>a.name),album:(x.al||x.album)?.name,duration:(x.dt||x.duration)/1000}))
+  );
+  return Promise.all(cs.map(async c=>{try{const d=await request('https://music.163.com/api/song/lyric?'+query({id:c.id,lv:-1,kv:-1,yv:-1,tv:-1,rv:-1}),null,'https://music.163.com');return quality(c,{lyric:lyricText(d.lrc),klyric:lyricText(d.yrc||d.klyric),translation:lyricText(d.ytlrc||d.tlyric),romanization:lyricText(d.romalrc||d.rlyric)})}catch{return null}}));
+ }
+ async function qq(){
+  const key='music.search.SearchCgiService';
+  async function searchRows(term){
+   let lastError;
+   for(const host of ['u.y.qq.com','c.y.qq.com']){
+    try{
+     const d=await request('https://'+host+'/cgi-bin/musicu.fcg',{[key]:{module:key,method:'DoSearchForQQMusicDesktop',param:{query:term,num_per_page:15,page_num:1,search_type:0}}},'https://'+host);
+     for(const code of [d.code,d[key]?.code,d[key]?.data?.code])if(code!==undefined&&Number(code)!==0)throw Error('QQ 搜索业务码 '+code);
+     if(!Array.isArray(d[key]?.data?.body?.song?.list))throw Error('QQ 搜索响应缺少歌曲列表');
+     const rows=d[key].data.body.song.list;log('QQ 搜索 '+host+' 返回 '+rows.length+' 首');if(rows.length)return rows;
+    }catch(e){lastError=e;log(e.message)}
+   }
+   if(lastError)log(lastError.message);
+   return [];
+  }
+  const cs=await sourceCandidates(searchRows,rows=>rows.map(x=>({source:'QQMusic',id:x.mid,title:x.title||x.name,artists:(x.singer||[]).map(a=>a.name),album:x.album?.name,duration:x.interval})));
+  return Promise.all(cs.map(async c=>{try{log('QQ 候选：'+c.title+'｜'+c.artists.join(' / ')+'｜'+c.duration+'s');const d=await request('https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?'+query({songmid:c.id,g_tk:5381,format:'json',nobase64:1}),null,'https://lyric.music.qq.com');for(const code of [d.code,d.retcode])if(code!==undefined&&Number(code)!==0)throw Error('QQ 歌词业务码 '+code);const result=quality(c,{lyric:decodeEntities(lyricText(d.lyric)),translation:decodeEntities(lyricText(d.trans||d.tlyric)),romanization:decodeEntities(lyricText(d.roma||d.romalrc||d.rlyric))});if(!result)log('QQ 候选无可用歌词 mid='+c.id);return result}catch(e){log('QQ 候选失败 mid='+c.id+' '+e.message);return null}}));
  }
  async function kugou(){
-  const d=await request('https://songsearch.kugou.com/song_search_v2?'+query({keyword:track.track+' '+track.artist,page:1,pagesize:15}),null,'https://www.kugou.com');
-  const cs=candidates((d.data?.lists||[]).map(x=>({source:'Kugou',id:String(x.Audioid||x.SongID||x.ID||''),hash:String(x.FileHash||''),title:x.SongName||x.OriSongName,artists:[x.SingerName||''].filter(Boolean),album:x.AlbumName,duration:Number(x.Duration||0)})).filter(x=>x.id&&x.hash&&x.title));
+  const cs=await sourceCandidates(
+   term=>request('https://songsearch.kugou.com/song_search_v2?'+query({keyword:term,page:1,pagesize:15}),null,'https://www.kugou.com'),
+   d=>(d.data?.lists||[]).map(x=>({source:'Kugou',id:String(x.Audioid||x.SongID||x.ID||''),hash:String(x.FileHash||''),title:x.SongName||x.OriSongName,artists:[x.SingerName||''].filter(Boolean),album:x.AlbumName,duration:Number(x.Duration||0)})).filter(x=>x.id&&x.hash&&x.title)
+  );
   return Promise.all(cs.map(async c=>{try{const found=await request('https://lyrics.kugou.com/search?'+query({ver:1,man:'yes',client:'pc',keyword:c.artists[0]+' - '+c.title,duration:Math.round((c.duration||0)*1000),hash:c.hash}),null,'https://www.kugou.com');const item=found.candidates?.[0];if(!item)return null;const lyric=await request('https://lyrics.kugou.com/download?'+query({ver:1,client:'pc',fmt:'lrc',charset:'utf8',id:item.id,accesskey:item.accesskey,hash:c.hash}),null,'https://www.kugou.com');return quality(c,{lyric:decodeBase64Utf8(lyric.content||'')})}catch(e){log('酷狗候选失败 mid='+c.id+' '+e.message);return null}}));
  }
  async function kuwo(){
-  const d=await request('https://search.kuwo.cn/r.s?'+query({all:track.track+' '+track.artist,ft:'music',itemset:'web_2013',client:'kt',pn:0,rn:15,rformat:'json',encoding:'utf8',vermerge:1,mobi:1}),null,'https://kuwo.cn');
-  const cs=candidates((d.abslist||[]).map(x=>({source:'Kuwo',id:String(x.DC_TARGETID||x.MUSICRID||'').replace(/^MUSIC_/,'') ,title:x.NAME||x.SONGNAME,artists:[x.ARTIST||''].filter(Boolean),album:x.ALBUM,duration:Number(x.DURATION||0)})).filter(x=>x.id&&x.title));
+  const cs=await sourceCandidates(
+   term=>request('https://search.kuwo.cn/r.s?'+query({all:term,ft:'music',itemset:'web_2013',client:'kt',pn:0,rn:15,rformat:'json',encoding:'utf8',vermerge:1,mobi:1}),null,'https://kuwo.cn'),
+   d=>(d.abslist||[]).map(x=>({source:'Kuwo',id:String(x.DC_TARGETID||x.MUSICRID||'').replace(/^MUSIC_/,'') ,title:x.NAME||x.SONGNAME,artists:[x.ARTIST||''].filter(Boolean),album:x.ALBUM,duration:Number(x.DURATION||0)})).filter(x=>x.id&&x.title)
+  );
   return Promise.all(cs.map(async c=>{try{const data=await request('https://m.kuwo.cn/newh5/singles/songinfoandlrc?'+query({musicId:c.id}),null,'https://m.kuwo.cn');const lines=data.data?.lrclist;if(!Array.isArray(lines))return null;const lyric=lines.map(line=>{const seconds=Number(line.time);if(!Number.isFinite(seconds))return '';const minutes=Math.floor(Math.max(0,seconds)/60),rest=(Math.max(0,seconds)-minutes*60).toFixed(2).padStart(5,'0');return '['+String(minutes).padStart(2,'0')+':'+rest+']'+String(line.lineLyric||'')}).filter(Boolean).join('\n');return quality(c,{lyric})}catch(e){log('酷我候选失败 mid='+c.id+' '+e.message);return null}}));
  }
- async function lrclib(){const d=await request('https://lrclib.net/api/search?'+query({track_name:track.track,artist_name:track.artist}));return candidates((Array.isArray(d)?d:[]).filter(x=>!x.instrumental).map(x=>({...x,source:'LRCLIB',title:x.trackName,artists:[x.artistName],album:x.albumName}))).map(c=>quality(c,{lyric:c.syncedLyrics,plain:c.plainLyrics}))}
+ async function lrclib(){
+  const cs=await sourceCandidates(
+   (_term,artistName)=>request('https://lrclib.net/api/search?'+query({track_name:stripTitleDecorations(track.track),artist_name:artistName})),
+   d=>(Array.isArray(d)?d:[]).filter(x=>!x.instrumental).map(x=>({...x,source:'LRCLIB',title:x.trackName,artists:[x.artistName],album:x.albumName}))
+  );
+  return cs.map(c=>quality(c,{lyric:c.syncedLyrics,plain:c.plainLyrics}));
+ }
  return new Promise((resolve,reject)=>{
  const results=[null,null,null,null,null],completeFlags=[false,false,false,false,false];const names=['QQ音乐','网易云','酷狗音乐','酷我音乐','LRCLIB'];
   const limit=setTimeout(()=>complete(true),budget);
@@ -140,7 +286,7 @@ async function selectLyrics(track,transport,log){
    if(rows.length&&((fastDone&&fastRows.length)||allDone||expired)){
     finished=true;clearTimeout(limit);const best=rows[0],merged={...best},auxiliarySources=new Set();
     const sameRecording=c=>{
-     const title=identity(c.title),bestTitle=identity(best.title),titleMatch=title===bestTitle||identity(baseTitle(c.title))===identity(baseTitle(best.title));
+     const titleMatch=titleSimilarity(c.title,best.title)>=0.72;
      return titleMatch&&(!best.duration||!c.duration||Math.abs(best.duration-c.duration)<=5);
     };
     for(const field of ['translation','romanization'])if(!merged[field]){

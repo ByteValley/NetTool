@@ -7,19 +7,19 @@
 
 [Script]
 # Spotify metadata 请求：追加 nonce 刷新 Spotify 的歌词可用状态
-http-request ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[\/?]|$) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261108-multi-source-v1, timeout = 10, tag = Spotify 歌词 metadata 刷新
+http-request ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[\/?]|$) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261110-title-artist-match-v1, timeout = 10, tag = Spotify 歌词 metadata 刷新
 
 # metadata JSON
-http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261108-multi-source-v1, requires-body = true, binary-body-mode = false, max-size = 2097152, timeout = 15, tag = Spotify 歌词 metadata JSON
+http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261110-title-artist-match-v1, requires-body = true, binary-body-mode = false, max-size = 2097152, timeout = 15, tag = Spotify 歌词 metadata JSON
 
 # metadata Protobuf
-http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261108-multi-source-v1, requires-body = true, binary-body-mode = true, max-size = 2097152, timeout = 15, tag = Spotify 歌词 metadata Protobuf
+http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261110-title-artist-match-v1, requires-body = true, binary-body-mode = true, max-size = 2097152, timeout = 15, tag = Spotify 歌词 metadata Protobuf
 
 # color-lyrics JSON
-http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261108-multi-source-v1, requires-body = true, binary-body-mode = false, max-size = 2097152, timeout = 15, tag = Spotify 多源歌词 JSON
+http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261110-title-artist-match-v1, requires-body = true, binary-body-mode = false, max-size = 2097152, timeout = 15, tag = Spotify 多源歌词 JSON
 
 # color-lyrics Protobuf
-http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261108-multi-source-v1, requires-body = true, binary-body-mode = true, max-size = 2097152, timeout = 15, tag = Spotify 多源歌词 Protobuf
+http-response ^https?:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$)) script-path = https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.Loon.js?v=20261110-title-artist-match-v1, requires-body = true, binary-body-mode = true, max-size = 2097152, timeout = 15, tag = Spotify 多源歌词 Protobuf
 
 [MITM]
 hostname = spclient.wg.spotify.com, spclient.spotify.com, *-spclient.spotify.com

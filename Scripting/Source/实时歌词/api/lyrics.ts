@@ -5,6 +5,7 @@ import { parseLrc } from "../utils/lrc"
 import { cacheLyrics, getCachedLyrics } from "../utils/cache"
 import {
   fetchCandidateLyric,
+  normalizeTitleForSearch,
   searchCandidates,
 } from "./musicSources"
 
@@ -18,7 +19,7 @@ async function fetchFromLrcApi(
 ): Promise<LyricData | null> {
   try {
     const url =
-      `${LRCAPI_BASE}?title=${encodeURIComponent(title)}` +
+      `${LRCAPI_BASE}?title=${encodeURIComponent(normalizeTitleForSearch(title) || title)}` +
       (artist ? `&artist=${encodeURIComponent(artist)}` : "")
     const response: any = await fetch(url)
     if (!response.ok) return null
