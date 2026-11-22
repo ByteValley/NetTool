@@ -41,7 +41,7 @@ scriptings:
   - http_request:
       name: Spotify歌词增强 metadata 请求
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?:[\/?]|$)
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.1
       timeout: 10
       update_interval: 3600
       env:
@@ -51,7 +51,7 @@ scriptings:
   - http_response:
       name: Spotify歌词增强 metadata JSON
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$))
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.1
       body_required: true
       binary_body: false
       max_size: 2097152
@@ -62,7 +62,7 @@ scriptings:
   - http_response:
       name: Spotify歌词增强 metadata Protobuf
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.1
       body_required: true
       binary_body: true
       max_size: 2097152
@@ -75,7 +75,7 @@ scriptings:
   - http_response:
       name: Spotify歌词增强 歌词 JSON
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?=[^#]*[?&]format=json(?:&|$))
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.1
       body_required: true
       binary_body: false
       max_size: 2097152
@@ -86,7 +86,7 @@ scriptings:
   - http_response:
       name: Spotify歌词增强 歌词 Protobuf
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.1
       body_required: true
       binary_body: true
       max_size: 2097152
@@ -99,7 +99,7 @@ scriptings:
   - http_response:
       name: Spotify歌词增强 extended-metadata
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/extended-metadata\/v\d+\/extended-metadata
-      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.0
+      script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Beta/Scripts/Enhancement/Spotify.Lyrics.Independent.Surge.js?v=20261122-v2.7.1
       body_required: true
       binary_body: true
       max_size: 4194304
