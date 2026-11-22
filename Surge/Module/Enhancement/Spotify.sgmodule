@@ -1,4 +1,4 @@
-#!name=Spotify增强
+#!name=Spotify Enhancement
 #!desc=Experimental Surge conversion of devchristian1337 Spotify.lpx (2026-11-10). Original scripts remain hosted upstream; runtime compatibility not verified. Optional filters enabled; remote protobuf alternative disabled.
 #!category=功能增强
 #!author=devchristian1337 (original); Surge configuration adaptation
