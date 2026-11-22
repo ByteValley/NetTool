@@ -1,4 +1,4 @@
-#!name=Spotify歌词增强
+#!name=Spotify歌词
 #!desc=全网多源检索歌词（QQ音乐 / 网易云 / 酷狗 / 酷我 / LRCLIB / Musixmatch），按歌名·歌手·时长·时间轴综合打分择优；外部歌词优先，找不到时保留 Spotify 原词；补中文翻译与简繁互译（小号字显示在原句下方）；播放页与歌词页同步显示；核心日志可在脚本日志与持久化数据 SpotifyLyricsEnhanced.log 中查看。
 #!category=功能增强
 #!arguments=原词优先:false,翻译:true,简繁互译:true,译文样式:小字,发音:true,检索预算:6500,预取预算:4000,缓存分钟:30,歌词源:qq+netease+kugou+kuwo+lrclib+musixmatch,日志级别:core
