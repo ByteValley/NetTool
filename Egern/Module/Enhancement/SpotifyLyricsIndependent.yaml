@@ -3,28 +3,66 @@ description: "补充 Spotify 多源歌词：QQ音乐、网易云、酷狗、酷�
 author: ByteValley
 homepage: https://github.com/ByteValley/NetTool
 icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Spotify.png
-compat_arguments:
-  原词优先: 'false'
-  翻译: 'true'
-  简繁互译: 'true'
-  译文样式: 小字
-  发音: 'true'
-  检索预算: '6500'
-  预取预算: '4000'
-  缓存分钟: '30'
-  歌词源: qq+netease+kugou+kuwo+lrclib+musixmatch
-  日志级别: core
-compat_arguments_desc: |-
-  原词优先：false = 外部歌词达到匹配条件时优先替换，未找到则保留 Spotify 原词（默认）；true = Spotify 有原词时只补译文/简繁。
-  翻译：为外语歌词逐行补中文译文。
-  简繁互译：自动判断中文歌词的简/繁体，逐行补另一种写法（本地处理，不联网）。
-  译文样式：小字 = 使用 Spotify 翻译字段显示在原句下方；不显示可在歌词页点「翻译」，仍不显示可改用「换行」（拼在原句下一行）。
-  发音：true = 仅识别闽南语/粤语；all = 为所有中文歌词检索；false = 关闭（仅有匹配来源时显示）。
-  检索预算：歌词页等待外部歌词检索的最长时间（2000-12000 毫秒）。
-  预取预算：播放页 metadata 阶段预取歌词的最长时间；0 = 关闭预取。
-  缓存分钟：预取结果保留时间；0 = 关闭缓存（同时禁用预取）。
-  歌词源：用 + 连接来源，可删减或调整顺序。
-  日志级别：core = 核心日志；debug = 记录每个请求与候选评分。
+env_schema:
+  prefer_original:
+    name: 原词优先
+    description: false 时外部歌词匹配成功就替换；true 时保留 Spotify 原词并只补译文/简繁。
+    default_value: "false"
+    options:
+      - "true"
+      - "false"
+  translation:
+    name: 翻译
+    description: 为外语歌词逐行补中文译文。
+    default_value: "true"
+    options:
+      - "true"
+      - "false"
+  convert:
+    name: 简繁互译
+    description: 自动判断中文歌词的简繁体，并逐行补另一种写法。
+    default_value: "true"
+    options:
+      - "true"
+      - "false"
+  trans_style:
+    name: 译文样式
+    description: 小字使用 Spotify 翻译字段；换行将译文拼在原句下一行。
+    default_value: 小字
+    options:
+      - 小字
+      - 换行
+  romanization:
+    name: 发音
+    description: true 仅识别闽南语/粤语；all 为所有中文歌词检索；false 关闭。
+    default_value: "true"
+    options:
+      - "true"
+      - all
+      - "false"
+  budget:
+    name: 检索预算
+    description: 歌词页等待外部歌词检索的最长时间，范围 2000-12000 毫秒。
+    default_value: "6500"
+  prefetch_budget:
+    name: 预取预算
+    description: metadata 阶段等待预取歌词的最长时间；0 关闭预取，范围 0-8000 毫秒。
+    default_value: "4000"
+  cache_minutes:
+    name: 缓存分钟
+    description: 预取结果保留时长；0 关闭缓存和预取，范围 0-1440 分钟。
+    default_value: "30"
+  sources:
+    name: 歌词源
+    description: 用 + 连接来源，可删减或调整顺序。
+    default_value: qq+netease+kugou+kuwo+lrclib+musixmatch
+  log_level:
+    name: 日志级别
+    description: core 为核心日志；debug 会记录每个请求与候选评分。
+    default_value: core
+    options:
+      - core
+      - debug
 
 rules:
   # 阻止 spclient 走 QUIC(HTTP/3)：QUIC 无法被 MITM，手机端会绕过脚本
@@ -44,8 +82,6 @@ scriptings:
       script_url: https://raw.githubusercontent.com/ByteValley/NetTool/main/Scripts/Enhancement/Spotify.Lyrics.Independent.js
       timeout: 10
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
 
   # metadata 响应（桌面端，JSON / Protobuf）：取歌曲资料 → 预取歌词 → 打开 has_lyrics
   - http_response:
@@ -57,8 +93,6 @@ scriptings:
       max_size: 2097152
       timeout: 12
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
   - http_response:
       name: Spotify歌词增强 metadata Protobuf
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/metadata\/\d+\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))
@@ -68,8 +102,6 @@ scriptings:
       max_size: 2097152
       timeout: 12
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
 
   # color-lyrics（JSON / Protobuf）：原词 + 译文 或 替换为全网最佳歌词
   - http_response:
@@ -81,8 +113,6 @@ scriptings:
       max_size: 2097152
       timeout: 15
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
   - http_response:
       name: Spotify歌词增强 歌词 Protobuf
       match: ^https:\/\/(?:spclient(?:\.wg)?|[\w-]+-spclient)\.spotify\.com(?::443)?\/color-lyrics\/v2\/track\/(?:[a-fA-F0-9]{32}|[A-Za-z0-9]{22})(?![^#]*[?&]format=json(?:&|$))
@@ -92,8 +122,6 @@ scriptings:
       max_size: 2097152
       timeout: 15
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
 
   # iOS / iPad / Android：曲目资料走批量 extended-metadata（POST），在这里打开 has_lyrics，客户端才会显示歌词入口并请求 color-lyrics
   - http_response:
@@ -105,8 +133,6 @@ scriptings:
       max_size: 4194304
       timeout: 12
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
 
   # iOS 播放页卡片列表 scrollsita：给 Spotify 无原生歌词的歌补「歌词」卡片，并隐藏卡片区广告
   - http_response:
@@ -118,8 +144,6 @@ scriptings:
       max_size: 2097152
       timeout: 5
       update_interval: 3600
-      env:
-        _compat.$argument: prefer_original={{{原词优先}}}&translation={{{翻译}}}&convert={{{简繁互译}}}&trans_style={{{译文样式}}}&romanization={{{发音}}}&budget={{{检索预算}}}&prefetch_budget={{{预取预算}}}&cache_minutes={{{缓存分钟}}}&sources={{{歌词源}}}&log_level={{{日志级别}}}
 
 mitm:
   hostnames:
